@@ -184,7 +184,6 @@ export interface LensRequest {
 	path: string[];
 	input: unknown;
 	select?: FieldSelection;
-	updateMode?: UpdateMode;
 }
 
 export interface LensResponse<T> {

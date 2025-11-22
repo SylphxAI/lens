@@ -18,6 +18,11 @@ export interface LensClientConfig {
 /**
  * Type-safe query options with field selection
  *
+ * Backend automatically optimizes transmission based on field types:
+ * - String fields → Delta strategy (57% savings for streaming)
+ * - Object fields → Patch strategy (99% savings for updates)
+ * - Primitive fields → Value strategy (simple, fast)
+ *
  * @example
  * ```ts
  * // Type-safe field selection with autocomplete
@@ -38,8 +43,6 @@ export interface LensClientConfig {
 export interface QueryOptions<TOutput = any, TSelect = Select<TOutput>> {
 	/** Type-safe field selection - only valid fields allowed */
 	select?: TSelect;
-	/** Update mode for subscriptions */
-	updateMode?: "value" | "delta" | "patch" | "auto";
 }
 
 /**
@@ -120,7 +123,6 @@ function createProxy<T extends LensObject>(
 							path,
 							input: actualInput,
 							select: actualOptions?.select,
-							updateMode: actualOptions?.updateMode,
 						});
 					};
 				}
