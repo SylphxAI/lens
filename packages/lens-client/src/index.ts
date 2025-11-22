@@ -5,7 +5,7 @@
  * Provides Router-like API similar to tRPC client.
  */
 
-import type { LensObject, LensRequest, LensTransport } from "@sylphx/lens-core";
+import type { LensObject, LensRequest, LensTransport, Select, Selected } from "@sylphx/lens-core";
 import type { Observable } from "@sylphx/lens-core";
 
 /**
@@ -16,11 +16,30 @@ export interface LensClientConfig {
 }
 
 /**
- * Query/Mutation options
+ * Type-safe query options with field selection
+ *
+ * @example
+ * ```ts
+ * // Type-safe field selection with autocomplete
+ * const user = await client.user.get.query(
+ *   { id: '1' },
+ *   {
+ *     select: {
+ *       id: true,        // ✅ Autocomplete
+ *       name: true,      // ✅ Autocomplete
+ *       email: true,     // ✅ Autocomplete
+ *       invalid: true    // ❌ Compile error
+ *     }
+ *   }
+ * );
+ * // user type: { id: string; name: string; email: string }
+ * ```
  */
-export interface QueryOptions {
-	/** Field selection */
-	select?: string[] | Record<string, any>;
+export interface QueryOptions<TOutput = any, TSelect = Select<TOutput>> {
+	/** Type-safe field selection - only valid fields allowed */
+	select?: TSelect;
+	/** Update mode for subscriptions */
+	updateMode?: "value" | "delta" | "patch" | "auto";
 }
 
 /**
@@ -120,26 +139,68 @@ export function createLensClient<T extends LensObject>(
 }
 
 /**
- * Type-safe client interface
+ * Type-safe client interface with field selection inference
+ *
+ * Features:
+ * - Autocomplete for field selection
+ * - Return type changes based on selected fields
+ * - Compile-time validation of field names
+ * - Nested selection support
+ *
+ * @example
+ * ```ts
+ * const client = createLensClient<typeof api>({ transport });
+ *
+ * // Without selection - full type
+ * const user = await client.user.get.query({ id: '1' });
+ * // user: { id: string; name: string; email: string; posts: Post[] }
+ *
+ * // With selection - partial type
+ * const partial = await client.user.get.query(
+ *   { id: '1' },
+ *   { select: { id: true, name: true } }
+ * );
+ * // partial: { id: string; name: string }
+ *
+ * // Nested selection
+ * const nested = await client.user.get.query(
+ *   { id: '1' },
+ *   { select: { id: true, posts: { title: true } } }
+ * );
+ * // nested: { id: string; posts: Array<{ title: string }> }
+ * ```
  */
 export type LensClient<T> = {
 	[K in keyof T]: T[K] extends { type: "query" }
 		? {
-				query: (
+				// Query without selection - returns full type
+				query(input: InferInput<T[K]>): Promise<InferOutput<T[K]>>;
+
+				// Query with selection - returns partial type based on selection
+				query<TSelect extends Select<InferOutput<T[K]>>>(
 					input: InferInput<T[K]>,
-					options?: QueryOptions,
-				) => Promise<InferOutput<T[K]>>;
-				subscribe: (
+					options: QueryOptions<InferOutput<T[K]>, TSelect>,
+				): Promise<Selected<InferOutput<T[K]>, TSelect>>;
+
+				// Subscribe without selection - returns full type
+				subscribe(input: InferInput<T[K]>): Observable<InferOutput<T[K]>>;
+
+				// Subscribe with selection - returns partial type based on selection
+				subscribe<TSelect extends Select<InferOutput<T[K]>>>(
 					input: InferInput<T[K]>,
-					options?: QueryOptions,
-				) => Observable<InferOutput<T[K]>>;
+					options: QueryOptions<InferOutput<T[K]>, TSelect>,
+				): Observable<Selected<InferOutput<T[K]>, TSelect>>;
 			}
 		: T[K] extends { type: "mutation" }
 			? {
-					mutate: (
+					// Mutation without selection - returns full type
+					mutate(input: InferInput<T[K]>): Promise<InferOutput<T[K]>>;
+
+					// Mutation with selection - returns partial type based on selection
+					mutate<TSelect extends Select<InferOutput<T[K]>>>(
 						input: InferInput<T[K]>,
-						options?: QueryOptions,
-					) => Promise<InferOutput<T[K]>>;
+						options: QueryOptions<InferOutput<T[K]>, TSelect>,
+					): Promise<Selected<InferOutput<T[K]>, TSelect>>;
 				}
 			: T[K] extends LensObject
 				? LensClient<T[K]>

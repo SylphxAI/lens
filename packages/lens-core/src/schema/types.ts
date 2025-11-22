@@ -11,29 +11,63 @@ import type { Observable } from "rxjs";
 import type { z } from "zod";
 
 /**
- * Field selection types - frontend controls what data to fetch
+ * Type-safe field selection for a model
+ * Provides autocomplete and compile-time validation
+ *
+ * @example
+ * ```ts
+ * type User = { id: string; name: string; email: string; posts: Post[] }
+ *
+ * const select: Select<User> = {
+ *   id: true,        // ✅ Autocomplete
+ *   name: true,      // ✅ Autocomplete
+ *   invalid: true    // ❌ Compile error - field doesn't exist
+ * }
+ * ```
  */
-export type FieldSelection =
-	| string[] // Array syntax: ['id', 'name', 'email']
-	| { [key: string]: boolean | FieldSelection } // Object syntax: { id: true, posts: { title: true } }
-	| string; // Template syntax: "id name posts { title }"
+export type Select<T> = {
+	[K in keyof T]?: T[K] extends Array<infer U>
+		? boolean | Select<U> // Array fields: true or nested selection
+		: T[K] extends object
+			? boolean | Select<T[K]> // Object fields: true or nested selection
+			: boolean; // Primitive fields: true only
+};
 
 /**
- * Type utility to extract selected fields from a type
+ * Legacy field selection type (deprecated - use Select<T> instead)
+ * Kept for backward compatibility during migration
+ *
+ * @deprecated Use Select<T> for type-safe field selection
  */
-export type Selected<T, S> = S extends string[]
-	? Pick<T, S[number] & keyof T>
-	: S extends Record<string, any>
-		? {
-				[K in keyof S & keyof T]: S[K] extends true
-					? T[K]
-					: S[K] extends FieldSelection
-						? T[K] extends Array<infer U>
-							? Array<Selected<U, S[K]>>
-							: Selected<T[K], S[K]>
-						: never;
-			}
-		: T;
+export type FieldSelection =
+	| { [key: string]: boolean | FieldSelection } // Object syntax only
+	| string; // Template syntax (for advanced use cases)
+
+/**
+ * Extract selected fields from a type based on Select<T>
+ * Returns a new type containing only the selected fields
+ *
+ * @example
+ * ```ts
+ * type User = { id: string; name: string; email: string; age: number }
+ * type Selection = { id: true; name: true }
+ * type Result = Selected<User, Selection>
+ * // Result = { id: string; name: string }
+ * ```
+ */
+export type Selected<T, S> = S extends Select<T>
+	? {
+			[K in keyof S & keyof T]: S[K] extends true
+				? T[K]
+				: S[K] extends Select<any>
+					? T[K] extends Array<infer U>
+						? Array<Selected<U, S[K]>>
+						: T[K] extends object
+							? Selected<T[K], S[K]>
+							: never
+					: never;
+		}
+	: T; // If no selection, return full type
 
 /**
  * Query definition with Zod schemas
