@@ -118,6 +118,11 @@ export class InProcessTransport implements LensTransport {
 	}
 
 	private validateInput(target: any, request: LensRequest): any {
+		// If no input schema defined (void input), accept undefined
+		if (!target.input) {
+			return undefined;
+		}
+
 		const inputResult = target.input.safeParse(request.input);
 		if (!inputResult.success) {
 			throw new Error(
