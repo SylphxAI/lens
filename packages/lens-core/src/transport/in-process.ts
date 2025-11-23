@@ -83,6 +83,13 @@ export class InProcessTransport implements LensTransport {
 		// Validate input
 		const validatedInput = this.validateInput(target, request);
 
+		// DEBUG: Log context being passed
+		console.log('[InProcessTransport] executeRequest:', {
+			path: request.path.join('.'),
+			hasContext: !!this.config.context,
+			context: this.config.context,
+		});
+
 		// Execute with context
 		return target.resolve({ input: validatedInput, ctx: this.config.context }).then((result: any) => {
 			// Validate output
