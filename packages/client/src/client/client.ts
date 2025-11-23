@@ -8,8 +8,10 @@
 import type {
 	Schema,
 	SchemaDefinition,
+	EntityDefinition,
 	InferEntity,
 	Select,
+	InferSelected,
 	CreateInput,
 	WhereInput,
 	OrderByInput,
@@ -38,15 +40,22 @@ export interface ClientConfig<S extends SchemaDefinition = SchemaDefinition> {
 	optimistic?: boolean;
 }
 
-/** Query options */
-export interface QueryOptions<S extends SchemaDefinition, E extends keyof S> {
-	/** Field selection */
-	select?: Select<S[E], S>;
+/** Query options with optional select */
+export interface QueryOptions<
+	S extends SchemaDefinition,
+	E extends keyof S,
+	Sel extends Select<S[E], S> | undefined = undefined,
+> {
+	/** Field selection (return type inferred from this) */
+	select?: Sel;
 }
 
-/** List query options */
-export interface ListOptions<S extends SchemaDefinition, E extends keyof S>
-	extends QueryOptions<S, E> {
+/** List query options with type-safe filtering */
+export interface ListOptions<
+	S extends SchemaDefinition,
+	E extends keyof S,
+	Sel extends Select<S[E], S> | undefined = undefined,
+> extends QueryOptions<S, E, Sel> {
 	/** Filter conditions (type-safe) */
 	where?: WhereInput<S[E]>;
 	/** Sorting (type-safe) */
@@ -58,6 +67,15 @@ export interface ListOptions<S extends SchemaDefinition, E extends keyof S>
 	/** Cursor for cursor-based pagination */
 	cursor?: { id: string };
 }
+
+/** Infer result type based on select option */
+export type InferQueryResult<
+	S extends SchemaDefinition,
+	E extends keyof S,
+	Sel extends Select<S[E], S> | undefined,
+> = Sel extends Select<S[E], S>
+	? InferSelected<S[E], Sel, S>
+	: InferEntity<S[E], S>;
 
 /** Mutation options */
 export interface MutationOptions {
@@ -73,17 +91,22 @@ export interface MutationResult<T> {
 	rollback?: () => void;
 }
 
-/** Entity accessor */
+/** Entity accessor with type-safe select inference */
 export interface EntityAccessor<
 	S extends SchemaDefinition,
 	E extends keyof S & string,
 	Entity = InferEntity<S[E], S>,
 > {
-	/** Get single entity by ID */
-	get(id: string, options?: QueryOptions<S, E>): Signal<EntityState<Entity>>;
+	/** Get single entity by ID (return type inferred from select) */
+	get<Sel extends Select<S[E], S> | undefined = undefined>(
+		id: string,
+		options?: QueryOptions<S, E, Sel>,
+	): Signal<EntityState<InferQueryResult<S, E, Sel>>>;
 
-	/** List entities */
-	list(options?: ListOptions<S, E>): Signal<EntityState<Entity[]>>;
+	/** List entities (return type inferred from select) */
+	list<Sel extends Select<S[E], S> | undefined = undefined>(
+		options?: ListOptions<S, E, Sel>,
+	): Signal<EntityState<InferQueryResult<S, E, Sel>[]>>;
 
 	/** Create new entity */
 	create(
@@ -142,8 +165,9 @@ function createEntityAccessor<
 ): EntityAccessor<S, E> {
 	type Entity = InferEntity<S[E], S>;
 
-	return {
-		get(id: string, options?: QueryOptions<S, E>): Signal<EntityState<Entity>> {
+	// Implementation uses Entity type, interface provides generic inference
+	const accessor = {
+		get(id: string, options?: { select?: unknown }): Signal<EntityState<Entity>> {
 			// Get or create entity signal
 			const entitySignal = store.getEntity<Entity>(entityName, id);
 
@@ -167,7 +191,7 @@ function createEntityAccessor<
 			return entitySignal;
 		},
 
-		list(options?: ListOptions<S, E>): Signal<EntityState<Entity[]>> {
+		list(options?: { select?: unknown; where?: unknown; orderBy?: unknown; take?: number; skip?: number; cursor?: unknown }): Signal<EntityState<Entity[]>> {
 			const queryKey = `${entityName}:list:${JSON.stringify(options ?? {})}`;
 			const listSignal = store.getList<Entity>(queryKey);
 
@@ -326,6 +350,9 @@ function createEntityAccessor<
 			};
 		},
 	};
+
+	// Cast to interface type which provides generic inference
+	return accessor as EntityAccessor<S, E>;
 }
 
 /**

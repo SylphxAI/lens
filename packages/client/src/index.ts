@@ -57,6 +57,7 @@ export {
 	type ListOptions,
 	type MutationOptions,
 	type MutationResult,
+	type InferQueryResult,
 } from "./client/client";
 
 // =============================================================================
