@@ -9,6 +9,7 @@
 import type { ZodType } from "zod";
 import type { Resource, ResourceDefinition, Relationship } from "./types";
 import { ResourceRegistry, ResourceRegistryError, getRegistry } from "./registry";
+import { generateResourceAPI } from "../codegen/api-generator";
 
 /**
  * Validation error for resource definitions
@@ -273,13 +274,16 @@ export function defineResource<
 		// @ts-expect-error - entity is compile-time only, never has runtime value
 		entity: undefined,
 		relationships: (definition.relationships || {}) as TRelationships,
-		// api will be added in Phase 2
-		api: undefined,
+		// api will be generated
+		api: undefined as any,
 	};
 
 	// Register resource
 	const registry = getRegistry();
 	registry.register(resource);
+
+	// Generate API
+	resource.api = generateResourceAPI(resource);
 
 	return resource;
 }

@@ -296,8 +296,72 @@ export interface Resource<
 	/** Relationships */
 	relationships: TRelationships;
 
-	/** Auto-generated API (added in Phase 2) */
-	api?: any; // Will be typed properly in codegen phase
+	/** Auto-generated API with CRUD operations */
+	api: {
+		getById: {
+			query(
+				input: { id: string },
+				options?: QueryOptions<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
+				ctx?: QueryContext,
+			): Promise<InferEntity<ResourceDefinition<TName, TFields, TRelationships>> | null>;
+			subscribe(
+				input: { id: string },
+				options?: QueryOptions<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
+				handlers?: {
+					onData?: (
+						data: InferEntity<ResourceDefinition<TName, TFields, TRelationships>> | null,
+					) => void;
+					onError?: (error: Error) => void;
+					onComplete?: () => void;
+				},
+				ctx?: QueryContext,
+			): { unsubscribe: () => void };
+		};
+		list: {
+			query(
+				input?: ListOptions<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
+				ctx?: QueryContext,
+			): Promise<Array<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>>;
+			subscribe(
+				input?: ListOptions<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
+				handlers?: {
+					onData?: (
+						data: Array<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
+					) => void;
+					onError?: (error: Error) => void;
+					onComplete?: () => void;
+				},
+				ctx?: QueryContext,
+			): { unsubscribe: () => void };
+		};
+		create: {
+			mutate(
+				input: Partial<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
+				options?: MutationOptions<
+					InferEntity<ResourceDefinition<TName, TFields, TRelationships>>
+				>,
+				ctx?: QueryContext,
+			): Promise<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>;
+		};
+		update: {
+			mutate(
+				input: {
+					id: string;
+					data: Partial<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>;
+				},
+				options?: MutationOptions<
+					InferEntity<ResourceDefinition<TName, TFields, TRelationships>>
+				>,
+				ctx?: QueryContext,
+			): Promise<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>;
+		};
+		delete: {
+			mutate(
+				input: { id: string },
+				ctx?: QueryContext,
+			): Promise<{ id: string; deleted: boolean }>;
+		};
+	};
 }
 
 /**

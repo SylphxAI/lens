@@ -125,3 +125,6 @@ export {
 
 export type { BatchLoadFn, DataLoaderOptions } from "./loader/index.js";
 
+// Code generation
+export { generateResourceAPI, type ResourceAPI } from "./codegen/index.js";
+
