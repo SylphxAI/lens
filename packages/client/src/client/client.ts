@@ -2,6 +2,7 @@
  * @lens/client - Client API
  *
  * Type-safe client for accessing schema entities.
+ * Uses Links (tRPC-style middleware) for transport.
  */
 
 import type {
@@ -9,31 +10,31 @@ import type {
 	SchemaDefinition,
 	InferEntity,
 	Select,
-	InferSelected,
 	CreateInput,
 	UpdateInput,
 	DeleteInput,
 } from "@lens/core";
-import { type Signal, computed } from "../signals/signal";
+import { type Signal } from "../signals/signal";
 import { ReactiveStore, type EntityState } from "../store/reactive-store";
-import type { Transport, TransportConfig } from "../transport/types";
-import { WebSocketTransport } from "../transport/websocket";
+import {
+	type Link,
+	type LinkFn,
+	type OperationResult,
+	composeLinks,
+	createOperationContext,
+} from "../links";
 
 // =============================================================================
 // Types
 // =============================================================================
 
 /** Client configuration */
-export interface ClientConfig {
-	/** WebSocket URL */
-	url?: string;
-	/** Separate WebSocket URL */
-	wsUrl?: string;
-	/** HTTP URL for fallback */
-	httpUrl?: string;
-	/** Custom transport */
-	transport?: Transport;
-	/** Enable optimistic updates */
+export interface ClientConfig<S extends SchemaDefinition = SchemaDefinition> {
+	/** Schema definition */
+	schema?: Schema<S>;
+	/** Links (middleware chain) - last one should be terminal */
+	links: Link[];
+	/** Enable optimistic updates (default: true) */
 	optimistic?: boolean;
 }
 
@@ -56,10 +57,18 @@ export interface ListOptions<S extends SchemaDefinition, E extends keyof S>
 	skip?: number;
 }
 
+/** Mutation options */
+export interface MutationOptions {
+	/** Enable optimistic update (default: true) */
+	optimistic?: boolean;
+}
+
 /** Mutation result */
 export interface MutationResult<T> {
+	/** Result data */
 	data: T;
-	optimisticId?: string;
+	/** Rollback function (only if optimistic) */
+	rollback?: () => void;
 }
 
 /** Entity accessor */
@@ -69,22 +78,29 @@ export interface EntityAccessor<
 	Entity = InferEntity<S[E], S>,
 > {
 	/** Get single entity by ID */
-	get(
-		input: { id: string },
-		options?: QueryOptions<S, E>,
-	): Signal<EntityState<Entity>>;
+	get(id: string, options?: QueryOptions<S, E>): Signal<EntityState<Entity>>;
 
 	/** List entities */
-	list(input?: ListOptions<S, E>): Signal<EntityState<Entity[]>>;
+	list(options?: ListOptions<S, E>): Signal<EntityState<Entity[]>>;
 
 	/** Create new entity */
-	create(input: CreateInput<S[E], S>): Promise<MutationResult<Entity>>;
+	create(
+		data: CreateInput<S[E], S>,
+		options?: MutationOptions,
+	): Promise<MutationResult<Entity>>;
 
 	/** Update entity */
-	update(input: UpdateInput<S[E], S>): Promise<MutationResult<Entity>>;
+	update(
+		id: string,
+		data: Partial<Omit<CreateInput<S[E], S>, "id">>,
+		options?: MutationOptions,
+	): Promise<MutationResult<Entity>>;
 
 	/** Delete entity */
-	delete(input: DeleteInput): Promise<void>;
+	delete(id: string, options?: MutationOptions): Promise<void>;
+
+	/** Subscribe to entity updates */
+	subscribe(id: string, callback: (data: Entity) => void): () => void;
 }
 
 /** Client type */
@@ -93,12 +109,13 @@ export type Client<S extends SchemaDefinition> = {
 } & {
 	/** Underlying store */
 	$store: ReactiveStore;
-	/** Underlying transport */
-	$transport: Transport;
-	/** Connect to server */
-	connect(): Promise<void>;
-	/** Disconnect from server */
-	disconnect(): void;
+	/** Execute raw operation */
+	$execute: (
+		type: "query" | "mutation",
+		entity: string,
+		op: string,
+		input: unknown,
+	) => Promise<OperationResult>;
 };
 
 // =============================================================================
@@ -114,35 +131,31 @@ function createEntityAccessor<
 >(
 	entityName: E,
 	store: ReactiveStore,
-	transport: Transport,
-	schema: Schema<S>,
+	execute: (
+		type: "query" | "mutation",
+		op: string,
+		input: unknown,
+	) => Promise<OperationResult>,
+	optimisticEnabled: boolean,
 ): EntityAccessor<S, E> {
 	type Entity = InferEntity<S[E], S>;
 
 	return {
-		get(
-			input: { id: string },
-			options?: QueryOptions<S, E>,
-		): Signal<EntityState<Entity>> {
-			const { id } = input;
-
+		get(id: string, options?: QueryOptions<S, E>): Signal<EntityState<Entity>> {
 			// Get or create entity signal
 			const entitySignal = store.getEntity<Entity>(entityName, id);
 
-			// Subscribe via transport if not already subscribed
+			// Fetch if loading
 			if (entitySignal.value.loading && entitySignal.value.data === null) {
-				// Retain reference
 				store.retain(entityName, id);
 
-				// Subscribe to entity
-				transport
-					.subscribe({
-						entity: entityName,
-						id,
-						select: options?.select as Record<string, unknown>,
-					})
-					.then((data) => {
-						store.setEntity(entityName, id, data);
+				execute("query", "get", { id, select: options?.select })
+					.then((result) => {
+						if (result.error) {
+							store.setEntityError(entityName, id, result.error);
+						} else {
+							store.setEntity(entityName, id, result.data);
+						}
 					})
 					.catch((error) => {
 						store.setEntityError(entityName, id, error);
@@ -152,26 +165,20 @@ function createEntityAccessor<
 			return entitySignal;
 		},
 
-		list(input?: ListOptions<S, E>): Signal<EntityState<Entity[]>> {
-			// Create query key from input
-			const queryKey = `${entityName}:list:${JSON.stringify(input ?? {})}`;
-
-			// Get or create list signal
+		list(options?: ListOptions<S, E>): Signal<EntityState<Entity[]>> {
+			const queryKey = `${entityName}:list:${JSON.stringify(options ?? {})}`;
 			const listSignal = store.getList<Entity>(queryKey);
 
-			// Fetch if loading
 			if (listSignal.value.loading && listSignal.value.data === null) {
-				transport
-					.query({
-						entity: entityName,
-						type: "list",
-						...input,
-					})
-					.then((data) => {
-						store.setList(queryKey, data as Entity[]);
+				execute("query", "list", options ?? {})
+					.then((result) => {
+						if (result.error) {
+							console.error("List query error:", result.error);
+						} else {
+							store.setList(queryKey, result.data as Entity[]);
+						}
 					})
 					.catch((error) => {
-						// Handle error
 						console.error("List query error:", error);
 					});
 			}
@@ -179,83 +186,142 @@ function createEntityAccessor<
 			return listSignal;
 		},
 
-		async create(input: CreateInput<S[E], S>): Promise<MutationResult<Entity>> {
-			// Generate temporary ID for optimistic update
-			const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-			const optimisticData = { id: tempId, ...input } as Entity & { id: string };
+		async create(
+			data: CreateInput<S[E], S>,
+			options?: MutationOptions,
+		): Promise<MutationResult<Entity>> {
+			const useOptimistic = options?.optimistic ?? optimisticEnabled;
 
-			// Apply optimistic update
-			const optimisticId = store.applyOptimistic(entityName, "create", optimisticData);
+			// Optimistic update
+			let optimisticId: string | undefined;
+			let tempId: string | undefined;
+
+			if (useOptimistic) {
+				tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+				const optimisticData = { id: tempId, ...data } as Entity & { id: string };
+				optimisticId = store.applyOptimistic(entityName, "create", optimisticData);
+			}
 
 			try {
-				// Send mutation to server
-				const result = await transport.mutate({
-					entity: entityName,
-					operation: "create",
-					input,
-				});
+				const result = await execute("mutation", "create", { data });
 
-				// Confirm with server data (includes real ID)
-				store.confirmOptimistic(optimisticId, result);
+				if (result.error) {
+					if (optimisticId) store.rollbackOptimistic(optimisticId);
+					throw result.error;
+				}
 
-				// Remove temp entry, add real one
-				store.removeEntity(entityName, tempId);
-				const realData = result as Entity & { id: string };
-				store.setEntity(entityName, realData.id, realData);
+				const realData = result.data as Entity & { id: string };
 
-				return { data: realData, optimisticId };
+				if (optimisticId) {
+					store.confirmOptimistic(optimisticId, realData);
+					if (tempId) store.removeEntity(entityName, tempId);
+					store.setEntity(entityName, realData.id, realData);
+				}
+
+				return {
+					data: realData,
+					rollback: optimisticId
+						? () => store.rollbackOptimistic(optimisticId!)
+						: undefined,
+				};
 			} catch (error) {
-				// Rollback on error
-				store.rollbackOptimistic(optimisticId);
+				if (optimisticId) store.rollbackOptimistic(optimisticId);
 				throw error;
 			}
 		},
 
-		async update(input: UpdateInput<S[E], S>): Promise<MutationResult<Entity>> {
-			// Apply optimistic update
-			const optimisticId = store.applyOptimistic(entityName, "update", input as Partial<Entity> & { id: string });
+		async update(
+			id: string,
+			data: Partial<Omit<CreateInput<S[E], S>, "id">>,
+			options?: MutationOptions,
+		): Promise<MutationResult<Entity>> {
+			const useOptimistic = options?.optimistic ?? optimisticEnabled;
+
+			let optimisticId: string | undefined;
+
+			if (useOptimistic) {
+				optimisticId = store.applyOptimistic(entityName, "update", {
+					id,
+					...data,
+				} as Partial<Entity> & { id: string });
+			}
 
 			try {
-				// Send mutation to server
-				const result = await transport.mutate({
-					entity: entityName,
-					operation: "update",
-					input,
-				});
+				const result = await execute("mutation", "update", { id, ...data });
 
-				// Confirm with server data
-				store.confirmOptimistic(optimisticId, result);
+				if (result.error) {
+					if (optimisticId) store.rollbackOptimistic(optimisticId);
+					throw result.error;
+				}
 
-				return { data: result as Entity, optimisticId };
+				if (optimisticId) {
+					store.confirmOptimistic(optimisticId, result.data);
+				}
+
+				return {
+					data: result.data as Entity,
+					rollback: optimisticId
+						? () => store.rollbackOptimistic(optimisticId!)
+						: undefined,
+				};
 			} catch (error) {
-				// Rollback on error
-				store.rollbackOptimistic(optimisticId);
+				if (optimisticId) store.rollbackOptimistic(optimisticId);
 				throw error;
 			}
 		},
 
-		async delete(input: DeleteInput): Promise<void> {
-			const { id } = input;
+		async delete(id: string, options?: MutationOptions): Promise<void> {
+			const useOptimistic = options?.optimistic ?? optimisticEnabled;
 
-			// Apply optimistic update
-			const optimisticId = store.applyOptimistic(entityName, "delete", { id });
+			let optimisticId: string | undefined;
+
+			if (useOptimistic) {
+				optimisticId = store.applyOptimistic(entityName, "delete", { id });
+			}
 
 			try {
-				// Send mutation to server
-				await transport.mutate({
-					entity: entityName,
-					operation: "delete",
-					input,
-				});
+				const result = await execute("mutation", "delete", { id });
 
-				// Confirm deletion
-				store.confirmOptimistic(optimisticId);
+				if (result.error) {
+					if (optimisticId) store.rollbackOptimistic(optimisticId);
+					throw result.error;
+				}
+
+				if (optimisticId) {
+					store.confirmOptimistic(optimisticId);
+				}
 				store.removeEntity(entityName, id);
 			} catch (error) {
-				// Rollback on error
-				store.rollbackOptimistic(optimisticId);
+				if (optimisticId) store.rollbackOptimistic(optimisticId);
 				throw error;
 			}
+		},
+
+		subscribe(id: string, callback: (data: Entity) => void): () => void {
+			const signal = this.get(id);
+
+			// Watch for changes
+			let prevData = signal.value.data;
+			const checkChange = () => {
+				const newData = signal.value.data;
+				if (newData && newData !== prevData) {
+					prevData = newData;
+					callback(newData);
+				}
+			};
+
+			// Initial call if data exists
+			if (signal.value.data) {
+				callback(signal.value.data);
+			}
+
+			// Poll for changes (in a real app, use effect or signal subscription)
+			const interval = setInterval(checkChange, 100);
+
+			return () => {
+				clearInterval(interval);
+				store.release(entityName, id);
+			};
 		},
 	};
 }
@@ -265,53 +331,82 @@ function createEntityAccessor<
  *
  * @example
  * ```typescript
- * const api = createClient<typeof schema>({
- *   url: 'ws://localhost:3000',
+ * import { createClient, loggerLink, httpLink } from "@lens/client";
+ *
+ * const client = createClient({
+ *   schema,
+ *   links: [
+ *     loggerLink(),
+ *     httpLink({ url: "http://localhost:3000/api" }),
+ *   ],
  * });
  *
  * // Type-safe entity access
- * const user = api.user.get({ id: '123' });
- * console.log(user.value?.name);
+ * const userSignal = client.User.get("123");
+ * console.log(userSignal.value.data?.name);
  *
  * // Mutations with optimistic updates
- * await api.user.update({ id: '123', name: 'New Name' });
+ * const { data, rollback } = await client.User.update("123", { name: "New" });
  * ```
  */
 export function createClient<S extends SchemaDefinition>(
-	config: ClientConfig,
-	schema?: Schema<S>,
+	config: ClientConfig<S>,
 ): Client<S> {
+	const { links, optimistic = true } = config;
+
+	// Validate links
+	if (!links || links.length === 0) {
+		throw new Error("At least one link is required");
+	}
+
+	// Initialize links
+	const initializedLinks: LinkFn[] = links.map((link) => link());
+
 	// Create store
-	const store = new ReactiveStore({
-		optimistic: config.optimistic ?? true,
+	const store = new ReactiveStore({ optimistic });
+
+	// Compose link chain (last link is terminal, doesn't call next)
+	const terminalLink = initializedLinks[initializedLinks.length - 1];
+	const middlewareLinks = initializedLinks.slice(0, -1);
+
+	const executeChain = composeLinks(middlewareLinks, async (op) => {
+		const result = terminalLink(op, () => Promise.resolve({ error: new Error("No next link") }));
+		return result instanceof Promise ? result : Promise.resolve(result);
 	});
 
-	// Create transport
-	const transport: Transport =
-		config.transport ??
-		new WebSocketTransport({
-			url: config.url ?? config.wsUrl ?? "ws://localhost:3000",
-			httpUrl: config.httpUrl,
-		});
+	// Execute function
+	const execute = async (
+		type: "query" | "mutation",
+		entity: string,
+		op: string,
+		input: unknown,
+	): Promise<OperationResult> => {
+		const context = createOperationContext(type, entity, op, input);
+		return executeChain(context);
+	};
 
 	// Create client object
 	const client = {
 		$store: store,
-		$transport: transport,
-		connect: () => transport.connect(),
-		disconnect: () => transport.disconnect(),
+		$execute: (type: "query" | "mutation", entity: string, op: string, input: unknown) =>
+			execute(type, entity, op, input),
 	} as Client<S>;
 
 	// Create entity accessors using Proxy
 	return new Proxy(client, {
 		get(target, prop: string) {
 			// Return internal properties
-			if (prop.startsWith("$") || prop === "connect" || prop === "disconnect") {
+			if (prop.startsWith("$")) {
 				return target[prop as keyof typeof target];
 			}
 
 			// Create entity accessor on demand
-			return createEntityAccessor(prop, store, transport, schema as Schema<S>);
+			return createEntityAccessor(
+				prop,
+				store,
+				(type, op, input) => execute(type, prop, op, input),
+				optimistic,
+			);
 		},
 	});
 }

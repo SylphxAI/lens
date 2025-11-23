@@ -2,7 +2,7 @@
  * @lens/client
  *
  * Reactive client for Lens API framework.
- * Signals, store, and transport for real-time data access.
+ * Signals, store, and Links for real-time data access.
  */
 
 // =============================================================================
@@ -55,43 +55,9 @@ export {
 	type EntityAccessor,
 	type QueryOptions,
 	type ListOptions,
+	type MutationOptions,
 	type MutationResult,
 } from "./client/client";
-
-// =============================================================================
-// Transport
-// =============================================================================
-
-export {
-	// Types
-	type Transport,
-	type TransportConfig,
-	type ConnectionState,
-	type SubscribeInput,
-	type QueryInput,
-	type MutateInput,
-	// Messages
-	type ClientMessage,
-	type ServerMessage,
-	type SubscribeMessage,
-	type UnsubscribeMessage,
-	type MutateMessage,
-	type QueryMessage,
-	type DataMessage,
-	type UpdateMessage,
-	type ResultMessage,
-	type ErrorMessage,
-} from "./transport/types";
-
-export { WebSocketTransport } from "./transport/websocket";
-export { HttpTransport, type HttpTransportConfig } from "./transport/http";
-export { SSETransport, type SSETransportConfig } from "./transport/sse";
-export {
-	InProcessTransport,
-	createInProcessTransport,
-	type InProcessTransportConfig,
-	type InProcessResolvers as InProcessTransportResolvers,
-} from "./transport/in-process";
 
 // =============================================================================
 // Links (tRPC-style middleware chain)
