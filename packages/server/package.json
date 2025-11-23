@@ -1,0 +1,38 @@
+{
+	"name": "@lens/server",
+	"version": "0.1.0",
+	"description": "Server runtime for Lens API framework",
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"types": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"build": "bun build ./src/index.ts --outdir ./dist --target node && bun run build:types",
+		"build:types": "tsc --emitDeclarationOnly --outDir ./dist",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"server",
+		"resolvers",
+		"graphql"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@lens/core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	}
+}

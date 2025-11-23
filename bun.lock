@@ -29,6 +29,16 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/server": {
+      "name": "@lens/server",
+      "version": "0.1.0",
+      "dependencies": {
+        "@lens/core": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
   },
   "packages": {
     "@babel/runtime": ["@babel/runtime@7.28.4", "", {}, "sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ=="],
@@ -90,6 +100,8 @@
     "@lens/client": ["@lens/client@workspace:packages/client"],
 
     "@lens/core": ["@lens/core@workspace:packages/core"],
+
+    "@lens/server": ["@lens/server@workspace:packages/server"],
 
     "@manypkg/find-root": ["@manypkg/find-root@1.1.0", "", { "dependencies": { "@babel/runtime": "^7.5.5", "@types/node": "^12.7.1", "find-up": "^4.1.0", "fs-extra": "^8.1.0" } }, "sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA=="],
 
