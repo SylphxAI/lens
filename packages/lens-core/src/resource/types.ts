@@ -298,7 +298,7 @@ export interface Resource<
 
 	/** Auto-generated API with CRUD operations */
 	api: {
-		getById: {
+		get: {
 			query(
 				input: { id: string },
 				options?: QueryOptions<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
@@ -493,24 +493,95 @@ export interface Subscription {
 }
 
 /**
+ * Database adapter interface
+ *
+ * Minimal interface for database operations.
+ * Adapters can extend this with additional methods.
+ */
+export interface DatabaseAdapter {
+	/** Find entity by ID */
+	findById(tableName: string, id: string): Promise<any>;
+
+	/** Find multiple entities with filters */
+	findMany(
+		tableName: string,
+		options?: {
+			where?: any;
+			orderBy?: any;
+			limit?: number;
+			offset?: number;
+		},
+	): Promise<any[]>;
+
+	/** Create entity */
+	create(tableName: string, data: any): Promise<any>;
+
+	/** Update entity */
+	update(tableName: string, id: string, data: any): Promise<any>;
+
+	/** Delete entity */
+	delete(tableName: string, id: string): Promise<void>;
+
+	/** Batch load entities by IDs */
+	batchLoadByIds(tableName: string, ids: readonly string[]): Promise<any[]>;
+
+	/** Batch load related entities */
+	batchLoadRelated(
+		tableName: string,
+		foreignKey: string,
+		parentIds: readonly string[],
+	): Promise<any[]>;
+}
+
+/**
+ * Event stream interface
+ *
+ * Simple pub/sub interface for resource events.
+ */
+export interface EventStreamInterface {
+	/** Publish event */
+	publish<T = any>(key: string, data: T): void;
+
+	/** Subscribe to events */
+	subscribe<T = any>(
+		key: string,
+		options: {
+			next?: (data: T) => void;
+			error?: (error: Error) => void;
+			complete?: () => void;
+		},
+	): { unsubscribe: () => void };
+
+	/** Subscribe to pattern */
+	subscribePattern<T = any>(
+		pattern: RegExp,
+		options: {
+			next?: (data: T) => void;
+			error?: (error: Error) => void;
+			complete?: () => void;
+		},
+	): { unsubscribe: () => void };
+
+	/** Get observable for key */
+	observe<T = any>(key: string): Observable<T>;
+}
+
+/**
  * Query context
  *
  * Passed to all query, mutation, and subscription handlers.
  * Contains database access, loaders, event streams, etc.
  */
-export interface QueryContext {
-	/** Database access */
-	db: any;
+export interface QueryContext<TUser = any> {
+	/** Database adapter for data persistence */
+	db: DatabaseAdapter;
 
-	/** DataLoader for batching */
-	loader: any;
+	/** Event stream for real-time subscriptions (optional) */
+	eventStream?: EventStreamInterface;
 
-	/** Event stream for subscriptions */
-	eventStream: any;
+	/** User context for authentication/authorization (optional) */
+	user?: TUser;
 
-	/** Optional: user context */
-	user?: any;
-
-	/** Optional: custom context */
+	/** Custom context extensions */
 	[key: string]: any;
 }

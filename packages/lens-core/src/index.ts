@@ -101,6 +101,8 @@ export type {
 	Subscription,
 	SubscriptionHandlers,
 	QueryContext,
+	DatabaseAdapter,
+	EventStreamInterface,
 	HasManyOptions,
 	BelongsToOptions,
 	HasOneOptions,
@@ -127,4 +129,12 @@ export type { BatchLoadFn, DataLoaderOptions } from "./loader/index.js";
 
 // Code generation
 export { generateResourceAPI, type ResourceAPI } from "./codegen/index.js";
+
+// Event system
+export {
+	EventStream,
+	createEventStream,
+	type Event,
+	type SubscriptionOptions,
+} from "./events/index.js";
 

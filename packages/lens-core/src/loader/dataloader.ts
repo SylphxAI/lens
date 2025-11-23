@@ -206,20 +206,19 @@ export class ResourceDataLoaderFactory {
 	private loaders: Map<string, DataLoader> = new Map();
 
 	/**
-	 * Create or get DataLoader for getById queries
+	 * Create or get entity loader
+	 *
+	 * Creates a DataLoader for fetching entities by ID with automatic batching.
 	 *
 	 * @param resource - Resource to load
 	 * @param ctx - Query context with database access
-	 * @returns DataLoader for this resource
+	 * @returns DataLoader for entity lookups
 	 */
-	getByIdLoader<T = any>(resource: Resource, ctx: QueryContext): DataLoader<string, T> {
-		const loaderKey = `${resource.name}:getById`;
+	entity<T = any>(resource: Resource, ctx: QueryContext): DataLoader<string, T> {
+		const loaderKey = `${resource.name}:entity`;
 
 		if (!this.loaders.has(loaderKey)) {
 			const loader = new DataLoader<string, T>(async (ids) => {
-				// Batch load all IDs in single query
-				// Implementation depends on database adapter
-				// For now, this is a placeholder that should be implemented by adapter
 				const results = await this.batchLoadById(resource, ids as string[], ctx);
 				return results;
 			});
@@ -231,14 +230,16 @@ export class ResourceDataLoaderFactory {
 	}
 
 	/**
-	 * Create or get DataLoader for relationship queries
+	 * Create or get relationship loader
+	 *
+	 * Creates a DataLoader for fetching related entities with automatic batching.
 	 *
 	 * @param resource - Source resource
 	 * @param relationName - Relationship name
 	 * @param ctx - Query context
-	 * @returns DataLoader for this relationship
+	 * @returns DataLoader for relationship lookups
 	 */
-	getRelationLoader<T = any>(
+	relation<T = any>(
 		resource: Resource,
 		relationName: string,
 		ctx: QueryContext,
@@ -254,7 +255,6 @@ export class ResourceDataLoaderFactory {
 			}
 
 			const loader = new DataLoader<string, T[]>(async (parentIds) => {
-				// Batch load related entities for all parent IDs
 				const results = await this.batchLoadRelated(
 					resource,
 					relationName,

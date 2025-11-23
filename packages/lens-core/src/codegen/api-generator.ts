@@ -20,6 +20,7 @@ import type {
 } from "../resource/types";
 import { createDataLoaderFactory } from "../loader/dataloader";
 import { QueryPlanner } from "../query/planner";
+import { getRegistry } from "../resource/registry";
 
 /**
  * Generated API for a resource
@@ -32,7 +33,7 @@ export interface ResourceAPI<
 	TRelationships extends Record<string, any>,
 > {
 	/** Get entity by ID with field selection and includes */
-	getById: {
+	get: {
 		query(
 			input: { id: string },
 			options?: QueryOptions<InferEntity<ResourceDefinition<TName, TFields, TRelationships>>>,
@@ -122,7 +123,7 @@ export interface ResourceAPI<
  * const api = generateResourceAPI(Message);
  *
  * // Auto-generated, type-safe, optimized
- * const message = await api.getById.query(
+ * const message = await api.get.query(
  *   { id: 'msg-1' },
  *   { include: { steps: true } },
  *   ctx
@@ -148,7 +149,7 @@ export function generateResourceAPI<
 	 * - Loads included relationships
 	 * - Detects and eliminates N+1 queries
 	 */
-	const getById = {
+	const get = {
 		async query(
 			input: { id: string },
 			options?: QueryOptions<Entity>,
@@ -156,7 +157,7 @@ export function generateResourceAPI<
 		): Promise<Entity | null> {
 			if (!ctx || !ctx.db) {
 				throw new Error(
-					`Context with database required for ${resource.name}.getById.query`,
+					`Context with database required for ${resource.name}.get.query`,
 				);
 			}
 
@@ -167,7 +168,7 @@ export function generateResourceAPI<
 			const plan = QueryPlanner.createPlan(resource, options);
 
 			// Execute query with batching
-			const loader = loaderFactory.getByIdLoader<Entity>(resource, ctx);
+			const loader = loaderFactory.entity<Entity>(resource, ctx);
 			let entity: Entity | null;
 
 			try {
@@ -182,14 +183,18 @@ export function generateResourceAPI<
 
 			if (!entity) return null;
 
-			// Load included relationships
-			if (options?.include) {
-				await loadRelationships(entity, options.include, ctx, loaderFactory);
+			// Extract and load relationships from select
+			if (options?.select) {
+				const includes = extractIncludesFromSelect(options.select, resource);
+				if (Object.keys(includes).length > 0) {
+					await loadRelationships(entity, includes, ctx, loaderFactory, resource);
+				}
+				return applyFieldSelection(entity, options.select);
 			}
 
-			// Apply field selection
-			if (options?.select) {
-				return applyFieldSelection(entity, options.select);
+			// Load included relationships (legacy support)
+			if (options?.include) {
+				await loadRelationships(entity, options.include, ctx, loaderFactory, resource);
 			}
 
 			return entity;
@@ -207,7 +212,7 @@ export function generateResourceAPI<
 		): { unsubscribe: () => void } {
 			if (!ctx || !ctx.eventStream) {
 				throw new Error(
-					`Context with eventStream required for ${resource.name}.getById.subscribe`,
+					`Context with eventStream required for ${resource.name}.get.subscribe`,
 				);
 			}
 
@@ -267,7 +272,7 @@ export function generateResourceAPI<
 				const loaderFactory = createDataLoaderFactory();
 				await Promise.all(
 					entities.map((entity: Entity) =>
-						loadRelationships(entity, input.include!, ctx, loaderFactory),
+						loadRelationships(entity, input.include!, ctx, loaderFactory, resource),
 					),
 				);
 			}
@@ -468,7 +473,7 @@ export function generateResourceAPI<
 	};
 
 	return {
-		getById,
+		get,
 		list,
 		create,
 		update,
@@ -477,16 +482,210 @@ export function generateResourceAPI<
 }
 
 /**
+ * Extract relationship includes from GraphQL-style select
+ *
+ * Converts select: { id: true, posts: { select: { id: true } } }
+ * Into include: { posts: { include: { ... } } }
+ */
+function extractIncludesFromSelect(
+	select: any,
+	resource: Resource,
+): Record<string, any> {
+	if (!select || typeof select !== "object") return {};
+
+	const includes: Record<string, any> = {};
+	const relationships = resource.definition.relationships || {};
+
+	for (const [fieldName, fieldValue] of Object.entries(select)) {
+		// Check if this field is a relationship
+		if (relationships[fieldName]) {
+			// If fieldValue is true, include the relationship without nested select
+			if (fieldValue === true) {
+				includes[fieldName] = true;
+			}
+			// If fieldValue is an object with select, extract nested includes
+			else if (
+				typeof fieldValue === "object" &&
+				fieldValue !== null &&
+				"select" in fieldValue
+			) {
+				const registry = getRegistry();
+				const targetResource = registry.get(relationships[fieldName].target);
+				if (targetResource) {
+					const nestedIncludes = extractIncludesFromSelect(
+						(fieldValue as any).select,
+						targetResource,
+					);
+					includes[fieldName] =
+						Object.keys(nestedIncludes).length > 0
+							? { include: nestedIncludes }
+							: true;
+				}
+			}
+		}
+	}
+
+	return includes;
+}
+
+/**
  * Load relationships for an entity
+ *
+ * Recursively loads included relationships using DataLoader for batching.
+ * Eliminates N+1 queries by batching relationship loads.
  */
 async function loadRelationships(
 	entity: any,
 	include: any,
 	ctx: QueryContext,
 	loaderFactory: ReturnType<typeof createDataLoaderFactory>,
+	sourceResource: Resource,
 ): Promise<void> {
-	// Implementation will be added when integrating with DataLoader
-	// For now, placeholder
+	if (!entity || !include || !ctx.db) return;
+
+	const registry = getRegistry();
+
+	// Load each included relationship
+	for (const [relationName, relationConfig] of Object.entries(include)) {
+		if (!relationConfig) continue;
+
+		// Get relationship definition from source resource
+		const relationships = sourceResource.definition.relationships || {};
+		const relationship = relationships[relationName];
+
+		if (!relationship) continue;
+
+		// Get target resource
+		const targetResource = registry.get(relationship.target);
+		if (!targetResource) continue;
+
+		// Load relationship based on type
+		switch (relationship.type) {
+			case "hasMany": {
+				// Load multiple related entities
+				const loader = loaderFactory.relation(
+					sourceResource,
+					relationName,
+					ctx,
+				);
+
+				try {
+					const relatedEntities = await loader.load(entity.id);
+					entity[relationName] = relatedEntities;
+
+					// Recursively load nested includes
+					if (
+						typeof relationConfig === "object" &&
+						relationConfig !== null &&
+						"include" in relationConfig &&
+						relationConfig.include &&
+						Array.isArray(relatedEntities)
+					) {
+						await Promise.all(
+							relatedEntities.map((related: any) =>
+								loadRelationships(
+									related,
+									(relationConfig as any).include,
+									ctx,
+									loaderFactory,
+									targetResource,
+								),
+							),
+						);
+					}
+				} catch (error) {
+					// If loading fails, set to empty array
+					entity[relationName] = [];
+				}
+				break;
+			}
+
+			case "belongsTo": {
+				// Load single related entity (this entity has the foreign key)
+				const foreignKeyValue = entity[relationship.foreignKey];
+				if (!foreignKeyValue) {
+					entity[relationName] = null;
+					break;
+				}
+
+				const loader = loaderFactory.entity(targetResource, ctx);
+
+				try {
+					const relatedEntity = await loader.load(foreignKeyValue);
+					entity[relationName] = relatedEntity;
+
+					// Recursively load nested includes
+					if (
+						relatedEntity &&
+						typeof relationConfig === "object" &&
+						relationConfig !== null &&
+						"include" in relationConfig &&
+						relationConfig.include
+					) {
+						await loadRelationships(
+							relatedEntity,
+							(relationConfig as any).include,
+							ctx,
+							loaderFactory,
+							targetResource,
+						);
+					}
+				} catch (error) {
+					// If loading fails, set to null
+					entity[relationName] = null;
+				}
+				break;
+			}
+
+			case "hasOne": {
+				// Load single related entity (related entity has the foreign key pointing to this entity)
+				const loader = loaderFactory.relation(
+					sourceResource,
+					relationName,
+					ctx,
+				);
+
+				try {
+					const relatedEntities = await loader.load(entity.id);
+					// hasOne returns first match from the array
+					const relatedEntity =
+						Array.isArray(relatedEntities) && relatedEntities.length > 0
+							? relatedEntities[0]
+							: null;
+					entity[relationName] = relatedEntity;
+
+					// Recursively load nested includes
+					if (
+						relatedEntity &&
+						typeof relationConfig === "object" &&
+						relationConfig !== null &&
+						"include" in relationConfig &&
+						relationConfig.include
+					) {
+						await loadRelationships(
+							relatedEntity,
+							(relationConfig as any).include,
+							ctx,
+							loaderFactory,
+							targetResource,
+						);
+					}
+				} catch (error) {
+					// If loading fails, set to null
+					entity[relationName] = null;
+				}
+				break;
+			}
+
+			case "manyToMany": {
+				// Load many-to-many related entities through join table
+				// This requires join table query support
+				// Placeholder for now - would need database adapter support
+				entity[relationName] = [];
+				break;
+			}
+		}
+	}
 }
 
 /**
@@ -505,8 +704,15 @@ function applyFieldSelection<T>(entity: T | null, select: any): any {
 			"select" in value &&
 			value.select
 		) {
-			// Nested selection
-			result[key] = applyFieldSelection((entity as any)[key], value.select);
+			// Nested selection - handle arrays and objects
+			const fieldValue = (entity as any)[key];
+			if (Array.isArray(fieldValue)) {
+				result[key] = fieldValue.map((item: any) =>
+					applyFieldSelection(item, value.select),
+				);
+			} else {
+				result[key] = applyFieldSelection(fieldValue, value.select);
+			}
 		}
 	}
 	return result;

@@ -61,4 +61,6 @@ export type {
 	SubscriptionHandlers,
 	// Context
 	QueryContext,
+	DatabaseAdapter,
+	EventStreamInterface,
 } from "./types";

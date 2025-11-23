@@ -24,7 +24,7 @@ describe("API Generation", () => {
 			});
 
 			expect(User.api).toBeDefined();
-			expect(User.api.getById).toBeDefined();
+			expect(User.api.get).toBeDefined();
 			expect(User.api.list).toBeDefined();
 			expect(User.api.create).toBeDefined();
 			expect(User.api.update).toBeDefined();
@@ -40,8 +40,8 @@ describe("API Generation", () => {
 				}),
 			});
 
-			expect(typeof User.api.getById.query).toBe("function");
-			expect(typeof User.api.getById.subscribe).toBe("function");
+			expect(typeof User.api.get.query).toBe("function");
+			expect(typeof User.api.get.subscribe).toBe("function");
 			expect(typeof User.api.list.query).toBe("function");
 			expect(typeof User.api.list.subscribe).toBe("function");
 			expect(typeof User.api.create.mutate).toBe("function");
@@ -50,7 +50,7 @@ describe("API Generation", () => {
 		});
 	});
 
-	describe("getById Query", () => {
+	describe("get Query", () => {
 		test("should query entity by id", async () => {
 			const User = defineResource({
 				name: "user",
@@ -73,7 +73,7 @@ describe("API Generation", () => {
 
 			const ctx: QueryContext = { db: mockDb } as any;
 
-			const result = await User.api.getById.query({ id: "1" }, undefined, ctx);
+			const result = await User.api.get.query({ id: "1" }, undefined, ctx);
 
 			expect(result).toEqual({
 				id: "1",
@@ -109,7 +109,7 @@ describe("API Generation", () => {
 
 			const ctx: QueryContext = { db: mockDb } as any;
 
-			const result = await User.api.getById.query(
+			const result = await User.api.get.query(
 				{ id: "1" },
 				{
 					select: {
@@ -134,7 +134,7 @@ describe("API Generation", () => {
 				fields: z.object({ id: z.string() }),
 			});
 
-			await expect(User.api.getById.query({ id: "1" })).rejects.toThrow(
+			await expect(User.api.get.query({ id: "1" })).rejects.toThrow(
 				"Context with database required",
 			);
 		});
@@ -685,7 +685,7 @@ describe("API Generation", () => {
 				eventStream: { subscribe: subscribeMock },
 			} as any;
 
-			const subscription = User.api.getById.subscribe(
+			const subscription = User.api.get.subscribe(
 				{ id: "1" },
 				undefined,
 				{
