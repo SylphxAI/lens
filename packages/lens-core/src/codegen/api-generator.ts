@@ -22,6 +22,11 @@ import { createDataLoaderFactory } from "../loader/dataloader";
 import { QueryPlanner } from "../query/planner";
 import { getRegistry } from "../resource/registry";
 import { ErrorHelpers, ContextError, LensErrorCode } from "../errors/index";
+import {
+	type FieldSubscriptionOptions,
+	type FieldUpdateEvent,
+	getFieldSubscriptionManager,
+} from "../subscription/index";
 
 /**
  * Generated API for a resource
@@ -201,7 +206,7 @@ export function generateResourceAPI<
 
 		subscribe(
 			input: { id: string },
-			options?: QueryOptions<Entity>,
+			options?: QueryOptions<Entity> & FieldSubscriptionOptions<Entity>,
 			handlers?: {
 				onData?: (data: Entity | null) => void;
 				onError?: (error: Error) => void;
@@ -213,7 +218,12 @@ export function generateResourceAPI<
 				throw ErrorHelpers.missingEventStream(resource.name, "get.subscribe");
 			}
 
-			// Subscribe to entity updates
+			// Field-level subscriptions mode
+			if (options?.fields) {
+				return this.subscribeFields(input.id, options.fields, ctx);
+			}
+
+			// Traditional entity subscription mode (legacy)
 			const eventKey = `${resource.name}:${input.id}`;
 			const subscription = ctx.eventStream.subscribe(eventKey, {
 				next: async (data: Entity | null) => {
@@ -235,6 +245,39 @@ export function generateResourceAPI<
 
 			return {
 				unsubscribe: () => subscription.unsubscribe(),
+			};
+		},
+
+		/**
+		 * Subscribe to field-level updates
+		 *
+		 * Internal method for handling field-level subscriptions.
+		 * Subscribes to individual field update events and routes them
+		 * to the appropriate handlers.
+		 */
+		subscribeFields(
+			entityId: string,
+			fields: any,
+			ctx: QueryContext,
+		): { unsubscribe: () => void } {
+			const manager = getFieldSubscriptionManager();
+
+			// Register field subscriptions
+			const unsubscribe = manager.subscribe(entityId, fields);
+
+			// Subscribe to field update events
+			const eventPattern = new RegExp(`^${resource.name}:${entityId}:field:`);
+			const subscription = ctx.eventStream!.subscribePattern(eventPattern, {
+				next: (event: FieldUpdateEvent) => {
+					manager.dispatch(event);
+				},
+			});
+
+			return {
+				unsubscribe: () => {
+					unsubscribe();
+					subscription.unsubscribe();
+				},
 			};
 		},
 	};

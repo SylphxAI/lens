@@ -180,3 +180,20 @@ export {
 	type PerformanceSummary,
 } from "./performance/index.js";
 
+// Field-level subscriptions
+export {
+	FieldSubscriptionManager,
+	getFieldSubscriptionManager,
+	setFieldSubscriptionManager,
+	isStreamingHandlers,
+	isFieldHandlers,
+	applyDelta,
+	type DeltaOperation,
+	type StreamingFieldHandlers,
+	type FieldHandlers,
+	type FieldSubscriptionHandlers,
+	type FieldSubscriptions,
+	type FieldSubscriptionOptions,
+	type FieldUpdateEvent,
+} from "./subscription/index.js";
+

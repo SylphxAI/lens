@@ -196,10 +196,53 @@ function validateResourceDefinition<
 	// Validate update strategy
 	if (definition.updateStrategy) {
 		const validStrategies = ["auto", "value", "delta", "patch"];
-		if (!validStrategies.includes(definition.updateStrategy)) {
+
+		// Support both string and object formats
+		if (typeof definition.updateStrategy === "string") {
+			if (!validStrategies.includes(definition.updateStrategy)) {
+				throw new ResourceDefinitionError(
+					`Resource '${definition.name}' has invalid updateStrategy '${definition.updateStrategy}'. ` +
+						`Valid strategies: ${validStrategies.join(", ")}`,
+				);
+			}
+		} else if (typeof definition.updateStrategy === "object") {
+			// Validate UpdateStrategyConfig object
+			const config = definition.updateStrategy;
+
+			if (config.mode && !validStrategies.includes(config.mode)) {
+				throw new ResourceDefinitionError(
+					`Resource '${definition.name}' has invalid updateStrategy.mode '${config.mode}'. ` +
+						`Valid strategies: ${validStrategies.join(", ")}`,
+				);
+			}
+
+			if (config.fieldStrategies) {
+				if (typeof config.fieldStrategies !== "object") {
+					throw new ResourceDefinitionError(
+						`Resource '${definition.name}' updateStrategy.fieldStrategies must be an object.`,
+					);
+				}
+
+				for (const [fieldName, strategy] of Object.entries(config.fieldStrategies)) {
+					if (!validStrategies.includes(strategy)) {
+						throw new ResourceDefinitionError(
+							`Resource '${definition.name}' has invalid strategy '${strategy}' for field '${fieldName}'. ` +
+								`Valid strategies: ${validStrategies.join(", ")}`,
+						);
+					}
+				}
+			}
+
+			if (config.streamingFields) {
+				if (!Array.isArray(config.streamingFields)) {
+					throw new ResourceDefinitionError(
+						`Resource '${definition.name}' updateStrategy.streamingFields must be an array.`,
+					);
+				}
+			}
+		} else {
 			throw new ResourceDefinitionError(
-				`Resource '${definition.name}' has invalid updateStrategy '${definition.updateStrategy}'. ` +
-					`Valid strategies: ${validStrategies.join(", ")}`,
+				`Resource '${definition.name}' updateStrategy must be a string or UpdateStrategyConfig object.`,
 			);
 		}
 	}
