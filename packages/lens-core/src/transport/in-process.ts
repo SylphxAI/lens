@@ -123,7 +123,10 @@ export class InProcessTransport implements LensTransport {
 			return undefined;
 		}
 
-		const inputResult = target.input.safeParse(request.input);
+		// If input is undefined, pass empty object to allow Zod defaults to apply
+		const input = request.input === undefined ? {} : request.input;
+
+		const inputResult = target.input.safeParse(input);
 		if (!inputResult.success) {
 			throw new Error(
 				`Input validation failed: ${inputResult.error.message}`
