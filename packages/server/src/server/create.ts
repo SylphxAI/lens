@@ -157,7 +157,7 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 
 		try {
 			// Execute initial query
-			const data = await this.engine.executeGet(entity as keyof S & string, entityId, select);
+			const data = await this.engine.executeGet(entity as keyof S & string, entityId, select as Parameters<typeof this.engine.executeGet>[2]);
 
 			// Send initial data
 			ws.send(
@@ -199,13 +199,13 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 				data = await this.engine.executeGet(
 					entity as keyof S & string,
 					(input as { id: string })?.id ?? "",
-					input?.select as Record<string, unknown>,
+					input?.select as Parameters<typeof this.engine.executeGet>[2],
 				);
 			} else {
 				data = await this.engine.executeList(
 					entity as keyof S & string,
 					input,
-					input?.select as Record<string, unknown>,
+					input?.select as Parameters<typeof this.engine.executeList>[2],
 				);
 			}
 
@@ -238,12 +238,15 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 
 			switch (operation) {
 				case "create":
-					data = await this.engine.executeCreate(entity as keyof S & string, input);
+					data = await this.engine.executeCreate(
+						entity as keyof S & string,
+						input as Parameters<typeof this.engine.executeCreate>[1],
+					);
 					break;
 				case "update":
 					data = await this.engine.executeUpdate(
 						entity as keyof S & string,
-						input as { id: string },
+						input as Parameters<typeof this.engine.executeUpdate>[1],
 					);
 					break;
 				case "delete":
@@ -302,26 +305,44 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 		}
 
 		try {
-			const body = await req.json();
+			const body = (await req.json()) as {
+				entity: keyof S & string;
+				operation: string;
+				input: Record<string, unknown>;
+			};
 			const { entity, operation, input } = body;
 
 			let data: unknown;
 
 			switch (operation) {
 				case "get":
-					data = await this.engine.executeGet(entity, input.id, input.select);
+					data = await this.engine.executeGet(
+						entity,
+						input.id as string,
+						input.select as Parameters<typeof this.engine.executeGet>[2],
+					);
 					break;
 				case "list":
-					data = await this.engine.executeList(entity, input, input?.select);
+					data = await this.engine.executeList(
+						entity,
+						input,
+						input?.select as Parameters<typeof this.engine.executeList>[2],
+					);
 					break;
 				case "create":
-					data = await this.engine.executeCreate(entity, input);
+					data = await this.engine.executeCreate(
+						entity,
+						input as Parameters<typeof this.engine.executeCreate>[1],
+					);
 					break;
 				case "update":
-					data = await this.engine.executeUpdate(entity, input);
+					data = await this.engine.executeUpdate(
+						entity,
+						input as Parameters<typeof this.engine.executeUpdate>[1],
+					);
 					break;
 				case "delete":
-					data = await this.engine.executeDelete(entity, input.id);
+					data = await this.engine.executeDelete(entity, input.id as string);
 					break;
 				default:
 					return new Response("Invalid operation", { status: 400 });

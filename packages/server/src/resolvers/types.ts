@@ -116,8 +116,8 @@ export interface EntityResolverDef<
 		| EntityResolver<InferEntity<E, S>, Ctx>
 		| BatchResolver<InferEntity<E, S>, Ctx>
 		| ListResolver<InferEntity<E, S>, Ctx>
-		| CreateResolver<InferEntity<E, S>, unknown, Ctx>
-		| UpdateResolver<InferEntity<E, S>, unknown, Ctx>
+		| CreateResolver<InferEntity<E, S>, Partial<InferEntity<E, S>>, Ctx>
+		| UpdateResolver<InferEntity<E, S>, Partial<InferEntity<E, S>> & { id: string }, Ctx>
 		| DeleteResolver<Ctx>
 		| RelationResolver<InferEntity<E, S>, unknown, Ctx>
 		| undefined;

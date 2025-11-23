@@ -248,7 +248,7 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		if (!this.loaders.has(entityName)) {
 			this.loaders.set(
 				entityName,
-				new DataLoader((ids) => batchFn(ids, ctx)),
+				new DataLoader((ids) => batchFn(ids, ctx)) as DataLoader<string, unknown>,
 			);
 		}
 		return this.loaders.get(entityName) as DataLoader<string, InferEntity<S[K], S>>;

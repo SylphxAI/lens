@@ -84,3 +84,4 @@ export {
 } from "./transport/types";
 
 export { WebSocketTransport } from "./transport/websocket";
+export { HttpTransport, type HttpTransportConfig } from "./transport/http";
