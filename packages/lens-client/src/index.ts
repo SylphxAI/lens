@@ -8,6 +8,11 @@
 import type { LensObject, LensRequest, LensTransport, Select, Selected } from "@sylphx/lens-core";
 import type { Observable } from "@sylphx/lens-core";
 
+// Optimistic updates
+export { NormalizedCache } from "./optimistic/cache.js";
+export { OptimisticExecutor } from "./optimistic/executor.js";
+export { executeTransform } from "./optimistic/transforms.js";
+
 /**
  * Client configuration
  */
