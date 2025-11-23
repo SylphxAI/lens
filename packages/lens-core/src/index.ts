@@ -8,6 +8,22 @@
 // Schema builder
 export { lens, createLensBuilder } from "./schema/builder.js";
 
+// Optimistic updates
+export { OptimisticBuilder } from "./schema/optimistic-builder.js";
+export { TransformUtils } from "./schema/transform-utils.js";
+export type {
+	OptimisticConfig,
+	Descriptor,
+	FieldDescriptor,
+	TransformDescriptor,
+	LiteralDescriptor,
+	Operation,
+	SetOperation,
+	ArrayPushOperation,
+	ArraySpliceOperation,
+	OptimisticUpdate,
+} from "./schema/optimistic-types.js";
+
 // Types
 export type {
 	LensQuery,

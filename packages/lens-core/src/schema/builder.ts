@@ -19,6 +19,8 @@
 import type { Observable } from "rxjs";
 import type { z } from "zod";
 import type { LensQuery, LensMutation, LensObject } from "./types.js";
+import { OptimisticBuilder } from "./optimistic-builder.js";
+import type { OptimisticConfig } from "./optimistic-types.js";
 
 /**
  * Handler function signatures for Builder Pattern API
@@ -57,7 +59,8 @@ export class ProcedureBuilder<TContext, TInputSchema = undefined, TOutputSchema 
 	constructor(
 		private readonly _context: TContext,
 		private readonly inputSchema: TInputSchema,
-		private readonly outputSchema: TOutputSchema
+		private readonly outputSchema: TOutputSchema,
+		private readonly optimisticConfig?: OptimisticConfig
 	) {}
 
 	/**
@@ -65,7 +68,7 @@ export class ProcedureBuilder<TContext, TInputSchema = undefined, TOutputSchema 
 	 * Returns new builder with updated type state
 	 */
 	input<TSchema extends z.ZodTypeAny>(schema: TSchema): ProcedureBuilder<TContext, TSchema, TOutputSchema> {
-		return new ProcedureBuilder(this._context, schema, this.outputSchema);
+		return new ProcedureBuilder(this._context, schema, this.outputSchema, this.optimisticConfig);
 	}
 
 	/**
@@ -73,7 +76,35 @@ export class ProcedureBuilder<TContext, TInputSchema = undefined, TOutputSchema 
 	 * Returns new builder with updated type state
 	 */
 	output<TSchema extends z.ZodTypeAny>(schema: TSchema): ProcedureBuilder<TContext, TInputSchema, TSchema> {
-		return new ProcedureBuilder(this._context, this.inputSchema, schema);
+		return new ProcedureBuilder(this._context, this.inputSchema, schema, this.optimisticConfig);
+	}
+
+	/**
+	 * Define optimistic update configuration for mutations
+	 * Returns new builder with optimistic config
+	 *
+	 * @example
+	 * ```ts
+	 * lens.input(UpdateSessionInput)
+	 *     .output(SessionSchema)
+	 *     .optimistic((opt) => opt
+	 *       .entity('Session')
+	 *       .id($ => $.sessionId)
+	 *       .apply((draft, input, t) => {
+	 *         draft.title = input.newTitle;
+	 *         draft.updatedAt = t.now();
+	 *       })
+	 *     )
+	 *     .mutation(async ({ input, ctx }) => { ... })
+	 * ```
+	 */
+	optimistic(
+		builder: (opt: OptimisticBuilder<TInputSchema, TOutputSchema>) => OptimisticBuilder<TInputSchema, TOutputSchema>
+	): ProcedureBuilder<TContext, TInputSchema, TOutputSchema> {
+		const opt = new OptimisticBuilder<TInputSchema, TOutputSchema>();
+		const configured = builder(opt);
+		const config = configured.build();
+		return new ProcedureBuilder(this._context, this.inputSchema, this.outputSchema, config);
 	}
 
 	/**
@@ -116,6 +147,7 @@ export class ProcedureBuilder<TContext, TInputSchema = undefined, TOutputSchema 
 			resolve: this.inputSchema !== undefined
 				? ((input: any, ctx: TContext) => handler({ input, ctx }))
 				: ((ctx: TContext) => handler({ ctx } as any)),
+			optimistic: this.optimisticConfig,
 		};
 	}
 
