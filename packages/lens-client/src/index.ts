@@ -12,12 +12,18 @@ import type { Observable } from "@sylphx/lens-core";
 export { NormalizedCache } from "./optimistic/cache.js";
 export { OptimisticExecutor } from "./optimistic/executor.js";
 export { executeTransform } from "./optimistic/transforms.js";
+export { OptimisticManager } from "./optimistic/manager.js";
+export type { OptimisticManagerConfig } from "./optimistic/manager.js";
 
 /**
  * Client configuration
  */
 export interface LensClientConfig {
 	transport: LensTransport;
+	/** Optional: API schema for accessing mutation metadata (including optimistic config) */
+	schema?: LensObject;
+	/** Optional: OptimisticManager for automatic optimistic updates */
+	optimisticManager?: import("./optimistic/manager.js").OptimisticManager;
 }
 
 /**
@@ -65,12 +71,29 @@ type InferOutput<T> = T extends { output: { parse: (val: any) => infer O } }
 	: never;
 
 /**
+ * Get mutation metadata from schema by path
+ */
+function getMutationMetadata(schema: LensObject | undefined, path: string[]): any {
+	if (!schema) return undefined;
+
+	let current: any = schema;
+	for (const key of path) {
+		if (!current || typeof current !== "object") return undefined;
+		current = current[key];
+	}
+
+	return current?.type === "mutation" ? current : undefined;
+}
+
+/**
  * Create proxy for nested path building
  */
 function createProxy<T extends LensObject>(
-	transport: LensTransport,
+	config: LensClientConfig,
 	path: string[] = [],
 ): any {
+	const { transport, schema, optimisticManager } = config;
+
 	return new Proxy(
 		{},
 		{
@@ -105,12 +128,38 @@ function createProxy<T extends LensObject>(
 						const actualInput = hasInput ? inputOrOptions : undefined;
 						const actualOptions = hasInput ? options : inputOrOptions;
 
-						return transport.mutate({
-							type: "mutation",
-							path,
-							input: actualInput,
-							select: actualOptions?.select,
-						});
+						// Get mutation metadata (including optimistic config)
+						const metadata = getMutationMetadata(schema, path);
+						const optimisticConfig = metadata?.optimistic;
+
+						// Apply optimistic update before mutation
+						let mutationId: string | null = null;
+						if (optimisticManager && optimisticConfig) {
+							mutationId = optimisticManager.beforeMutation(optimisticConfig, actualInput);
+						}
+
+						try {
+							// Execute mutation
+							const result = await transport.mutate({
+								type: "mutation",
+								path,
+								input: actualInput,
+								select: actualOptions?.select,
+							});
+
+							// Confirm optimistic update on success
+							if (optimisticManager && mutationId) {
+								optimisticManager.onSuccess(mutationId);
+							}
+
+							return result;
+						} catch (error) {
+							// Rollback optimistic update on error
+							if (optimisticManager && mutationId) {
+								optimisticManager.onError(mutationId);
+							}
+							throw error;
+						}
 					};
 				}
 
@@ -133,7 +182,7 @@ function createProxy<T extends LensObject>(
 				}
 
 				// Continue building path
-				return createProxy(transport, newPath);
+				return createProxy(config, newPath);
 			},
 		},
 	);
@@ -144,27 +193,36 @@ function createProxy<T extends LensObject>(
  *
  * @example
  * ```ts
+ * // Basic usage
  * const client = createLensClient<typeof api>({ transport });
  *
- * // Type-safe queries
- * const user = await client.user.get.query({ id: '1' });
+ * // With automatic optimistic updates
+ * import { OptimisticManager } from '@sylphx/lens-client';
  *
- * // Type-safe mutations
- * const updated = await client.user.update.mutate({
- *   id: '1',
- *   data: { name: 'Alice' }
+ * const optimisticManager = new OptimisticManager({ debug: true });
+ * const client = createLensClient<typeof api>({
+ *   transport,
+ *   schema: api, // Pass API schema for optimistic metadata
+ *   optimisticManager,
  * });
  *
- * // Type-safe subscriptions
- * client.user.get.subscribe({ id: '1' }).subscribe({
- *   next: (user) => console.log(user)
+ * // Mutations now automatically apply optimistic updates
+ * await client.session.updateTitle.mutate({
+ *   sessionId: 'sess-1',
+ *   newTitle: 'Updated Title'
+ * });
+ * // UI updates immediately, confirms on success, rolls back on error
+ *
+ * // Subscribe to entity changes (merged with optimistic)
+ * optimisticManager.subscribe('Session', 'sess-1').subscribe({
+ *   next: (session) => console.log('Session updated:', session)
  * });
  * ```
  */
 export function createLensClient<T extends LensObject>(
 	config: LensClientConfig,
 ): LensClient<T> {
-	return createProxy(config.transport) as LensClient<T>;
+	return createProxy(config) as LensClient<T>;
 }
 
 /**
