@@ -212,10 +212,8 @@ function createEntityAccessor<
 		},
 
 		async update(input: UpdateInput<S[E], S>): Promise<MutationResult<Entity>> {
-			const { id, ...data } = input;
-
 			// Apply optimistic update
-			const optimisticId = store.applyOptimistic(entityName, "update", { id, ...data });
+			const optimisticId = store.applyOptimistic(entityName, "update", input as Partial<Entity> & { id: string });
 
 			try {
 				// Send mutation to server
