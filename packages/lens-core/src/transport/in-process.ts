@@ -18,6 +18,7 @@ import type { LensObject } from "../schema/types.js";
  */
 export interface InProcessTransportConfig {
 	api: LensObject<any>;
+	context?: any;
 }
 
 /**
@@ -48,7 +49,7 @@ export class InProcessTransport implements LensTransport {
 		const validatedInput = this.validateInput(target, request);
 
 		return new Observable<T>((subscriber) => {
-			const subscription = target.subscribe(validatedInput).subscribe({
+			const subscription = target.subscribe(validatedInput, this.config.context).subscribe({
 				next: (value: any) => {
 					// Validate output
 					const outputResult = target.output.safeParse(value);
@@ -82,8 +83,8 @@ export class InProcessTransport implements LensTransport {
 		// Validate input
 		const validatedInput = this.validateInput(target, request);
 
-		// Execute
-		return target.resolve(validatedInput).then((result: any) => {
+		// Execute with context
+		return target.resolve(validatedInput, this.config.context).then((result: any) => {
 			// Validate output
 			const outputResult = target.output.safeParse(result);
 			if (!outputResult.success) {
