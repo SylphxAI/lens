@@ -90,5 +90,47 @@ export {
 	InProcessTransport,
 	createInProcessTransport,
 	type InProcessTransportConfig,
-	type InProcessResolvers,
+	type InProcessResolvers as InProcessTransportResolvers,
 } from "./transport/in-process";
+
+// =============================================================================
+// Links (tRPC-style middleware chain)
+// =============================================================================
+
+export {
+	// Types
+	type OperationType,
+	type OperationContext,
+	type OperationResult,
+	type NextLink,
+	type LinkFn,
+	type Link,
+	type TerminalLink,
+	type Observable,
+	type Observer,
+	type Unsubscribable,
+	// Utilities
+	composeLinks,
+	createOperationContext,
+	// Middleware links
+	loggerLink,
+	type LoggerLinkOptions,
+	retryLink,
+	type RetryLinkOptions,
+	cacheLink,
+	createCacheStore,
+	type CacheLinkOptions,
+	splitLink,
+	splitByType,
+	type SplitLinkOptions,
+	// Terminal links
+	httpLink,
+	httpBatchLink,
+	type HttpLinkOptions,
+	sseLink,
+	type SSELinkOptions,
+	inProcessLink,
+	createInProcessLink,
+	type InProcessLinkOptions,
+	type InProcessResolvers,
+} from "./links";
