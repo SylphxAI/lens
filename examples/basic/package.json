@@ -1,0 +1,25 @@
+{
+	"name": "lens-basic-example",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"server": "bun run server.ts",
+		"dev": "vite",
+		"build": "vite build"
+	},
+	"dependencies": {
+		"@lens/client": "workspace:*",
+		"@lens/core": "workspace:*",
+		"@lens/react": "workspace:*",
+		"@lens/server": "workspace:*",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
+	},
+	"devDependencies": {
+		"@types/react": "^18.3.12",
+		"@types/react-dom": "^18.3.1",
+		"@vitejs/plugin-react": "^4.3.4",
+		"typescript": "^5.9.3",
+		"vite": "^6.0.0"
+	}
+}

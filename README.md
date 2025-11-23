@@ -107,22 +107,59 @@ import type { schema } from './schema';
 export const api = createClient<typeof schema>({
   url: 'ws://localhost:3000',
 });
+```
 
+### React
+
+```tsx
 // App.tsx
+import { LensProvider, useEntity, useList, useMutation } from '@lens/react';
 import { api } from './api';
 
+// Wrap your app with the provider
 function App() {
-  const user = api.user.get({ id: '123' });
+  return (
+    <LensProvider client={api}>
+      <UserProfile userId="123" />
+    </LensProvider>
+  );
+}
+
+// Use hooks to access data
+function UserProfile({ userId }: { userId: string }) {
+  const { data: user, loading, error } = useEntity('User', { id: userId });
+  const { mutate: updateUser } = useMutation('User', 'update');
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  if (!user) return <div>User not found</div>;
 
   return (
     <div>
-      <h1>{user.value?.name}</h1>
-      <ul>
-        {user.value?.posts.map(post => (
-          <li key={post.id}>{post.title}</li>
-        ))}
-      </ul>
+      <h1>{user.name}</h1>
+      <button onClick={() => updateUser({ id: userId, name: 'New Name' })}>
+        Update Name
+      </button>
     </div>
+  );
+}
+
+// List entities
+function PostList() {
+  const { data: posts, loading } = useList('Post', {
+    where: { published: true },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  });
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <ul>
+      {posts.map(post => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
   );
 }
 ```
