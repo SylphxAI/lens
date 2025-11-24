@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { createSchema, t, authPlugin, type AuthClientAPI } from "@lens/core";
+import { createSchema, t } from "@lens/core";
 import { createServer, type LensServer, createResolvers } from "../index";
 
 // =============================================================================
@@ -355,41 +355,6 @@ describe("E2E: Server-Client", () => {
 		});
 	});
 
-	describe("Server with Plugins", () => {
-		it("creates server with unified auth plugin", async () => {
-			const { users } = testData;
-			const pluginServer = createServer({
-				schema,
-				resolvers: createResolvers(schema, {
-					User: {
-						resolve: async (id) => users.get(id) ?? null,
-					},
-				}),
-				context: () => ({ db: {} }),
-				plugins: [
-					{
-						plugin: authPlugin,
-						config: {
-							headerName: "Authorization",
-							tokenPrefix: "Bearer",
-							validateToken: async (token) => {
-								if (token === "valid-token") {
-									return { valid: true, user: { id: "1" } };
-								}
-								return { valid: false };
-							},
-						},
-					},
-				],
-			});
-
-			// Server should be created successfully
-			expect(pluginServer).toBeDefined();
-			expect(pluginServer.engine).toBeDefined();
-
-			await pluginServer.close();
-		});
-	});
 });
 
 describe("E2E: Field Selection Edge Cases", () => {

@@ -46,12 +46,5 @@ export {
 	type QueryOptions as ReactiveQueryOptions,
 	type ListOptions as ReactiveListOptions,
 	type InferQueryResult as ReactiveInferQueryResult,
-	type PluginEntry,
 } from "./reactive-client";
 
-export {
-	OptimisticManager,
-	createOptimisticManager,
-	type OptimisticEntry,
-	type OptimisticManagerConfig,
-} from "./optimistic-manager";

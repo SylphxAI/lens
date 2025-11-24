@@ -140,7 +140,7 @@ export {
 	type QueryResult,
 	type ListQueryResult,
 	type QueryTransport,
-	// ReactiveClient (new reactive client)
+	// ReactiveClient
 	createReactiveClient,
 	type ReactiveClient,
 	type ReactiveClientConfig,
@@ -151,36 +151,4 @@ export {
 	type ReactiveQueryOptions,
 	type ReactiveListOptions,
 	type ReactiveInferQueryResult,
-	// OptimisticManager (optimistic updates)
-	OptimisticManager,
-	createOptimisticManager,
-	type OptimisticEntry,
-	type OptimisticManagerConfig,
 } from "./reactive";
-
-// =============================================================================
-// Plugin System
-// =============================================================================
-
-export {
-	// Core types (re-exported from @lens/core)
-	defineUnifiedPlugin,
-	isConfiguredPlugin,
-	type UnifiedPlugin,
-	type CallableUnifiedPlugin,
-	type ConfiguredPlugin,
-	type ClientPluginContext,
-	type ClientPluginHooks,
-	type ClientPluginInstance,
-	type ClientPluginDef,
-	// Client plugin manager
-	createPluginManager,
-	type PluginManager,
-	type PluginInput,
-	// Client-only plugins
-	optimisticPlugin,
-	type OptimisticPluginAPI,
-	// Config types
-	type OptimisticPluginConfig,
-	type ExtendedPluginContext,
-} from "./plugins";

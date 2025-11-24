@@ -1,8 +1,10 @@
 /**
  * @lens/client - ReactiveClient
  *
- * New reactive client that uses EntitySignals for fine-grained reactivity.
+ * Reactive client with fine-grained field-level reactivity.
  * Returns EntitySignals with field-level signals ($.field) and computed value.
+ *
+ * Optimistic updates are CORE BEHAVIOR - mutations are optimistic by default.
  */
 
 import type {
@@ -21,7 +23,6 @@ import type {
 import { EntitySignal } from "./entity-signal";
 import { SubscriptionManager, type SubscriptionTransport } from "./subscription-manager";
 import { QueryResolver, type QueryTransport } from "./query-resolver";
-import { OptimisticManager, type OptimisticManagerConfig } from "./optimistic-manager";
 import { type Signal, computed } from "../signals/signal";
 import {
 	type Link,
@@ -30,22 +31,10 @@ import {
 	composeLinks,
 	createOperationContext,
 } from "../links";
-import {
-	createPluginManager,
-	type Plugin,
-	type PluginManager,
-	type PluginContext,
-} from "../plugins";
 
 // =============================================================================
 // Types
 // =============================================================================
-
-/** Plugin registration entry */
-export interface PluginEntry<T = unknown> {
-	plugin: Plugin<T>;
-	config?: T;
-}
 
 /** Reactive client configuration */
 export interface ReactiveClientConfig<S extends SchemaDefinition = SchemaDefinition> {
@@ -53,10 +42,6 @@ export interface ReactiveClientConfig<S extends SchemaDefinition = SchemaDefinit
 	links: Link[];
 	/** WebSocket URL for real-time subscriptions */
 	subscriptionUrl?: string;
-	/** Optimistic update configuration */
-	optimistic?: OptimisticManagerConfig;
-	/** Plugins to register */
-	plugins?: Array<Plugin | PluginEntry>;
 }
 
 /** Query options with optional select */
@@ -142,16 +127,16 @@ export interface ReactiveEntityAccessor<
 		options?: ListOptions<S, E, Sel>,
 	): ListResult<InferQueryResult<S, E, Sel> & Record<string, unknown>>;
 
-	/** Create entity */
+	/** Create entity (optimistic by default) */
 	create(data: CreateInput<S[E], S>): Promise<MutationResult<Entity>>;
 
-	/** Update entity */
+	/** Update entity (optimistic by default) */
 	update(
 		id: string,
 		data: Partial<Omit<CreateInput<S[E], S>, "id">>,
 	): Promise<MutationResult<Entity>>;
 
-	/** Delete entity */
+	/** Delete entity (optimistic by default) */
 	delete(id: string): Promise<void>;
 
 	/** Batch create */
@@ -172,10 +157,6 @@ export type ReactiveClient<S extends SchemaDefinition> = {
 	$subscriptions: SubscriptionManager;
 	/** Query resolver */
 	$resolver: QueryResolver;
-	/** Optimistic update manager */
-	$optimistic: OptimisticManager;
-	/** Plugin manager */
-	$plugins: PluginManager & { [name: string]: unknown };
 	/** Set real-time transport */
 	$setSubscriptionTransport: (transport: SubscriptionTransport) => void;
 	/** Execute raw operation */
@@ -188,6 +169,91 @@ export type ReactiveClient<S extends SchemaDefinition> = {
 	/** Destroy client and cleanup */
 	$destroy: () => void;
 };
+
+// =============================================================================
+// Optimistic Updates (Core Behavior)
+// =============================================================================
+
+interface OptimisticEntry {
+	entity: string;
+	id: string;
+	operation: "create" | "update" | "delete";
+	previousData: Record<string, unknown> | null;
+}
+
+/** Optimistic update tracking - core behavior, not a plugin */
+class OptimisticTracker {
+	private pending = new Map<string, OptimisticEntry>();
+	private counter = 0;
+
+	constructor(private subscriptions: SubscriptionManager) {}
+
+	/** Apply optimistic update immediately */
+	apply(
+		entity: string,
+		id: string,
+		operation: "create" | "update" | "delete",
+		data: Record<string, unknown>,
+	): string {
+		const optId = `opt_${++this.counter}`;
+
+		// Get current data for rollback
+		const signal = this.subscriptions.getSignal(entity, id);
+		const previousData = signal?.value.value ?? null;
+
+		// Store for potential rollback
+		this.pending.set(optId, { entity, id, operation, previousData });
+
+		// Apply optimistic update to subscription
+		if (operation === "delete") {
+			// Mark as deleted (signal will show null)
+			const sub = this.subscriptions.getOrCreateSubscription(entity, id, {});
+			sub.signal.setFields({ __deleted: true } as Record<string, unknown>);
+		} else {
+			// Create or update
+			const sub = this.subscriptions.getOrCreateSubscription(entity, id, data);
+			if (operation === "update" && previousData) {
+				// Merge update into existing data
+				sub.signal.setFields({ ...previousData, ...data });
+			} else {
+				sub.signal.setFields(data);
+			}
+		}
+
+		return optId;
+	}
+
+	/** Confirm optimistic update with server response */
+	confirm(optId: string, serverData?: Record<string, unknown>): void {
+		const entry = this.pending.get(optId);
+		if (!entry) return;
+
+		// Update with authoritative server data
+		if (serverData && entry.operation !== "delete") {
+			const sub = this.subscriptions.getOrCreateSubscription(entry.entity, entry.id, serverData);
+			sub.signal.setFields(serverData);
+		}
+
+		this.pending.delete(optId);
+	}
+
+	/** Rollback optimistic update on failure */
+	rollback(optId: string): void {
+		const entry = this.pending.get(optId);
+		if (!entry) return;
+
+		// Restore previous data
+		if (entry.previousData) {
+			const sub = this.subscriptions.getOrCreateSubscription(entry.entity, entry.id, entry.previousData);
+			sub.signal.setFields(entry.previousData);
+		} else if (entry.operation === "create") {
+			// Was a create - remove the optimistic entity
+			// TODO: Add method to remove from subscription manager
+		}
+
+		this.pending.delete(optId);
+	}
+}
 
 // =============================================================================
 // Implementation
@@ -203,10 +269,8 @@ function createReactiveEntityAccessor<
 	entityName: E,
 	subscriptions: SubscriptionManager,
 	resolver: QueryResolver,
-	optimistic: OptimisticManager,
+	optimistic: OptimisticTracker,
 	execute: (type: "query" | "mutation", op: string, input: unknown) => Promise<OperationResult>,
-	pluginManager?: PluginManager,
-	pluginContext?: PluginContext,
 ): ReactiveEntityAccessor<S, E> {
 	type Entity = InferEntity<S[E], S> & Record<string, unknown>;
 
@@ -366,21 +430,10 @@ function createReactiveEntityAccessor<
 			const entityData = data as unknown as Entity;
 			const id = (entityData as { id?: string }).id;
 
-			// Call plugin hook
-			if (pluginManager && pluginContext) {
-				pluginManager.callHook(
-					"onBeforeMutation",
-					pluginContext,
-					entityName,
-					"create",
-					data,
-				);
-			}
-
-			// Apply optimistic update if we have an ID
+			// Apply optimistic update if we have an ID (core behavior)
 			let optId = "";
 			if (id) {
-				optId = optimistic.applyOptimistic(entityName, id, "create", entityData);
+				optId = optimistic.apply(entityName, id, "create", entityData);
 			}
 
 			try {
@@ -390,25 +443,13 @@ function createReactiveEntityAccessor<
 				const entity = result.data as Entity;
 				const serverId = (entity as { id?: string }).id;
 
-				// Confirm optimistic update
+				// Confirm optimistic update with server data
 				if (optId) {
 					optimistic.confirm(optId, entity);
 				} else if (serverId) {
 					// No optimistic update, just update subscription
 					const sub = subscriptions.getOrCreateSubscription(entityName, serverId, entity);
 					sub.signal.setFields(entity);
-				}
-
-				// Call plugin hook
-				if (pluginManager && pluginContext) {
-					pluginManager.callHook(
-						"onAfterMutation",
-						pluginContext,
-						entityName,
-						"create",
-						result,
-						{},
-					);
 				}
 
 				return {
@@ -419,17 +460,6 @@ function createReactiveEntityAccessor<
 				// Rollback on failure
 				if (optId) {
 					optimistic.rollback(optId);
-				}
-				// Call plugin error hook
-				if (pluginManager && pluginContext) {
-					pluginManager.callHook(
-						"onMutationError",
-						pluginContext,
-						entityName,
-						"create",
-						error as Error,
-						{},
-					);
 				}
 				throw error;
 			}
@@ -439,19 +469,8 @@ function createReactiveEntityAccessor<
 			id: string,
 			data: Partial<Omit<CreateInput<S[E], S>, "id">>,
 		): Promise<MutationResult<Entity>> {
-			// Call plugin hook
-			if (pluginManager && pluginContext) {
-				pluginManager.callHook(
-					"onBeforeMutation",
-					pluginContext,
-					entityName,
-					"update",
-					{ id, data },
-				);
-			}
-
-			// Apply optimistic update
-			const optId = optimistic.applyOptimistic(entityName, id, "update", data as Partial<Entity>);
+			// Apply optimistic update (core behavior)
+			const optId = optimistic.apply(entityName, id, "update", data as Record<string, unknown>);
 
 			try {
 				const result = await execute("mutation", "update", { id, ...data });
@@ -459,59 +478,23 @@ function createReactiveEntityAccessor<
 
 				const entity = result.data as Entity;
 
-				// Confirm optimistic update with server data
+				// Confirm optimistic update with server data (server is authoritative)
 				optimistic.confirm(optId, entity);
-
-				// Call plugin hook
-				if (pluginManager && pluginContext) {
-					pluginManager.callHook(
-						"onAfterMutation",
-						pluginContext,
-						entityName,
-						"update",
-						result,
-						{},
-					);
-				}
 
 				return {
 					data: entity,
-					rollback: optId ? () => optimistic.rollback(optId) : undefined,
+					rollback: () => optimistic.rollback(optId),
 				};
 			} catch (error) {
 				// Rollback on failure
-				if (optId) {
-					optimistic.rollback(optId);
-				}
-				// Call plugin error hook
-				if (pluginManager && pluginContext) {
-					pluginManager.callHook(
-						"onMutationError",
-						pluginContext,
-						entityName,
-						"update",
-						error as Error,
-						{},
-					);
-				}
+				optimistic.rollback(optId);
 				throw error;
 			}
 		},
 
 		async delete(id: string): Promise<void> {
-			// Call plugin hook
-			if (pluginManager && pluginContext) {
-				pluginManager.callHook(
-					"onBeforeMutation",
-					pluginContext,
-					entityName,
-					"delete",
-					{ id },
-				);
-			}
-
-			// Apply optimistic delete
-			const optId = optimistic.applyOptimistic(entityName, id, "delete", {});
+			// Apply optimistic delete (core behavior)
+			const optId = optimistic.apply(entityName, id, "delete", {});
 
 			try {
 				const result = await execute("mutation", "delete", { id });
@@ -519,34 +502,9 @@ function createReactiveEntityAccessor<
 
 				// Confirm optimistic delete
 				optimistic.confirm(optId);
-
-				// Call plugin hook
-				if (pluginManager && pluginContext) {
-					pluginManager.callHook(
-						"onAfterMutation",
-						pluginContext,
-						entityName,
-						"delete",
-						result,
-						{},
-					);
-				}
 			} catch (error) {
 				// Rollback on failure
-				if (optId) {
-					optimistic.rollback(optId);
-				}
-				// Call plugin error hook
-				if (pluginManager && pluginContext) {
-					pluginManager.callHook(
-						"onMutationError",
-						pluginContext,
-						entityName,
-						"delete",
-						error as Error,
-						{},
-					);
-				}
+				optimistic.rollback(optId);
 				throw error;
 			}
 		},
@@ -597,7 +555,7 @@ function createReactiveEntityAccessor<
 export function createReactiveClient<S extends SchemaDefinition>(
 	config: ReactiveClientConfig<S>,
 ): ReactiveClient<S> {
-	const { links, plugins: pluginConfigs } = config;
+	const { links } = config;
 
 	// Validate links
 	if (!links || links.length === 0) {
@@ -607,13 +565,12 @@ export function createReactiveClient<S extends SchemaDefinition>(
 	// Initialize links
 	const initializedLinks: LinkFn[] = links.map((link) => link());
 
-	// Create subscription manager, query resolver, and optimistic manager
+	// Create subscription manager and query resolver
 	const subscriptions = new SubscriptionManager();
 	const resolver = new QueryResolver(subscriptions);
-	const optimisticManager = new OptimisticManager(subscriptions, config.optimistic);
 
-	// Create plugin manager
-	const pluginManager = createPluginManager();
+	// Create optimistic tracker (core behavior, not a plugin)
+	const optimistic = new OptimisticTracker(subscriptions);
 
 	// Compose link chain
 	const terminalLink = initializedLinks[initializedLinks.length - 1];
@@ -654,61 +611,18 @@ export function createReactiveClient<S extends SchemaDefinition>(
 
 	resolver.setTransport(queryTransport);
 
-	// Create plugin context
-	const pluginContext: PluginContext = {
-		subscriptions,
-		resolver,
-		execute,
-	};
-
-	// Register plugins
-	if (pluginConfigs) {
-		for (const entry of pluginConfigs) {
-			if ("plugin" in entry) {
-				// PluginEntry with config
-				pluginManager.register(entry.plugin, entry.config);
-			} else {
-				// Just a Plugin
-				pluginManager.register(entry);
-			}
-		}
-	}
-
-	// Create $plugins proxy that exposes plugin APIs
-	const pluginsProxy = new Proxy(pluginManager as PluginManager & { [name: string]: unknown }, {
-		get(target, prop: string) {
-			// Forward manager methods
-			if (prop in target) {
-				return target[prop as keyof PluginManager];
-			}
-			// Get plugin API by name
-			return target.get(prop);
-		},
-	});
-
 	// Create client object
 	const client = {
 		$subscriptions: subscriptions,
 		$resolver: resolver,
-		$optimistic: optimisticManager,
-		$plugins: pluginsProxy,
 		$setSubscriptionTransport: (transport: SubscriptionTransport) => {
 			subscriptions.setTransport(transport);
-			// Notify plugins of connection
-			pluginManager.callHook("onConnect", pluginContext);
 		},
 		$execute: execute,
 		$destroy: () => {
-			pluginManager.callHook("onDestroy", pluginContext);
-			pluginManager.destroy();
 			subscriptions.destroy();
 		},
 	} as ReactiveClient<S>;
-
-	// Initialize plugins asynchronously
-	pluginManager.init(pluginContext).catch((error) => {
-		console.error("Failed to initialize plugins:", error);
-	});
 
 	// Create entity accessors using Proxy
 	return new Proxy(client, {
@@ -723,10 +637,8 @@ export function createReactiveClient<S extends SchemaDefinition>(
 				prop,
 				subscriptions,
 				resolver,
-				optimisticManager,
+				optimistic,
 				(type, op, input) => execute(type, prop, op, input),
-				pluginManager,
-				pluginContext,
 			);
 		},
 	});

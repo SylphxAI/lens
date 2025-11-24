@@ -4,21 +4,14 @@
  * Factory for creating a Lens server with GraphStateManager integration.
  */
 
-import type { Schema, SchemaDefinition, UnifiedPlugin, ServerHandshake } from "@lens/core";
+import type { Schema, SchemaDefinition } from "@lens/core";
 import type { Resolvers, BaseContext } from "../resolvers/types";
 import { ExecutionEngine } from "../execution/engine";
 import { GraphStateManager, type StateClient } from "../state/graph-state-manager";
-import { createServerPluginManager, type ServerPluginManager } from "../plugins";
 
 // =============================================================================
 // Types
 // =============================================================================
-
-/** Plugin entry for server config */
-export interface PluginEntry<T = unknown> {
-	plugin: UnifiedPlugin<T>;
-	config?: T;
-}
 
 export interface ServerConfig<S extends SchemaDefinition, Ctx extends BaseContext> {
 	/** Schema definition */
@@ -27,9 +20,7 @@ export interface ServerConfig<S extends SchemaDefinition, Ctx extends BaseContex
 	resolvers: Resolvers<S, Ctx>;
 	/** Context factory */
 	context?: (req?: unknown) => Ctx;
-	/** Plugins */
-	plugins?: Array<UnifiedPlugin | PluginEntry>;
-	/** Server version (for handshake) */
+	/** Server version */
 	version?: string;
 }
 
@@ -116,7 +107,6 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 	engine: ExecutionEngine<S, Ctx>;
 	stateManager: GraphStateManager;
 	private server: unknown = null;
-	private pluginManager: ServerPluginManager;
 	private version: string;
 	private clientCounter = 0;
 
@@ -143,20 +133,6 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 		});
 
 		this.version = config.version ?? "1.0.0";
-
-		// Initialize plugin manager
-		this.pluginManager = createServerPluginManager();
-
-		// Register plugins
-		if (config.plugins) {
-			for (const entry of config.plugins) {
-				if ("plugin" in entry) {
-					this.pluginManager.register(entry.plugin, entry.config);
-				} else {
-					this.pluginManager.register(entry);
-				}
-			}
-		}
 	}
 
 	handleWebSocket(ws: WebSocketLike): void {
@@ -235,16 +211,11 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 	}
 
 	private handleHandshake(ws: WebSocketLike, message: HandshakeMessage): void {
-		const handshake: ServerHandshake = {
-			version: this.version,
-			plugins: this.pluginManager.getHandshakeInfo(),
-		};
-
 		ws.send(
 			JSON.stringify({
 				type: "handshake",
 				id: message.id,
-				...handshake,
+				version: this.version,
 			}),
 		);
 	}
@@ -470,9 +441,6 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 	}
 
 	async listen(port: number): Promise<void> {
-		// Initialize plugins
-		await this.pluginManager.init();
-
 		// Use Bun's built-in server
 		this.server = Bun.serve({
 			port,
@@ -520,9 +488,6 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 	}
 
 	async close(): Promise<void> {
-		// Destroy plugins
-		await this.pluginManager.destroy();
-
 		// Clear all state
 		this.stateManager.clear();
 

@@ -207,39 +207,3 @@ export {
 	applyUpdate,
 } from "./updates/strategies";
 
-// =============================================================================
-// Unified Plugin System
-// =============================================================================
-
-export {
-	// Helper
-	defineUnifiedPlugin,
-	isConfiguredPlugin,
-	// Types
-	type PluginMeta,
-	type BasePluginConfig,
-	// Client types
-	type ClientPluginContext,
-	type ClientPluginHooks,
-	type ClientPluginInstance,
-	type ClientPluginDef,
-	// Server types
-	type ServerRequestContext,
-	type ServerPluginContext,
-	type ServerPluginHooks,
-	type ServerPluginInstance,
-	type ServerPluginDef,
-	// Unified
-	type UnifiedPlugin,
-	type CallableUnifiedPlugin,
-	type ConfiguredPlugin,
-	// Handshake
-	type PluginHandshakeInfo,
-	type ServerHandshake,
-	type ClientHandshake,
-	// Built-in plugins
-	authPlugin,
-	type AuthPluginConfig,
-	type AuthClientAPI,
-	type AuthServerAPI,
-} from "./plugins";
