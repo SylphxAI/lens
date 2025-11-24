@@ -1,6 +1,6 @@
 # Lens Implementation Plan
 
-> Current Status: **Phase 4** - Server Integration Complete, Client Integration In Progress
+> Current Status: **Phase 5** - Client Integration Complete, React Hooks Pending
 
 ---
 
@@ -11,7 +11,7 @@
 | 1 | New Architecture Design | ✅ Complete |
 | 2 | Core API (@lens/core) | ✅ Complete |
 | 3 | Server Integration | ✅ Complete |
-| 4 | Client Integration | 🟡 In Progress |
+| 4 | Client Integration | ✅ Complete |
 | 5 | React Hooks Update | ⬜ Pending |
 
 ---
@@ -110,44 +110,36 @@ server.listen(3000)
 
 ---
 
-## Phase 4: Client Integration 🟡 In Progress
+## Phase 4: Client Integration ✅ Complete
 
-### Current State
-
-The existing client (`@lens/client`) uses CRUD-based API:
-- `client.user.get({ id })`
-- `client.user.list()`
-- `client.user.create(input)`
-
-### New Client API
+New `createClientV2()` implemented with operations-based API:
 
 ```typescript
-const client = createClient({
+const client = createClientV2({
   queries,
   mutations,
   links: [websocketLink({ url: '...' })],
 })
 
 // Type-safe operation access
-const me = await client.whoami()
-const results = await client.searchUsers({ query: 'john' })
-const post = await client.createPost({ title: 'Hello', content: 'World' })
+const me = await client.query.whoami()
+const results = await client.query.searchUsers({ query: 'john' })
+const { data, rollback } = await client.mutation.createPost({
+  title: 'Hello',
+  content: 'World',
+})
 ```
 
-### Changes Required
+### Features Implemented
 
-1. **Client Generation**
-   - Generate client methods from query/mutation definitions
-   - Type-safe input/output inference
+- **Type-Safe Accessors**: `client.query.*` and `client.mutation.*`
+- **Input/Output Inference**: Types inferred from operation definitions
+- **Optimistic Updates**: Execute `optimistic()` with rollback support
+- **Store Integration**: Access underlying ReactiveStore via `$store`
+- **Raw Execute**: Direct operation execution via `$execute()`
+- **Backward Compatibility**: `createClient()` still available
 
-2. **Optimistic Updates**
-   - Execute `optimistic()` function on mutation call
-   - Apply to local cache
-   - Replace/rollback on server response
-
-3. **Multi-Entity Handling**
-   - Handle mutations returning `{ users: [User], notifications: [Notification] }`
-   - Update cache for multiple entity types
+### Tests: 16 passing
 
 ---
 
@@ -181,8 +173,8 @@ function CreatePost() {
 |---------|-------|--------|
 | @lens/core | 191 | ✅ |
 | @lens/server | 124 | ✅ (+27 new) |
-| @lens/client | 167 | ✅ |
-| **Total** | **482** | ✅ |
+| @lens/client | 183 | ✅ (+16 new) |
+| **Total** | **498** | ✅ |
 
 ---
 
@@ -190,6 +182,7 @@ function CreatePost() {
 
 | Hash | Description |
 |------|-------------|
+| `d1c4d98` | feat(client): add createClientV2 for operations-based API |
 | `2311c15` | feat(server): add createServerV2 for operations-based API |
 | `f2c46e6` | feat(core): add AsyncLocalStorage context system |
 | `07f1960` | feat(core): add entityResolvers for nested data handling |
@@ -245,5 +238,5 @@ const user = useCurrentUser()
 1. ~~**Create `createServerV2()`** - New server accepting operations~~ ✅
 2. ~~**Update ExecutionEngine** - Add `executeQuery()`, `executeMutation()`~~ ✅
 3. ~~**Integrate Context** - Wrap execution in `runWithContext()`~~ ✅
-4. **Create `createClientV2()`** - Client with operations-based API
+4. ~~**Create `createClientV2()`** - Client with operations-based API~~ ✅
 5. **Update React Hooks** - Accept operation references
