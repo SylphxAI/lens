@@ -1,6 +1,6 @@
 # Lens Implementation Plan
 
-> Current Status: **Phase 5** - Client Integration Complete, React Hooks Pending
+> Current Status: **All Phases Complete** 🎉
 
 ---
 
@@ -12,7 +12,7 @@
 | 2 | Core API (@lens/core) | ✅ Complete |
 | 3 | Server Integration | ✅ Complete |
 | 4 | Client Integration | ✅ Complete |
-| 5 | React Hooks Update | ⬜ Pending |
+| 5 | React Hooks Update | ✅ Complete |
 
 ---
 
@@ -143,27 +143,48 @@ const { data, rollback } = await client.mutation.createPost({
 
 ---
 
-## Phase 5: React Hooks Update ⬜ Pending
+## Phase 5: React Hooks Update ✅ Complete
 
-### New Hooks API
+New React hooks for operations-based API:
 
 ```tsx
+// Provider
+<LensProviderV2 client={client}>
+  <App />
+</LensProviderV2>
+
+// useQuery - auto-executes on mount
 function UserProfile() {
-  const { data, loading, error } = useQuery(client.whoami)
+  const { data, loading, error, refetch } = useQuery('whoami')
   // ...
 }
 
+// useLazyQuery - execute on demand
+function SearchUsers() {
+  const { execute, data, loading } = useLazyQuery('searchUsers')
+  const handleSearch = (query) => execute({ query })
+  // ...
+}
+
+// useMutationV2 - with optimistic support
 function CreatePost() {
-  const { mutate, loading } = useMutation(client.createPost)
+  const { mutate, loading, error, data, reset } = useMutationV2('createPost')
+  const handleCreate = async (input) => {
+    const { data, rollback } = await mutate(input)
+  }
   // ...
 }
 ```
 
-### Changes Required
+### Features Implemented
 
-1. Update `useQuery()` to accept operation references
-2. Update `useMutation()` to handle optimistic updates
-3. Support dependency arrays for reactive queries
+- **LensProviderV2**: Context provider for ClientV2
+- **useQuery**: Auto-execute query with loading/error state
+- **useLazyQuery**: Execute query on demand
+- **useMutationV2**: Execute mutations with optimistic support
+- **Backward Compatibility**: Original hooks still available
+
+### Tests: 17 passing
 
 ---
 
@@ -174,7 +195,8 @@ function CreatePost() {
 | @lens/core | 191 | ✅ |
 | @lens/server | 124 | ✅ (+27 new) |
 | @lens/client | 183 | ✅ (+16 new) |
-| **Total** | **498** | ✅ |
+| @lens/react | 17 | ✅ (+17 new) |
+| **Total** | **515** | ✅ |
 
 ---
 
@@ -182,6 +204,7 @@ function CreatePost() {
 
 | Hash | Description |
 |------|-------------|
+| `bd01ba9` | feat(react): add V2 hooks for operations-based API |
 | `d1c4d98` | feat(client): add createClientV2 for operations-based API |
 | `2311c15` | feat(server): add createServerV2 for operations-based API |
 | `f2c46e6` | feat(core): add AsyncLocalStorage context system |
@@ -235,8 +258,17 @@ const user = useCurrentUser()
 
 ## Next Steps
 
+All phases complete! 🎉
+
 1. ~~**Create `createServerV2()`** - New server accepting operations~~ ✅
 2. ~~**Update ExecutionEngine** - Add `executeQuery()`, `executeMutation()`~~ ✅
 3. ~~**Integrate Context** - Wrap execution in `runWithContext()`~~ ✅
 4. ~~**Create `createClientV2()`** - Client with operations-based API~~ ✅
-5. **Update React Hooks** - Accept operation references
+5. ~~**Update React Hooks** - Accept operation references~~ ✅
+
+### Future Enhancements (Optional)
+
+- Add WebSocket link V2 for operations protocol
+- Add subscription support for real-time queries
+- Add cache invalidation strategies
+- Add devtools for debugging
