@@ -35,6 +35,32 @@ export {
 } from "./hooks";
 
 // =============================================================================
+// Reactive Hooks (Fine-grained reactivity)
+// =============================================================================
+
+export {
+	// Context & Provider
+	ReactiveLensProvider,
+	useReactiveLensClient,
+	type ReactiveLensProviderProps,
+} from "./reactive-context";
+
+export {
+	// Entity hooks with field-level signals
+	useReactiveEntity,
+	useReactiveList,
+	// Field signal hook
+	useFieldSignal,
+	// Mutation hook
+	useReactiveMutation,
+	// Types
+	type UseReactiveEntityResult,
+	type UseReactiveListResult,
+	type UpdateMutationInput as ReactiveUpdateMutationInput,
+	type DeleteMutationInput as ReactiveDeleteMutationInput,
+} from "./reactive-hooks";
+
+// =============================================================================
 // Re-exports from @preact/signals-react
 // =============================================================================
 
