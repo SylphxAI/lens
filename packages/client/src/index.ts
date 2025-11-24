@@ -158,3 +158,28 @@ export {
 	type OptimisticEntry,
 	type OptimisticManagerConfig,
 } from "./reactive";
+
+// =============================================================================
+// Plugin System
+// =============================================================================
+
+export {
+	// Core
+	createPluginManager,
+	definePlugin,
+	// Types
+	type Plugin,
+	type PluginInstance,
+	type PluginContext,
+	type PluginHooks,
+	type PluginManager,
+	type OptimisticPluginConfig,
+	type DevToolsPluginConfig,
+	type CachePluginConfig,
+	type RetryPluginConfig,
+	// Built-in plugins
+	optimisticPlugin,
+	devToolsPlugin,
+	type OptimisticPluginAPI,
+	type DevToolsPluginAPI,
+} from "./plugins";
