@@ -32,17 +32,17 @@ function createMockClient() {
 
 	return {
 		User: {
-			get: mock((_input: { id: string }) => {
+			get: mock((_id: string, _options?: unknown) => {
 				return entitySignal;
 			}),
 			list: mock(() => listSignal),
 			create: mock(async (input: unknown) => ({
 				data: { id: "new-id", ...(input as object) },
 			})),
-			update: mock(async (input: { id: string }) => ({
-				data: { id: input.id, name: "Updated", email: "updated@test.com" },
+			update: mock(async (id: string, _data?: unknown) => ({
+				data: { id, name: "Updated", email: "updated@test.com" },
 			})),
-			delete: mock(async () => {}),
+			delete: mock(async (_id: string) => {}),
 		},
 		$store: {
 			release: mock(() => {}),
@@ -160,7 +160,7 @@ describe("useEntity", () => {
 		});
 
 		expect(client.User.get).toHaveBeenCalledWith(
-			{ id: "123" },
+			"123",
 			{ select: { name: true } },
 		);
 	});
@@ -237,13 +237,13 @@ describe("useMutation", () => {
 		});
 
 		await act(async () => {
-			await result.current.mutate({ id: "123", name: "Updated Name" });
+			await result.current.mutate({ id: "123", data: { name: "Updated Name" } });
 		});
 
-		expect(client.User.update).toHaveBeenCalledWith({
-			id: "123",
-			name: "Updated Name",
-		});
+		expect(client.User.update).toHaveBeenCalledWith(
+			"123",
+			{ name: "Updated Name" },
+		);
 	});
 
 	test("delete mutation executes correctly", async () => {
@@ -258,7 +258,7 @@ describe("useMutation", () => {
 			await result.current.mutate({ id: "123" });
 		});
 
-		expect(client.User.delete).toHaveBeenCalledWith({ id: "123" });
+		expect(client.User.delete).toHaveBeenCalledWith("123");
 	});
 
 	test("handles mutation error", async () => {
