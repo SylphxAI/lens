@@ -37,9 +37,11 @@ import {
 	type Link,
 	type LinkFn,
 	type OperationResult,
+	type NextLink,
 	composeLinks,
 	createOperationContext,
 } from "../links";
+import { createQueryResult, type QueryResult } from "../query";
 
 // =============================================================================
 // Types
@@ -129,15 +131,15 @@ export interface EntityAccessor<
 		options?: ListOptions<S, E, Sel>,
 	): Signal<EntityState<InferQueryResult<S, E, Sel>[]>>;
 
-	/** Find first matching entity */
+	/** Find first matching entity (can await or subscribe) */
 	findFirst<Sel extends Select<S[E], S> | undefined = undefined>(
 		options?: ListOptions<S, E, Sel>,
-	): Promise<InferQueryResult<S, E, Sel> | null>;
+	): QueryResult<InferQueryResult<S, E, Sel> | null>;
 
-	/** Find many entities (promise-based, non-reactive) */
+	/** Find many entities (can await or subscribe) */
 	findMany<Sel extends Select<S[E], S> | undefined = undefined>(
 		options?: ListOptions<S, E, Sel>,
-	): Promise<InferQueryResult<S, E, Sel>[]>;
+	): QueryResult<InferQueryResult<S, E, Sel>[]>;
 
 	/** Count entities */
 	count(options?: { where?: WhereInput<S[E]> }): Promise<number>;
@@ -232,6 +234,7 @@ function createEntityAccessor<
 		op: string,
 		input: unknown,
 	) => Promise<OperationResult>,
+	executeLink: NextLink,
 	optimisticEnabled: boolean,
 ): EntityAccessor<S, E> {
 	type Entity = InferEntity<S[E], S>;
@@ -394,17 +397,25 @@ function createEntityAccessor<
 			}
 		},
 
-		// New query methods
-		async findFirst(options?: { select?: unknown; where?: unknown; orderBy?: unknown; skip?: number }): Promise<Entity | null> {
-			const result = await execute("query", "findFirst", { ...options, take: 1 });
-			if (result.error) throw result.error;
-			return (result.data as Entity) ?? null;
+		// Query methods - return QueryResult (can await or subscribe)
+		findFirst(options?: { select?: unknown; where?: unknown; orderBy?: unknown; skip?: number }): QueryResult<Entity | null> {
+			const operation = createOperationContext(
+				"query",
+				entityName,
+				"findFirst",
+				{ ...options, take: 1 },
+			);
+			return createQueryResult<Entity | null>(operation, executeLink);
 		},
 
-		async findMany(options?: { select?: unknown; where?: unknown; orderBy?: unknown; take?: number; skip?: number; cursor?: unknown; distinct?: unknown }): Promise<Entity[]> {
-			const result = await execute("query", "findMany", options ?? {});
-			if (result.error) throw result.error;
-			return (result.data as Entity[]) ?? [];
+		findMany(options?: { select?: unknown; where?: unknown; orderBy?: unknown; take?: number; skip?: number; cursor?: unknown; distinct?: unknown }): QueryResult<Entity[]> {
+			const operation = createOperationContext(
+				"query",
+				entityName,
+				"findMany",
+				options ?? {},
+			);
+			return createQueryResult<Entity[]>(operation, executeLink);
 		},
 
 		async count(options?: { where?: unknown }): Promise<number> {
@@ -583,6 +594,7 @@ export function createClient<S extends SchemaDefinition>(
 				prop,
 				store,
 				(type, op, input) => execute(type, prop, op, input),
+				executeChain,
 				optimistic,
 			);
 		},
