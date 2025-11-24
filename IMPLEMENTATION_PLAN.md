@@ -1,465 +1,259 @@
 # Lens Implementation Plan
 
-> From Zero to World-Changing
+> Current Status: **Phase 2.5** - Core complete, GraphStateManager needed
 
 ---
 
-## Phase Overview
+## Progress Overview
+
+| Phase | Component | Status |
+|-------|-----------|--------|
+| 1 | Core Foundation | ✅ Complete |
+| 2 | Server Runtime | 🟡 90% (missing GraphStateManager) |
+| 3 | Client Runtime | ✅ Complete |
+| 4 | React Integration | ✅ Complete |
+| 5 | Polish & Release | 🟡 In Progress |
+
+---
+
+## What's Done
+
+### Phase 1: Core Foundation ✅
 
 ```
-Phase 1: Core Foundation
-├── Schema Type System
-├── Type Inference Engine
-└── Shared Utilities
+packages/core/
+├── schema/          ✅ Type builders, inference, relations
+├── updates/         ✅ value/delta/patch strategies
+└── plugins/         ✅ 8 plugins (auth, cache, pagination, etc.)
+```
 
-Phase 2: Server Runtime
-├── Resolver System
-├── Graph Execution
-├── Update Strategies
-└── WebSocket Handler
+**Features:**
+- [x] `t.*` type builders with full inference
+- [x] `createSchema()` with validation
+- [x] `InferEntity<T>` type inference
+- [x] `InferSelected<T, S>` selection inference
+- [x] Update strategies (value, delta, patch)
+- [x] `selectStrategy()` auto-selection
+- [x] `createUpdate()` / `applyUpdate()`
+- [x] Plugin system (8 built-in plugins)
 
-Phase 3: Client Runtime
-├── Reactive Store (Signals)
-├── Transport Layer
-├── Optimistic Engine
-└── Relation Resolution
+### Phase 2: Server Runtime 🟡
 
-Phase 4: React Integration
-├── Hooks
-├── Suspense Support
-└── DevTools
+```
+packages/server/
+├── resolvers/       ✅ Resolver creation, validation
+├── execution/       ✅ Engine, DataLoader, batching
+├── subscriptions/   ✅ Handler, field-level tracking
+└── server/          ✅ WebSocket, HTTP handlers
+```
 
-Phase 5: Polish & Release
-├── Documentation
-├── Examples
-├── Performance
-└── Testing
+**Features:**
+- [x] `createResolvers()` with validation
+- [x] Execution engine with selection
+- [x] DataLoader with automatic batching
+- [x] Subscription handler (field-level)
+- [x] WebSocket/HTTP handlers
+- [x] AsyncIterable detection (partial)
+- [ ] **GraphStateManager** ← MISSING
+- [ ] **emit() API** ← MISSING
+- [ ] **yield streaming** ← MISSING
+
+### Phase 3: Client Runtime ✅
+
+```
+packages/client/
+├── store/           ✅ ReactiveStore
+├── reactive/        ✅ EntitySignal, SubscriptionManager
+├── links/           ✅ WebSocket, HTTP, SSE
+└── client.ts        ✅ createClient API
+```
+
+**Features:**
+- [x] Signal implementation
+- [x] ReactiveStore with entity management
+- [x] EntitySignal with field-level signals
+- [x] SubscriptionManager
+- [x] QueryResolver
+- [x] WebSocket transport
+- [x] Auto-reconnection
+- [x] Field selection optimization
+- [x] `applyUpdate()` for all strategies
+
+### Phase 4: React Integration ✅
+
+```
+packages/react/
+├── hooks.ts         ✅ useEntity, useList, useMutation
+├── provider.tsx     ✅ LensProvider
+└── suspense.ts      ✅ Suspense support
+```
+
+**Features:**
+- [x] `useEntity` hook
+- [x] `useList` hook
+- [x] `useMutation` hook
+- [x] `useComputed` hook
+- [x] `LensProvider`
+- [x] Suspense support
+
+### Phase 5: Polish 🟡
+
+- [x] README with examples
+- [x] ARCHITECTURE.md
+- [x] API.md reference
+- [x] Basic example app
+- [x] 377 tests passing
+- [ ] Package READMEs
+- [ ] CHANGELOG
+
+---
+
+## What's Missing
+
+### GraphStateManager (Critical)
+
+The orchestration layer that connects resolvers to clients:
+
+```typescript
+class GraphStateManager {
+    // Canonical state per entity (server truth)
+    private canonical: Map<EntityKey, EntityData>;
+
+    // Per-client: what they last received
+    private clients: Map<ClientId, Map<EntityKey, ClientState>>;
+
+    // Core method - called by resolvers
+    emit(entity: string, id: string, data: Partial<T>): void;
+}
+```
+
+**Responsibilities:**
+1. Maintain canonical state per subscribed entity
+2. Track per-client last known state
+3. Compute diff when state changes
+4. Auto-select transfer strategy
+5. Push minimal updates to clients
+
+### Resolver emit() API
+
+```typescript
+interface ResolverContext {
+    // Existing
+    db: Database;
+    user?: User;
+
+    // NEW
+    emit: (data: Partial<Entity>) => void;
+    onCleanup: (fn: () => void) => void;
+}
+```
+
+### yield Streaming
+
+Connect async generators to GraphStateManager:
+
+```typescript
+// Current: only takes first value
+if (isAsyncIterable(result)) {
+    for await (const value of result) {
+        return value;  // ❌ Ignores subsequent yields
+    }
+}
+
+// Needed: stream all yields
+if (isAsyncIterable(result)) {
+    for await (const value of result) {
+        graphStateManager.emit(entity, id, value);  // ✅
+    }
+}
 ```
 
 ---
 
-## Phase 1: Core Foundation
+## Implementation Order
 
-**Goal**: Build the type system that powers everything.
-
-### 1.1 Schema Type Builder
-
-```typescript
-// packages/core/src/schema/types.ts
-
-// Type builder DSL
-export const t = {
-  id: () => new IdType(),
-  string: () => new StringType(),
-  int: () => new IntType(),
-  float: () => new FloatType(),
-  boolean: () => new BooleanType(),
-  datetime: () => new DateTimeType(),
-  enum: <T extends readonly string[]>(values: T) => new EnumType<T>(),
-  object: <T>() => new ObjectType<T>(),
-  array: <T>(item: Type<T>) => new ArrayType<T>(),
-
-  // Relations
-  hasOne: <T extends string>(target: T) => new HasOneType<T>(),
-  hasMany: <T extends string>(target: T) => new HasManyType<T>(),
-  belongsTo: <T extends string>(target: T) => new BelongsToType<T>(),
-};
-```
-
-### 1.2 Schema Creation
+### Step 1: GraphStateManager
+Location: `packages/server/src/state/graph-state-manager.ts`
 
 ```typescript
-// packages/core/src/schema/create.ts
-
-export function createSchema<T extends SchemaDefinition>(def: T): Schema<T> {
-  // Validate schema
-  // Build relation graph
-  // Generate type metadata
-  return new Schema(def);
+export class GraphStateManager {
+    emit(entity: string, id: string, data: Partial<T>): void;
+    subscribe(clientId: string, entity: string, id: string, fields: string[]): void;
+    unsubscribe(clientId: string, entity: string, id: string): void;
 }
 ```
 
-### 1.3 Type Inference
+### Step 2: ResolverContext.emit()
+Location: `packages/server/src/execution/engine.ts`
 
-```typescript
-// packages/core/src/schema/infer.ts
+- Add `emit()` to context
+- Add `onCleanup()` for teardown
 
-// Infer entity type from schema
-export type InferEntity<T> = {
-  [K in ScalarFields<T>]: InferScalar<T[K]>;
-} & {
-  [K in RelationFields<T>]: InferRelation<T[K]>;
-};
+### Step 3: Connect yield → emit
+Location: `packages/server/src/execution/engine.ts`
 
-// Infer selected type
-export type InferSelected<T, S extends Select<T>> = {
-  [K in keyof S & keyof T]: S[K] extends true
-    ? T[K]
-    : S[K] extends { select: infer RS }
-      ? InferSelected<T[K], RS>
-      : never;
-};
-```
+- Loop through async iterator
+- Each yield calls `emit()`
 
-### 1.4 Update Strategies
-
-```typescript
-// packages/core/src/updates/strategies.ts
-
-export interface UpdateStrategy {
-  name: 'value' | 'delta' | 'patch';
-  encode(prev: any, next: any): any;
-  decode(current: any, update: any): any;
-}
-
-export const valueStrategy: UpdateStrategy = { ... };
-export const deltaStrategy: UpdateStrategy = { ... };
-export const patchStrategy: UpdateStrategy = { ... };
-
-export function selectStrategy(type: FieldType, prev: any, next: any): UpdateStrategy;
-```
-
-### Deliverables
-
-- [ ] `t.*` type builders with full inference
-- [ ] `createSchema()` with validation
-- [ ] `InferEntity<T>` type inference
-- [ ] `InferSelected<T, S>` selection inference
-- [ ] Update strategy implementations
-- [ ] 100% test coverage
+### Step 4: Connect return → emit
+- `return value` = `emit(value)` + complete
 
 ---
 
-## Phase 2: Server Runtime
+## Test Coverage
 
-**Goal**: Build the resolver and execution system.
-
-### 2.1 Resolver Definition
-
-```typescript
-// packages/server/src/resolvers/create.ts
-
-export function createResolvers<S extends Schema>(
-  schema: S,
-  resolvers: ResolverDefinition<S>
-): Resolvers<S> {
-  // Validate resolvers match schema
-  // Set up DataLoader factories
-  // Build resolver graph
-  return new Resolvers(schema, resolvers);
-}
-```
-
-### 2.2 Graph Execution Engine
-
-```typescript
-// packages/server/src/execution/engine.ts
-
-export class ExecutionEngine {
-  // Execute query with field selection
-  async execute<E extends Entity>(
-    entity: E,
-    id: string,
-    select: Select<E>,
-  ): Promise<Selected<E, typeof select>>;
-
-  // Subscribe to entity updates
-  subscribe<E extends Entity>(
-    entity: E,
-    id: string,
-    select: Select<E>,
-  ): AsyncIterable<Selected<E, typeof select>>;
-}
-```
-
-### 2.3 DataLoader Integration
-
-```typescript
-// packages/server/src/execution/dataloader.ts
-
-export class GraphDataLoader {
-  // Automatic batching for N+1 elimination
-  load<E extends Entity>(entity: E, id: string): Promise<E>;
-  loadMany<E extends Entity>(entity: E, ids: string[]): Promise<E[]>;
-
-  // Relation loading with batching
-  loadRelation<E extends Entity, R extends Relation>(
-    entity: E,
-    relation: R,
-    parentIds: string[],
-  ): Promise<Map<string, RelationType<R>[]>>;
-}
-```
-
-### 2.4 WebSocket Handler
-
-```typescript
-// packages/server/src/transport/websocket.ts
-
-export function createWebSocketHandler(
-  engine: ExecutionEngine,
-): WebSocketHandler {
-  return {
-    onConnection(ws) { ... },
-    onMessage(ws, message) { ... },
-    onClose(ws) { ... },
-  };
-}
-```
-
-### Deliverables
-
-- [ ] `createResolvers()` with validation
-- [ ] Execution engine with selection
-- [ ] DataLoader with automatic batching
-- [ ] AsyncIterable resolver support (yield)
-- [ ] Update strategy encoding
-- [ ] WebSocket handler
-- [ ] HTTP handler (fallback)
-- [ ] 100% test coverage
+| Package | Tests | Status |
+|---------|-------|--------|
+| @lens/core | 89 | ✅ |
+| @lens/server | 127 | ✅ |
+| @lens/client | 98 | ✅ |
+| @lens/react | 63 | ✅ |
+| **Total** | **377** | ✅ |
 
 ---
 
-## Phase 3: Client Runtime
+## File Structure
 
-**Goal**: Build the reactive client with signals.
-
-### 3.1 Reactive Store
-
-```typescript
-// packages/client/src/store/reactive-store.ts
-
-export class ReactiveStore {
-  // Entity signals
-  private entities: Map<string, Signal<any>>;
-
-  // Get or create entity signal
-  getEntity<E>(entity: string, id: string): Signal<E | null>;
-
-  // Apply server update
-  applyUpdate(update: ServerUpdate): void;
-
-  // Optimistic updates
-  applyOptimistic(mutation: Mutation): string;  // Returns optimistic ID
-  confirmOptimistic(id: string): void;
-  rollbackOptimistic(id: string): void;
-}
 ```
-
-### 3.2 Signal Implementation
-
-```typescript
-// packages/client/src/signals/signal.ts
-
-export interface Signal<T> {
-  readonly value: T;
-  subscribe(fn: (value: T) => void): () => void;
-}
-
-export function createSignal<T>(initial: T): WritableSignal<T>;
-export function computed<T>(fn: () => T): Signal<T>;
+packages/
+├── core/                    @lens/core
+│   ├── src/
+│   │   ├── schema/          Type system
+│   │   ├── updates/         Transfer strategies
+│   │   └── plugins/         Plugin system
+│   └── package.json
+│
+├── server/                  @lens/server
+│   ├── src/
+│   │   ├── resolvers/       Resolver creation
+│   │   ├── execution/       Graph execution
+│   │   ├── subscriptions/   Subscription handler
+│   │   ├── state/           GraphStateManager (TODO)
+│   │   └── server/          HTTP/WS handlers
+│   └── package.json
+│
+├── client/                  @lens/client
+│   ├── src/
+│   │   ├── store/           ReactiveStore
+│   │   ├── reactive/        EntitySignal, etc.
+│   │   ├── links/           Transport
+│   │   └── client.ts        API
+│   └── package.json
+│
+└── react/                   @lens/react
+    ├── src/
+    │   ├── hooks.ts         React hooks
+    │   ├── provider.tsx     Context
+    │   └── suspense.ts      Suspense
+    └── package.json
 ```
-
-### 3.3 Client API
-
-```typescript
-// packages/client/src/client.ts
-
-export function createClient<S extends Schema>(config: ClientConfig): Client<S> {
-  return {
-    [entity]: {
-      get: (input, options?) => Signal<Entity>,
-      list: (input?, options?) => Signal<Entity[]>,
-      create: (input) => Promise<Entity>,
-      update: (input) => Promise<Entity>,
-      delete: (input) => Promise<void>,
-    },
-  };
-}
-```
-
-### 3.4 Transport Layer
-
-```typescript
-// packages/client/src/transport/websocket.ts
-
-export class WebSocketTransport {
-  connect(): Promise<void>;
-  subscribe(entity: string, id: string, select: Select): Subscription;
-  mutate(mutation: Mutation): Promise<Result>;
-  close(): void;
-}
-```
-
-### Deliverables
-
-- [ ] Signal implementation (value, computed)
-- [ ] ReactiveStore with entity management
-- [ ] Optimistic update engine
-- [ ] WebSocket transport
-- [ ] Auto-reconnection
-- [ ] Field selection optimization
-- [ ] Relation resolution
-- [ ] 100% test coverage
 
 ---
 
-## Phase 4: React Integration
+## Next Steps
 
-**Goal**: Seamless React integration.
-
-### 4.1 React Hooks
-
-```typescript
-// packages/react/src/hooks.ts
-
-// Use entity signal in React
-export function useEntity<E>(
-  accessor: EntityAccessor<E>,
-  input: { id: string },
-  options?: SelectOptions,
-): Signal<E | null>;
-
-// Use list signal in React
-export function useList<E>(
-  accessor: ListAccessor<E>,
-  input?: ListInput,
-  options?: SelectOptions,
-): Signal<E[]>;
-
-// Use mutation with optimistic
-export function useMutation<I, O>(
-  mutator: Mutator<I, O>,
-): MutationResult<I, O>;
-
-// Computed value
-export function useComputed<T>(fn: () => T): T;
-```
-
-### 4.2 Provider
-
-```typescript
-// packages/react/src/provider.tsx
-
-export function LensProvider({
-  client,
-  children,
-}: {
-  client: Client;
-  children: React.ReactNode;
-}) {
-  return (
-    <LensContext.Provider value={client}>
-      {children}
-    </LensContext.Provider>
-  );
-}
-```
-
-### 4.3 Suspense Support
-
-```typescript
-// packages/react/src/suspense.ts
-
-export function useEntitySuspense<E>(
-  accessor: EntityAccessor<E>,
-  input: { id: string },
-): E;  // Throws promise if loading
-```
-
-### Deliverables
-
-- [ ] `useEntity` hook
-- [ ] `useList` hook
-- [ ] `useMutation` hook
-- [ ] `useComputed` hook
-- [ ] `LensProvider`
-- [ ] Suspense support
-- [ ] Error boundaries
-- [ ] DevTools integration
-- [ ] 100% test coverage
-
----
-
-## Phase 5: Polish & Release
-
-**Goal**: Production-ready release.
-
-### 5.1 Documentation
-
-- [ ] Complete API reference
-- [ ] Getting started guide
-- [ ] Migration guide (from tRPC/GraphQL)
-- [ ] Best practices
-- [ ] Examples repository
-
-### 5.2 Examples
-
-- [ ] Basic CRUD
-- [ ] Real-time chat
-- [ ] LLM streaming
-- [ ] Collaborative editing
-- [ ] Full-stack Next.js
-
-### 5.3 Performance
-
-- [ ] Benchmarks
-- [ ] Memory profiling
-- [ ] Bundle size optimization
-- [ ] Tree-shaking verification
-
-### 5.4 Testing
-
-- [ ] Unit tests (100% coverage)
-- [ ] Integration tests
-- [ ] E2E tests
-- [ ] Load tests
-
-### 5.5 Release
-
-- [ ] Changelog
-- [ ] Semantic versioning
-- [ ] NPM publish
-- [ ] GitHub release
-
----
-
-## Timeline
-
-| Phase | Duration | Status |
-|-------|----------|--------|
-| Phase 1: Core | 1 week | 🚧 Starting |
-| Phase 2: Server | 1 week | ⏳ Pending |
-| Phase 3: Client | 1 week | ⏳ Pending |
-| Phase 4: React | 3 days | ⏳ Pending |
-| Phase 5: Polish | 1 week | ⏳ Pending |
-
----
-
-## Success Criteria
-
-### Functional
-
-- [ ] Full type inference from schema to client
-- [ ] Real-time updates work transparently
-- [ ] Streaming fields work without special handling
-- [ ] Optimistic updates are automatic
-- [ ] N+1 queries are eliminated
-- [ ] Transfer is optimized (delta/patch)
-
-### Performance
-
-- [ ] < 10KB gzipped client bundle
-- [ ] < 1ms overhead per operation
-- [ ] < 100ms p99 latency
-
-### Developer Experience
-
-- [ ] Zero configuration required
-- [ ] Full autocomplete in IDE
-- [ ] Helpful error messages
-- [ ] Comprehensive documentation
-
----
-
-## Let's Build This! 🚀
+1. **Implement GraphStateManager** - Core orchestration
+2. **Add emit() to ResolverContext** - Enable flexible emitting
+3. **Connect yield → emit** - Stream generator values
+4. **Add integration tests** - End-to-end reactive flow
+5. **Package READMEs** - Per-package documentation

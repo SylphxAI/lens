@@ -2,8 +2,6 @@
 
 > **TypeScript-first, Reactive Graph API Framework**
 
-Lens is a revolutionary approach to building APIs that combines the best of GraphQL's query flexibility with tRPC's type safety, while adding first-class support for real-time streaming and optimistic updates.
-
 ---
 
 ## Core Philosophy
@@ -13,232 +11,172 @@ Lens is a revolutionary approach to building APIs that combines the best of Grap
 │                                                             │
 │   "Everything is Reactive. Everything can Stream."          │
 │                                                             │
-│   - Zero distinction between static and streaming data      │
+│   - Zero distinction between query and subscription         │
 │   - Server emits, Client receives                           │
-│   - No configuration, only implementation                   │
+│   - Declare what you want, get updates automatically        │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Design Principles
 
-1. **TypeScript-First** - Full type inference from schema to client, zero codegen
-2. **Reactive by Default** - Every field, every entity is reactive
-3. **Frontend-Driven** - Client declares what it needs, server delivers
-4. **Zero Config** - Schema = Shape, Resolver = Implementation, that's it
-5. **Minimal Transfer** - Automatic delta/patch/value strategy selection
-6. **Transparent Streaming** - Client doesn't know or care about streaming
+1. **TypeScript-First** - Full type inference from schema to client
+2. **Reactive by Default** - Every query returns a live signal
+3. **Frontend-Driven** - Client declares what it needs
+4. **Zero Config** - Schema = Shape, Resolver = Implementation
+5. **Minimal Transfer** - Automatic delta/patch/value strategy
+6. **Simple API** - Internal complexity, external simplicity
 
 ---
 
-## Mental Model
+## The Unified Model
 
-### The Unified Reactive Model
+### No Query vs Subscription
 
-There is no distinction between "streaming" and "non-streaming" fields.
+Traditional APIs separate "queries" (one-time) from "subscriptions" (live).
+
+**Lens unifies them:**
 
 ```
-Static data    = Server yields once
-Streaming data = Server yields many times
-Same pattern, same code, same API
+return value   → Server yields once      → Client receives once
+yield values   → Server yields many      → Client receives updates
+emit(data)     → Server emits anytime    → Client receives updates
+
+All three feed into the same reactive pipeline.
+Client just sees: Signal<T> that updates automatically.
 ```
 
-### Data Flow
+### Three Syntaxes, One Purpose
+
+```typescript
+// ═══════════════════════════════════════════════════════════
+// 1. return - Simplest, one-time data
+// ═══════════════════════════════════════════════════════════
+resolve: async (id, ctx) => {
+    return await db.get(id);
+}
+
+// ═══════════════════════════════════════════════════════════
+// 2. yield - Generator pattern, sequential streaming
+// ═══════════════════════════════════════════════════════════
+resolve: async function* (id, ctx) {
+    yield await db.get(id);              // Initial
+    for await (const chunk of llm.stream()) {
+        yield { content: chunk };        // Updates
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 3. emit - Most flexible, any pattern
+// ═══════════════════════════════════════════════════════════
+resolve: async (id, ctx) => {
+    ctx.emit(await db.get(id));          // Initial
+
+    redis.subscribe(`entity:${id}`, (msg) => {
+        ctx.emit(msg);                   // Event-driven
+    });
+
+    ctx.onCleanup(() => redis.unsubscribe());
+}
+```
+
+**User chooses based on data source pattern:**
+
+| Pattern | Syntax | Example |
+|---------|--------|---------|
+| DB query | `return` | `return await db.get(id)` |
+| Sequential stream | `yield` | LLM streaming |
+| Event-driven | `emit()` | WebSocket, Redis pub/sub |
+| Mixed | `yield` + `emit()` | Initial + live updates |
+
+---
+
+## Data Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         CLIENT                               │
-│                                                             │
-│   const user = api.user.get({ id })   // Signal<User>       │
-│   <div>{user.name}</div>              // Auto-updates       │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │              Reactive Store                         │   │
-│   │   Signals auto-subscribe, auto-update, auto-dispose │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                          ▲                                  │
-│                          │ WebSocket                        │
-└──────────────────────────┼──────────────────────────────────┘
-                           │
-┌──────────────────────────┼──────────────────────────────────┐
-│                          ▼              SERVER               │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │              Graph Emitter                          │   │
-│   │   yield data → Framework delivers to subscribers    │   │
-│   └─────────────────────────────────────────────────────┘   │
-│                          ▲                                  │
-│                          │                                  │
-│   ┌──────────┬───────────┴───────────┬──────────┐          │
-│   │    DB    │         LLM           │  Service │          │
-│   │  Source  │        Source         │  Source  │          │
-│   └──────────┴───────────────────────┴──────────┘          │
-│                                                             │
+│                                                              │
+│   api.post.get({ id })  →  Signal<Post>  (auto-updates)     │
+│                                 ↑                            │
+│   ┌─────────────────────────────┴──────────────────────────┐│
+│   │  Reactive Store                                         ││
+│   │  • Applies updates (value/delta/patch)                 ││
+│   │  • Maintains local state                               ││
+│   └─────────────────────────────────────────────────────────┘│
+│                                 ↑                            │
+│                            WebSocket                         │
+└─────────────────────────────────┼───────────────────────────┘
+                                  │
+┌─────────────────────────────────┼───────────────────────────┐
+│                                 ↓              SERVER        │
+│   ┌─────────────────────────────────────────────────────────┐│
+│   │  GraphStateManager                                       ││
+│   │                                                          ││
+│   │  ┌─────────────┐     ┌─────────────┐                   ││
+│   │  │ Canonical   │     │ Per-Client  │                   ││
+│   │  │ State       │────▶│ Diff        │────▶ Send         ││
+│   │  │ (truth)     │     │ (minimal)   │                   ││
+│   │  └─────────────┘     └─────────────┘                   ││
+│   │         ↑                                               ││
+│   │   return / yield / emit()                               ││
+│   └─────────┼───────────────────────────────────────────────┘│
+│             │                                                │
+│   ┌─────────┴───────────────────────────────────────────────┐│
+│   │  Resolvers                                               ││
+│   │  • Any data source: DB, LLM, Redis, WebSocket...        ││
+│   │  • emit() patches server state                          ││
+│   │  • Server auto-syncs to clients                         ││
+│   └─────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Architecture Layers
+## Server State Management
 
-### Layer 1: Schema (Shape Definition)
+### GraphStateManager
 
-Schema defines WHAT the data looks like. Nothing else.
-
-```typescript
-import { createSchema, t } from '@lens/core';
-
-const schema = createSchema({
-  User: {
-    id: t.id(),
-    name: t.string(),
-    email: t.string(),
-    avatar: t.string().nullable(),
-    posts: t.hasMany('Post'),
-    profile: t.hasOne('Profile'),
-  },
-
-  Post: {
-    id: t.id(),
-    title: t.string(),
-    content: t.string(),         // Can stream (LLM) or not (DB)
-    status: t.enum(['draft', 'published']),
-    author: t.belongsTo('User'),
-    comments: t.hasMany('Comment'),
-  },
-
-  Comment: {
-    id: t.id(),
-    body: t.string(),
-    author: t.belongsTo('User'),
-    post: t.belongsTo('Post'),
-  },
-});
-```
-
-**Key points:**
-- No `.streaming()` annotation - streaming is runtime behavior
-- Relations define the graph structure
-- Types are inferred automatically
-
-### Layer 2: Resolvers (Implementation)
-
-Resolvers define HOW to get data. They decide runtime behavior.
+The server maintains **canonical state** for each subscribed entity:
 
 ```typescript
-import { createResolvers } from '@lens/server';
+class GraphStateManager {
+    // Canonical state per entity (server truth)
+    private canonical: Map<EntityKey, EntityData>;
 
-const resolvers = createResolvers(schema, {
-  User: {
-    // Simple: return value (yields once)
-    resolve: async (id, ctx) => {
-      return await ctx.db.user.findUnique({ where: { id } });
-    },
+    // Per-client: what they last received
+    private clients: Map<ClientId, Map<EntityKey, ClientState>>;
 
-    // Batch: for N+1 elimination
-    batch: async (ids, ctx) => {
-      return await ctx.db.user.findMany({ where: { id: { in: ids } } });
-    },
+    // When resolver emits:
+    emit(entity: string, id: string, data: Partial<T>): void {
+        // 1. Merge into canonical state
+        canonical[key] = { ...canonical[key], ...data };
 
-    // Relations
-    posts: async (user, ctx) => {
-      return await ctx.db.post.findMany({ where: { authorId: user.id } });
-    },
-  },
+        // 2. For each subscribed client:
+        for (const client of getSubscribers(entity, id)) {
+            // 3. Compute minimal diff
+            const diff = createUpdate(client.lastState, canonical[key]);
 
-  Post: {
-    // Streaming: yield multiple times
-    resolve: async function* (id, ctx) {
-      // Initial from DB
-      const post = await ctx.db.post.findUnique({ where: { id } });
-      yield post;
+            // 4. Send (auto-selects value/delta/patch)
+            send(client, diff);
 
-      // If generating, stream from LLM
-      if (post.isGenerating) {
-        for await (const chunk of ctx.llm.stream(post.promptId)) {
-          yield {
-            ...post,
-            content: post.content + chunk.text,
-          };
+            // 5. Update client's last known state
+            client.lastState = canonical[key];
         }
-      }
-
-      // Listen for DB changes
-      for await (const change of ctx.db.watch('Post', id)) {
-        yield change;
-      }
-    },
-  },
-});
+    }
+}
 ```
 
-**Key points:**
-- `return` = yield once (static)
-- `yield` = can yield many times (streaming)
-- Same API, different behavior based on implementation
-
-### Layer 3: Client (Reactive Access)
-
-Client provides reactive access to the graph.
+### Emit Behavior
 
 ```typescript
-import { createClient } from '@lens/client';
+// Partial update - merges into state
+ctx.emit({ content: "new content" });
+// canonical = { ...canonical, content: "new content" }
 
-const api = createClient<typeof schema>({
-  url: 'wss://api.example.com/lens',
-});
-
-// Get entity - returns Signal
-const user = api.user.get({ id: '123' });
-// user: Signal<User | null>
-
-// Computed relations
-const posts = computed(() => user.value?.posts ?? []);
-// posts: Signal<Post[]>
-
-// Field selection (optimization)
-const simpleUser = api.user.get({ id: '123' }, {
-  select: { name: true, avatar: true },
-});
-// simpleUser: Signal<{ name: string; avatar: string | null } | null>
-
-// Mutations (auto-optimistic)
-await api.post.update({
-  id: '456',
-  title: 'New Title',
-});
-// UI updates immediately, rolls back on error
-```
-
-**Key points:**
-- Everything returns a Signal (reactive)
-- Field selection is an optimization hint
-- Optimistic updates are automatic
-
-### Layer 4: React Integration
-
-React hooks wrap signals for React's rendering model.
-
-```tsx
-import { useEntity, useMutation } from '@lens/react';
-
-function UserProfile({ userId }: { userId: string }) {
-  const user = useEntity(api.user, { id: userId });
-  const posts = useComputed(() => user.value?.posts ?? []);
-
-  const updateUser = useMutation(api.user.update);
-
-  return (
-    <div>
-      <h1>{user.value?.name}</h1>
-      <button onClick={() => updateUser({ id: userId, name: 'New Name' })}>
-        Update
-      </button>
-      {posts.value.map(post => (
-        <PostCard key={post.id} post={post} />
-      ))}
-    </div>
-  );
-}
+// Full update - replaces state
+ctx.emit({ id, title, content, author, createdAt });
+// canonical = newData
 ```
 
 ---
@@ -247,65 +185,80 @@ function UserProfile({ userId }: { userId: string }) {
 
 ### Automatic Strategy Selection
 
-Server automatically selects the optimal transfer strategy:
+Server selects optimal transfer based on data type and change:
 
-| Field Type | Strategy | Savings |
-|------------|----------|---------|
-| `string` (short) | `value` | - |
-| `string` (long, small change) | `delta` | ~57% |
-| `object` | `patch` | ~99% |
-| `array` | `patch` | ~90% |
-| `number`, `boolean` | `value` | - |
+| Data Type | Strategy | When | Savings |
+|-----------|----------|------|---------|
+| Short string | `value` | < 100 chars | - |
+| Long string | `delta` | Small change | ~57% |
+| Object | `patch` | Partial change | ~99% |
+| Array | `patch` | Modifications | ~90% |
+| Primitives | `value` | Always | - |
 
 ### Wire Protocol
 
 ```typescript
-// Initial
-{ type: 'initial', entity: 'Post', id: '123', data: { ... } }
+// Value - full replacement
+{ strategy: "value", data: "New Title" }
 
-// Value update
-{ type: 'update', entity: 'Post', id: '123', field: 'title', strategy: 'value', data: 'New Title' }
+// Delta - character-level diff
+{ strategy: "delta", data: [{ position: 10, insert: "Hello" }] }
 
-// Delta update (streaming text)
-{ type: 'update', entity: 'Post', id: '123', field: 'content', strategy: 'delta', data: { pos: 100, insert: 'Hello' } }
-
-// Patch update (object/array)
-{ type: 'update', entity: 'Post', id: '123', field: 'metadata', strategy: 'patch', data: [{ op: 'add', path: '/views', value: 100 }] }
+// Patch - JSON Patch RFC 6902
+{ strategy: "patch", data: [{ op: "replace", path: "/name", value: "John" }] }
 ```
 
 ---
 
-## Optimistic Updates
+## Client Reactivity
 
-### Automatic Inference
+### EntitySignal
 
-Optimistic updates are inferred from mutation input:
+Every query returns a reactive signal with field-level granularity:
 
 ```typescript
-// Mutation
-await api.post.update({ id: '123', title: 'New Title' });
+interface EntitySignal<T> {
+    // Full entity value (computed)
+    readonly value: T;
 
-// Framework automatically:
-// 1. Detects: has `id` → update operation
-// 2. Extracts: fields to update = { title: 'New Title' }
-// 3. Applies: merge into cached entity
-// 4. Marks: as optimistic
-// 5. On success: confirm
-// 6. On error: rollback
+    // Field-level signals
+    readonly $: { [K in keyof T]: Signal<T[K]> };
+
+    // Metadata
+    readonly loading: Signal<boolean>;
+    readonly error: Signal<Error | null>;
+
+    // Lifecycle
+    dispose(): void;
+}
 ```
 
-No configuration needed!
-
-### Create/Delete
+### Fine-grained Updates
 
 ```typescript
-// Create - generates temp ID
-await api.post.create({ title: 'New Post' });
-// temp:uuid → replaced with real ID on success
+// Coarse: re-renders when ANY field changes
+<div>{user.value.name}</div>
 
-// Delete - removes from cache
-await api.post.delete({ id: '123' });
-// Restored on error
+// Fine: re-renders ONLY when name changes
+<div>{user.$.name.value}</div>
+```
+
+### Field-level Subscriptions
+
+Client tracks which fields are subscribed:
+
+```typescript
+// First query - full entity
+const user = api.user.get({ id });
+// Server: SUBSCRIBE User:123 [*]
+
+// Second query - derives from existing
+const userName = api.user.get({ id }, { select: { name: true } });
+// No network! Computed from user.$.name
+
+// First disposes
+user.dispose();
+// Server: UNSUBSCRIBE User:123 (except name)
 ```
 
 ---
@@ -313,8 +266,8 @@ await api.post.delete({ id: '123' });
 ## Package Structure
 
 ```
-@lens/core      Schema types, utilities, shared code
-@lens/server    Resolvers, graph execution, handlers
+@lens/core      Schema, types, update strategies
+@lens/server    Resolvers, GraphStateManager, handlers
 @lens/client    Reactive store, signals, transport
 @lens/react     React hooks and bindings
 ```
@@ -327,13 +280,12 @@ await api.post.delete({ id: '123' });
 |---------|---------|------|------|
 | Type Safety | Codegen | Native | Native |
 | Field Selection | ✅ | ❌ | ✅ |
-| Nested Queries | ✅ | ❌ | ✅ |
-| Real-time | Subscription | Manual | Native |
-| Streaming | ❌ | ❌ | Native |
-| Optimistic | Manual | Manual | Auto |
-| N+1 Prevention | DataLoader | Manual | Auto |
-| Transfer Optimization | ❌ | ❌ | Auto |
-| Boilerplate | High | Low | Zero |
+| Real-time | Subscription | Manual | **Native** |
+| Streaming | ❌ | ❌ | **Native** |
+| Optimistic | Manual | Manual | **Auto** |
+| N+1 Prevention | DataLoader | Manual | **Auto** |
+| Transfer Optimization | ❌ | ❌ | **Auto** |
+| Query/Sub Unified | ❌ | ❌ | **✅** |
 
 ---
 
@@ -342,8 +294,13 @@ await api.post.delete({ id: '123' });
 ```
 Schema     = Define shape (WHAT)
 Resolvers  = Implement fetching (HOW)
+             - return (once)
+             - yield (stream)
+             - emit (flexible)
 Client     = Reactive access (USE)
+             - Signal<T> auto-updates
+             - Declare what you want
 
+Server maintains truth, syncs to clients.
 Everything else is automatic.
-Zero config. Only implementation.
 ```

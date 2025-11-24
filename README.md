@@ -242,9 +242,24 @@ const posts = computed(() => user.value?.posts);
 
 ## Documentation
 
-- [Architecture](./ARCHITECTURE.md) - Design philosophy and system overview
+- [Architecture](./ARCHITECTURE.md) - Design philosophy and unified model
 - [API Reference](./docs/API.md) - Complete API documentation
-- [Implementation Plan](./IMPLEMENTATION_PLAN.md) - Development roadmap
+- [Implementation Plan](./IMPLEMENTATION_PLAN.md) - Progress and roadmap
+
+---
+
+## Status
+
+| Component | Status |
+|-----------|--------|
+| Schema & Types | ✅ Complete |
+| Client (Reactive Store) | ✅ Complete |
+| Server (Resolvers) | 🟡 90% |
+| React Hooks | ✅ Complete |
+| Plugins (8 built-in) | ✅ Complete |
+| Tests (377) | ✅ Passing |
+
+**Next**: GraphStateManager for unified emit/yield/return → client sync
 
 ---
 

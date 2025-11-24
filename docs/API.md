@@ -124,31 +124,79 @@ const resolvers = createResolvers(schema, {
 });
 ```
 
-### Resolver Types
+### Resolver Patterns
 
-#### Static Resolver (return)
+Lens supports three patterns for emitting data. All feed into the same reactive pipeline.
+
+#### 1. return (Static)
+
+Simplest pattern - returns once, subscription receives one value.
 
 ```typescript
-// Returns once, yields once
 resolve: async (id, ctx) => {
   return await ctx.db.user.findUnique({ where: { id } });
 }
 ```
 
-#### Streaming Resolver (yield)
+#### 2. yield (Streaming)
+
+Generator pattern - yields multiple values in sequence.
 
 ```typescript
-// Can yield multiple times
 resolve: async function* (id, ctx) {
   // Initial value
   const post = await ctx.db.post.findUnique({ where: { id } });
   yield post;
 
-  // Stream updates
-  for await (const update of ctx.db.watch('Post', id)) {
-    yield { ...post, ...update };
+  // Stream updates (e.g., LLM streaming)
+  for await (const chunk of ctx.llm.stream(post.promptId)) {
+    yield { ...post, content: post.content + chunk };
   }
 }
+```
+
+#### 3. emit (Flexible)
+
+Most flexible - can emit from anywhere (callbacks, events, etc.)
+
+```typescript
+resolve: async (id, ctx) => {
+  // Initial
+  ctx.emit(await ctx.db.post.findUnique({ where: { id } }));
+
+  // Event-driven updates
+  ctx.db.watch('Post', id, (change) => {
+    ctx.emit(change);  // Partial or full update
+  });
+
+  // Cleanup when subscription ends
+  ctx.onCleanup(() => ctx.db.unwatch('Post', id));
+}
+```
+
+#### Mixed Pattern
+
+Can combine yield and emit:
+
+```typescript
+resolve: async function* (id, ctx) {
+  yield await ctx.db.get(id);  // Initial via yield
+
+  // Then emit from events
+  ctx.onCleanup(
+    redis.subscribe(`entity:${id}`, (msg) => ctx.emit(msg))
+  );
+}
+```
+
+#### Emit Behavior
+
+```typescript
+// Partial update - merges into existing state
+ctx.emit({ title: "New Title" });
+
+// Full update - replaces state
+ctx.emit({ id, title, content, author, createdAt });
 ```
 
 #### Batch Resolver
