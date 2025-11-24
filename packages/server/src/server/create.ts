@@ -128,6 +128,7 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 
 		// Create ExecutionEngine with GraphStateManager integration
 		this.engine = new ExecutionEngine(config.resolvers, {
+			schema: config.schema,
 			createContext: contextFactory,
 			stateManager: this.stateManager,
 		});

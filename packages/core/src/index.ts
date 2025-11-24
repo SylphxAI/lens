@@ -21,9 +21,14 @@ export {
 	FloatType,
 	BooleanType,
 	DateTimeType,
+	DecimalType,
 	EnumType,
 	ObjectType,
 	ArrayType,
+	// Custom types
+	CustomType,
+	defineType,
+	type CustomTypeDefinition,
 	// Relation types
 	HasOneType,
 	HasManyType,

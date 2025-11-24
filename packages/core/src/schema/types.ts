@@ -17,7 +17,7 @@ type Brand<T, B> = T & { [__brand]: B };
 // =============================================================================
 
 /** Base class for all field types */
-export abstract class FieldType<T = unknown> {
+export abstract class FieldType<T = unknown, SerializedT = T> {
 	abstract readonly _type: string;
 	abstract readonly _tsType: T;
 
@@ -47,6 +47,28 @@ export abstract class FieldType<T = unknown> {
 	getDefault(): T | undefined {
 		return this._default;
 	}
+
+	/**
+	 * Serialize value for transport (server → client)
+	 * Override this for custom types (e.g., Date → ISO string)
+	 */
+	serialize(value: T): SerializedT {
+		return value as unknown as SerializedT;
+	}
+
+	/**
+	 * Deserialize value from transport (client ← server)
+	 * Override this for custom types (e.g., ISO string → Date)
+	 */
+	deserialize(value: SerializedT): T {
+		return value as unknown as T;
+	}
+
+	/**
+	 * Optional validation before serialization
+	 * Override this for custom validation logic
+	 */
+	validate?(value: unknown): boolean;
 }
 
 /** Wrapper type for nullable fields */
@@ -93,10 +115,79 @@ export class BooleanType extends FieldType<boolean> {
 	readonly _tsType!: boolean;
 }
 
-/** DateTime field type */
-export class DateTimeType extends FieldType<Date> {
+/** DateTime field type (serialized as ISO string) */
+export class DateTimeType extends FieldType<Date, string> {
 	readonly _type = "datetime" as const;
 	readonly _tsType!: Date;
+
+	/**
+	 * Serialize Date → ISO string for transport
+	 * @example Date(2024-01-15) → "2024-01-15T00:00:00.000Z"
+	 */
+	serialize(value: Date): string {
+		if (!(value instanceof Date)) {
+			throw new Error(`Expected Date instance, got ${typeof value}`);
+		}
+		return value.toISOString();
+	}
+
+	/**
+	 * Deserialize ISO string → Date
+	 * @example "2024-01-15T00:00:00.000Z" → Date(2024-01-15)
+	 */
+	deserialize(value: string): Date {
+		if (typeof value !== "string") {
+			throw new Error(`Expected string, got ${typeof value}`);
+		}
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) {
+			throw new Error(`Invalid date string: ${value}`);
+		}
+		return date;
+	}
+
+	validate(value: unknown): boolean {
+		return value instanceof Date && !Number.isNaN(value.getTime());
+	}
+}
+
+/** Decimal field type (serialized as string for precision) */
+export class DecimalType extends FieldType<number, string> {
+	readonly _type = "decimal" as const;
+	readonly _tsType!: number;
+
+	/**
+	 * Serialize number → string to preserve precision
+	 * @example 123.456789 → "123.456789"
+	 *
+	 * **Why string?** JavaScript numbers lose precision for large/small values.
+	 * Decimal/currency values must maintain exact precision during transport.
+	 */
+	serialize(value: number): string {
+		if (typeof value !== "number" || Number.isNaN(value)) {
+			throw new Error(`Expected number, got ${typeof value}`);
+		}
+		return value.toString();
+	}
+
+	/**
+	 * Deserialize string → number
+	 * @example "123.456789" → 123.456789
+	 */
+	deserialize(value: string): number {
+		if (typeof value !== "string") {
+			throw new Error(`Expected string, got ${typeof value}`);
+		}
+		const num = Number.parseFloat(value);
+		if (Number.isNaN(num)) {
+			throw new Error(`Invalid decimal string: ${value}`);
+		}
+		return num;
+	}
+
+	validate(value: unknown): boolean {
+		return typeof value === "number" && !Number.isNaN(value) && Number.isFinite(value);
+	}
 }
 
 /** Enum field type */
@@ -123,6 +214,109 @@ export class ArrayType<T> extends FieldType<T[]> {
 	constructor(public readonly itemType: FieldType<T>) {
 		super();
 	}
+}
+
+// =============================================================================
+// Custom Types
+// =============================================================================
+
+/**
+ * Custom type definition interface
+ * Used with defineType() to create reusable type definitions
+ */
+export interface CustomTypeDefinition<T, SerializedT = T> {
+	/** Type name (for debugging/introspection) */
+	name: string;
+
+	/** Base type for runtime validation (e.g., 'object', 'string') */
+	baseType?: string;
+
+	/** TypeScript type (runtime value, not used - only for type inference) */
+	type?: T;
+
+	/** Serialize value for transport (T → SerializedT) */
+	serialize: (value: T) => SerializedT;
+
+	/** Deserialize value from transport (SerializedT → T) */
+	deserialize: (value: SerializedT) => T;
+
+	/** Optional validation before serialization */
+	validate?: (value: unknown) => boolean;
+}
+
+/**
+ * Custom field type with user-defined serialization
+ * Created via defineType() for reusability
+ *
+ * @example
+ * ```typescript
+ * const PointType = defineType({
+ *   name: 'Point',
+ *   serialize: (p: Point) => ({ lat: p.lat, lng: p.lng }),
+ *   deserialize: (data) => new Point(data.lat, data.lng),
+ * })
+ *
+ * // Reuse across entities
+ * const schema = {
+ *   Store: { location: t.custom(PointType) },
+ *   Event: { location: t.custom(PointType) },
+ * }
+ * ```
+ */
+export class CustomType<T, SerializedT = T> extends FieldType<T, SerializedT> {
+	readonly _type = "custom" as const;
+	readonly _tsType!: T;
+
+	constructor(public readonly definition: CustomTypeDefinition<T, SerializedT>) {
+		super();
+	}
+
+	serialize(value: T): SerializedT {
+		// Run validation if provided
+		if (this.definition.validate && !this.definition.validate(value)) {
+			throw new Error(`Validation failed for custom type: ${this.definition.name}`);
+		}
+		return this.definition.serialize(value);
+	}
+
+	deserialize(value: SerializedT): T {
+		return this.definition.deserialize(value);
+	}
+
+	validate(value: unknown): boolean {
+		return this.definition.validate ? this.definition.validate(value) : true;
+	}
+}
+
+/**
+ * Define a reusable custom type
+ *
+ * **Why this pattern?**
+ * 1. Reusability - define once, use in multiple entities
+ * 2. Type Safety - TypeScript infers correct types
+ * 3. Type Libraries - create shareable packages
+ * 4. Consistency - same serialization logic everywhere
+ *
+ * @example
+ * ```typescript
+ * // Define custom Point type
+ * const PointType = defineType({
+ *   name: 'Point',
+ *   serialize: (p: Point) => ({ lat: p.lat, lng: p.lng }),
+ *   deserialize: (data) => new Point(data.lat, data.lng),
+ *   validate: (v) => v instanceof Point,
+ * })
+ *
+ * // Use in schema
+ * const Store = {
+ *   location: t.custom(PointType),  // ✅ Reusable!
+ * }
+ * ```
+ */
+export function defineType<T, SerializedT = T>(
+	definition: CustomTypeDefinition<T, SerializedT>,
+): CustomTypeDefinition<T, SerializedT> {
+	return definition;
 }
 
 // =============================================================================
@@ -201,8 +395,11 @@ export const t = {
 	/** Boolean value */
 	boolean: () => new BooleanType(),
 
-	/** Date/time value */
+	/** Date/time value (auto-serialized as ISO string) */
 	datetime: () => new DateTimeType(),
+
+	/** Decimal/currency value (auto-serialized as string for precision) */
+	decimal: () => new DecimalType(),
 
 	/** Enum with specific values */
 	enum: <const T extends readonly string[]>(values: T) => new EnumType(values),
@@ -212,6 +409,10 @@ export const t = {
 
 	/** Array of a type */
 	array: <T>(itemType: FieldType<T>) => new ArrayType(itemType),
+
+	/** Custom type with user-defined serialization (use defineType() to create) */
+	custom: <T, SerializedT = T>(definition: CustomTypeDefinition<T, SerializedT>) =>
+		new CustomType(definition),
 
 	// Relations
 

@@ -88,7 +88,10 @@ describe("ExecutionEngine", () => {
 			},
 		});
 
-		engine = new ExecutionEngine(resolvers, () => ({ db: {} }));
+		engine = new ExecutionEngine(resolvers, {
+			schema,
+			createContext: () => ({ db: {} }),
+		});
 	});
 
 	describe("executeGet", () => {

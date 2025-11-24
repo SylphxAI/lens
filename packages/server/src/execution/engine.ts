@@ -5,7 +5,7 @@
  * Supports reactive execution with GraphStateManager integration.
  */
 
-import type { SchemaDefinition, InferEntity, Select } from "@lens/core";
+import type { SchemaDefinition, InferEntity, Select, Schema, FieldType } from "@lens/core";
 import type {
 	Resolvers,
 	BaseContext,
@@ -89,7 +89,9 @@ export class DataLoader<K, V> {
 // Execution Engine Configuration
 // =============================================================================
 
-export interface ExecutionEngineConfig<Ctx extends BaseContext> {
+export interface ExecutionEngineConfig<S extends SchemaDefinition, Ctx extends BaseContext> {
+	/** Schema (for field serialization) */
+	schema: Schema<S>;
 	/** Function to create user context */
 	createContext: () => Ctx;
 	/** Optional GraphStateManager for reactive updates */
@@ -132,6 +134,7 @@ export interface ReactiveSubscription {
  * ```
  */
 export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext> {
+	private schema: Schema<S>;
 	private loaders = new Map<string, DataLoader<string, unknown>>();
 	private resolvers: Resolvers<S, Ctx>;
 	private createContext: () => Ctx;
@@ -139,12 +142,15 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 	private activeSubscriptions = new Map<string, { cleanup: () => void }>();
 	private subscriptionCounter = 0;
 
-	constructor(resolvers: Resolvers<S, Ctx>, config: ExecutionEngineConfig<Ctx> | (() => Ctx)) {
+	constructor(resolvers: Resolvers<S, Ctx>, config: ExecutionEngineConfig<S, Ctx> | (() => Ctx)) {
 		this.resolvers = resolvers;
 		if (typeof config === "function") {
-			// Legacy: direct createContext function
+			// Legacy: direct createContext function (no serialization support)
 			this.createContext = config;
+			// Create a minimal schema placeholder (won't have serialization)
+			this.schema = {} as Schema<S>;
 		} else {
+			this.schema = config.schema;
 			this.createContext = config.createContext;
 			this.stateManager = config.stateManager;
 		}
@@ -170,7 +176,8 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		if (batchResolver) {
 			const loader = this.getOrCreateLoader(entityName, batchResolver, ctx);
 			const result = await loader.load(id);
-			return this.applySelection(result, select) as InferEntity<S[K], S> | null;
+			const selected = this.applySelection(result, select);
+			return this.serializeEntity(entityName, selected as Record<string, unknown>) as InferEntity<S[K], S> | null;
 		}
 
 		// Fall back to single resolver
@@ -181,14 +188,16 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 			// For now, just get the first value
 			// TODO: Support streaming
 			for await (const value of resolveResult) {
-				return this.applySelection(value, select) as InferEntity<S[K], S> | null;
+				const selected = this.applySelection(value, select);
+				return this.serializeEntity(entityName, selected as Record<string, unknown>) as InferEntity<S[K], S> | null;
 			}
 			return null;
 		}
 
 		// Handle promise
 		const result = await resolveResult;
-		return this.applySelection(result, select) as InferEntity<S[K], S> | null;
+		const selected = this.applySelection(result, select);
+		return this.serializeEntity(entityName, selected as Record<string, unknown>) as InferEntity<S[K], S> | null;
 	}
 
 	/**
@@ -207,7 +216,10 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		}
 
 		const results = await resolver.list(input ?? {}, ctx);
-		return results.map((r) => this.applySelection(r, select)) as InferEntity<S[K], S>[];
+		return results.map((r) => {
+			const selected = this.applySelection(r, select);
+			return this.serializeEntity(entityName, selected as Record<string, unknown>);
+		}) as InferEntity<S[K], S>[];
 	}
 
 	/**
@@ -226,7 +238,10 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 			const result = await resolver.listPaginated(input ?? {}, ctx);
 			return {
 				...result,
-				data: result.data.map((r) => this.applySelection(r, select)) as InferEntity<S[K], S>[],
+				data: result.data.map((r) => {
+					const selected = this.applySelection(r, select);
+					return this.serializeEntity(entityName, selected as Record<string, unknown>);
+				}) as InferEntity<S[K], S>[],
 			};
 		}
 
@@ -250,7 +265,10 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		};
 
 		return {
-			data: data.map((r) => this.applySelection(r, select)) as InferEntity<S[K], S>[],
+			data: data.map((r) => {
+				const selected = this.applySelection(r, select);
+				return this.serializeEntity(entityName, selected as Record<string, unknown>);
+			}) as InferEntity<S[K], S>[],
 			pageInfo,
 		};
 	}
@@ -281,7 +299,7 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 
 		const result = await resolver.create(input, ctx);
 		this.invalidateLoaders(entityName);
-		return result as InferEntity<S[K], S>;
+		return this.serializeEntity(entityName, result as Record<string, unknown>) as InferEntity<S[K], S>;
 	}
 
 	/**
@@ -300,7 +318,7 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 
 		const result = await resolver.update(input, ctx);
 		this.invalidateLoaders(entityName);
-		return result as InferEntity<S[K], S>;
+		return this.serializeEntity(entityName, result as Record<string, unknown>) as InferEntity<S[K], S>;
 	}
 
 	/**
@@ -342,14 +360,16 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		// Handle async generator (streaming)
 		if (isAsyncIterable(resolveResult)) {
 			for await (const value of resolveResult) {
-				yield this.applySelection(value, select) as InferEntity<S[K], S> | null;
+				const selected = this.applySelection(value, select);
+				yield this.serializeEntity(entityName, selected as Record<string, unknown>) as InferEntity<S[K], S> | null;
 			}
 			return;
 		}
 
 		// Handle single promise (emit once)
 		const result = await resolveResult;
-		yield this.applySelection(result, select) as InferEntity<S[K], S> | null;
+		const selected = this.applySelection(result, select);
+		yield this.serializeEntity(entityName, selected as Record<string, unknown>) as InferEntity<S[K], S> | null;
 	}
 
 	// ===========================================================================
@@ -526,6 +546,80 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 	 * Filters the data object to only include selected fields.
 	 * Supports nested selection for relations.
 	 */
+	/**
+	 * Serialize entity data for transport
+	 * Auto-calls serialize() on field types (Date → ISO string, Decimal → string, etc.)
+	 *
+	 * Note: Only serializes scalar fields. Relations are left as-is (not recursively serialized)
+	 * to avoid circular reference issues. Nested relation data will be serialized when
+	 * fetched through their own queries.
+	 */
+	private serializeEntity<K extends keyof S & string>(
+		entityName: K,
+		data: Record<string, unknown> | null,
+	): Record<string, unknown> | null {
+		if (data === null) return null;
+
+		const entityDef = this.schema.definition[entityName];
+		if (!entityDef) return data;
+
+		const result: Record<string, unknown> = {};
+
+		// Serialize each field according to its type
+		for (const [fieldName, value] of Object.entries(data)) {
+			const fieldType = entityDef[fieldName] as FieldType | undefined;
+
+			if (!fieldType) {
+				// Field not in schema (extra data from resolver)
+				result[fieldName] = value;
+				continue;
+			}
+
+			// Handle null values
+			if (value === null || value === undefined) {
+				result[fieldName] = value;
+				continue;
+			}
+
+			// Relations: Don't recursively serialize to avoid circular references
+			// The nested data will be serialized when fetched through its own query
+			if (fieldType._type === "hasMany" || fieldType._type === "belongsTo" || fieldType._type === "hasOne") {
+				result[fieldName] = value;
+				continue;
+			}
+
+			// Handle arrays of scalar values
+			if (Array.isArray(value) && fieldType._type === "array") {
+				// For now, just pass through array values
+				// TODO: If itemType has serialization, apply it
+				result[fieldName] = value;
+				continue;
+			}
+
+			// Handle object fields (not relations)
+			if (typeof value === "object" && value !== null && fieldType._type === "object") {
+				// Regular object field - pass through
+				result[fieldName] = value;
+				continue;
+			}
+
+			// Scalar field - call serialize() if method exists
+			if (typeof fieldType.serialize === "function") {
+				try {
+					result[fieldName] = fieldType.serialize(value);
+				} catch (error) {
+					// If serialization fails, log warning and use original value
+					console.warn(`Failed to serialize field ${String(entityName)}.${fieldName}:`, error);
+					result[fieldName] = value;
+				}
+			} else {
+				result[fieldName] = value;
+			}
+		}
+
+		return result;
+	}
+
 	private applySelection<T>(data: T | null, select?: Record<string, unknown>): T | null {
 		if (data === null || !select) return data;
 
