@@ -58,29 +58,28 @@ export interface AuthServerAPI {
  *
  * @example
  * ```typescript
- * // Client
  * import { authPlugin } from "@lens/core";
  *
+ * // Client (simple)
  * const client = createClient({
- *   plugins: [authPlugin],
+ *   plugins: [authPlugin()],
  * });
  *
- * // Login
+ * // Client (with config)
+ * const client = createClient({
+ *   plugins: [authPlugin({ tokenPrefix: "Token" })],
+ * });
+ *
+ * // Access API
  * const auth = client.$plugins.get<AuthClientAPI>("auth");
  * auth?.setToken(response.token);
  *
  * // Server
  * const server = createServer({
- *   plugins: [{
- *     plugin: authPlugin,
- *     config: {
- *       secret: process.env.JWT_SECRET,
- *       validateToken: async (token) => {
- *         // Validate JWT
- *         return { valid: true, user: decoded };
- *       },
- *     },
- *   }],
+ *   plugins: [authPlugin({
+ *     secret: process.env.JWT_SECRET,
+ *     validateToken: async (token) => ({ valid: true, user: decoded }),
+ *   })],
  * });
  * ```
  */

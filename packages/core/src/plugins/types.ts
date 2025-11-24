@@ -206,11 +206,55 @@ export interface UnifiedPlugin<TConfig = unknown> extends PluginMeta {
 	getClientConfig?: (config?: TConfig) => Record<string, unknown>;
 }
 
+/** Configured plugin instance (result of calling plugin with config) */
+export interface ConfiguredPlugin<TConfig = unknown> {
+	/** Original plugin definition */
+	__plugin: UnifiedPlugin<TConfig>;
+	/** Configuration */
+	__config: TConfig | undefined;
+	/** Plugin name */
+	name: string;
+}
+
+/** Callable unified plugin */
+export interface CallableUnifiedPlugin<TConfig = unknown> extends UnifiedPlugin<TConfig> {
+	/** Call with config to create configured instance */
+	(config?: TConfig): ConfiguredPlugin<TConfig>;
+}
+
 /** Helper to define a unified plugin with type safety */
 export function defineUnifiedPlugin<TConfig = void>(
 	plugin: UnifiedPlugin<TConfig>,
-): UnifiedPlugin<TConfig> {
-	return plugin;
+): CallableUnifiedPlugin<TConfig> {
+	// Use Object.defineProperties to set name on function
+	const configure = (config?: TConfig): ConfiguredPlugin<TConfig> => ({
+		__plugin: plugin,
+		__config: config,
+		name: plugin.name,
+	});
+
+	// Define all properties including name (which is normally readonly on functions)
+	Object.defineProperties(configure, {
+		name: { value: plugin.name, writable: false, configurable: true },
+		version: { value: plugin.version, writable: true, configurable: true },
+		dependencies: { value: plugin.dependencies, writable: true, configurable: true },
+		defaultConfig: { value: plugin.defaultConfig, writable: true, configurable: true },
+		client: { value: plugin.client, writable: true, configurable: true },
+		server: { value: plugin.server, writable: true, configurable: true },
+		getClientConfig: { value: plugin.getClientConfig, writable: true, configurable: true },
+	});
+
+	return configure as CallableUnifiedPlugin<TConfig>;
+}
+
+/** Check if value is a configured plugin */
+export function isConfiguredPlugin(value: unknown): value is ConfiguredPlugin {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"__plugin" in value &&
+		"__config" in value
+	);
 }
 
 // =============================================================================

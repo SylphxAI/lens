@@ -4,8 +4,30 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { authPlugin, type AuthClientAPI, type AuthServerAPI } from "./auth";
+import { isConfiguredPlugin } from "./types";
 
 describe("authPlugin", () => {
+	describe("callable interface", () => {
+		it("can be called as a function", () => {
+			const configured = authPlugin();
+			expect(isConfiguredPlugin(configured)).toBe(true);
+			expect(configured.name).toBe("auth");
+		});
+
+		it("accepts config when called", () => {
+			const configured = authPlugin({ tokenPrefix: "Token" });
+			expect(configured.__config).toEqual({ tokenPrefix: "Token" });
+		});
+
+		it("preserves plugin properties", () => {
+			// Plugin is callable but still has properties
+			expect(authPlugin.name).toBe("auth");
+			expect(authPlugin.version).toBe("1.0.0");
+			expect(authPlugin.client).toBeDefined();
+			expect(authPlugin.server).toBeDefined();
+		});
+	});
+
 	describe("metadata", () => {
 		it("has correct name and version", () => {
 			expect(authPlugin.name).toBe("auth");
