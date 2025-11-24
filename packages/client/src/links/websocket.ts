@@ -61,10 +61,24 @@ interface ServerUpdateMessageWS {
 	};
 }
 
+/** Server handshake response */
+interface ServerHandshakeResponse {
+	type: "handshake";
+	id: string;
+	version: string;
+	plugins: Array<{
+		name: string;
+		version?: string;
+		config?: Record<string, unknown>;
+	}>;
+	schemaHash?: string;
+}
+
 /** Server message types */
 type ServerMessageWS =
 	| { type: "connected"; clientId: string }
 	| { type: "heartbeat"; timestamp: number }
+	| ServerHandshakeResponse
 	| ServerUpdateMessageWS;
 
 // =============================================================================
@@ -105,6 +119,11 @@ export class WebSocketSubscriptionTransport implements SubscriptionTransport {
 
 	/** State change listeners */
 	private stateListeners = new Set<(state: WebSocketState) => void>();
+
+	/** Server handshake info */
+	private serverInfo: ServerHandshakeResponse | null = null;
+	private handshakeResolve: ((info: ServerHandshakeResponse) => void) | null = null;
+	private handshakeHandler: ((info: ServerHandshakeResponse) => void) | null = null;
 
 	/** Track active subscriptions for recovery */
 	private activeSubscriptions = new Map<string, ServerMessage>();
@@ -268,6 +287,63 @@ export class WebSocketSubscriptionTransport implements SubscriptionTransport {
 		return () => this.stateListeners.delete(listener);
 	}
 
+	/**
+	 * Send handshake and wait for server response
+	 * Returns server info including version and enabled plugins
+	 */
+	async handshake(clientVersion?: string): Promise<ServerHandshakeResponse> {
+		if (this.state !== "connected" || !this.ws) {
+			throw new Error("Cannot handshake: not connected");
+		}
+
+		// If already have server info, return it
+		if (this.serverInfo) {
+			return this.serverInfo;
+		}
+
+		// Send handshake request
+		const handshakeId = `handshake_${Date.now()}`;
+		this.ws.send(
+			JSON.stringify({
+				type: "handshake",
+				id: handshakeId,
+				clientVersion,
+			}),
+		);
+
+		// Wait for response
+		return new Promise<ServerHandshakeResponse>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.handshakeResolve = null;
+				reject(new Error("Handshake timeout"));
+			}, this.options.connectionTimeout);
+
+			this.handshakeResolve = (info) => {
+				clearTimeout(timeout);
+				this.serverInfo = info;
+				resolve(info);
+			};
+		});
+	}
+
+	/**
+	 * Get server info from last handshake
+	 */
+	getServerInfo(): ServerHandshakeResponse | null {
+		return this.serverInfo;
+	}
+
+	/**
+	 * Set handler for handshake responses
+	 * Called when server sends plugin/config info
+	 */
+	onHandshake(handler: (info: ServerHandshakeResponse) => void): () => void {
+		this.handshakeHandler = handler;
+		return () => {
+			this.handshakeHandler = null;
+		};
+	}
+
 	// ===========================================================================
 	// Message Handling
 	// ===========================================================================
@@ -283,6 +359,16 @@ export class WebSocketSubscriptionTransport implements SubscriptionTransport {
 
 				case "heartbeat":
 					// Server is alive
+					break;
+
+				case "handshake":
+					// Server handshake response with plugin info
+					if (this.handshakeResolve) {
+						this.handshakeResolve(message);
+						this.handshakeResolve = null;
+					}
+					// Also call handler if set
+					this.handshakeHandler?.(message);
 					break;
 
 				case "update":

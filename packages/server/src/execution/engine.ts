@@ -263,13 +263,50 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 
 	/**
 	 * Apply field selection to result
+	 *
+	 * Filters the data object to only include selected fields.
+	 * Supports nested selection for relations.
 	 */
 	private applySelection<T>(data: T | null, select?: Record<string, unknown>): T | null {
 		if (data === null || !select) return data;
 
-		// For now, return full object
-		// TODO: Implement field selection filtering
-		return data;
+		const result: Record<string, unknown> = {};
+
+		for (const [key, value] of Object.entries(select)) {
+			if (value === false) continue;
+
+			const dataValue = (data as Record<string, unknown>)[key];
+
+			if (value === true) {
+				// Simple field selection
+				result[key] = dataValue;
+			} else if (typeof value === "object" && value !== null) {
+				// Nested selection (relations or nested select)
+				const nestedSelect = (value as { select?: Record<string, unknown> }).select ?? value;
+
+				if (Array.isArray(dataValue)) {
+					// HasMany relation
+					result[key] = dataValue.map((item) =>
+						this.applySelection(item as Record<string, unknown>, nestedSelect as Record<string, unknown>),
+					);
+				} else if (dataValue !== null && typeof dataValue === "object") {
+					// HasOne/BelongsTo relation
+					result[key] = this.applySelection(
+						dataValue as Record<string, unknown>,
+						nestedSelect as Record<string, unknown>,
+					);
+				} else {
+					result[key] = dataValue;
+				}
+			}
+		}
+
+		// Always include id if present in data (unless explicitly excluded)
+		if ("id" in (data as Record<string, unknown>) && !("id" in select)) {
+			result.id = (data as Record<string, unknown>).id;
+		}
+
+		return result as T;
 	}
 }
 
