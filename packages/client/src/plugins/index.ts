@@ -2,7 +2,7 @@
  * @lens/client - Plugins
  *
  * Plug-and-play feature system for Lens client.
- * Uses UnifiedPlugin from @lens/core for cross-cutting concerns.
+ * Uses UnifiedPlugin from @lens/core.
  *
  * @example
  * ```typescript
@@ -23,29 +23,21 @@
 // Re-export from @lens/core (canonical source)
 export {
 	defineUnifiedPlugin,
+	isConfiguredPlugin,
 	type UnifiedPlugin,
+	type CallableUnifiedPlugin,
+	type ConfiguredPlugin,
 	type ClientPluginContext,
 	type ClientPluginHooks,
 	type ClientPluginInstance,
 	type ClientPluginDef,
 } from "@lens/core";
 
-// Client-specific plugin manager
-export { createPluginManager } from "./manager";
-export type { PluginManager } from "./types";
+// Client plugin manager
+export { createPluginManager, type PluginManager, type PluginInput } from "./manager";
 
-// Client-only plugins (not in core)
+// Client-only plugins
 export { optimisticPlugin, type OptimisticPluginAPI } from "./optimistic";
 
 // Config types (for client-specific plugins)
-export type { OptimisticPluginConfig } from "./types";
-
-// Legacy exports - DEPRECATED, use @lens/core instead
-// These will be removed in next major version
-export type {
-	Plugin,
-	PluginInstance,
-	PluginContext,
-	PluginHooks,
-} from "./types";
-export { definePlugin } from "./manager";
+export type { OptimisticPluginConfig, ExtendedPluginContext } from "./types";

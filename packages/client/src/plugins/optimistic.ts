@@ -5,9 +5,26 @@
  * Plug and play - just add to your client.
  */
 
-import { definePlugin } from "./manager";
-import type { OptimisticPluginConfig, PluginContext } from "./types";
+import { defineUnifiedPlugin, type ClientPluginContext } from "@lens/core";
+import type { SubscriptionManager } from "../reactive/subscription-manager";
 import { OptimisticManager } from "../reactive/optimistic-manager";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Optimistic updates plugin config */
+export interface OptimisticPluginConfig {
+	/** Enable optimistic updates (default: true) */
+	enabled?: boolean;
+	/** Timeout for pending updates in ms (default: 30000) */
+	timeout?: number;
+}
+
+/** Extended context with subscription manager (set by ReactiveClient) */
+interface ExtendedPluginContext extends ClientPluginContext {
+	subscriptions?: SubscriptionManager;
+}
 
 // =============================================================================
 // Optimistic Plugin
@@ -38,7 +55,7 @@ import { OptimisticManager } from "../reactive/optimistic-manager";
  * const pending = client.$plugins.optimistic.getPending();
  * ```
  */
-export const optimisticPlugin = definePlugin<OptimisticPluginConfig>({
+export const optimisticPlugin = defineUnifiedPlugin<OptimisticPluginConfig>({
 	name: "optimistic",
 	version: "1.0.0",
 
@@ -47,15 +64,20 @@ export const optimisticPlugin = definePlugin<OptimisticPluginConfig>({
 		timeout: 30000,
 	},
 
-	create: (config) => {
+	// Client-only plugin
+	client: (config) => {
 		let manager: OptimisticManager | null = null;
-		const pendingOps = new Map<string, string>(); // op key -> optimistic id
+		// Track pending operations: opKey -> optId
+		const pendingOps = new Map<string, string>();
 
 		return {
 			name: "optimistic",
 
-			onInit: (ctx: PluginContext) => {
-				manager = new OptimisticManager(ctx.subscriptions, config);
+			onInit: (ctx: ClientPluginContext) => {
+				const extCtx = ctx as ExtendedPluginContext;
+				if (extCtx.subscriptions) {
+					manager = new OptimisticManager(extCtx.subscriptions, config);
+				}
 			},
 
 			onBeforeMutation: (ctx, entity, op, input) => {
@@ -95,16 +117,20 @@ export const optimisticPlugin = definePlugin<OptimisticPluginConfig>({
 
 				if (optId) {
 					pendingOps.set(opKey, optId);
+					// Store opKey in input for retrieval in after hooks
+					(input as Record<string, unknown>).__opKey = opKey;
 				}
-
-				return { input, meta: { opKey, optId } };
 			},
 
-			onAfterMutation: (ctx, entity, op, result, meta) => {
-				if (!manager || !meta?.optId) return;
+			onAfterMutation: (ctx, entity, op, result) => {
+				if (!manager) return;
 
-				const optId = meta.optId as string;
-				const opKey = meta.opKey as string;
+				// Find the pending operation
+				const opKey = findPendingOpKey(pendingOps, entity, op);
+				if (!opKey) return;
+
+				const optId = pendingOps.get(opKey);
+				if (!optId) return;
 
 				// Confirm optimistic update with server data
 				if (!result.error) {
@@ -114,11 +140,15 @@ export const optimisticPlugin = definePlugin<OptimisticPluginConfig>({
 				pendingOps.delete(opKey);
 			},
 
-			onMutationError: (ctx, entity, op, error, meta) => {
-				if (!manager || !meta?.optId) return;
+			onMutationError: (ctx, entity, op, error) => {
+				if (!manager) return;
 
-				const optId = meta.optId as string;
-				const opKey = meta.opKey as string;
+				// Find the pending operation
+				const opKey = findPendingOpKey(pendingOps, entity, op);
+				if (!opKey) return;
+
+				const optId = pendingOps.get(opKey);
+				if (!optId) return;
 
 				// Rollback on error
 				manager.rollback(optId);
@@ -158,6 +188,21 @@ export const optimisticPlugin = definePlugin<OptimisticPluginConfig>({
 		};
 	},
 });
+
+// Helper to find pending op by entity and op (gets the oldest one)
+function findPendingOpKey(
+	pendingOps: Map<string, string>,
+	entity: string,
+	op: string,
+): string | undefined {
+	const prefix = `${entity}:${op}:`;
+	for (const key of pendingOps.keys()) {
+		if (key.startsWith(prefix)) {
+			return key;
+		}
+	}
+	return undefined;
+}
 
 // Type for the plugin API
 export type OptimisticPluginAPI = {

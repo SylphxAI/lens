@@ -2,15 +2,22 @@
  * @lens/client - Plugin System Tests
  */
 
-import { describe, it, expect, beforeEach, mock } from "bun:test";
-import { createPluginManager, definePlugin } from "./manager";
+import { describe, it, expect, beforeEach } from "bun:test";
+import { createPluginManager } from "./manager";
 import { optimisticPlugin } from "./optimistic";
-import type { PluginContext } from "./types";
+import { defineUnifiedPlugin, type ClientPluginContext } from "@lens/core";
 import { SubscriptionManager } from "../reactive/subscription-manager";
 import { QueryResolver } from "../reactive/query-resolver";
 
 // Mock context factory
-function createMockContext(): PluginContext {
+function createMockContext(): ClientPluginContext {
+	return {
+		execute: async () => ({ data: {} }),
+	};
+}
+
+// Extended context with subscriptions for optimistic plugin
+function createExtendedContext() {
 	const subscriptions = new SubscriptionManager();
 	const resolver = new QueryResolver(subscriptions);
 
@@ -25,9 +32,9 @@ describe("Plugin System", () => {
 	describe("Plugin Manager", () => {
 		it("registers plugins", () => {
 			const manager = createPluginManager();
-			const plugin = definePlugin({
+			const plugin = defineUnifiedPlugin({
 				name: "test-plugin",
-				create: () => ({ name: "test-plugin" }),
+				client: () => ({ name: "test-plugin" }),
 			});
 
 			manager.register(plugin);
@@ -38,9 +45,9 @@ describe("Plugin System", () => {
 
 		it("prevents duplicate registration", () => {
 			const manager = createPluginManager();
-			const plugin = definePlugin({
+			const plugin = defineUnifiedPlugin({
 				name: "test-plugin",
-				create: () => ({ name: "test-plugin" }),
+				client: () => ({ name: "test-plugin" }),
 			});
 
 			manager.register(plugin);
@@ -52,10 +59,10 @@ describe("Plugin System", () => {
 		it("checks dependencies", () => {
 			const manager = createPluginManager();
 
-			const childPlugin = definePlugin({
+			const childPlugin = defineUnifiedPlugin({
 				name: "child",
 				dependencies: ["parent"],
-				create: () => ({ name: "child" }),
+				client: () => ({ name: "child" }),
 			});
 
 			expect(() => manager.register(childPlugin)).toThrow(/requires "parent"/);
@@ -64,15 +71,15 @@ describe("Plugin System", () => {
 		it("allows registration with satisfied dependencies", () => {
 			const manager = createPluginManager();
 
-			const parentPlugin = definePlugin({
+			const parentPlugin = defineUnifiedPlugin({
 				name: "parent",
-				create: () => ({ name: "parent" }),
+				client: () => ({ name: "parent" }),
 			});
 
-			const childPlugin = definePlugin({
+			const childPlugin = defineUnifiedPlugin({
 				name: "child",
 				dependencies: ["parent"],
-				create: () => ({ name: "child" }),
+				client: () => ({ name: "child" }),
 			});
 
 			manager.register(parentPlugin);
@@ -85,9 +92,9 @@ describe("Plugin System", () => {
 			const manager = createPluginManager();
 			let initialized = false;
 
-			const plugin = definePlugin({
+			const plugin = defineUnifiedPlugin({
 				name: "test-plugin",
-				create: () => ({
+				client: () => ({
 					name: "test-plugin",
 					onInit: () => {
 						initialized = true;
@@ -104,9 +111,9 @@ describe("Plugin System", () => {
 		it("exposes plugin API", async () => {
 			const manager = createPluginManager();
 
-			const plugin = definePlugin({
+			const plugin = defineUnifiedPlugin({
 				name: "test-plugin",
-				create: () => ({
+				client: () => ({
 					name: "test-plugin",
 					api: {
 						getValue: () => 42,
@@ -125,17 +132,17 @@ describe("Plugin System", () => {
 			const manager = createPluginManager();
 			const calls: string[] = [];
 
-			const plugin1 = definePlugin({
+			const plugin1 = defineUnifiedPlugin({
 				name: "plugin-1",
-				create: () => ({
+				client: () => ({
 					name: "plugin-1",
 					onConnect: () => calls.push("plugin-1"),
 				}),
 			});
 
-			const plugin2 = definePlugin({
+			const plugin2 = defineUnifiedPlugin({
 				name: "plugin-2",
-				create: () => ({
+				client: () => ({
 					name: "plugin-2",
 					onConnect: () => calls.push("plugin-2"),
 				}),
@@ -155,9 +162,9 @@ describe("Plugin System", () => {
 			const manager = createPluginManager();
 			let destroyed = false;
 
-			const plugin = definePlugin({
+			const plugin = defineUnifiedPlugin({
 				name: "test-plugin",
-				create: () => ({
+				client: () => ({
 					name: "test-plugin",
 					destroy: () => {
 						destroyed = true;
@@ -172,15 +179,30 @@ describe("Plugin System", () => {
 
 			expect(destroyed).toBe(true);
 		});
+
+		it("skips plugins without client implementation", () => {
+			const manager = createPluginManager();
+
+			// Server-only plugin (no client part)
+			const serverOnlyPlugin = defineUnifiedPlugin({
+				name: "server-only",
+				server: () => ({ name: "server-only" }),
+			});
+
+			manager.register(serverOnlyPlugin);
+
+			// Should not be registered since it has no client implementation
+			expect(manager.list()).not.toContain("server-only");
+		});
 	});
 
-	describe("definePlugin Helper", () => {
+	describe("defineUnifiedPlugin Helper", () => {
 		it("creates plugin definition", () => {
-			const plugin = definePlugin({
+			const plugin = defineUnifiedPlugin({
 				name: "my-plugin",
 				version: "1.0.0",
 				defaultConfig: { enabled: true },
-				create: (config) => ({
+				client: (config) => ({
 					name: "my-plugin",
 					api: { isEnabled: () => config?.enabled },
 				}),
@@ -194,10 +216,10 @@ describe("Plugin System", () => {
 		it("merges config with defaults", async () => {
 			const manager = createPluginManager();
 
-			const plugin = definePlugin<{ a: number; b: number }>({
+			const plugin = defineUnifiedPlugin<{ a: number; b: number }>({
 				name: "config-plugin",
 				defaultConfig: { a: 1, b: 2 },
-				create: (config) => ({
+				client: (config) => ({
 					name: "config-plugin",
 					api: { getConfig: () => config },
 				}),
@@ -209,13 +231,33 @@ describe("Plugin System", () => {
 			const api = manager.get<{ getConfig: () => { a: number; b: number } }>("config-plugin");
 			expect(api?.getConfig()).toEqual({ a: 10, b: 2 });
 		});
+
+		it("supports callable plugin syntax", async () => {
+			const manager = createPluginManager();
+
+			const plugin = defineUnifiedPlugin<{ value: number }>({
+				name: "callable-plugin",
+				defaultConfig: { value: 0 },
+				client: (config) => ({
+					name: "callable-plugin",
+					api: { getValue: () => config?.value },
+				}),
+			});
+
+			// Call plugin with config
+			manager.register(plugin({ value: 42 }));
+			await manager.init(createMockContext());
+
+			const api = manager.get<{ getValue: () => number }>("callable-plugin");
+			expect(api?.getValue()).toBe(42);
+		});
 	});
 
 	describe("Optimistic Plugin", () => {
 		it("creates with default config", async () => {
 			const manager = createPluginManager();
 			manager.register(optimisticPlugin);
-			await manager.init(createMockContext());
+			await manager.init(createExtendedContext());
 
 			const api = manager.get<{ isEnabled: () => boolean }>("optimistic");
 			expect(api?.isEnabled()).toBe(true);
@@ -224,7 +266,7 @@ describe("Plugin System", () => {
 		it("can be disabled", async () => {
 			const manager = createPluginManager();
 			manager.register(optimisticPlugin, { enabled: false });
-			await manager.init(createMockContext());
+			await manager.init(createExtendedContext());
 
 			const api = manager.get<{ isEnabled: () => boolean }>("optimistic");
 			expect(api?.isEnabled()).toBe(false);
@@ -233,7 +275,7 @@ describe("Plugin System", () => {
 		it("exposes getPending API", async () => {
 			const manager = createPluginManager();
 			manager.register(optimisticPlugin);
-			await manager.init(createMockContext());
+			await manager.init(createExtendedContext());
 
 			const api = manager.get<{ getPending: () => unknown[] }>("optimistic");
 			expect(api?.getPending()).toEqual([]);
@@ -242,7 +284,7 @@ describe("Plugin System", () => {
 		it("exposes getPendingCount API", async () => {
 			const manager = createPluginManager();
 			manager.register(optimisticPlugin);
-			await manager.init(createMockContext());
+			await manager.init(createExtendedContext());
 
 			const api = manager.get<{ getPendingCount: () => number }>("optimistic");
 			expect(api?.getPendingCount()).toBe(0);

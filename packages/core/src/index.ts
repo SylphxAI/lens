@@ -214,6 +214,7 @@ export {
 export {
 	// Helper
 	defineUnifiedPlugin,
+	isConfiguredPlugin,
 	// Types
 	type PluginMeta,
 	type BasePluginConfig,
@@ -230,6 +231,8 @@ export {
 	type ServerPluginDef,
 	// Unified
 	type UnifiedPlugin,
+	type CallableUnifiedPlugin,
+	type ConfiguredPlugin,
 	// Handshake
 	type PluginHandshakeInfo,
 	type ServerHandshake,

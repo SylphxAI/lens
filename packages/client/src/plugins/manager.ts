@@ -2,36 +2,95 @@
  * @lens/client - Plugin Manager
  *
  * Manages plugin registration, lifecycle, and hook execution.
+ * Uses UnifiedPlugin types from @lens/core.
  */
 
 import type {
-	Plugin,
-	PluginInstance,
-	PluginContext,
-	PluginManager,
-	PluginHooks,
-} from "./types";
+	UnifiedPlugin,
+	ClientPluginHooks,
+	ClientPluginInstance,
+	ClientPluginContext,
+	ConfiguredPlugin,
+	CallableUnifiedPlugin,
+} from "@lens/core";
+import { isConfiguredPlugin } from "@lens/core";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Plugin input - can be a UnifiedPlugin or a ConfiguredPlugin */
+export type PluginInput<TConfig = unknown> =
+	| UnifiedPlugin<TConfig>
+	| CallableUnifiedPlugin<TConfig>
+	| ConfiguredPlugin<TConfig>;
+
+/** Plugin manager interface */
+export interface PluginManager {
+	/** Register a plugin */
+	register<T>(plugin: PluginInput<T>, config?: T): void;
+	/** Get plugin API */
+	get<T = unknown>(name: string): T | undefined;
+	/** Check if plugin is registered */
+	has(name: string): boolean;
+	/** List all registered plugins */
+	list(): string[];
+	/** Initialize all plugins */
+	init(ctx: ClientPluginContext): Promise<void>;
+	/** Destroy all plugins */
+	destroy(): void;
+	/** Call hook on all plugins */
+	callHook<K extends keyof ClientPluginHooks>(
+		hook: K,
+		...args: Parameters<NonNullable<ClientPluginHooks[K]>>
+	): void;
+}
 
 // =============================================================================
 // Plugin Manager Implementation
 // =============================================================================
 
+interface PendingPlugin {
+	plugin: UnifiedPlugin<unknown>;
+	config: unknown;
+}
+
 /**
- * Create a plugin manager
+ * Create a plugin manager for client plugins
  */
 export function createPluginManager(): PluginManager {
-	const plugins = new Map<string, PluginInstance>();
-	const pendingPlugins: Array<{ plugin: Plugin<unknown>; config: unknown }> = [];
+	const plugins = new Map<string, ClientPluginInstance>();
+	const pendingPlugins: PendingPlugin[] = [];
 	let initialized = false;
-	let context: PluginContext | null = null;
+	let context: ClientPluginContext | null = null;
 
 	return {
 		/**
 		 * Register a plugin
 		 */
-		register<T>(plugin: Plugin<T>, config?: T): void {
+		register<T>(input: PluginInput<T>, config?: T): void {
+			// Extract plugin and config from input
+			let plugin: UnifiedPlugin<T>;
+			let finalConfig: T | undefined;
+
+			if (isConfiguredPlugin(input)) {
+				// ConfiguredPlugin - already has config
+				plugin = input.__plugin as UnifiedPlugin<T>;
+				finalConfig = input.__config as T;
+			} else {
+				// UnifiedPlugin or CallableUnifiedPlugin
+				plugin = input as UnifiedPlugin<T>;
+				finalConfig = config;
+			}
+
 			if (plugins.has(plugin.name) || pendingPlugins.some((p) => p.plugin.name === plugin.name)) {
 				console.warn(`Plugin "${plugin.name}" is already registered`);
+				return;
+			}
+
+			// Check if plugin has client part
+			if (!plugin.client) {
+				console.warn(`Plugin "${plugin.name}" has no client implementation, skipping`);
 				return;
 			}
 
@@ -49,21 +108,20 @@ export function createPluginManager(): PluginManager {
 			// Merge config with defaults
 			const mergedConfig = {
 				...plugin.defaultConfig,
-				...config,
+				...finalConfig,
 			} as T;
-
-			// Create instance
-			const instance = plugin.create(mergedConfig);
 
 			if (initialized && context) {
 				// Initialize immediately if manager is already initialized
-				// Note: We can't await here since register() is sync, but onInit
-				// should complete quickly for hot-registered plugins
+				const instance = plugin.client(mergedConfig);
 				void instance.onInit?.(context);
 				plugins.set(plugin.name, instance);
 			} else {
 				// Queue for later initialization
-				pendingPlugins.push({ plugin: plugin as Plugin<unknown>, config: mergedConfig });
+				pendingPlugins.push({
+					plugin: plugin as UnifiedPlugin<unknown>,
+					config: mergedConfig,
+				});
 			}
 		},
 
@@ -95,7 +153,7 @@ export function createPluginManager(): PluginManager {
 		/**
 		 * Initialize all plugins
 		 */
-		async init(ctx: PluginContext): Promise<void> {
+		async init(ctx: ClientPluginContext): Promise<void> {
 			if (initialized) return;
 
 			context = ctx;
@@ -103,9 +161,11 @@ export function createPluginManager(): PluginManager {
 
 			// Initialize pending plugins in order
 			for (const { plugin, config } of pendingPlugins) {
-				const instance = plugin.create(config);
-				await instance.onInit?.(ctx);
-				plugins.set(plugin.name, instance);
+				if (plugin.client) {
+					const instance = plugin.client(config);
+					await instance.onInit?.(ctx);
+					plugins.set(plugin.name, instance);
+				}
 			}
 
 			pendingPlugins.length = 0;
@@ -129,9 +189,9 @@ export function createPluginManager(): PluginManager {
 		/**
 		 * Call hook on all plugins
 		 */
-		callHook<K extends keyof PluginHooks>(
+		callHook<K extends keyof ClientPluginHooks>(
 			hook: K,
-			...args: Parameters<NonNullable<PluginHooks[K]>>
+			...args: Parameters<NonNullable<ClientPluginHooks[K]>>
 		): void {
 			for (const instance of plugins.values()) {
 				const hookFn = instance[hook] as ((...a: unknown[]) => void) | undefined;
@@ -145,32 +205,4 @@ export function createPluginManager(): PluginManager {
 			}
 		},
 	};
-}
-
-// =============================================================================
-// Helper: Define Plugin
-// =============================================================================
-
-/**
- * Helper to define a plugin with type safety
- *
- * @example
- * ```typescript
- * const myPlugin = definePlugin({
- *   name: "my-plugin",
- *   defaultConfig: { enabled: true },
- *   create: (config) => ({
- *     name: "my-plugin",
- *     onInit: (ctx) => console.log("Initialized!"),
- *     api: {
- *       doSomething: () => console.log("Did something!"),
- *     },
- *   }),
- * });
- * ```
- */
-export function definePlugin<TConfig = void>(
-	plugin: Plugin<TConfig>,
-): Plugin<TConfig> {
-	return plugin;
 }
