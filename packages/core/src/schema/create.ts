@@ -16,6 +16,42 @@ import { isRelationType } from "./types";
 import type { InferEntity, InferSchemaEntities, Select, InferSelected } from "./infer";
 
 // =============================================================================
+// Type-Level Relation Validation
+// =============================================================================
+
+/** Extract all relation target names from an entity definition */
+type ExtractEntityRelationTargets<E extends EntityDefinition> = {
+	[K in keyof E]: E[K] extends HasOneType<infer T>
+		? T
+		: E[K] extends HasManyType<infer T>
+			? T
+			: E[K] extends BelongsToType<infer T>
+				? T
+				: never;
+}[keyof E];
+
+/** Extract all relation target names from a schema definition */
+type ExtractAllRelationTargets<S extends SchemaDefinition> = {
+	[E in keyof S]: ExtractEntityRelationTargets<S[E]>;
+}[keyof S];
+
+/** Check if all relation targets exist in the schema */
+type InvalidRelationTargets<S extends SchemaDefinition> = Exclude<
+	ExtractAllRelationTargets<S>,
+	keyof S | never
+>;
+
+/** Validated schema definition - ensures all relation targets exist */
+export type ValidatedSchemaDefinition<S extends SchemaDefinition> =
+	InvalidRelationTargets<S> extends never
+		? S
+		: {
+				__error: "Invalid relation target(s) found";
+				__invalidTargets: InvalidRelationTargets<S>;
+				__validEntities: keyof S;
+			};
+
+// =============================================================================
 // Schema Class
 // =============================================================================
 
@@ -168,8 +204,20 @@ export class Schema<S extends SchemaDefinition> {
 // Schema Creation
 // =============================================================================
 
+/** Helper type that returns never if there are invalid relations, otherwise returns true */
+type HasValidRelations<S extends SchemaDefinition> =
+	InvalidRelationTargets<S> extends never ? true : false;
+
+/** Error type shown when relations are invalid */
+type RelationError<S extends SchemaDefinition> = InvalidRelationTargets<S> extends never
+	? never
+	: `Invalid relation target: "${InvalidRelationTargets<S> & string}". Valid entities are: ${keyof S & string}`;
+
 /**
  * Create a typed schema from entity definitions.
+ *
+ * **Compile-time validation**: If a relation points to a non-existent entity,
+ * TypeScript will show an error with the invalid target name.
  *
  * @example
  * ```typescript
@@ -188,13 +236,20 @@ export class Schema<S extends SchemaDefinition> {
  *   },
  * });
  *
+ * // ❌ This would cause a compile error:
+ * // createSchema({
+ * //   User: { posts: t.hasMany('Posts') }  // 'Posts' doesn't exist!
+ * // });
+ *
  * // Type inference works automatically
  * type User = InferEntity<typeof schema.definition.User, typeof schema.definition>;
  * // { id: string; name: string; email: string; posts: Post[] }
  * ```
  */
-export function createSchema<S extends SchemaDefinition>(definition: S): Schema<S> {
-	return new Schema(definition);
+export function createSchema<S extends SchemaDefinition>(
+	definition: HasValidRelations<S> extends true ? S : RelationError<S>,
+): Schema<S> {
+	return new Schema(definition as S);
 }
 
 // =============================================================================

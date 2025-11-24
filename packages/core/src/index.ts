@@ -59,6 +59,8 @@ export {
 	type SchemaEntities,
 	type SchemaSelect,
 	type SchemaSelected,
+	// Validation types
+	type ValidatedSchemaDefinition,
 	// Errors
 	SchemaValidationError,
 } from "./schema/create";

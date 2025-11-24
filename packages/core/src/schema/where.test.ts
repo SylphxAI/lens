@@ -376,6 +376,51 @@ describe("UpdateInput type safety", () => {
 	});
 });
 
+// =============================================================================
+// Relation Validation Type Tests
+// =============================================================================
+
+describe("Relation validation", () => {
+	it("valid schema compiles without error", () => {
+		// This schema has valid relations - should compile fine
+		const validSchema = createSchema({
+			Author: {
+				id: t.id(),
+				books: t.hasMany("Book"),
+			},
+			Book: {
+				id: t.id(),
+				author: t.belongsTo("Author"),
+			},
+		});
+
+		expect(validSchema.entities.size).toBe(2);
+	});
+
+	it("validates relations at runtime", () => {
+		// Runtime validation should throw for invalid relations
+		expect(() =>
+			createSchema({
+				User: {
+					id: t.id(),
+					// @ts-expect-error - 'InvalidEntity' doesn't exist
+					profile: t.hasOne("InvalidEntity"),
+				},
+			} as any),
+		).toThrow("does not exist");
+	});
+
+	// Compile-time validation test
+	// This would cause a compile error if uncommented:
+	// const badSchema = createSchema({
+	//   User: {
+	//     id: t.id(),
+	//     posts: t.hasMany('Posts'),  // ❌ 'Posts' not 'Post'
+	//   },
+	// });
+	// Error: Invalid relation target: "Posts". Valid entities are: "User"
+});
+
 describe("Runtime behavior", () => {
 	it("where objects are plain JavaScript objects", () => {
 		const where: WhereInput<UserDef> = {
