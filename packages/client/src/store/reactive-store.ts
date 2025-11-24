@@ -27,6 +27,10 @@ export interface EntityState<T = unknown> {
 	stale: boolean;
 	/** Subscription reference count */
 	refCount: number;
+	/** Cache timestamp */
+	cachedAt?: number;
+	/** Cache tags for invalidation */
+	tags?: string[];
 }
 
 /** Optimistic update entry */
@@ -48,6 +52,28 @@ export interface StoreConfig {
 	cacheTTL?: number;
 	/** Maximum cache size (default: 1000) */
 	maxCacheSize?: number;
+	/** Cascade invalidation rules */
+	cascadeRules?: CascadeRule[];
+}
+
+/** Cascade invalidation rule */
+export interface CascadeRule {
+	/** Source entity type that triggers invalidation */
+	source: string;
+	/** Operation types that trigger cascade (default: all) */
+	operations?: ("create" | "update" | "delete")[];
+	/** Target entities to invalidate */
+	targets: string[];
+}
+
+/** Invalidation options */
+export interface InvalidationOptions {
+	/** Invalidate by tag */
+	tags?: string[];
+	/** Invalidate by entity type pattern (glob-like) */
+	pattern?: string;
+	/** Cascade to related entities */
+	cascade?: boolean;
 }
 
 // =============================================================================
@@ -68,13 +94,17 @@ export class ReactiveStore {
 	private optimisticUpdates = new Map<string, OptimisticEntry>();
 
 	/** Configuration */
-	private config: Required<StoreConfig>;
+	private config: Required<Omit<StoreConfig, "cascadeRules">> & { cascadeRules: CascadeRule[] };
+
+	/** Tag to entity keys mapping */
+	private tagIndex = new Map<string, Set<EntityKey>>();
 
 	constructor(config: StoreConfig = {}) {
 		this.config = {
 			optimistic: config.optimistic ?? true,
 			cacheTTL: config.cacheTTL ?? 5 * 60 * 1000,
 			maxCacheSize: config.maxCacheSize ?? 1000,
+			cascadeRules: config.cascadeRules ?? [],
 		};
 	}
 
@@ -107,9 +137,10 @@ export class ReactiveStore {
 	/**
 	 * Set entity data
 	 */
-	setEntity<T>(entityName: string, entityId: string, data: T): void {
+	setEntity<T>(entityName: string, entityId: string, data: T, tags?: string[]): void {
 		const key = this.makeKey(entityName, entityId);
 		const entitySignal = this.entities.get(key);
+		const now = Date.now();
 
 		if (entitySignal) {
 			entitySignal.value = {
@@ -118,6 +149,8 @@ export class ReactiveStore {
 				loading: false,
 				error: null,
 				stale: false,
+				cachedAt: now,
+				tags: tags ?? entitySignal.value.tags,
 			};
 		} else {
 			this.entities.set(
@@ -128,8 +161,20 @@ export class ReactiveStore {
 					error: null,
 					stale: false,
 					refCount: 0,
+					cachedAt: now,
+					tags,
 				}),
 			);
+		}
+
+		// Update tag index
+		if (tags) {
+			for (const tag of tags) {
+				if (!this.tagIndex.has(tag)) {
+					this.tagIndex.set(tag, new Set());
+				}
+				this.tagIndex.get(tag)!.add(key);
+			}
 		}
 	}
 
@@ -365,6 +410,184 @@ export class ReactiveStore {
 	 */
 	getPendingOptimistic(): OptimisticEntry[] {
 		return Array.from(this.optimisticUpdates.values());
+	}
+
+	// ===========================================================================
+	// Cache Invalidation
+	// ===========================================================================
+
+	/**
+	 * Invalidate entity and mark as stale
+	 */
+	invalidate(entityName: string, entityId: string, options?: InvalidationOptions): void {
+		const key = this.makeKey(entityName, entityId);
+		this.markStale(key);
+
+		// Cascade invalidation
+		if (options?.cascade !== false) {
+			this.cascadeInvalidate(entityName, "update");
+		}
+	}
+
+	/**
+	 * Invalidate all entities of a type
+	 */
+	invalidateEntity(entityName: string, options?: InvalidationOptions): void {
+		for (const key of this.entities.keys()) {
+			if (key.startsWith(`${entityName}:`)) {
+				this.markStale(key);
+			}
+		}
+
+		// Invalidate related lists
+		for (const listKey of this.lists.keys()) {
+			if (listKey.includes(entityName)) {
+				const listSignal = this.lists.get(listKey);
+				if (listSignal) {
+					listSignal.value = { ...listSignal.value, stale: true };
+				}
+			}
+		}
+
+		// Cascade invalidation
+		if (options?.cascade !== false) {
+			this.cascadeInvalidate(entityName, "update");
+		}
+	}
+
+	/**
+	 * Invalidate by tags
+	 */
+	invalidateByTags(tags: string[]): number {
+		let count = 0;
+		for (const tag of tags) {
+			const keys = this.tagIndex.get(tag);
+			if (keys) {
+				for (const key of keys) {
+					this.markStale(key);
+					count++;
+				}
+			}
+		}
+		return count;
+	}
+
+	/**
+	 * Invalidate by pattern (glob-like: User:*, *:123)
+	 */
+	invalidateByPattern(pattern: string): number {
+		const regex = this.patternToRegex(pattern);
+		let count = 0;
+
+		for (const key of this.entities.keys()) {
+			if (regex.test(key)) {
+				this.markStale(key);
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	/**
+	 * Tag an entity for group invalidation
+	 */
+	tagEntity(entityName: string, entityId: string, tags: string[]): void {
+		const key = this.makeKey(entityName, entityId);
+		const entitySignal = this.entities.get(key);
+
+		if (entitySignal) {
+			entitySignal.value = {
+				...entitySignal.value,
+				tags: [...new Set([...(entitySignal.value.tags ?? []), ...tags])],
+			};
+
+			// Update tag index
+			for (const tag of tags) {
+				if (!this.tagIndex.has(tag)) {
+					this.tagIndex.set(tag, new Set());
+				}
+				this.tagIndex.get(tag)!.add(key);
+			}
+		}
+	}
+
+	/**
+	 * Check if entity data is stale (past TTL)
+	 */
+	isStale(entityName: string, entityId: string): boolean {
+		const key = this.makeKey(entityName, entityId);
+		const entitySignal = this.entities.get(key);
+
+		if (!entitySignal) return true;
+		if (entitySignal.value.stale) return true;
+		if (!entitySignal.value.cachedAt) return false;
+
+		return Date.now() - entitySignal.value.cachedAt > this.config.cacheTTL;
+	}
+
+	/**
+	 * Get data with stale-while-revalidate pattern
+	 * Returns stale data immediately and triggers revalidation callback
+	 */
+	getStaleWhileRevalidate<T>(
+		entityName: string,
+		entityId: string,
+		revalidate: () => Promise<T>,
+	): { data: T | null; isStale: boolean; revalidating: Promise<T> | null } {
+		const key = this.makeKey(entityName, entityId);
+		const entitySignal = this.entities.get(key);
+		const isStale = this.isStale(entityName, entityId);
+
+		let revalidating: Promise<T> | null = null;
+
+		if (isStale && entitySignal?.value.data != null) {
+			// Return stale data and trigger revalidation
+			revalidating = revalidate().then((newData) => {
+				this.setEntity(entityName, entityId, newData);
+				return newData;
+			});
+		}
+
+		return {
+			data: (entitySignal?.value.data as T) ?? null,
+			isStale,
+			revalidating,
+		};
+	}
+
+	// ===========================================================================
+	// Private Invalidation Helpers
+	// ===========================================================================
+
+	private markStale(key: EntityKey): void {
+		const entitySignal = this.entities.get(key);
+		if (entitySignal) {
+			entitySignal.value = { ...entitySignal.value, stale: true };
+		}
+	}
+
+	private cascadeInvalidate(
+		entityName: string,
+		operation: "create" | "update" | "delete",
+	): void {
+		for (const rule of this.config.cascadeRules) {
+			if (rule.source !== entityName) continue;
+			if (rule.operations && !rule.operations.includes(operation)) continue;
+
+			for (const target of rule.targets) {
+				this.invalidateEntity(target, { cascade: false }); // Prevent infinite loop
+			}
+		}
+	}
+
+	private patternToRegex(pattern: string): RegExp {
+		// Convert glob-like pattern to regex: * -> .*, ? -> .
+		const escaped = pattern
+			.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+			.replace(/\*/g, ".*")
+			.replace(/\?/g, ".");
+		return new RegExp(`^${escaped}$`);
 	}
 
 	// ===========================================================================

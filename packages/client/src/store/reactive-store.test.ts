@@ -296,4 +296,143 @@ describe("ReactiveStore", () => {
 			expect(stats.pendingOptimistic).toBe(0);
 		});
 	});
+
+	describe("Cache Invalidation", () => {
+		test("invalidate marks entity as stale", () => {
+			const store = createStore();
+			store.setEntity("User", "123", { id: "123", name: "John" });
+
+			store.invalidate("User", "123");
+
+			const entity = store.getEntity("User", "123");
+			expect(entity.value.stale).toBe(true);
+		});
+
+		test("invalidateEntity marks all entities of type as stale", () => {
+			const store = createStore();
+			store.setEntity("User", "1", { id: "1" });
+			store.setEntity("User", "2", { id: "2" });
+			store.setEntity("Post", "1", { id: "1" });
+
+			store.invalidateEntity("User");
+
+			expect(store.getEntity("User", "1").value.stale).toBe(true);
+			expect(store.getEntity("User", "2").value.stale).toBe(true);
+			expect(store.getEntity("Post", "1").value.stale).toBe(false);
+		});
+
+		test("invalidateByTags marks tagged entities as stale", () => {
+			const store = createStore();
+			store.setEntity("User", "1", { id: "1" }, ["team-a"]);
+			store.setEntity("User", "2", { id: "2" }, ["team-b"]);
+			store.setEntity("User", "3", { id: "3" }, ["team-a", "admin"]);
+
+			const count = store.invalidateByTags(["team-a"]);
+
+			expect(count).toBe(2);
+			expect(store.getEntity("User", "1").value.stale).toBe(true);
+			expect(store.getEntity("User", "2").value.stale).toBe(false);
+			expect(store.getEntity("User", "3").value.stale).toBe(true);
+		});
+
+		test("invalidateByPattern matches glob patterns", () => {
+			const store = createStore();
+			store.setEntity("User", "1", { id: "1" });
+			store.setEntity("User", "2", { id: "2" });
+			store.setEntity("Post", "1", { id: "1" });
+
+			const count = store.invalidateByPattern("User:*");
+
+			expect(count).toBe(2);
+			expect(store.getEntity("User", "1").value.stale).toBe(true);
+			expect(store.getEntity("User", "2").value.stale).toBe(true);
+			expect(store.getEntity("Post", "1").value.stale).toBe(false);
+		});
+
+		test("tagEntity adds tags to existing entity", () => {
+			const store = createStore();
+			store.setEntity("User", "1", { id: "1" });
+
+			store.tagEntity("User", "1", ["featured", "premium"]);
+
+			const entity = store.getEntity("User", "1");
+			expect(entity.value.tags).toContain("featured");
+			expect(entity.value.tags).toContain("premium");
+		});
+
+		test("isStale returns true for stale entities", () => {
+			const store = createStore();
+			store.setEntity("User", "1", { id: "1" });
+
+			expect(store.isStale("User", "1")).toBe(false);
+
+			store.invalidate("User", "1");
+
+			expect(store.isStale("User", "1")).toBe(true);
+		});
+
+		test("isStale returns true for non-existent entities", () => {
+			const store = createStore();
+
+			expect(store.isStale("User", "nonexistent")).toBe(true);
+		});
+
+		test("cascade invalidation triggers related entity invalidation", () => {
+			const store = createStore({
+				cascadeRules: [{ source: "User", targets: ["Post", "Comment"] }],
+			});
+
+			store.setEntity("User", "1", { id: "1" });
+			store.setEntity("Post", "1", { id: "1" });
+			store.setEntity("Comment", "1", { id: "1" });
+			store.setEntity("Tag", "1", { id: "1" });
+
+			store.invalidateEntity("User");
+
+			expect(store.getEntity("Post", "1").value.stale).toBe(true);
+			expect(store.getEntity("Comment", "1").value.stale).toBe(true);
+			expect(store.getEntity("Tag", "1").value.stale).toBe(false);
+		});
+	});
+
+	describe("Stale While Revalidate", () => {
+		test("returns stale data with revalidation promise", async () => {
+			const store = createStore();
+			store.setEntity("User", "1", { id: "1", name: "Old" });
+			// Manually mark as stale
+			store.invalidate("User", "1", { cascade: false });
+
+			const result = store.getStaleWhileRevalidate("User", "1", async () => ({
+				id: "1",
+				name: "New",
+			}));
+
+			// Returns old data immediately
+			expect(result.data).toEqual({ id: "1", name: "Old" });
+			expect(result.isStale).toBe(true);
+			expect(result.revalidating).not.toBeNull();
+
+			// Wait for revalidation
+			if (result.revalidating) {
+				await result.revalidating;
+			}
+
+			// Data should be updated
+			const entity = store.getEntity("User", "1");
+			expect(entity.value.data).toEqual({ id: "1", name: "New" });
+		});
+
+		test("returns null with null revalidation for missing data", () => {
+			const store = createStore();
+
+			const result = store.getStaleWhileRevalidate("User", "nonexistent", async () => ({
+				id: "1",
+				name: "New",
+			}));
+
+			expect(result.data).toBeNull();
+			expect(result.isStale).toBe(true);
+			expect(result.revalidating).toBeNull();
+		});
+	});
 });
