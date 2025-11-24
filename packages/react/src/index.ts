@@ -26,10 +26,12 @@ export {
 	useLensComputed,
 	// Types
 	type EntityInput,
-	type SelectOptions,
+	type QueryOptions,
 	type UseEntityResult,
 	type UseListResult,
 	type UseMutationResult,
+	type UpdateMutationInput,
+	type DeleteMutationInput,
 } from "./hooks";
 
 // =============================================================================

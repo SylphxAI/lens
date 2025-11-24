@@ -6,8 +6,17 @@
 
 import { useEffect, useMemo, useCallback, useState } from "react";
 import { useSignal, useComputed } from "@preact/signals-react";
-import type { Signal, EntityState, Client, ListOptions } from "@lens/client";
-import type { SchemaDefinition, InferEntity, CreateInput, UpdateInput, DeleteInput } from "@lens/core";
+import type { Signal, EntityState, Client, ListOptions, InferQueryResult } from "@lens/client";
+import type {
+	SchemaDefinition,
+	InferEntity,
+	CreateInput,
+	Select,
+	WhereInput,
+	CreateManyResult,
+	UpdateManyResult,
+	DeleteManyResult,
+} from "@lens/core";
 import { useLensClient } from "./context";
 
 // =============================================================================
@@ -19,9 +28,13 @@ export interface EntityInput {
 	id: string;
 }
 
-/** Select options for queries */
-export interface SelectOptions<S extends SchemaDefinition, E extends keyof S> {
-	select?: Record<string, unknown>;
+/** Select options for queries (type-safe) */
+export interface QueryOptions<
+	S extends SchemaDefinition,
+	E extends keyof S,
+	Sel extends Select<S[E], S> | undefined = undefined,
+> {
+	select?: Sel;
 }
 
 /** Result of useEntity hook */
@@ -67,7 +80,7 @@ export interface UseMutationResult<TInput, TOutput> {
 // =============================================================================
 
 /**
- * Subscribe to a single entity by ID
+ * Subscribe to a single entity by ID (with type-safe select inference)
  *
  * @example
  * ```tsx
@@ -80,28 +93,41 @@ export interface UseMutationResult<TInput, TOutput> {
  *
  *   return <h1>{user.name}</h1>;
  * }
+ *
+ * // With select (return type inferred from select!)
+ * function UserName({ userId }: { userId: string }) {
+ *   const { data } = useEntity('User', { id: userId }, {
+ *     select: { id: true, name: true }
+ *   });
+ *   // data is { id: string, name: string } | null
+ *   return <span>{data?.name}</span>;
+ * }
  * ```
  */
-export function useEntity<S extends SchemaDefinition, E extends keyof S & string>(
+export function useEntity<
+	S extends SchemaDefinition,
+	E extends keyof S & string,
+	Sel extends Select<S[E], S> | undefined = undefined,
+>(
 	entityName: E,
 	input: EntityInput,
-	options?: SelectOptions<S, E>,
-): UseEntityResult<InferEntity<S[E], S>> {
+	options?: QueryOptions<S, E, Sel>,
+): UseEntityResult<InferQueryResult<S, E, Sel>> {
 	const client = useLensClient<S>();
 
 	// Get entity accessor
 	const accessor = (client as Record<string, unknown>)[entityName] as {
-		get: (input: EntityInput, options?: SelectOptions<S, E>) => Signal<EntityState<InferEntity<S[E], S>>>;
+		get: (id: string, options?: { select?: unknown }) => Signal<EntityState<InferQueryResult<S, E, Sel>>>;
 	};
 
 	// Subscribe to entity signal
 	const entitySignal = useMemo(
-		() => accessor.get(input, options),
+		() => accessor.get(input.id, options),
 		[entityName, input.id, JSON.stringify(options?.select)],
 	);
 
 	// Track signal value with useState for React re-renders
-	const [state, setState] = useState<EntityState<InferEntity<S[E], S>>>(entitySignal.value);
+	const [state, setState] = useState<EntityState<InferQueryResult<S, E, Sel>>>(entitySignal.value);
 
 	// Subscribe to signal changes
 	useEffect(() => {
@@ -124,7 +150,7 @@ export function useEntity<S extends SchemaDefinition, E extends keyof S & string
 	const refetch = useCallback(() => {
 		client.$store.setEntityLoading(entityName, input.id, true);
 		// Re-trigger subscription
-		accessor.get(input, options);
+		accessor.get(input.id, options);
 	}, [entityName, input.id, options]);
 
 	return {
@@ -140,14 +166,14 @@ export function useEntity<S extends SchemaDefinition, E extends keyof S & string
 // =============================================================================
 
 /**
- * Subscribe to a list of entities
+ * Subscribe to a list of entities (with type-safe filtering and select inference)
  *
  * @example
  * ```tsx
  * function UserList() {
  *   const { data: users, loading } = useList('User', {
- *     where: { active: true },
- *     orderBy: { name: 'asc' },
+ *     where: { isActive: true },  // Type-safe where!
+ *     orderBy: { name: 'asc' },   // Type-safe orderBy!
  *     take: 10,
  *   });
  *
@@ -161,17 +187,31 @@ export function useEntity<S extends SchemaDefinition, E extends keyof S & string
  *     </ul>
  *   );
  * }
+ *
+ * // With select (return type inferred!)
+ * function UserNames() {
+ *   const { data } = useList('User', {
+ *     select: { id: true, name: true },
+ *     where: { isActive: true },
+ *   });
+ *   // data is { id: string, name: string }[]
+ *   return data.map(u => <span key={u.id}>{u.name}</span>);
+ * }
  * ```
  */
-export function useList<S extends SchemaDefinition, E extends keyof S & string>(
+export function useList<
+	S extends SchemaDefinition,
+	E extends keyof S & string,
+	Sel extends Select<S[E], S> | undefined = undefined,
+>(
 	entityName: E,
-	options?: ListOptions<S, E>,
-): UseListResult<InferEntity<S[E], S>> {
+	options?: ListOptions<S, E, Sel>,
+): UseListResult<InferQueryResult<S, E, Sel>> {
 	const client = useLensClient<S>();
 
 	// Get entity accessor
 	const accessor = (client as Record<string, unknown>)[entityName] as {
-		list: (options?: ListOptions<S, E>) => Signal<EntityState<InferEntity<S[E], S>[]>>;
+		list: (options?: ListOptions<S, E, Sel>) => Signal<EntityState<InferQueryResult<S, E, Sel>[]>>;
 	};
 
 	// Subscribe to list signal
@@ -181,7 +221,7 @@ export function useList<S extends SchemaDefinition, E extends keyof S & string>(
 	);
 
 	// Track signal value with useState for React re-renders
-	const [state, setState] = useState<EntityState<InferEntity<S[E], S>[]>>(listSignal.value);
+	const [state, setState] = useState<EntityState<InferQueryResult<S, E, Sel>[]>>(listSignal.value);
 
 	// Subscribe to signal changes
 	useEffect(() => {
@@ -215,6 +255,17 @@ export function useList<S extends SchemaDefinition, E extends keyof S & string>(
 // useMutation Hook
 // =============================================================================
 
+/** Update input type for mutations */
+export type UpdateMutationInput<S extends SchemaDefinition, E extends keyof S> = {
+	id: string;
+	data: Partial<Omit<CreateInput<S[E], S>, "id">>;
+};
+
+/** Delete input type */
+export type DeleteMutationInput = {
+	id: string;
+};
+
 /**
  * Execute mutations with loading/error state
  *
@@ -232,13 +283,19 @@ export function useList<S extends SchemaDefinition, E extends keyof S & string>(
  *     }
  *   };
  *
- *   return (
- *     <form onSubmit={handleSubmit}>
- *       <button disabled={loading}>
- *         {loading ? 'Creating...' : 'Create User'}
- *       </button>
- *     </form>
- *   );
+ *   return <button onClick={() => createUser(data)} disabled={loading}>Create</button>;
+ * }
+ *
+ * function UpdateUser({ userId }: { userId: string }) {
+ *   const { mutate: updateUser } = useMutation('User', 'update');
+ *
+ *   // Update takes { id, data } format
+ *   await updateUser({ id: userId, data: { name: 'New Name' } });
+ * }
+ *
+ * function DeleteUser({ userId }: { userId: string }) {
+ *   const { mutate: deleteUser } = useMutation('User', 'delete');
+ *   await deleteUser({ id: userId });
  * }
  * ```
  */
@@ -253,8 +310,8 @@ export function useMutation<
 	Op extends "create"
 		? CreateInput<S[E], S>
 		: Op extends "update"
-			? UpdateInput<S[E], S>
-			: DeleteInput,
+			? UpdateMutationInput<S, E>
+			: DeleteMutationInput,
 	Op extends "delete" ? void : InferEntity<S[E], S>
 > {
 	const client = useLensClient<S>();
@@ -266,9 +323,9 @@ export function useMutation<
 
 	// Get entity accessor
 	const accessor = (client as Record<string, unknown>)[entityName] as {
-		create: (input: CreateInput<S[E], S>) => Promise<{ data: InferEntity<S[E], S> }>;
-		update: (input: UpdateInput<S[E], S>) => Promise<{ data: InferEntity<S[E], S> }>;
-		delete: (input: DeleteInput) => Promise<void>;
+		create: (data: CreateInput<S[E], S>) => Promise<{ data: InferEntity<S[E], S> }>;
+		update: (id: string, data: unknown) => Promise<{ data: InferEntity<S[E], S> }>;
+		delete: (id: string) => Promise<void>;
 	};
 
 	// Mutation function
@@ -286,20 +343,24 @@ export function useMutation<
 						setData((result as { data: InferEntity<S[E], S> }).data);
 						return (result as { data: InferEntity<S[E], S> }).data;
 
-					case "update":
-						result = await accessor.update(input as UpdateInput<S[E], S>);
+					case "update": {
+						const { id, data: updateData } = input as UpdateMutationInput<S, E>;
+						result = await accessor.update(id, updateData);
 						setData((result as { data: InferEntity<S[E], S> }).data);
 						return (result as { data: InferEntity<S[E], S> }).data;
+					}
 
-					case "delete":
-						await accessor.delete(input as DeleteInput);
+					case "delete": {
+						const { id } = input as DeleteMutationInput;
+						await accessor.delete(id);
 						setData(null);
 						return undefined;
+					}
 				}
 			} catch (err) {
-				const error = err instanceof Error ? err : new Error(String(err));
-				setError(error);
-				throw error;
+				const mutationError = err instanceof Error ? err : new Error(String(err));
+				setError(mutationError);
+				throw mutationError;
 			} finally {
 				setLoading(false);
 			}
@@ -324,8 +385,8 @@ export function useMutation<
 		Op extends "create"
 			? CreateInput<S[E], S>
 			: Op extends "update"
-				? UpdateInput<S[E], S>
-				: DeleteInput,
+				? UpdateMutationInput<S, E>
+				: DeleteMutationInput,
 		Op extends "delete" ? void : InferEntity<S[E], S>
 	>;
 }
