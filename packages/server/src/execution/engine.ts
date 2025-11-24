@@ -183,10 +183,11 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		// Fall back to single resolver
 		const resolveResult = resolver.resolve(id, ctx);
 
-		// Handle async generator (streaming)
+		// Handle async generator
 		if (isAsyncIterable(resolveResult)) {
-			// For now, just get the first value
-			// TODO: Support streaming
+			// Returns first yielded value (by design - executeGet is for single-value queries)
+			// For streaming all values, use executeReactive() instead
+			// Client controls this via await (single) vs subscribe (streaming)
 			for await (const value of resolveResult) {
 				const selected = this.applySelection(value, select);
 				return this.serializeEntity(entityName, selected as Record<string, unknown>) as InferEntity<S[K], S> | null;
