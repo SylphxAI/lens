@@ -245,3 +245,22 @@ export {
 	type ZodLikeSchema,
 } from "./operations/index";
 
+// =============================================================================
+// Entity Resolvers
+// =============================================================================
+
+export {
+	// Main function
+	entityResolvers,
+	// Type guards
+	isBatchResolver,
+	isEntityResolvers,
+	// Types
+	type EntityResolvers,
+	type EntityResolversDefinition,
+	type EntityResolverDef,
+	type FieldResolver,
+	type FieldResolverFn,
+	type BatchResolverFn,
+} from "./resolvers/index";
+
