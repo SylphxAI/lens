@@ -88,3 +88,15 @@ export {
 	type WebSocketLinkOptions,
 	type WebSocketState,
 } from "./websocket";
+
+// =============================================================================
+// WebSocket V2 (Operations Protocol)
+// =============================================================================
+
+export {
+	WebSocketTransportV2,
+	createWebSocketTransportV2,
+	websocketLinkV2,
+	type WebSocketLinkV2Options,
+	type WebSocketV2State,
+} from "./websocket-v2";

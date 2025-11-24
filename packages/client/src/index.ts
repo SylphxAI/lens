@@ -136,6 +136,12 @@ export {
 	websocketLink,
 	type WebSocketLinkOptions,
 	type WebSocketState,
+	// WebSocket V2 (operations protocol)
+	WebSocketTransportV2,
+	createWebSocketTransportV2,
+	websocketLinkV2,
+	type WebSocketLinkV2Options,
+	type WebSocketV2State,
 } from "./links";
 
 // =============================================================================
