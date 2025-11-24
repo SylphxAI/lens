@@ -2,10 +2,10 @@
 
 > **The Reactive Graph API Framework**
 
-TypeScript-first • Real-time Native • Zero Config
+TypeScript-first • Real-time Native • Zero Codegen
 
 ```typescript
-// Define schema
+// Code-first: define schema in TypeScript, types are inferred
 const schema = createSchema({
   Post: {
     id: t.id(),
@@ -40,11 +40,12 @@ Lens combines the best of all worlds:
 | Feature | GraphQL | tRPC | **Lens** |
 |---------|---------|------|----------|
 | Type Safety | Codegen | ✅ | ✅ |
+| Code-first | SDL-first | ✅ | ✅ |
 | Field Selection | ✅ | ❌ | ✅ |
 | Real-time | Addon | Manual | **Native** |
 | Streaming | ❌ | ❌ | **Native** |
 | Optimistic Updates | Manual | Manual | **Auto** |
-| Configuration | Heavy | Medium | **Zero** |
+| Codegen Required | Yes | No | **No** |
 
 ---
 
@@ -197,9 +198,9 @@ function UserProfile({ userId }: { userId: string }) {
 
 ## Core Concepts
 
-### 1. Schema = Source of Truth
+### 1. Code-first Schema
 
-Your schema defines **what** your data looks like. Everything else is derived from it.
+Define your schema in TypeScript — **no SDL, no codegen, full type inference**.
 
 ```typescript
 const schema = createSchema({
@@ -210,6 +211,10 @@ const schema = createSchema({
     createdAt: t.datetime(), // Date field (auto-serialized)
   },
 });
+
+// Types are automatically inferred
+type Post = InferEntity<typeof schema.definition.Post>;
+// { id: string; title: string; views?: number; createdAt: Date }
 ```
 
 ### 2. Resolvers = Implementation
