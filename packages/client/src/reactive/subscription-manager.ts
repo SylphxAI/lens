@@ -5,15 +5,12 @@
  * Tracks which fields are subscribed and handles ref counting.
  */
 
-import type { Update } from "@lens/core";
+import type { Update, EntityKey } from "@lens/core";
+import { makeEntityKey, parseEntityKey } from "@lens/core";
 import { EntitySignal } from "./entity-signal";
 
-// =============================================================================
-// Types
-// =============================================================================
-
-/** Entity key format: "Entity:id" */
-export type EntityKey = `${string}:${string}`;
+// Re-export for convenience
+export type { EntityKey };
 
 /** Field subscription state */
 export interface FieldSubscription {
@@ -429,12 +426,11 @@ export class SubscriptionManager {
 	// ===========================================================================
 
 	private makeKey(entityName: string, entityId: string): EntityKey {
-		return `${entityName}:${entityId}`;
+		return makeEntityKey(entityName, entityId);
 	}
 
 	private parseKey(key: EntityKey): [string, string] {
-		const [entityName, entityId] = key.split(":");
-		return [entityName, entityId];
+		return parseEntityKey(key);
 	}
 
 	/**

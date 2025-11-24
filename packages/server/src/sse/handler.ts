@@ -179,21 +179,3 @@ export function createSSEHandler(config: SSEHandlerConfig): SSEHandler {
 	return new SSEHandler(config);
 }
 
-// =============================================================================
-// Legacy exports (backward compatibility)
-// =============================================================================
-
-/** @deprecated Use SSEClientInfo instead */
-export interface SSEClient {
-	id: string;
-	send: (event: string, data: unknown) => void;
-	close: () => void;
-}
-
-/** @deprecated No longer used - subscriptions handled by GraphStateManager */
-export interface SSESubscription {
-	subscriptionId: string;
-	entity: string;
-	entityId: string;
-	select?: Record<string, unknown>;
-}

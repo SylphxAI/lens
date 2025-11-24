@@ -4,16 +4,12 @@
  * Manages entity signals, caching, and optimistic updates.
  */
 
-import type { Update } from "@lens/core";
-import { applyUpdate } from "@lens/core";
+import type { Update, EntityKey } from "@lens/core";
+import { applyUpdate, makeEntityKey } from "@lens/core";
 import { signal, type WritableSignal, type Signal, batch } from "../signals/signal";
 
-// =============================================================================
-// Types
-// =============================================================================
-
-/** Entity cache key */
-export type EntityKey = `${string}:${string}`;
+// Re-export for convenience
+export type { EntityKey };
 
 /** Entity state with metadata */
 export interface EntityState<T = unknown> {
@@ -663,10 +659,10 @@ export class ReactiveStore {
 	// ===========================================================================
 
 	/**
-	 * Create cache key
+	 * Create cache key (delegates to @lens/core)
 	 */
 	private makeKey(entityName: string, entityId: string): EntityKey {
-		return `${entityName}:${entityId}`;
+		return makeEntityKey(entityName, entityId);
 	}
 
 	/**

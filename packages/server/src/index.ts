@@ -95,7 +95,4 @@ export {
 	// Types
 	type SSEHandlerConfig,
 	type SSEClientInfo,
-	// Legacy (deprecated)
-	type SSEClient,
-	type SSESubscription,
 } from "./sse/handler";

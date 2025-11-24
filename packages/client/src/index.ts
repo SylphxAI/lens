@@ -126,7 +126,6 @@ export {
 	// SubscriptionManager (field-level subscriptions)
 	SubscriptionManager,
 	createSubscriptionManager,
-	type EntityKey as SubscriptionEntityKey,
 	type FieldSubscription,
 	type EntitySubscription,
 	type SubscribeMessage,

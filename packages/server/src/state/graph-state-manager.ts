@@ -9,14 +9,10 @@
  * - Pushes updates to subscribed clients
  */
 
-import { createUpdate, type Update } from "@lens/core";
+import { createUpdate, type Update, type EntityKey, makeEntityKey } from "@lens/core";
 
-// =============================================================================
-// Types
-// =============================================================================
-
-/** Entity key format: "Entity:id" */
-export type EntityKey = `${string}:${string}`;
+// Re-export for convenience
+export type { EntityKey };
 
 /** Client connection interface */
 export interface StateClient {
@@ -408,7 +404,7 @@ export class GraphStateManager {
 	}
 
 	private makeKey(entity: string, id: string): EntityKey {
-		return `${entity}:${id}`;
+		return makeEntityKey(entity, id);
 	}
 
 	// ===========================================================================
