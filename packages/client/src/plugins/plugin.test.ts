@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test";
 import { createPluginManager, definePlugin } from "./manager";
 import { optimisticPlugin } from "./optimistic";
-import { devToolsPlugin } from "./devtools";
 import type { PluginContext } from "./types";
 import { SubscriptionManager } from "../reactive/subscription-manager";
 import { QueryResolver } from "../reactive/query-resolver";
@@ -250,68 +249,6 @@ describe("Plugin System", () => {
 		});
 	});
 
-	describe("DevTools Plugin", () => {
-		it("creates with default config", async () => {
-			const manager = createPluginManager();
-			manager.register(devToolsPlugin);
-			await manager.init(createMockContext());
-
-			const api = manager.get<{ isEnabled: () => boolean }>("devtools");
-			// Enabled in test environment (not production)
-			expect(api?.isEnabled()).toBe(true);
-		});
-
-		it("exposes getLogs API", async () => {
-			const manager = createPluginManager();
-			manager.register(devToolsPlugin);
-			await manager.init(createMockContext());
-
-			const api = manager.get<{ getLogs: () => unknown[] }>("devtools");
-			expect(api?.getLogs()).toEqual([]);
-		});
-
-		it("exposes getStats API", async () => {
-			const manager = createPluginManager();
-			manager.register(devToolsPlugin);
-			await manager.init(createMockContext());
-
-			const api = manager.get<{ getStats: () => object }>("devtools");
-			expect(api?.getStats()).toEqual({
-				queries: 0,
-				mutations: 0,
-				subscriptions: 0,
-				errors: 0,
-			});
-		});
-
-		it("tracks stats on hooks", async () => {
-			const manager = createPluginManager();
-			manager.register(devToolsPlugin);
-			const ctx = createMockContext();
-			await manager.init(ctx);
-
-			// Simulate mutation hooks
-			manager.callHook("onBeforeMutation", ctx, "User", "create", { name: "Test" });
-			manager.callHook("onAfterMutation", ctx, "User", "create", { data: {} }, {});
-
-			const api = manager.get<{ getStats: () => { mutations: number } }>("devtools");
-			expect(api?.getStats().mutations).toBe(1);
-		});
-
-		it("can clear logs", async () => {
-			const manager = createPluginManager();
-			manager.register(devToolsPlugin);
-			const ctx = createMockContext();
-			await manager.init(ctx);
-
-			// Add some logs
-			manager.callHook("onConnect", ctx);
-
-			const api = manager.get<{ getLogs: () => unknown[]; clear: () => void }>("devtools");
-			expect(api?.getLogs().length).toBeGreaterThan(0);
-
-			api?.clear();
-			expect(api?.getLogs().length).toBe(0);
-		});
-	});
+	// Note: DevTools Plugin tests are in @lens/core/plugins/devtools.test.ts
+	// since devToolsPlugin is now part of the unified plugin system
 });

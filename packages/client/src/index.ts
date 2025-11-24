@@ -163,22 +163,24 @@ export {
 // =============================================================================
 
 export {
-	// Core
+	// Core (re-exported from @lens/core)
+	defineUnifiedPlugin,
+	type UnifiedPlugin,
+	type ClientPluginContext,
+	type ClientPluginHooks,
+	type ClientPluginInstance,
+	type ClientPluginDef,
+	// Client plugin manager
 	createPluginManager,
+	type PluginManager,
+	// Client-only plugins
+	optimisticPlugin,
+	type OptimisticPluginAPI,
+	type OptimisticPluginConfig,
+	// Legacy (deprecated - use @lens/core)
 	definePlugin,
-	// Types
 	type Plugin,
 	type PluginInstance,
 	type PluginContext,
 	type PluginHooks,
-	type PluginManager,
-	type OptimisticPluginConfig,
-	type DevToolsPluginConfig,
-	type CachePluginConfig,
-	type RetryPluginConfig,
-	// Built-in plugins
-	optimisticPlugin,
-	devToolsPlugin,
-	type OptimisticPluginAPI,
-	type DevToolsPluginAPI,
 } from "./plugins";
