@@ -379,6 +379,7 @@ describe("ExecutionEngine Reactive", () => {
 			});
 
 			const engine = new ExecutionEngine(resolvers, {
+				schema: reactiveSchema,
 				createContext: () => ({}),
 				stateManager,
 			});
@@ -415,6 +416,7 @@ describe("ExecutionEngine Reactive", () => {
 			});
 
 			const engine = new ExecutionEngine(resolvers, {
+				schema: reactiveSchema,
 				createContext: () => ({}),
 				stateManager,
 			});
@@ -427,6 +429,47 @@ describe("ExecutionEngine Reactive", () => {
 			// Should have received updates (only changed fields after initial)
 			expect(mockClient.messages.length).toBeGreaterThanOrEqual(3);
 			expect(mockClient.messages[0].updates.title.data).toBe("First");
+		});
+
+		test("serializes Date objects in reactive updates", async () => {
+			const schemaWithDate = createSchema({
+				Event: {
+					id: t.id(),
+					name: t.string(),
+					date: t.datetime(),
+				},
+			});
+
+			const stateManager = new GraphStateManager();
+			const mockClient = createMockClient("c1");
+			stateManager.addClient(mockClient);
+			stateManager.subscribe("c1", "Event", "1", "*");
+			mockClient.messages = [];
+
+			const testDate = new Date("2024-01-01T00:00:00Z");
+
+			const resolvers = createResolvers(schemaWithDate, {
+				Event: {
+					resolve: async (id) => ({
+						id,
+						name: "Conference",
+						date: testDate,
+					}),
+				},
+			});
+
+			const engine = new ExecutionEngine(resolvers, {
+				schema: schemaWithDate,
+				createContext: () => ({}),
+				stateManager,
+			});
+
+			await engine.executeReactive("Event", "1");
+			await sleep(10);
+
+			expect(mockClient.messages.length).toBe(1);
+			// Date should be serialized to ISO string
+			expect(mockClient.messages[0].updates.date.data).toBe("2024-01-01T00:00:00.000Z");
 		});
 
 		test("supports ctx.emit() from resolver", async () => {
@@ -449,6 +492,7 @@ describe("ExecutionEngine Reactive", () => {
 			});
 
 			const engine = new ExecutionEngine(resolvers, {
+				schema: reactiveSchema,
 				createContext: () => ({}),
 				stateManager,
 			});
@@ -481,6 +525,7 @@ describe("ExecutionEngine Reactive", () => {
 			});
 
 			const engine = new ExecutionEngine(resolvers, {
+				schema: reactiveSchema,
 				createContext: () => ({}),
 				stateManager,
 			});
@@ -513,6 +558,7 @@ describe("ExecutionEngine Reactive", () => {
 			});
 
 			const engine = new ExecutionEngine(resolvers, {
+				schema: reactiveSchema,
 				createContext: () => ({}),
 				stateManager,
 			});
@@ -545,6 +591,7 @@ describe("ExecutionEngine Reactive", () => {
 			});
 
 			const engine = new ExecutionEngine(resolvers, {
+				schema: reactiveSchema,
 				createContext: () => ({}),
 				stateManager,
 			});

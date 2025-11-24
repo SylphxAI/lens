@@ -426,7 +426,9 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 		const emitContext: EmitContext<InferEntity<S[K], S>> = {
 			emit: (data) => {
 				if (!isActive) return;
-				this.stateManager!.emit(entityName, id, data as Record<string, unknown>);
+				// Serialize before emitting to ensure proper data types (Date → ISO string, etc)
+				const serialized = this.serializeEntity(entityName, data as Record<string, unknown>);
+				this.stateManager!.emit(entityName, id, serialized as Record<string, unknown>);
 			},
 			onCleanup: (fn) => {
 				cleanupFns.push(fn);
@@ -452,7 +454,9 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 			// Single promise: emit once
 			resolveResult.then((value) => {
 				if (isActive && value) {
-					this.stateManager!.emit(entityName, id, value as Record<string, unknown>);
+					// Serialize before emitting
+					const serialized = this.serializeEntity(entityName, value as Record<string, unknown>);
+					this.stateManager!.emit(entityName, id, serialized as Record<string, unknown>);
 				}
 			});
 		}
@@ -488,7 +492,9 @@ export class ExecutionEngine<S extends SchemaDefinition, Ctx extends BaseContext
 			for await (const value of iterable) {
 				if (!isActive()) break;
 				if (value) {
-					this.stateManager!.emit(entityName, id, value as Record<string, unknown>);
+					// Serialize before emitting
+					const serialized = this.serializeEntity(entityName, value as Record<string, unknown>);
+					this.stateManager!.emit(entityName, id, serialized as Record<string, unknown>);
 				}
 			}
 		} catch (error) {
