@@ -15,6 +15,21 @@ import type {
 	CreateInput,
 	WhereInput,
 	OrderByInput,
+	CursorInput,
+	// Batch operations
+	CreateManyInput,
+	CreateManyResult,
+	UpdateManyInput,
+	UpdateManyResult,
+	DeleteManyInput,
+	DeleteManyResult,
+	// Find types
+	FindFirstInput,
+	FindManyInput,
+	UpsertInput,
+	// Aggregation
+	CountInput,
+	AggregateInput,
 } from "@lens/core";
 import { type Signal } from "../signals/signal";
 import { ReactiveStore, type EntityState } from "../store/reactive-store";
@@ -64,8 +79,10 @@ export interface ListOptions<
 	take?: number;
 	/** Offset */
 	skip?: number;
-	/** Cursor for cursor-based pagination */
-	cursor?: { id: string };
+	/** Cursor for cursor-based pagination (type-safe) */
+	cursor?: CursorInput<S[E]>;
+	/** Distinct fields */
+	distinct?: (keyof S[E] & string)[];
 }
 
 /** Infer result type based on select option */
@@ -97,6 +114,10 @@ export interface EntityAccessor<
 	E extends keyof S & string,
 	Entity = InferEntity<S[E], S>,
 > {
+	// =========================================================================
+	// Query Methods
+	// =========================================================================
+
 	/** Get single entity by ID (return type inferred from select) */
 	get<Sel extends Select<S[E], S> | undefined = undefined>(
 		id: string,
@@ -107,6 +128,23 @@ export interface EntityAccessor<
 	list<Sel extends Select<S[E], S> | undefined = undefined>(
 		options?: ListOptions<S, E, Sel>,
 	): Signal<EntityState<InferQueryResult<S, E, Sel>[]>>;
+
+	/** Find first matching entity */
+	findFirst<Sel extends Select<S[E], S> | undefined = undefined>(
+		options?: ListOptions<S, E, Sel>,
+	): Promise<InferQueryResult<S, E, Sel> | null>;
+
+	/** Find many entities (promise-based, non-reactive) */
+	findMany<Sel extends Select<S[E], S> | undefined = undefined>(
+		options?: ListOptions<S, E, Sel>,
+	): Promise<InferQueryResult<S, E, Sel>[]>;
+
+	/** Count entities */
+	count(options?: { where?: WhereInput<S[E]> }): Promise<number>;
+
+	// =========================================================================
+	// Single Mutation Methods
+	// =========================================================================
 
 	/** Create new entity */
 	create(
@@ -123,6 +161,39 @@ export interface EntityAccessor<
 
 	/** Delete entity */
 	delete(id: string, options?: MutationOptions): Promise<void>;
+
+	/** Upsert entity (create or update) */
+	upsert(
+		args: {
+			where: { id: string };
+			create: CreateInput<S[E], S>;
+			update: Partial<Omit<CreateInput<S[E], S>, "id">>;
+		},
+		options?: MutationOptions,
+	): Promise<MutationResult<Entity>>;
+
+	// =========================================================================
+	// Batch Mutation Methods
+	// =========================================================================
+
+	/** Create many entities */
+	createMany(
+		args: { data: CreateInput<S[E], S>[]; skipDuplicates?: boolean },
+	): Promise<CreateManyResult>;
+
+	/** Update many entities */
+	updateMany(
+		args: { where: WhereInput<S[E]>; data: Partial<Omit<CreateInput<S[E], S>, "id">> },
+	): Promise<UpdateManyResult>;
+
+	/** Delete many entities */
+	deleteMany(
+		args: { where: WhereInput<S[E]> },
+	): Promise<DeleteManyResult>;
+
+	// =========================================================================
+	// Subscription Methods
+	// =========================================================================
 
 	/** Subscribe to entity updates */
 	subscribe(id: string, callback: (data: Entity) => void): () => void;
@@ -321,6 +392,84 @@ function createEntityAccessor<
 				if (optimisticId) store.rollbackOptimistic(optimisticId);
 				throw error;
 			}
+		},
+
+		// New query methods
+		async findFirst(options?: { select?: unknown; where?: unknown; orderBy?: unknown; skip?: number }): Promise<Entity | null> {
+			const result = await execute("query", "findFirst", { ...options, take: 1 });
+			if (result.error) throw result.error;
+			return (result.data as Entity) ?? null;
+		},
+
+		async findMany(options?: { select?: unknown; where?: unknown; orderBy?: unknown; take?: number; skip?: number; cursor?: unknown; distinct?: unknown }): Promise<Entity[]> {
+			const result = await execute("query", "findMany", options ?? {});
+			if (result.error) throw result.error;
+			return (result.data as Entity[]) ?? [];
+		},
+
+		async count(options?: { where?: unknown }): Promise<number> {
+			const result = await execute("query", "count", options ?? {});
+			if (result.error) throw result.error;
+			return result.data as number;
+		},
+
+		// New mutation methods
+		async upsert(
+			args: { where: { id: string }; create: CreateInput<S[E], S>; update: Partial<Omit<CreateInput<S[E], S>, "id">> },
+			options?: MutationOptions,
+		): Promise<MutationResult<Entity>> {
+			const useOptimistic = options?.optimistic ?? optimisticEnabled;
+			let optimisticId: string | undefined;
+
+			if (useOptimistic) {
+				// For upsert, we optimistically assume update
+				optimisticId = store.applyOptimistic(entityName, "update", {
+					id: args.where.id,
+					...args.update,
+				} as Partial<Entity> & { id: string });
+			}
+
+			try {
+				const result = await execute("mutation", "upsert", args);
+
+				if (result.error) {
+					if (optimisticId) store.rollbackOptimistic(optimisticId);
+					throw result.error;
+				}
+
+				const data = result.data as Entity & { id: string };
+
+				if (optimisticId) {
+					store.confirmOptimistic(optimisticId, data);
+					store.setEntity(entityName, data.id, data);
+				}
+
+				return {
+					data,
+					rollback: optimisticId ? () => store.rollbackOptimistic(optimisticId!) : undefined,
+				};
+			} catch (error) {
+				if (optimisticId) store.rollbackOptimistic(optimisticId);
+				throw error;
+			}
+		},
+
+		async createMany(args: { data: CreateInput<S[E], S>[]; skipDuplicates?: boolean }): Promise<CreateManyResult> {
+			const result = await execute("mutation", "createMany", args);
+			if (result.error) throw result.error;
+			return result.data as CreateManyResult;
+		},
+
+		async updateMany(args: { where: unknown; data: unknown }): Promise<UpdateManyResult> {
+			const result = await execute("mutation", "updateMany", args);
+			if (result.error) throw result.error;
+			return result.data as UpdateManyResult;
+		},
+
+		async deleteMany(args: { where: unknown }): Promise<DeleteManyResult> {
+			const result = await execute("mutation", "deleteMany", args);
+			if (result.error) throw result.error;
+			return result.data as DeleteManyResult;
 		},
 
 		subscribe(id: string, callback: (data: Entity) => void): () => void {

@@ -401,3 +401,278 @@ export type PaginationInput<E extends EntityDefinition> = {
 	/** Cursor for cursor-based pagination */
 	cursor?: CursorInput<E>;
 };
+
+// =============================================================================
+// Aggregation Types
+// =============================================================================
+
+/** Numeric fields that can be aggregated */
+export type NumericFields<E extends EntityDefinition> = {
+	[K in ScalarFields<E>]: E[K] extends IntType | FloatType ? K : never;
+}[ScalarFields<E>];
+
+/** Aggregation select for numeric operations */
+export type AggregateSelect<E extends EntityDefinition> = {
+	[K in NumericFields<E>]?: true;
+};
+
+/** Count input */
+export type CountInput<E extends EntityDefinition> = {
+	where?: WhereInput<E>;
+	/** Count specific field (null values excluded) */
+	select?: { [K in ScalarFields<E>]?: true } | { _all?: true };
+};
+
+/** Aggregate input with type-safe field selection */
+export type AggregateInput<E extends EntityDefinition> = {
+	where?: WhereInput<E>;
+	orderBy?: OrderByInput<E> | OrderByInput<E>[];
+	take?: number;
+	skip?: number;
+	cursor?: CursorInput<E>;
+	/** Count records */
+	_count?: true | { [K in ScalarFields<E>]?: true };
+	/** Sum numeric fields */
+	_sum?: AggregateSelect<E>;
+	/** Average of numeric fields */
+	_avg?: AggregateSelect<E>;
+	/** Minimum value */
+	_min?: { [K in ScalarFields<E>]?: true };
+	/** Maximum value */
+	_max?: { [K in ScalarFields<E>]?: true };
+};
+
+/** Infer aggregate result type */
+export type AggregateResult<E extends EntityDefinition, A extends AggregateInput<E>> = {
+	_count: A["_count"] extends true
+		? number
+		: A["_count"] extends object
+			? { [K in keyof A["_count"] & ScalarFields<E>]: number }
+			: never;
+	_sum: A["_sum"] extends object
+		? { [K in keyof A["_sum"] & NumericFields<E>]: number | null }
+		: never;
+	_avg: A["_avg"] extends object
+		? { [K in keyof A["_avg"] & NumericFields<E>]: number | null }
+		: never;
+	_min: A["_min"] extends object
+		? { [K in keyof A["_min"] & ScalarFields<E>]: InferScalarWithNullable<E[K]> | null }
+		: never;
+	_max: A["_max"] extends object
+		? { [K in keyof A["_max"] & ScalarFields<E>]: InferScalarWithNullable<E[K]> | null }
+		: never;
+};
+
+/** Group by input */
+export type GroupByInput<E extends EntityDefinition> = {
+	by: ScalarFields<E>[];
+	where?: WhereInput<E>;
+	orderBy?: OrderByInput<E> | OrderByInput<E>[];
+	having?: WhereInput<E>;
+	take?: number;
+	skip?: number;
+	_count?: true | { [K in ScalarFields<E>]?: true };
+	_sum?: AggregateSelect<E>;
+	_avg?: AggregateSelect<E>;
+	_min?: { [K in ScalarFields<E>]?: true };
+	_max?: { [K in ScalarFields<E>]?: true };
+};
+
+// =============================================================================
+// Batch Operation Types
+// =============================================================================
+
+/** Create many input */
+export type CreateManyInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	data: CreateInput<E, S>[];
+	/** Skip duplicate records (based on unique constraints) */
+	skipDuplicates?: boolean;
+};
+
+/** Create many result */
+export type CreateManyResult = {
+	count: number;
+};
+
+/** Update many input */
+export type UpdateManyInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	where: WhereInput<E>;
+	data: Partial<Omit<CreateInput<E, S>, "id">>;
+};
+
+/** Update many result */
+export type UpdateManyResult = {
+	count: number;
+};
+
+/** Delete many input */
+export type DeleteManyInput<E extends EntityDefinition> = {
+	where: WhereInput<E>;
+};
+
+/** Delete many result */
+export type DeleteManyResult = {
+	count: number;
+};
+
+// =============================================================================
+// Relation Mutation Types
+// =============================================================================
+
+/** Connect a single relation by unique field */
+export type ConnectInput = {
+	id: string;
+};
+
+/** Connect or create a relation */
+export type ConnectOrCreateInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	where: { id: string };
+	create: CreateInput<E, S>;
+};
+
+/** Relation mutation for hasOne/belongsTo */
+export type SingleRelationInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	/** Connect to existing record */
+	connect?: ConnectInput;
+	/** Connect or create if not exists */
+	connectOrCreate?: ConnectOrCreateInput<E, S>;
+	/** Create new related record */
+	create?: CreateInput<E, S>;
+	/** Disconnect (set to null) - only for optional relations */
+	disconnect?: boolean;
+	/** Delete related record */
+	delete?: boolean;
+	/** Update related record */
+	update?: Partial<CreateInput<E, S>>;
+	/** Upsert related record */
+	upsert?: {
+		create: CreateInput<E, S>;
+		update: Partial<CreateInput<E, S>>;
+	};
+};
+
+/** Relation mutation for hasMany */
+export type ManyRelationInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	/** Connect existing records */
+	connect?: ConnectInput[];
+	/** Connect or create records */
+	connectOrCreate?: ConnectOrCreateInput<E, S>[];
+	/** Create new related records */
+	create?: CreateInput<E, S>[];
+	/** Create many related records */
+	createMany?: { data: CreateInput<E, S>[]; skipDuplicates?: boolean };
+	/** Disconnect specific records */
+	disconnect?: ConnectInput[];
+	/** Set relations (replace all) */
+	set?: ConnectInput[];
+	/** Delete specific related records */
+	delete?: ConnectInput[];
+	/** Delete many by condition */
+	deleteMany?: WhereInput<E>[];
+	/** Update specific related records */
+	update?: { where: ConnectInput; data: Partial<CreateInput<E, S>> }[];
+	/** Update many by condition */
+	updateMany?: { where: WhereInput<E>; data: Partial<CreateInput<E, S>> }[];
+	/** Upsert related records */
+	upsert?: {
+		where: ConnectInput;
+		create: CreateInput<E, S>;
+		update: Partial<CreateInput<E, S>>;
+	}[];
+};
+
+/** Type-safe create input with relation mutations */
+export type CreateInputWithRelations<
+	E extends EntityDefinition,
+	S extends SchemaDefinition,
+> = CreateInput<E, S> & {
+	[K in RelationFields<E>]?: E[K] extends HasManyType<infer Target>
+		? Target extends keyof S
+			? ManyRelationInput<S[Target], S>
+			: never
+		: E[K] extends HasOneType<infer Target>
+			? Target extends keyof S
+				? SingleRelationInput<S[Target], S>
+				: never
+			: E[K] extends BelongsToType<infer Target>
+				? Target extends keyof S
+					? SingleRelationInput<S[Target], S> | string
+					: never
+				: never;
+};
+
+/** Type-safe update input with relation mutations */
+export type UpdateInputWithRelations<
+	E extends EntityDefinition,
+	S extends SchemaDefinition,
+> = { id: string } & Partial<Omit<CreateInput<E, S>, "id">> & {
+		[K in RelationFields<E>]?: E[K] extends HasManyType<infer Target>
+			? Target extends keyof S
+				? ManyRelationInput<S[Target], S>
+				: never
+			: E[K] extends HasOneType<infer Target>
+				? Target extends keyof S
+					? SingleRelationInput<S[Target], S>
+					: never
+				: E[K] extends BelongsToType<infer Target>
+					? Target extends keyof S
+						? SingleRelationInput<S[Target], S> | string
+						: never
+					: never;
+	};
+
+// =============================================================================
+// Find Types (findFirst, findUnique, upsert)
+// =============================================================================
+
+/** Find first input */
+export type FindFirstInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	where?: WhereInput<E>;
+	orderBy?: OrderByInput<E> | OrderByInput<E>[];
+	select?: Select<E, S>;
+	skip?: number;
+	cursor?: CursorInput<E>;
+	/** Throw if not found */
+	rejectOnNotFound?: boolean;
+};
+
+/** Find unique input (by unique field) */
+export type FindUniqueInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	where: { id: string } | WhereUniqueInput<E>;
+	select?: Select<E, S>;
+	/** Throw if not found */
+	rejectOnNotFound?: boolean;
+};
+
+/** Where unique input - for fields with unique constraints */
+export type WhereUniqueInput<E extends EntityDefinition> = {
+	id?: string;
+} & {
+	[K in ScalarFields<E>]?: InferScalarWithNullable<E[K]>;
+};
+
+/** Upsert input */
+export type UpsertInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	where: { id: string } | WhereUniqueInput<E>;
+	create: CreateInput<E, S>;
+	update: Partial<Omit<CreateInput<E, S>, "id">>;
+	select?: Select<E, S>;
+};
+
+// =============================================================================
+// Distinct Types
+// =============================================================================
+
+/** Distinct input */
+export type DistinctInput<E extends EntityDefinition> = ScalarFields<E>[];
+
+/** Find many with distinct */
+export type FindManyInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
+	where?: WhereInput<E>;
+	orderBy?: OrderByInput<E> | OrderByInput<E>[];
+	select?: Select<E, S>;
+	take?: number;
+	skip?: number;
+	cursor?: CursorInput<E>;
+	distinct?: DistinctInput<E>;
+};

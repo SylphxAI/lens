@@ -96,6 +96,7 @@ export {
 	// Field categorization
 	type ScalarFields,
 	type RelationFields,
+	type NumericFields,
 	// Entity inference
 	type InferEntity,
 	type InferFieldType,
@@ -109,10 +110,31 @@ export {
 	type InferSchemaEntities,
 	type EntityNames,
 	type EntityType,
-	// Input types
+	// Input types (mutations)
 	type CreateInput,
 	type UpdateInput,
 	type DeleteInput,
+	type CreateInputWithRelations,
+	type UpdateInputWithRelations,
+	// Batch operation types
+	type CreateManyInput,
+	type CreateManyResult,
+	type UpdateManyInput,
+	type UpdateManyResult,
+	type DeleteManyInput,
+	type DeleteManyResult,
+	// Relation mutation types
+	type ConnectInput,
+	type ConnectOrCreateInput,
+	type SingleRelationInput,
+	type ManyRelationInput,
+	// Find types
+	type FindFirstInput,
+	type FindUniqueInput,
+	type FindManyInput,
+	type WhereUniqueInput,
+	type UpsertInput,
+	type DistinctInput,
 	// Filter types (Where)
 	type StringFilter,
 	type NumberFilter,
@@ -129,6 +151,12 @@ export {
 	// Pagination types
 	type CursorInput,
 	type PaginationInput,
+	// Aggregation types
+	type AggregateSelect,
+	type AggregateInput,
+	type AggregateResult,
+	type CountInput,
+	type GroupByInput,
 	// Utility types
 	type RequireKeys,
 	type OptionalKeys,
