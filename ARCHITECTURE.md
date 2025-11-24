@@ -200,77 +200,162 @@ class QueryResult<T> {
 
 ---
 
-## 3. Smart Link Selection (Auto-Optimization)
+## 3. Links - Self-Sufficient Transports
 
-### The Problem
+### Core Principle
 
-```typescript
-// Should use different transport based on usage
-await client.User.get(id)           // Single value → HTTP (efficient)
-client.User.get(id).subscribe(...)  // Streaming → SSE/WebSocket
-```
+**Each link is self-sufficient and handles all operation types using its best approach.**
 
-### The Solution: Automatic Transport Selection
+No metadata needed. No smart routing. Users compose links as they prefer.
 
-```typescript
-// Client detects usage pattern
-const userQuery = client.User.get(id)
+### Link Capabilities
 
-// If await → Use httpLink (most efficient)
-const user = await userQuery  // → HTTP POST /api { entity: "User", op: "get", id }
-
-// If subscribe → Use sseLink or websocketLink
-userQuery.subscribe(u => ...)  // → SSE GET /api/stream?entity=User&id=123
-```
-
-### Server Metadata
-
-Server tells client if resolver is single or streaming:
+#### httpLink - Request/Response
 
 ```typescript
-// Server resolver patterns
-const resolvers = createResolvers(schema, {
-  User: {
-    // Pattern 1: Single return (type: "single")
-    resolve: async (id) => {
-      return await db.user.findUnique({ where: { id } })
-    },
-
-    // Pattern 2: Generator (type: "stream")
-    resolve: async function* (id) {
-      yield await db.user.findUnique({ where: { id } })
-      // Subscribe to updates
-      for await (const update of userStream(id)) {
-        yield update
-      }
-    },
-
-    // Pattern 3: Emit (type: "stream")
-    resolve: async (id, ctx) => {
-      ctx.emit(await db.user.findUnique({ where: { id } }))
-      redis.subscribe(`user:${id}`, data => ctx.emit(data))
-      ctx.onCleanup(() => redis.unsubscribe())
-    },
-  },
+const client = createClient({
+  schema,
+  links: [
+    httpLink({
+      url: '/api',
+      // Optional: polling for subscriptions
+      polling: { interval: 1000 }
+    })
+  ]
 })
 
-// Server exposes resolver metadata
-GET /api/meta → {
-  User: { resolve: "single", list: "single" },
-  Post: { resolve: "stream", list: "single" }
-}
+// Queries → POST /api
+await client.User.get(id)
+
+// Subscriptions → Polling (if enabled)
+client.User.get(id).subscribe(user => {
+  // Poll every 1000ms
+})
 ```
 
-### Optimization Matrix
+**How httpLink handles subscriptions:**
+- If `polling` enabled → Poll at interval
+- If `polling` disabled → Throw error (subscriptions not supported)
 
-| Client | Server | Transport | Behavior |
-|--------|--------|-----------|----------|
-| `await` | single | HTTP | ✅ Most efficient (one request-response) |
-| `await` | stream | HTTP | ⚠️ Gets first value only (inefficient) |
-| `subscribe` | single | SSE | ✅ Gets one value, auto-close connection |
-| `subscribe` | stream | SSE/WS | ✅ Streaming updates, keep alive |
+#### sseLink - Server-Sent Events
 
-**Key:** Even if server is single-return, client can still `.subscribe()` for consistency. Makes it easy to upgrade server to streaming later without changing client code.
+```typescript
+const client = createClient({
+  schema,
+  links: [
+    sseLink({ url: '/api' })
+  ]
+})
+
+// Queries → SSE (get first value, close)
+await client.User.get(id)  // Opens SSE, waits for first event, closes
+
+// Subscriptions → SSE (keep connection open)
+client.User.get(id).subscribe(user => {
+  // Receives all updates via SSE
+})
+```
+
+**How sseLink handles everything:**
+- Queries → Open SSE, receive first value, close connection
+- Subscriptions → Open SSE, receive all values, keep connection alive
+- One unified transport for all operations
+
+#### websocketLink - Full Duplex
+
+```typescript
+const client = createClient({
+  schema,
+  links: [
+    websocketLink({ url: '/api' })
+  ]
+})
+
+// Queries → WebSocket message/response
+await client.User.get(id)
+
+// Subscriptions → WebSocket streaming
+client.User.get(id).subscribe(user => {
+  // Receives updates via WebSocket
+})
+```
+
+### User-Controlled Composition
+
+Users decide how to compose links for their use case:
+
+#### Simple: One Link Handles Everything
+
+```typescript
+// Option 1: SSE for everything (recommended for real-time apps)
+const client = createClient({
+  links: [sseLink({ url: '/api' })]
+})
+
+// Option 2: HTTP for everything (simple apps, no real-time)
+const client = createClient({
+  links: [httpLink({ url: '/api', polling: true })]
+})
+```
+
+#### Advanced: Manual Split
+
+```typescript
+// User decides: HTTP for queries, SSE for subscriptions
+const client = createClient({
+  links: [
+    splitLink({
+      condition: (op) => op.type === 'subscription',
+      true: sseLink({ url: '/api' }),
+      false: httpLink({ url: '/api' })
+    })
+  ]
+})
+
+// Or even more granular
+const client = createClient({
+  links: [
+    splitLink({
+      condition: (op) => op.entity === 'Stock',
+      true: sseLink({ url: '/api' }),    // Real-time stocks
+      false: httpLink({ url: '/api' })   // Other entities
+    })
+  ]
+})
+```
+
+#### Multiple HTTP Links
+
+```typescript
+// Different HTTP links for different operations
+const client = createClient({
+  links: [
+    splitLink({
+      condition: (op) => op.type === 'mutation',
+      true: httpLink({ url: '/api/write', method: 'POST' }),
+      false: httpLink({ url: '/api/read', method: 'GET' })
+    })
+  ]
+})
+```
+
+### Why No Metadata?
+
+**Simple reasoning:**
+- If user provides `sseLink` → they want SSE
+- If user provides `httpLink` → they want HTTP
+- If user wants different transports → they use `splitLink`
+
+**No automatic decisions needed.** User is in control.
+
+### Trade-offs
+
+| Link | Queries | Subscriptions | Complexity | Use Case |
+|------|---------|---------------|------------|----------|
+| httpLink only | ✅ Fast | ⚠️ Polling | Low | Simple apps, no real-time |
+| sseLink only | ✅ Good | ✅ Excellent | Low | Real-time apps |
+| websocketLink only | ✅ Good | ✅ Excellent | Medium | Full-duplex needed |
+| splitLink combo | ✅ Optimized | ✅ Optimized | Higher | Fine-grained control |
 
 ---
 
