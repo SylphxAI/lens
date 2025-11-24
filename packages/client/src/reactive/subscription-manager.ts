@@ -482,6 +482,14 @@ export class SubscriptionManager {
 			this.batchTimer = null;
 		}
 	}
+
+	/**
+	 * Destroy the subscription manager (alias for clear)
+	 */
+	destroy(): void {
+		this.clear();
+		this.transport = null;
+	}
 }
 
 // =============================================================================

@@ -46,6 +46,7 @@ export {
 	type QueryOptions as ReactiveQueryOptions,
 	type ListOptions as ReactiveListOptions,
 	type InferQueryResult as ReactiveInferQueryResult,
+	type PluginEntry,
 } from "./reactive-client";
 
 export {
