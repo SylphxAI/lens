@@ -43,6 +43,7 @@ export {
 // Middleware Links
 // =============================================================================
 
+export { deserializeLink, type DeserializeLinkOptions } from "./deserialize";
 export { loggerLink, type LoggerLinkOptions } from "./logger";
 export { retryLink, type RetryLinkOptions } from "./retry";
 export { cacheLink, createCacheStore, type CacheLinkOptions } from "./cache";
