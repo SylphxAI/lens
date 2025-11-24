@@ -48,6 +48,7 @@ export { loggerLink, type LoggerLinkOptions } from "./logger";
 export { retryLink, type RetryLinkOptions } from "./retry";
 export { cacheLink, createCacheStore, type CacheLinkOptions } from "./cache";
 export { splitLink, splitByType, type SplitLinkOptions } from "./split";
+export { queryOptimizerLink, type QueryOptimizerOptions } from "./query-optimizer";
 
 // =============================================================================
 // Terminal Links

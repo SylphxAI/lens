@@ -90,6 +90,8 @@ export {
 	splitLink,
 	splitByType,
 	type SplitLinkOptions,
+	queryOptimizerLink,
+	type QueryOptimizerOptions,
 	// Terminal links
 	httpLink,
 	httpBatchLink,
