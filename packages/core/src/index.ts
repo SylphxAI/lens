@@ -164,6 +164,24 @@ export {
 } from "./schema/infer";
 
 // =============================================================================
+// Shared Types
+// =============================================================================
+
+/** Entity key format: "EntityName:id" */
+export type EntityKey = `${string}:${string}`;
+
+/** Create entity key from entity name and id */
+export function makeEntityKey(entity: string, id: string): EntityKey {
+	return `${entity}:${id}`;
+}
+
+/** Parse entity key into entity name and id */
+export function parseEntityKey(key: EntityKey): [string, string] {
+	const colonIndex = key.indexOf(":");
+	return [key.slice(0, colonIndex), key.slice(colonIndex + 1)];
+}
+
+// =============================================================================
 // Update Strategies
 // =============================================================================
 

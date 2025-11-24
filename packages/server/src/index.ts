@@ -2,7 +2,7 @@
  * @lens/server
  *
  * Server runtime for Lens API framework.
- * Resolvers, execution engine, and WebSocket handler.
+ * Resolvers, execution engine, GraphStateManager, and WebSocket handler.
  */
 
 // =============================================================================
@@ -66,43 +66,7 @@ export {
 } from "./server/create";
 
 // =============================================================================
-// SSE (Server-Sent Events)
-// =============================================================================
-
-export {
-	// Class
-	SSEHandler,
-	// Factory
-	createSSEHandler,
-	// Types
-	type SSEClient,
-	type SSESubscription,
-	type SSEHandlerConfig,
-} from "./sse/handler";
-
-// =============================================================================
-// Subscriptions (Field-level real-time updates)
-// =============================================================================
-
-export {
-	// Class
-	SubscriptionHandler,
-	// Factory
-	createSubscriptionHandler,
-	// Types
-	type SubscriptionClient,
-	type ClientSubscribeMessage,
-	type ClientUnsubscribeMessage,
-	type ClientMessage,
-	type ServerUpdateMessage,
-	type EntityKey as SubscriptionEntityKey,
-	type FieldSubscriptionState,
-	type EntitySubscriptionState,
-	type SubscriptionHandlerConfig,
-} from "./subscriptions";
-
-// =============================================================================
-// State Management (Canonical state + client sync)
+// State Management (Single source of truth for subscriptions)
 // =============================================================================
 
 export {
@@ -111,10 +75,41 @@ export {
 	// Factory
 	createGraphStateManager,
 	// Types
-	type EntityKey as StateEntityKey,
+	type EntityKey,
 	type StateClient,
 	type StateUpdateMessage,
 	type StateFullMessage,
 	type Subscription,
 	type GraphStateManagerConfig,
 } from "./state";
+
+// =============================================================================
+// Deprecated (kept for backward compatibility, will be removed)
+// =============================================================================
+
+/**
+ * @deprecated Use GraphStateManager instead. SSEHandler will be removed in next major version.
+ */
+export {
+	SSEHandler,
+	createSSEHandler,
+	type SSEClient,
+	type SSESubscription,
+	type SSEHandlerConfig,
+} from "./sse/handler";
+
+/**
+ * @deprecated Use GraphStateManager instead. SubscriptionHandler will be removed in next major version.
+ */
+export {
+	SubscriptionHandler,
+	createSubscriptionHandler,
+	type SubscriptionClient,
+	type ClientSubscribeMessage,
+	type ClientUnsubscribeMessage,
+	type ClientMessage,
+	type ServerUpdateMessage,
+	type FieldSubscriptionState,
+	type EntitySubscriptionState,
+	type SubscriptionHandlerConfig,
+} from "./subscriptions";

@@ -61,7 +61,7 @@ resolve: async (id, ctx) => {
 // ═══════════════════════════════════════════════════════════
 resolve: async function* (id, ctx) {
     yield await db.get(id);              // Initial
-    for await (const chunk of llm.stream()) {
+    for await (const chunk of stream) {
         yield { content: chunk };        // Updates
     }
 }
@@ -111,11 +111,11 @@ resolve: async (id, ctx) => {
 ┌─────────────────────────────────┼───────────────────────────┐
 │                                 ↓              SERVER        │
 │   ┌─────────────────────────────────────────────────────────┐│
-│   │  GraphStateManager                                       ││
+│   │  GraphStateManager (Single Source of Truth)             ││
 │   │                                                          ││
 │   │  ┌─────────────┐     ┌─────────────┐                   ││
 │   │  │ Canonical   │     │ Per-Client  │                   ││
-│   │  │ State       │────▶│ Diff        │────▶ Send         ││
+│   │  │ State       │────▶│ Diff        │────▶ WebSocket    ││
 │   │  │ (truth)     │     │ (minimal)   │                   ││
 │   │  └─────────────┘     └─────────────┘                   ││
 │   │         ↑                                               ││
@@ -124,7 +124,7 @@ resolve: async (id, ctx) => {
 │             │                                                │
 │   ┌─────────┴───────────────────────────────────────────────┐│
 │   │  Resolvers                                               ││
-│   │  • Any data source: DB, LLM, Redis, WebSocket...        ││
+│   │  • Any data source: DB, Redis, WebSocket...             ││
 │   │  • emit() patches server state                          ││
 │   │  • Server auto-syncs to clients                         ││
 │   └─────────────────────────────────────────────────────────┘│
@@ -133,11 +133,11 @@ resolve: async (id, ctx) => {
 
 ---
 
-## Server State Management
+## Server Architecture
 
-### GraphStateManager
+### GraphStateManager (Core)
 
-The server maintains **canonical state** for each subscribed entity:
+The **single** orchestration layer for all subscriptions:
 
 ```typescript
 class GraphStateManager {
@@ -167,16 +167,19 @@ class GraphStateManager {
 }
 ```
 
-### Emit Behavior
+### Server Integration
 
 ```typescript
-// Partial update - merges into state
-ctx.emit({ content: "new content" });
-// canonical = { ...canonical, content: "new content" }
+const server = createServer({
+    schema,
+    resolvers,
+    context: () => ({ db }),
+});
 
-// Full update - replaces state
-ctx.emit({ id, title, content, author, createdAt });
-// canonical = newData
+// Internally:
+// - GraphStateManager handles all subscription state
+// - ExecutionEngine.executeReactive() connects resolvers → GraphStateManager
+// - WebSocket handler connects GraphStateManager → clients
 ```
 
 ---
@@ -243,33 +246,23 @@ interface EntitySignal<T> {
 <div>{user.$.name.value}</div>
 ```
 
-### Field-level Subscriptions
-
-Client tracks which fields are subscribed:
-
-```typescript
-// First query - full entity
-const user = api.user.get({ id });
-// Server: SUBSCRIBE User:123 [*]
-
-// Second query - derives from existing
-const userName = api.user.get({ id }, { select: { name: true } });
-// No network! Computed from user.$.name
-
-// First disposes
-user.dispose();
-// Server: UNSUBSCRIBE User:123 (except name)
-```
-
 ---
 
 ## Package Structure
 
 ```
-@lens/core      Schema, types, update strategies
-@lens/server    Resolvers, GraphStateManager, handlers
+@lens/core      Schema, types, update strategies, EntityKey
+@lens/server    Resolvers, GraphStateManager, ExecutionEngine
 @lens/client    Reactive store, signals, transport
 @lens/react     React hooks and bindings
+```
+
+### Key Types (from @lens/core)
+
+```typescript
+// Shared across all packages
+export type EntityKey = `${string}:${string}`;
+export type Update = { strategy: "value" | "delta" | "patch"; data: unknown };
 ```
 
 ---
@@ -301,6 +294,11 @@ Client     = Reactive access (USE)
              - Signal<T> auto-updates
              - Declare what you want
 
-Server maintains truth, syncs to clients.
+GraphStateManager = Single source of truth
+                    - Maintains canonical state
+                    - Tracks per-client state
+                    - Computes minimal diffs
+                    - Auto-syncs to clients
+
 Everything else is automatic.
 ```

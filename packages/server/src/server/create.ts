@@ -1,12 +1,13 @@
 /**
  * @lens/server - Server Creation
  *
- * Factory for creating a Lens server.
+ * Factory for creating a Lens server with GraphStateManager integration.
  */
 
-import type { Schema, SchemaDefinition, createUpdate, UnifiedPlugin, ServerHandshake } from "@lens/core";
+import type { Schema, SchemaDefinition, UnifiedPlugin, ServerHandshake } from "@lens/core";
 import type { Resolvers, BaseContext } from "../resolvers/types";
 import { ExecutionEngine } from "../execution/engine";
+import { GraphStateManager, type StateClient } from "../state/graph-state-manager";
 import { createServerPluginManager, type ServerPluginManager } from "../plugins";
 
 // =============================================================================
@@ -35,6 +36,9 @@ export interface ServerConfig<S extends SchemaDefinition, Ctx extends BaseContex
 export interface LensServer<S extends SchemaDefinition, Ctx extends BaseContext> {
 	/** Execution engine */
 	engine: ExecutionEngine<S, Ctx>;
+
+	/** State manager (for external access if needed) */
+	stateManager: GraphStateManager;
 
 	/** Handle WebSocket connection */
 	handleWebSocket(ws: WebSocketLike): void;
@@ -67,12 +71,15 @@ interface SubscribeMessage {
 	id: string;
 	entity: string;
 	entityId: string;
+	fields?: string[] | "*";
 	select?: Record<string, unknown>;
 }
 
 interface UnsubscribeMessage {
 	type: "unsubscribe";
 	id: string;
+	entity: string;
+	entityId: string;
 }
 
 interface MutateMessage {
@@ -107,14 +114,34 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 	implements LensServer<S, Ctx>
 {
 	engine: ExecutionEngine<S, Ctx>;
-	private subscriptions = new Map<string, { entityName: string; entityId: string; ws: WebSocketLike }>();
+	stateManager: GraphStateManager;
 	private server: unknown = null;
 	private pluginManager: ServerPluginManager;
 	private version: string;
+	private clientCounter = 0;
+
+	/** Track WebSocket → clientId mapping */
+	private wsToClient = new Map<WebSocketLike, string>();
+
+	/** Track active subscriptions per client: clientId → Set<subscriptionId> */
+	private clientSubscriptions = new Map<string, Map<string, { entity: string; entityId: string }>>();
 
 	constructor(config: ServerConfig<S, Ctx>) {
 		const contextFactory = config.context ?? (() => ({} as Ctx));
-		this.engine = new ExecutionEngine(config.resolvers, contextFactory);
+
+		// Create GraphStateManager (single source of truth)
+		this.stateManager = new GraphStateManager({
+			onEntityUnsubscribed: (entity, id) => {
+				// Optional: cleanup when no more subscribers
+			},
+		});
+
+		// Create ExecutionEngine with GraphStateManager integration
+		this.engine = new ExecutionEngine(config.resolvers, {
+			createContext: contextFactory,
+			stateManager: this.stateManager,
+		});
+
 		this.version = config.version ?? "1.0.0";
 
 		// Initialize plugin manager
@@ -133,12 +160,24 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 	}
 
 	handleWebSocket(ws: WebSocketLike): void {
-		const connectionSubs = new Set<string>();
+		// Generate unique client ID
+		const clientId = `ws_${++this.clientCounter}_${Date.now()}`;
+		this.wsToClient.set(ws, clientId);
+		this.clientSubscriptions.set(clientId, new Map());
+
+		// Register client with GraphStateManager
+		const stateClient: StateClient = {
+			id: clientId,
+			send: (msg) => {
+				ws.send(JSON.stringify(msg));
+			},
+		};
+		this.stateManager.addClient(stateClient);
 
 		ws.onmessage = async (event) => {
 			try {
 				const message = JSON.parse(event.data) as ClientMessage;
-				await this.handleMessage(ws, message, connectionSubs);
+				await this.handleMessage(ws, clientId, message);
 			} catch (error) {
 				ws.send(
 					JSON.stringify({
@@ -150,27 +189,41 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 		};
 
 		ws.onclose = () => {
-			// Clean up subscriptions
-			for (const subId of connectionSubs) {
-				this.subscriptions.delete(subId);
-			}
+			this.handleDisconnect(ws, clientId);
 		};
+	}
+
+	private handleDisconnect(ws: WebSocketLike, clientId: string): void {
+		// Unsubscribe from all entities
+		const subs = this.clientSubscriptions.get(clientId);
+		if (subs) {
+			for (const [_, { entity, entityId }] of subs) {
+				this.stateManager.unsubscribe(clientId, entity, entityId);
+			}
+		}
+
+		// Remove client from GraphStateManager
+		this.stateManager.removeClient(clientId);
+
+		// Cleanup maps
+		this.wsToClient.delete(ws);
+		this.clientSubscriptions.delete(clientId);
 	}
 
 	private async handleMessage(
 		ws: WebSocketLike,
+		clientId: string,
 		message: ClientMessage,
-		connectionSubs: Set<string>,
 	): Promise<void> {
 		switch (message.type) {
 			case "handshake":
 				this.handleHandshake(ws, message);
 				break;
 			case "subscribe":
-				await this.handleSubscribe(ws, message, connectionSubs);
+				await this.handleSubscribe(ws, clientId, message);
 				break;
 			case "unsubscribe":
-				this.handleUnsubscribe(message, connectionSubs);
+				this.handleUnsubscribe(clientId, message);
 				break;
 			case "query":
 				await this.handleQuery(ws, message);
@@ -198,36 +251,45 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 
 	private async handleSubscribe(
 		ws: WebSocketLike,
+		clientId: string,
 		message: SubscribeMessage,
-		connectionSubs: Set<string>,
 	): Promise<void> {
-		const { id, entity, entityId, select } = message;
-
-		// Store subscription
-		this.subscriptions.set(id, { entityName: entity, entityId, ws });
-		connectionSubs.add(id);
+		const { id, entity, entityId, fields = "*" } = message;
 
 		try {
-			// Execute initial query
-			const data = await this.engine.executeGet(entity as keyof S & string, entityId, select as Parameters<typeof this.engine.executeGet>[2]);
+			// Track subscription
+			const subs = this.clientSubscriptions.get(clientId);
+			if (subs) {
+				subs.set(id, { entity, entityId });
+			}
 
-			// Send initial data
-			ws.send(
-				JSON.stringify({
-					type: "data",
-					subscriptionId: id,
-					data,
-				}),
+			// Subscribe to GraphStateManager (will receive updates automatically)
+			this.stateManager.subscribe(clientId, entity, entityId, fields);
+
+			// Execute reactive query - this will emit initial data to GraphStateManager
+			// which will then push to the client
+			await this.engine.executeReactive(
+				entity as keyof S & string,
+				entityId,
+				fields,
 			);
 
-			// TODO: Set up streaming subscription if resolver supports it
+			// Send subscription acknowledgment
+			ws.send(
+				JSON.stringify({
+					type: "subscribed",
+					subscriptionId: id,
+					entity,
+					entityId,
+				}),
+			);
 		} catch (error) {
 			ws.send(
 				JSON.stringify({
 					type: "error",
 					id,
 					error: {
-						code: "EXECUTION_ERROR",
+						code: "SUBSCRIPTION_ERROR",
 						message: error instanceof Error ? error.message : "Unknown error",
 					},
 				}),
@@ -235,10 +297,17 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 		}
 	}
 
-	private handleUnsubscribe(message: UnsubscribeMessage, connectionSubs: Set<string>): void {
-		const { id } = message;
-		this.subscriptions.delete(id);
-		connectionSubs.delete(id);
+	private handleUnsubscribe(clientId: string, message: UnsubscribeMessage): void {
+		const { id, entity, entityId } = message;
+
+		// Unsubscribe from GraphStateManager
+		this.stateManager.unsubscribe(clientId, entity, entityId);
+
+		// Remove from tracking
+		const subs = this.clientSubscriptions.get(clientId);
+		if (subs) {
+			subs.delete(id);
+		}
 	}
 
 	private async handleQuery(ws: WebSocketLike, message: QueryMessage): Promise<void> {
@@ -264,7 +333,7 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 			ws.send(
 				JSON.stringify({
 					type: "data",
-					subscriptionId: id,
+					id,
 					data,
 				}),
 			);
@@ -300,6 +369,10 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 						entity as keyof S & string,
 						input as Parameters<typeof this.engine.executeUpdate>[1],
 					);
+					// Emit update to GraphStateManager for reactive sync
+					if (data && typeof data === "object" && "id" in data) {
+						this.stateManager.emit(entity, (data as { id: string }).id, data as Record<string, unknown>);
+					}
 					break;
 				case "delete":
 					data = await this.engine.executeDelete(
@@ -316,9 +389,6 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 					data,
 				}),
 			);
-
-			// Notify subscribers of affected entities
-			this.notifySubscribers(entity, input);
 		} catch (error) {
 			ws.send(
 				JSON.stringify({
@@ -330,23 +400,6 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 					},
 				}),
 			);
-		}
-	}
-
-	private notifySubscribers(entityName: string, data: unknown): void {
-		// Notify all subscribers watching this entity
-		for (const [subId, sub] of this.subscriptions) {
-			if (sub.entityName === entityName) {
-				// Send update notification
-				sub.ws.send(
-					JSON.stringify({
-						type: "update",
-						subscriptionId: subId,
-						strategy: "value",
-						data,
-					}),
-				);
-			}
 		}
 	}
 
@@ -435,21 +488,22 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 			},
 			websocket: {
 				message: (ws, message) => {
-					const wsLike: WebSocketLike = {
-						send: (data) => ws.send(data),
-						close: () => ws.close(),
-					};
-					wsLike.onmessage?.({ data: message.toString() });
+					const clientId = this.wsToClient.get(ws as unknown as WebSocketLike);
+					if (clientId) {
+						const wsLike = this.createWsLike(ws);
+						wsLike.onmessage?.({ data: message.toString() });
+					}
 				},
 				open: (ws) => {
-					const wsLike: WebSocketLike = {
-						send: (data) => ws.send(data),
-						close: () => ws.close(),
-					};
+					const wsLike = this.createWsLike(ws);
 					this.handleWebSocket(wsLike);
 				},
 				close: (ws) => {
-					// Handled in handleWebSocket
+					const wsLike = this.createWsLike(ws);
+					const clientId = this.wsToClient.get(wsLike);
+					if (clientId) {
+						this.handleDisconnect(wsLike, clientId);
+					}
 				},
 			},
 		});
@@ -457,9 +511,20 @@ class LensServerImpl<S extends SchemaDefinition, Ctx extends BaseContext>
 		console.log(`Lens server listening on port ${port}`);
 	}
 
+	private createWsLike(ws: unknown): WebSocketLike {
+		const bunWs = ws as { send: (data: string) => void; close: () => void };
+		return {
+			send: (data) => bunWs.send(data),
+			close: () => bunWs.close(),
+		};
+	}
+
 	async close(): Promise<void> {
 		// Destroy plugins
 		await this.pluginManager.destroy();
+
+		// Clear all state
+		this.stateManager.clear();
 
 		if (this.server && typeof (this.server as { stop?: () => void }).stop === "function") {
 			(this.server as { stop: () => void }).stop();
