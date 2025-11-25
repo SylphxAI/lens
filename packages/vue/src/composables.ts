@@ -5,8 +5,8 @@
  * Uses Vue's Composition API for reactive state management.
  */
 
-import { ref, shallowRef, onUnmounted, watch, type Ref, type ShallowRef } from "vue";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { type Ref, type ShallowRef, onUnmounted, ref, shallowRef, watch } from "vue";
 
 // =============================================================================
 // Types
@@ -59,9 +59,7 @@ export interface UseQueryOptions {
 }
 
 /** Mutation function type */
-export type MutationFn<TInput, TOutput> = (
-	input: TInput,
-) => Promise<MutationResult<TOutput>>;
+export type MutationFn<TInput, TOutput> = (input: TInput) => Promise<MutationResult<TOutput>>;
 
 // =============================================================================
 // useQuery
@@ -277,9 +275,7 @@ export function useMutation<TInput, TOutput>(
  * </template>
  * ```
  */
-export function useLazyQuery<T>(
-	queryFn: () => QueryResult<T>,
-): UseLazyQueryResult<T> {
+export function useLazyQuery<T>(queryFn: () => QueryResult<T>): UseLazyQueryResult<T> {
 	const data = shallowRef<T | null>(null);
 	const loading = ref(false);
 	const error = shallowRef<Error | null>(null);

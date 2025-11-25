@@ -22,8 +22,8 @@
  * ```
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // =============================================================================
 // Types
@@ -99,10 +99,7 @@ export interface UseQueryOptions {
  * }
  * ```
  */
-export function useQuery<T>(
-	query: QueryResult<T>,
-	options?: UseQueryOptions,
-): UseQueryResult<T> {
+export function useQuery<T>(query: QueryResult<T>, options?: UseQueryOptions): UseQueryResult<T> {
 	const [data, setData] = useState<T | null>(null);
 	const [loading, setLoading] = useState(!options?.skip);
 	const [error, setError] = useState<Error | null>(null);
@@ -183,9 +180,7 @@ export function useQuery<T>(
 // =============================================================================
 
 /** Mutation function type */
-export type MutationFn<TInput, TOutput> = (
-	input: TInput,
-) => Promise<MutationResult<TOutput>>;
+export type MutationFn<TInput, TOutput> = (input: TInput) => Promise<MutationResult<TOutput>>;
 
 /**
  * Execute mutations with loading/error state

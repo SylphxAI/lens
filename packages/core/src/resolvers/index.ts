@@ -1,36 +1,3 @@
-/**
- * @sylphx/lens-core - Entity Resolvers API
- *
- * Define resolvers for nested data handling.
- * These resolvers are reused across ALL operations.
- *
- * @example
- * ```typescript
- * import { entityResolvers } from '@sylphx/lens-core';
- *
- * export const resolvers = entityResolvers({
- *   User: {
- *     // Simple resolver
- *     posts: (user) => useDB().post.findMany({ where: { authorId: user.id } }),
- *   },
- *   Post: {
- *     // Batch resolver for N+1 prevention
- *     author: {
- *       batch: async (posts) => {
- *         const authorIds = [...new Set(posts.map(p => p.authorId))];
- *         const authors = await useDB().user.findMany({ where: { id: { in: authorIds } } });
- *         const authorMap = new Map(authors.map(a => [a.id, a]));
- *         return posts.map(p => authorMap.get(p.authorId));
- *       },
- *     },
- *   },
- * });
- * ```
- */
-
-import type { EntityDef } from "../schema/define";
-import type { EntityDefinition } from "../schema/types";
-
 // =============================================================================
 // Type Definitions
 // =============================================================================
@@ -215,7 +182,9 @@ export function entityResolvers<T extends EntityResolversDefinition>(
 // =============================================================================
 
 /** Check if value is an EntityResolvers instance */
-export function isEntityResolvers(value: unknown): value is EntityResolvers<EntityResolversDefinition> {
+export function isEntityResolvers(
+	value: unknown,
+): value is EntityResolvers<EntityResolversDefinition> {
 	return (
 		typeof value === "object" &&
 		value !== null &&

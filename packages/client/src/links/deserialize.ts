@@ -5,8 +5,8 @@
  * Inverse of server-side serialization.
  */
 
-import type { Schema, SchemaDefinition, FieldType } from "@sylphx/lens-core";
-import type { Link, LinkFn, OperationResult } from "./types";
+import type { FieldType, Schema, SchemaDefinition } from "@sylphx/lens-core";
+import type { Link, LinkFn } from "./types";
 
 export interface DeserializeLinkOptions<S extends SchemaDefinition> {
 	/** Schema (for type information) */
@@ -71,7 +71,11 @@ export function deserializeLink<S extends SchemaDefinition>(
 					);
 				} else if (result.data && typeof result.data === "object") {
 					// Single entity operation - deserialize object
-					deserializedData = deserializeEntity(entityName, result.data as Record<string, unknown>, entityDef);
+					deserializedData = deserializeEntity(
+						entityName,
+						result.data as Record<string, unknown>,
+						entityDef,
+					);
 				} else {
 					// Primitive or null - return as-is
 					deserializedData = result.data;
@@ -120,7 +124,11 @@ function deserializeEntity<S extends SchemaDefinition>(
 
 		// Relations: Don't deserialize nested objects to avoid issues
 		// They will be deserialized when fetched through their own queries
-		if (fieldType._type === "hasMany" || fieldType._type === "belongsTo" || fieldType._type === "hasOne") {
+		if (
+			fieldType._type === "hasMany" ||
+			fieldType._type === "belongsTo" ||
+			fieldType._type === "hasOne"
+		) {
 			result[fieldName] = value;
 			continue;
 		}

@@ -4,15 +4,15 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-	valueStrategy,
-	deltaStrategy,
-	patchStrategy,
-	selectStrategy,
-	createUpdate,
-	applyUpdate,
 	type DeltaUpdate,
 	type PatchUpdate,
 	type ValueUpdate,
+	applyUpdate,
+	createUpdate,
+	deltaStrategy,
+	patchStrategy,
+	selectStrategy,
+	valueStrategy,
 } from "./strategies";
 
 describe("Value Strategy", () => {
@@ -59,8 +59,9 @@ describe("Delta Strategy", () => {
 
 	test("uses delta for long strings with small changes", () => {
 		// Long base string where delta is more efficient
-		const base = "This is a very long string that needs to be long enough to make delta encoding worthwhile for bandwidth savings";
-		const updated = base + " appended";
+		const base =
+			"This is a very long string that needs to be long enough to make delta encoding worthwhile for bandwidth savings";
+		const updated = `${base} appended`;
 
 		const update = deltaStrategy.encode(base, updated);
 		// For long strings with small changes, delta is more efficient
@@ -248,7 +249,7 @@ describe("Strategy Selection", () => {
 
 	test("selects delta for long strings", () => {
 		const longString = "a".repeat(150);
-		const strategy = selectStrategy(longString, longString + " appended");
+		const strategy = selectStrategy(longString, `${longString} appended`);
 		expect(strategy.name).toBe("delta");
 	});
 
@@ -283,7 +284,7 @@ describe("createUpdate and applyUpdate", () => {
 	test("creates and applies delta update for long strings", () => {
 		const longText =
 			"This is a long text that should trigger delta strategy for updates because it exceeds the minimum threshold";
-		const newText = longText + " with appended content";
+		const newText = `${longText} with appended content`;
 
 		const update = createUpdate(longText, newText);
 		expect(update.strategy).toBe("delta");

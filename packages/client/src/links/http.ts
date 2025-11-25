@@ -4,13 +4,23 @@
  * Terminal link that executes operations via HTTP.
  */
 
-import type { Link, LinkFn, OperationContext, OperationResult, Observable, Observer, Unsubscribable } from "./types";
+import type {
+	Link,
+	LinkFn,
+	Observable,
+	Observer,
+	OperationContext,
+	OperationResult,
+	Unsubscribable,
+} from "./types";
 
 export interface HttpLinkOptions {
 	/** Base URL for API */
 	url: string;
 	/** Request headers */
-	headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
+	headers?:
+		| Record<string, string>
+		| (() => Record<string, string> | Promise<Record<string, string>>);
 	/** Custom fetch implementation */
 	fetch?: typeof fetch;
 	/** Request timeout in ms */
@@ -67,8 +77,7 @@ export function httpLink(options: HttpLinkOptions): Link {
 	// Helper to execute a single HTTP request
 	async function executeRequest(op: OperationContext): Promise<OperationResult> {
 		try {
-			const resolvedHeaders =
-				typeof headers === "function" ? await headers() : headers;
+			const resolvedHeaders = typeof headers === "function" ? await headers() : headers;
 
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -227,8 +236,7 @@ export function httpBatchLink(
 		if (batch.length === 0) return;
 
 		try {
-			const resolvedHeaders =
-				typeof headers === "function" ? await headers() : headers;
+			const resolvedHeaders = typeof headers === "function" ? await headers() : headers;
 
 			const response = await customFetch(url, {
 				method: "POST",
@@ -256,7 +264,11 @@ export function httpBatchLink(
 				return;
 			}
 
-			const results = (await response.json()) as Array<{ id: string; data?: unknown; error?: string }>;
+			const results = (await response.json()) as Array<{
+				id: string;
+				data?: unknown;
+				error?: string;
+			}>;
 
 			// Match results to operations
 			for (const { op, resolve } of batch) {

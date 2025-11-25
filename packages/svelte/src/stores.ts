@@ -5,8 +5,8 @@
  * Integrates with Svelte's store contract (subscribe method).
  */
 
-import { readable, writable, type Readable, type Writable } from "svelte/store";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { type Readable, readable, writable } from "svelte/store";
 
 // =============================================================================
 // Types
@@ -69,10 +69,7 @@ export interface QueryStoreOptions {
  * {/if}
  * ```
  */
-export function query<T>(
-	queryResult: QueryResult<T>,
-	options?: QueryStoreOptions,
-): QueryStore<T> {
+export function query<T>(queryResult: QueryResult<T>, options?: QueryStoreOptions): QueryStore<T> {
 	let refetchFn: (() => void) | null = null;
 
 	const store = readable<QueryStoreValue<T>>(
@@ -131,9 +128,7 @@ export function query<T>(
 // =============================================================================
 
 /** Mutation function type */
-export type MutationFn<TInput, TOutput> = (
-	input: TInput,
-) => Promise<MutationResult<TOutput>>;
+export type MutationFn<TInput, TOutput> = (input: TInput) => Promise<MutationResult<TOutput>>;
 
 /**
  * Create a store for executing mutations with loading/error state.

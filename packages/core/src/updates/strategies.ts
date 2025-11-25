@@ -283,7 +283,7 @@ function computeJsonPatch(prev: object, next: object, basePath = ""): PatchOpera
 
 /** Apply JSON Patch operations */
 function applyJsonPatch(current: object, operations: PatchOperation[]): object {
-	let result = structuredClone(current);
+	const result = structuredClone(current);
 
 	for (const op of operations) {
 		const pathParts = parseJsonPointer(op.path);
@@ -335,10 +335,7 @@ const THRESHOLDS = {
 /**
  * Select optimal update strategy based on data type and change
  */
-export function selectStrategy(
-	prev: unknown,
-	next: unknown,
-): UpdateStrategy {
+export function selectStrategy(prev: unknown, next: unknown): UpdateStrategy {
 	// Strings use delta if long enough (check before primitives)
 	if (typeof prev === "string" && typeof next === "string") {
 		if (next.length >= THRESHOLDS.STRING_DELTA_MIN) {

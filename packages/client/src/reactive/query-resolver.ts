@@ -5,9 +5,9 @@
  * Handles query deduplication, request batching, and caching.
  */
 
+import { type Signal, computed } from "../signals/signal";
+import { type EntitySignal, deriveEntitySignal } from "./entity-signal";
 import type { SubscriptionManager } from "./subscription-manager";
-import { EntitySignal, deriveEntitySignal } from "./entity-signal";
-import { computed, type Signal } from "../signals/signal";
 
 // =============================================================================
 // Types
@@ -382,11 +382,7 @@ export class QueryResolver {
 			for (const pending of this.pendingQueries) {
 				const { query, resolve, reject } = pending;
 				try {
-					const data = await this.fetchEntity(
-						query.entityName,
-						query.entityId!,
-						query.fields,
-					);
+					const data = await this.fetchEntity(query.entityName, query.entityId!, query.fields);
 					resolve(data);
 				} catch (err) {
 					reject(err instanceof Error ? err : new Error(String(err)));

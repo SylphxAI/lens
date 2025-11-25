@@ -2,7 +2,7 @@
  * Tests for Compression Link
  */
 
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { compressionLink } from "./compression";
 import { createOperationContext } from "./types";
 

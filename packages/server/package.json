@@ -17,16 +17,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"server",
-		"resolvers",
-		"graphql"
-	],
+	"files": ["dist", "src"],
+	"keywords": ["lens", "server", "resolvers", "graphql"],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

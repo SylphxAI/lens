@@ -4,7 +4,7 @@
  * Tests for connection recovery and subscription resync.
  */
 
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { WebSocketSubscriptionTransport } from "./websocket";
 
 // Mock WebSocket for testing

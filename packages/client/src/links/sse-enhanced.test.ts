@@ -2,7 +2,7 @@
  * Tests for enhanced SSE Link (self-sufficient)
  */
 
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { sseLink } from "./sse";
 import { createOperationContext } from "./types";
 

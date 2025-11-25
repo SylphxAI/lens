@@ -4,9 +4,9 @@
  * Manages entity signals, caching, and optimistic updates.
  */
 
-import type { Update, EntityKey } from "@sylphx/lens-core";
+import type { EntityKey, Update } from "@sylphx/lens-core";
 import { applyUpdate, makeEntityKey } from "@sylphx/lens-core";
-import { signal, type WritableSignal, type Signal, batch } from "../signals/signal";
+import { type Signal, type WritableSignal, batch, signal } from "../signals/signal";
 
 // Re-export for convenience
 export type { EntityKey };
@@ -323,7 +323,7 @@ export class ReactiveStore {
 
 				case "update":
 					// Merge with existing data
-					if (entitySignal && entitySignal.value.data) {
+					if (entitySignal?.value.data) {
 						this.setEntity(entityName, entityId, {
 							...(entitySignal.value.data as object),
 							...data,
@@ -563,10 +563,7 @@ export class ReactiveStore {
 		}
 	}
 
-	private cascadeInvalidate(
-		entityName: string,
-		operation: "create" | "update" | "delete",
-	): void {
+	private cascadeInvalidate(entityName: string, operation: "create" | "update" | "delete"): void {
 		for (const rule of this.config.cascadeRules) {
 			if (rule.source !== entityName) continue;
 			if (rule.operations && !rule.operations.includes(operation)) continue;

@@ -4,15 +4,10 @@
  * Tests for Lens server operations and GraphStateManager integration.
  */
 
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
+import { entity, mutation, query, t } from "@sylphx/lens-core";
 import { z } from "zod";
-import {
-	entity,
-	t,
-	query,
-	mutation,
-} from "@sylphx/lens-core";
-import { createServer, type WebSocketLike } from "./create";
+import { type WebSocketLike, createServer } from "./create";
 
 // =============================================================================
 // Test Fixtures
@@ -156,7 +151,9 @@ describe("executeQuery", () => {
 			queries: {},
 		});
 
-		await expect(server.executeQuery("unknownQuery")).rejects.toThrow("Query not found: unknownQuery");
+		await expect(server.executeQuery("unknownQuery")).rejects.toThrow(
+			"Query not found: unknownQuery",
+		);
 	});
 });
 
@@ -287,7 +284,12 @@ describe("WebSocket Protocol", () => {
 
 		// Simulate mutation
 		ws.onmessage?.({
-			data: JSON.stringify({ type: "mutation", id: "m-1", operation: "createUser", input: { name: "Test" } }),
+			data: JSON.stringify({
+				type: "mutation",
+				id: "m-1",
+				operation: "createUser",
+				input: { name: "Test" },
+			}),
 		});
 
 		await new Promise((r) => setTimeout(r, 20));

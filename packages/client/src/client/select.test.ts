@@ -5,8 +5,8 @@
  * These are compile-time type tests.
  */
 
-import { describe, it, expect } from "bun:test";
-import { t, entity, createSchema, hasMany, belongsTo } from "@sylphx/lens-core";
+import { describe, expect, it } from "bun:test";
+import { belongsTo, createSchema, entity, hasMany, t } from "@sylphx/lens-core";
 import type { InferQueryResult, ListOptions, QueryOptions } from "./client";
 
 // =============================================================================

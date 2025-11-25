@@ -47,4 +47,3 @@ export {
 	type ListOptions as ReactiveListOptions,
 	type InferQueryResult as ReactiveInferQueryResult,
 } from "./reactive-client";
-

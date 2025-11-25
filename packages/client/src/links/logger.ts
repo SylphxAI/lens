@@ -31,12 +31,7 @@ export interface LoggerLinkOptions {
  * ```
  */
 export function loggerLink(options: LoggerLinkOptions = {}): Link {
-	const {
-		log = console.log,
-		logError = console.error,
-		enabled = true,
-		formatter,
-	} = options;
+	const { log = console.log, logError = console.error, enabled = true, formatter } = options;
 
 	return (): LinkFn => {
 		return async (op, next) => {

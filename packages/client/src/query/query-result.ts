@@ -5,7 +5,7 @@
  * Lazy execution - doesn't fetch until await or subscribe is called.
  */
 
-import type { OperationContext, OperationResult, NextLink } from "../links/types";
+import type { NextLink, OperationContext } from "../links/types";
 
 // =============================================================================
 // Types

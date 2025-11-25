@@ -4,8 +4,8 @@
  * Provides Lens client to React component tree.
  */
 
-import { createContext, useContext, type ReactNode } from "react";
 import type { LensClient } from "@sylphx/lens-client";
+import { type ReactNode, createContext, useContext } from "react";
 
 // =============================================================================
 // Context
@@ -53,11 +53,7 @@ export interface LensProviderProps {
  * ```
  */
 export function LensProvider({ client, children }: LensProviderProps) {
-	return (
-		<LensContext.Provider value={client}>
-			{children}
-		</LensContext.Provider>
-	);
+	return <LensContext.Provider value={client}>{children}</LensContext.Provider>;
 }
 
 // =============================================================================

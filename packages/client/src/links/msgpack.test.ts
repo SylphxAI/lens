@@ -2,8 +2,8 @@
  * Tests for MessagePack Serialization Link
  */
 
-import { describe, expect, test, mock } from "bun:test";
-import { msgpackLink, serializeMsgpack, deserializeMsgpack, compareSizes } from "./msgpack";
+import { describe, expect, mock, test } from "bun:test";
+import { compareSizes, deserializeMsgpack, msgpackLink, serializeMsgpack } from "./msgpack";
 import { createOperationContext } from "./types";
 
 describe("msgpackLink", () => {
@@ -235,8 +235,7 @@ describe("compareSizes", () => {
 		const data = { value: 42 };
 		const comparison = compareSizes(data);
 
-		const expectedReduction =
-			((comparison.json - comparison.msgpack) / comparison.json) * 100;
+		const expectedReduction = ((comparison.json - comparison.msgpack) / comparison.json) * 100;
 
 		expect(comparison.reduction).toBe(`${expectedReduction.toFixed(1)}%`);
 	});

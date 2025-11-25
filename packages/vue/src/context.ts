@@ -4,16 +4,14 @@
  * Vue provide/inject for Lens client.
  */
 
-import { inject, provide, type InjectionKey } from "vue";
 import type { LensClient } from "@sylphx/lens-client";
+import { type InjectionKey, inject, provide } from "vue";
 
 // =============================================================================
 // Injection Key
 // =============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const LensClientKey: InjectionKey<LensClient<any, any>> =
-	Symbol("lens-client");
+export const LensClientKey: InjectionKey<LensClient<any, any>> = Symbol("lens-client");
 
 // =============================================================================
 // Provider
@@ -41,7 +39,6 @@ export const LensClientKey: InjectionKey<LensClient<any, any>> =
  * </template>
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function provideLensClient(client: LensClient<any, any>): void {
 	provide(LensClientKey, client);
 }
@@ -65,7 +62,6 @@ export function provideLensClient(client: LensClient<any, any>): void {
  * </script>
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 	const client = inject(LensClientKey);
 
@@ -76,6 +72,5 @@ export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 		);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	return client as LensClient<any, any> & TRouter;
 }

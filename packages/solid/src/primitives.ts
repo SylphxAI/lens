@@ -5,14 +5,8 @@
  * Uses SolidJS fine-grained reactivity for optimal performance.
  */
 
-import {
-	createSignal,
-	createEffect,
-	onCleanup,
-	createMemo,
-	type Accessor,
-} from "solid-js";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { type Accessor, createSignal, onCleanup } from "solid-js";
 
 // =============================================================================
 // Types
@@ -65,9 +59,7 @@ export interface CreateQueryOptions {
 }
 
 /** Mutation function type */
-export type MutationFn<TInput, TOutput> = (
-	input: TInput,
-) => Promise<MutationResult<TOutput>>;
+export type MutationFn<TInput, TOutput> = (input: TInput) => Promise<MutationResult<TOutput>>;
 
 // =============================================================================
 // createQuery
@@ -284,9 +276,7 @@ export function createMutation<TInput, TOutput>(
  * }
  * ```
  */
-export function createLazyQuery<T>(
-	queryFn: () => QueryResult<T>,
-): CreateLazyQueryResult<T> {
+export function createLazyQuery<T>(queryFn: () => QueryResult<T>): CreateLazyQueryResult<T> {
 	const [data, setData] = createSignal<T | null>(null);
 	const [loading, setLoading] = createSignal(false);
 	const [error, setError] = createSignal<Error | null>(null);

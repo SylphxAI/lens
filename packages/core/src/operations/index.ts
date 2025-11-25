@@ -154,9 +154,12 @@ export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
 /**
  * Normalize DSL to internal format for interpreter
  */
-export function normalizeOptimisticDSL(
-	dsl: OptimisticDSL,
-): { type: "merge" | "create" | "delete" | "updateMany" | "custom"; set?: Record<string, unknown>; config?: OptimisticUpdateManyConfig; fn?: OptimisticFn<unknown, unknown> } {
+export function normalizeOptimisticDSL(dsl: OptimisticDSL): {
+	type: "merge" | "create" | "delete" | "updateMany" | "custom";
+	set?: Record<string, unknown>;
+	config?: OptimisticUpdateManyConfig;
+	fn?: OptimisticFn<unknown, unknown>;
+} {
 	// String shorthand
 	if (dsl === "merge") return { type: "merge" };
 	if (dsl === "create") return { type: "create" };
@@ -308,7 +311,9 @@ export interface MutationBuilderWithReturns<TInput, TOutput> {
 	 * .optimistic(({ input }) => ({ id: input.id, ...input }))
 	 * ```
 	 */
-	optimistic(spec: OptimisticDSL | OptimisticFn<TInput, TOutput>): MutationBuilderWithOptimistic<TInput, TOutput>;
+	optimistic(
+		spec: OptimisticDSL | OptimisticFn<TInput, TOutput>,
+	): MutationBuilderWithOptimistic<TInput, TOutput>;
 
 	/** Define resolver function */
 	resolve(fn: ResolverFn<TInput, TOutput>): MutationDef<TInput, TOutput>;
@@ -349,7 +354,9 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 		return builder;
 	}
 
-	optimistic(spec: OptimisticDSL | OptimisticFn<TInput, TOutput>): MutationBuilderWithOptimistic<TInput, TOutput> {
+	optimistic(
+		spec: OptimisticDSL | OptimisticFn<TInput, TOutput>,
+	): MutationBuilderWithOptimistic<TInput, TOutput> {
 		const builder = new MutationBuilderImpl<TInput, TOutput>(this._name);
 		builder._inputSchema = this._inputSchema;
 		builder._outputSpec = this._outputSpec;

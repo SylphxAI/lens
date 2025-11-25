@@ -2,13 +2,13 @@
  * @sylphx/lens-client - SubscriptionManager Tests
  */
 
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import {
-	SubscriptionManager,
-	createSubscriptionManager,
-	type SubscriptionTransport,
 	type ServerMessage,
+	type SubscriptionManager,
+	type SubscriptionTransport,
 	type UpdateMessage,
+	createSubscriptionManager,
 } from "./subscription-manager";
 
 describe("SubscriptionManager", () => {

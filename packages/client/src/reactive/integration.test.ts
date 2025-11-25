@@ -5,15 +5,15 @@
  * Tests: client → subscription manager → server (GraphStateManager) → push update → client
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
+import { GraphStateManager, type StateClient } from "@sylphx/lens-server";
 import {
-	createSubscriptionManager,
-	createQueryResolver,
+	type ServerMessage,
 	type SubscriptionTransport,
 	type UpdateMessage,
-	type ServerMessage,
+	createQueryResolver,
+	createSubscriptionManager,
 } from "./index";
-import { GraphStateManager, type StateClient } from "@sylphx/lens-server";
 
 describe("Reactive Integration", () => {
 	describe("Client ↔ Server Subscription Flow", () => {
@@ -59,7 +59,8 @@ describe("Reactive Integration", () => {
 							field,
 							update,
 						};
-						const handler = (clientTransport as { _handler?: (msg: UpdateMessage) => void })._handler;
+						const handler = (clientTransport as { _handler?: (msg: UpdateMessage) => void })
+							._handler;
 						if (handler) {
 							handler(updateMsg);
 						}
@@ -326,11 +327,7 @@ describe("Reactive Integration", () => {
 			expect(fullResult.derived).toBe(false);
 
 			// Second query: partial (name only) - should derive
-			const partialResult = await resolver.resolveEntity<{ name: string }>(
-				"User",
-				"123",
-				["name"],
-			);
+			const partialResult = await resolver.resolveEntity<{ name: string }>("User", "123", ["name"]);
 
 			expect(fetchCount).toBe(1); // No additional fetch
 			expect(partialResult.derived).toBe(true);

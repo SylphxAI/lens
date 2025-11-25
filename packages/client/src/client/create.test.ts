@@ -4,10 +4,10 @@
  * Tests for Lens client.
  */
 
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
+import { type Update, entity, mutation, query, t } from "@sylphx/lens-core";
 import { z } from "zod";
-import { entity, t, query, mutation, type Update } from "@sylphx/lens-core";
-import { createClient, type Transport, type QueriesMap, type MutationsMap } from "./create";
+import { type Transport, createClient } from "./create";
 
 // =============================================================================
 // Test Fixtures
@@ -34,9 +34,7 @@ const mockUsers = [
 	{ id: "user-2", name: "Bob", email: "bob@example.com", bio: "Designer" },
 ];
 
-const mockPosts = [
-	{ id: "post-1", title: "Hello", content: "World", authorId: "user-1" },
-];
+const mockPosts = [{ id: "post-1", title: "Hello", content: "World", authorId: "user-1" }];
 
 // =============================================================================
 // Mock Transport
@@ -58,7 +56,10 @@ interface MockSubscription {
 function createMockTransport(handlers: {
 	query?: Record<string, (input: unknown) => Promise<unknown>>;
 	mutation?: Record<string, (input: unknown) => Promise<unknown>>;
-}): Transport & { subscriptions: MockSubscription[]; emit: (index: number, data: unknown) => void } {
+}): Transport & {
+	subscriptions: MockSubscription[];
+	emit: (index: number, data: unknown) => void;
+} {
 	const subscriptions: MockSubscription[] = [];
 
 	return {
@@ -83,13 +84,15 @@ function createMockTransport(handlers: {
 			// Execute query and send initial data
 			const handler = handlers.query?.[operation];
 			if (handler) {
-				handler(input).then((data) => {
-					if (sub.active) {
-						callbacks.onData(data);
-					}
-				}).catch((err) => {
-					callbacks.onError(err);
-				});
+				handler(input)
+					.then((data) => {
+						if (sub.active) {
+							callbacks.onData(data);
+						}
+					})
+					.catch((err) => {
+						callbacks.onError(err);
+					});
 			}
 
 			return {
@@ -135,9 +138,7 @@ const createDefaultHandlers = () => ({
 		whoami: async () => mockUsers[0],
 		searchUsers: async (input: unknown) => {
 			const { query } = input as { query: string };
-			return mockUsers.filter((u) =>
-				u.name.toLowerCase().includes(query.toLowerCase()),
-			);
+			return mockUsers.filter((u) => u.name.toLowerCase().includes(query.toLowerCase()));
 		},
 	},
 	mutation: {
@@ -677,10 +678,7 @@ describe("In-Flight Deduplication", () => {
 		});
 
 		// Make requests for different users
-		await Promise.all([
-			client.getUser({ id: "user-1" }),
-			client.getUser({ id: "user-2" }),
-		]);
+		await Promise.all([client.getUser({ id: "user-1" }), client.getUser({ id: "user-2" })]);
 
 		// Should call transport twice (different inputs)
 		expect(callCount).toBe(2);
@@ -805,8 +803,12 @@ describe("Maximum Principle (最大原則)", () => {
 		await new Promise((r) => setTimeout(r, 20));
 
 		// Both should have received initial data
-		expect(updates.filter((u) => (u as { type: string }).type === "full").length).toBeGreaterThan(0);
-		expect(updates.filter((u) => (u as { type: string }).type === "field").length).toBeGreaterThan(0);
+		expect(updates.filter((u) => (u as { type: string }).type === "full").length).toBeGreaterThan(
+			0,
+		);
+		expect(updates.filter((u) => (u as { type: string }).type === "field").length).toBeGreaterThan(
+			0,
+		);
 
 		unsub1();
 		unsub2();

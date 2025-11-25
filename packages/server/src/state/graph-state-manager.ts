@@ -9,7 +9,7 @@
  * - Pushes updates to subscribed clients
  */
 
-import { createUpdate, type Update, type EntityKey, makeEntityKey } from "@sylphx/lens-core";
+import { type EntityKey, type Update, createUpdate, makeEntityKey } from "@sylphx/lens-core";
 
 // Re-export for convenience
 export type { EntityKey };
@@ -137,12 +137,7 @@ export class GraphStateManager {
 	/**
 	 * Subscribe a client to an entity
 	 */
-	subscribe(
-		clientId: string,
-		entity: string,
-		id: string,
-		fields: string[] | "*" = "*",
-	): void {
+	subscribe(clientId: string, entity: string, id: string, fields: string[] | "*" = "*"): void {
 		const key = this.makeKey(entity, id);
 
 		// Add to entity subscribers
@@ -195,12 +190,7 @@ export class GraphStateManager {
 	/**
 	 * Update subscription fields for a client
 	 */
-	updateSubscription(
-		clientId: string,
-		entity: string,
-		id: string,
-		fields: string[] | "*",
-	): void {
+	updateSubscription(clientId: string, entity: string, id: string, fields: string[] | "*"): void {
 		const key = this.makeKey(entity, id);
 		const clientStateMap = this.clientStates.get(clientId);
 
@@ -296,8 +286,7 @@ export class GraphStateManager {
 		const { lastState, fields } = clientEntityState;
 
 		// Determine which fields to send
-		const fieldsToCheck =
-			fields === "*" ? Object.keys(newState) : Array.from(fields);
+		const fieldsToCheck = fields === "*" ? Object.keys(newState) : Array.from(fields);
 
 		// Compute updates for changed fields
 		const updates: Record<string, Update> = {};
@@ -449,8 +438,6 @@ export class GraphStateManager {
 /**
  * Create a GraphStateManager instance
  */
-export function createGraphStateManager(
-	config?: GraphStateManagerConfig,
-): GraphStateManager {
+export function createGraphStateManager(config?: GraphStateManagerConfig): GraphStateManager {
 	return new GraphStateManager(config);
 }

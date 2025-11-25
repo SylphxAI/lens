@@ -5,8 +5,8 @@
  * Implements the operations protocol with field-level subscriptions.
  */
 
-import type { Transport } from "./create";
 import { type Update, applyUpdate } from "@sylphx/lens-core";
+import type { Transport } from "./create";
 
 // =============================================================================
 // Types
@@ -191,11 +191,14 @@ export class WebSocketTransport implements Transport {
 			this.state = "reconnecting";
 			this.reconnectAttempts++;
 
-			this.reconnectTimer = setTimeout(() => {
-				this.connect().catch(() => {
-					// Will retry on next disconnect
-				});
-			}, this.options.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1));
+			this.reconnectTimer = setTimeout(
+				() => {
+					this.connect().catch(() => {
+						// Will retry on next disconnect
+					});
+				},
+				this.options.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+			);
 		}
 	}
 
@@ -351,7 +354,7 @@ export class WebSocketTransport implements Transport {
 			operation,
 			input,
 			fields,
-			select,  // Include SelectionObject for nested resolution
+			select, // Include SelectionObject for nested resolution
 		});
 
 		return {
@@ -385,13 +388,13 @@ export class WebSocketTransport implements Transport {
 						type: "updateFields",
 						id,
 						// Tell server: switch from * to these specific fields
-						setFields: sub.fields,  // New message type for replacing all fields
+						setFields: sub.fields, // New message type for replacing all fields
 					});
 					return;
 				}
 
 				// Normal field add/remove (when not subscribed to "*")
-				if (sub.fields === "*") return;  // Already subscribed to all, no-op for regular adds
+				if (sub.fields === "*") return; // Already subscribed to all, no-op for regular adds
 
 				const fieldsSet = new Set(sub.fields);
 				add?.forEach((f) => fieldsSet.add(f));
@@ -431,7 +434,7 @@ export class WebSocketTransport implements Transport {
 				operation,
 				input,
 				fields,
-				select,  // Include SelectionObject for nested resolution
+				select, // Include SelectionObject for nested resolution
 			});
 		});
 	}
@@ -483,17 +486,13 @@ export class WebSocketTransport implements Transport {
 /**
  * Create WebSocket transport
  */
-export function createWebSocketTransport(
-	options: WebSocketTransportOptions,
-): WebSocketTransport {
+export function createWebSocketTransport(options: WebSocketTransportOptions): WebSocketTransport {
 	return new WebSocketTransport(options);
 }
 
 /**
  * Create WebSocket transport (alias)
  */
-export function websocketTransport(
-	options: WebSocketTransportOptions,
-): WebSocketTransport {
+export function websocketTransport(options: WebSocketTransportOptions): WebSocketTransport {
 	return new WebSocketTransport(options);
 }

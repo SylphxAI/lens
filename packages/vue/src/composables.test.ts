@@ -3,17 +3,15 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { ref, nextTick } from "vue";
-import { useQuery, useMutation, useLazyQuery } from "./composables";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { ref } from "vue";
+import { useLazyQuery, useMutation, useQuery } from "./composables";
 
 // =============================================================================
 // Mock QueryResult
 // =============================================================================
 
-function createMockQueryResult<T>(
-	initialValue: T | null = null,
-): QueryResult<T> & {
+function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T> & {
 	_setValue: (value: T) => void;
 	_setError: (error: Error) => void;
 } {
@@ -136,9 +134,9 @@ describe("useQuery", () => {
 
 describe("useMutation", () => {
 	test("executes mutation and returns result", async () => {
-		const mutationFn = async (
-			input: { name: string },
-		): Promise<MutationResult<{ id: string; name: string }>> => {
+		const mutationFn = async (input: { name: string }): Promise<
+			MutationResult<{ id: string; name: string }>
+		> => {
 			return { data: { id: "new-id", name: input.name } };
 		};
 
@@ -155,9 +153,9 @@ describe("useMutation", () => {
 	});
 
 	test("handles mutation error", async () => {
-		const mutationFn = async (
-			_input: { name: string },
-		): Promise<MutationResult<{ id: string }>> => {
+		const mutationFn = async (_input: { name: string }): Promise<
+			MutationResult<{ id: string }>
+		> => {
 			throw new Error("Mutation failed");
 		};
 
@@ -174,9 +172,9 @@ describe("useMutation", () => {
 	});
 
 	test("reset clears mutation state", async () => {
-		const mutationFn = async (
-			input: { name: string },
-		): Promise<MutationResult<{ id: string; name: string }>> => {
+		const mutationFn = async (input: { name: string }): Promise<
+			MutationResult<{ id: string; name: string }>
+		> => {
 			return { data: { id: "new-id", name: input.name } };
 		};
 

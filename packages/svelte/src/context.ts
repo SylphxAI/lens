@@ -4,8 +4,8 @@
  * Svelte context for Lens client injection.
  */
 
-import { getContext, setContext } from "svelte";
 import type { LensClient } from "@sylphx/lens-client";
+import { getContext, setContext } from "svelte";
 
 // =============================================================================
 // Client Context

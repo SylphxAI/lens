@@ -2,8 +2,8 @@
  * Tests for Signal Implementation (powered by @preact/signals-core)
  */
 
-import { describe, expect, test, mock } from "bun:test";
-import { signal, computed, effect, batch, isSignal, derive } from "./signal";
+import { describe, expect, mock, test } from "bun:test";
+import { batch, computed, derive, effect, isSignal, signal } from "./signal";
 
 describe("signal()", () => {
 	test("creates signal with initial value", () => {

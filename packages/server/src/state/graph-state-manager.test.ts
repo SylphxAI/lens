@@ -2,8 +2,12 @@
  * Tests for GraphStateManager
  */
 
-import { describe, it, expect, beforeEach, mock } from "bun:test";
-import { GraphStateManager, type StateClient, type StateUpdateMessage } from "./graph-state-manager";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import {
+	GraphStateManager,
+	type StateClient,
+	type StateUpdateMessage,
+} from "./graph-state-manager";
 
 describe("GraphStateManager", () => {
 	let manager: GraphStateManager;
@@ -188,7 +192,7 @@ describe("GraphStateManager", () => {
 			manager.emit("Post", "123", { content: longText });
 			mockClient.messages = [];
 
-			manager.emit("Post", "123", { content: longText + " appended" });
+			manager.emit("Post", "123", { content: `${longText} appended` });
 
 			// Should use delta for efficient transfer
 			const update = mockClient.messages[0].updates.content;

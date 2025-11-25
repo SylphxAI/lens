@@ -5,9 +5,9 @@
  * Enables minimal re-renders and efficient server subscriptions.
  */
 
-import { signal, computed, type Signal, type WritableSignal } from "../signals/signal";
 import type { Update } from "@sylphx/lens-core";
 import { applyUpdate } from "@sylphx/lens-core";
+import { type Signal, type WritableSignal, computed, signal } from "../signals/signal";
 
 // =============================================================================
 // Types

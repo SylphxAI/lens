@@ -10,10 +10,10 @@
  * - Reference counting and canDerive
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, expect, it } from "bun:test";
+import { type Update, applyUpdate, entity, mutation, query, t } from "@sylphx/lens-core";
 import { z } from "zod";
-import { entity, t, query, mutation, type Update, applyUpdate } from "@sylphx/lens-core";
-import { createServer, type WebSocketLike } from "../server/create";
+import { type WebSocketLike, createServer } from "../server/create";
 
 // =============================================================================
 // Test Fixtures
@@ -35,12 +35,12 @@ const Post = entity("Post", {
 });
 
 // Mock data
-let mockUsers = [
+const mockUsers = [
 	{ id: "user-1", name: "Alice", email: "alice@example.com", status: "online" },
 	{ id: "user-2", name: "Bob", email: "bob@example.com", status: "offline" },
 ];
 
-let mockPosts = [
+const mockPosts = [
 	{ id: "post-1", title: "Hello", content: "World", authorId: "user-1" },
 	{ id: "post-2", title: "Test", content: "Post", authorId: "user-1" },
 ];
@@ -65,7 +65,10 @@ function createMockClient(server: ReturnType<typeof createServer>) {
 			lastData: unknown;
 		}
 	>();
-	const pending = new Map<string, { resolve: (data: unknown) => void; reject: (error: Error) => void }>();
+	const pending = new Map<
+		string,
+		{ resolve: (data: unknown) => void; reject: (error: Error) => void }
+	>();
 
 	let messageIdCounter = 0;
 	const nextId = () => `msg_${++messageIdCounter}`;
@@ -164,7 +167,12 @@ function createMockClient(server: ReturnType<typeof createServer>) {
 				},
 				updateFields: (add?: string[], remove?: string[]) => {
 					ws.onmessage?.({
-						data: JSON.stringify({ type: "updateFields", id, addFields: add, removeFields: remove }),
+						data: JSON.stringify({
+							type: "updateFields",
+							id,
+							addFields: add,
+							removeFields: remove,
+						}),
 					});
 				},
 			};
@@ -258,7 +266,10 @@ describe("E2E - Basic Operations", () => {
 		});
 
 		const client = createMockClient(server);
-		const result = await client.mutate("createUser", { name: "Charlie", email: "charlie@example.com" });
+		const result = await client.mutate("createUser", {
+			name: "Charlie",
+			email: "charlie@example.com",
+		});
 		expect(result).toMatchObject({ name: "Charlie", email: "charlie@example.com" });
 	});
 });

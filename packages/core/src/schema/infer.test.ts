@@ -6,18 +6,17 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { t } from "./types";
-import { entity, createSchema, hasMany, hasOne, belongsTo } from "./define";
+import { belongsTo, createSchema, entity, hasMany, hasOne } from "./define";
 import type {
+	CreateInput,
 	InferEntity,
 	InferScalar,
-	InferSelected,
-	Select,
-	ScalarFields,
 	RelationFields,
-	CreateInput,
+	ScalarFields,
+	Select,
 	UpdateInput,
 } from "./infer";
+import { t } from "./types";
 
 // =============================================================================
 // Test Entities (using new entity() API)

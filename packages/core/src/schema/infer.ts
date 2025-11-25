@@ -102,8 +102,10 @@ export type InferEntity<E extends EntityDefinition, S extends SchemaDefinition =
 };
 
 /** Infer field type (scalar or relation) */
-export type InferFieldType<F extends FieldDefinition, S extends SchemaDefinition> =
-	IsRelation<F> extends true ? InferRelationType<F, S> : InferScalarWithNullable<F>;
+export type InferFieldType<
+	F extends FieldDefinition,
+	S extends SchemaDefinition,
+> = IsRelation<F> extends true ? InferRelationType<F, S> : InferScalarWithNullable<F>;
 
 /** Infer scalar type with nullable support */
 export type InferScalarWithNullable<F extends FieldType> = F extends { _nullable: true }
@@ -111,9 +113,9 @@ export type InferScalarWithNullable<F extends FieldType> = F extends { _nullable
 	: InferScalar<F>;
 
 /** Infer relation type, resolving to target entity if schema provided */
-export type InferRelationType<F extends FieldDefinition, S extends SchemaDefinition> = [
-	S,
-] extends [never]
+export type InferRelationType<F extends FieldDefinition, S extends SchemaDefinition> = [S] extends [
+	never,
+]
 	? // No schema context - return placeholder
 		F extends HasManyType<infer Target>
 		? Array<{ __entity: Target }>
@@ -215,10 +217,7 @@ export type InferSchemaEntities<S extends SchemaDefinition> = {
 export type EntityNames<S extends SchemaDefinition> = keyof S & string;
 
 /** Get entity type by name */
-export type EntityType<S extends SchemaDefinition, Name extends keyof S> = InferEntity<
-	S[Name],
-	S
->;
+export type EntityType<S extends SchemaDefinition, Name extends keyof S> = InferEntity<S[Name], S>;
 
 // =============================================================================
 // Input Types (for mutations)
@@ -250,13 +249,15 @@ type OptionalScalarFields<E extends EntityDefinition> = {
 };
 
 /** Create input type with proper optional handling */
-export type CreateInput<E extends EntityDefinition, S extends SchemaDefinition = never> =
-	RequiredScalarFields<E> &
-		OptionalScalarFields<E> & {
-			[K in RelationFields<E>]?: E[K] extends BelongsToType<string>
-				? string // Foreign key ID
-				: never;
-		};
+export type CreateInput<
+	E extends EntityDefinition,
+	S extends SchemaDefinition = never,
+> = RequiredScalarFields<E> &
+	OptionalScalarFields<E> & {
+		[K in RelationFields<E>]?: E[K] extends BelongsToType<string>
+			? string // Foreign key ID
+			: never;
+	};
 
 /** Update input type (id required, all else optional) */
 export type UpdateInput<E extends EntityDefinition, S extends SchemaDefinition = never> = {
@@ -602,10 +603,9 @@ export type CreateInputWithRelations<
 };
 
 /** Type-safe update input with relation mutations */
-export type UpdateInputWithRelations<
-	E extends EntityDefinition,
-	S extends SchemaDefinition,
-> = { id: string } & Partial<Omit<CreateInput<E, S>, "id">> & {
+export type UpdateInputWithRelations<E extends EntityDefinition, S extends SchemaDefinition> = {
+	id: string;
+} & Partial<Omit<CreateInput<E, S>, "id">> & {
 		[K in RelationFields<E>]?: E[K] extends HasManyType<infer Target>
 			? Target extends keyof S
 				? ManyRelationInput<S[Target], S>

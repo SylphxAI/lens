@@ -14,13 +14,13 @@
 
 import {
 	createClient,
+	effect,
 	// Links (middleware chain)
 	loggerLink,
 	retryLink,
-	websocketLink,
 	// Reactive utilities
 	signal,
-	effect,
+	websocketLink,
 } from "@lens/client";
 
 // TYPE-only import from server!

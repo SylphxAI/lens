@@ -5,7 +5,7 @@
  * Tracks which fields are subscribed and handles ref counting.
  */
 
-import type { Update, EntityKey } from "@sylphx/lens-core";
+import type { EntityKey, Update } from "@sylphx/lens-core";
 import { makeEntityKey, parseEntityKey } from "@sylphx/lens-core";
 import { EntitySignal } from "./entity-signal";
 

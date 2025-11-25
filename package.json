@@ -4,9 +4,7 @@
 	"private": true,
 	"description": "Type-safe, real-time API framework",
 	"type": "module",
-	"workspaces": [
-		"packages/*"
-	],
+	"workspaces": ["packages/*"],
 	"scripts": {
 		"build": "bun run --filter '*' build",
 		"test": "bun run --filter '*' test",
@@ -25,16 +23,7 @@
 		"@types/bun": "latest",
 		"typescript": "^5.9.3"
 	},
-	"keywords": [
-		"typescript",
-		"type-safe",
-		"real-time",
-		"api",
-		"lens",
-		"zod",
-		"graphql",
-		"trpc"
-	],
+	"keywords": ["typescript", "type-safe", "real-time", "api", "lens", "zod", "graphql", "trpc"],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"repository": {

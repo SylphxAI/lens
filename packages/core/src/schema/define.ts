@@ -33,9 +33,9 @@
  * ```
  */
 
-import type { EntityDefinition, FieldDefinition } from "./types";
-import { HasOneType, HasManyType, BelongsToType } from "./types";
 import { Schema } from "./create";
+import type { EntityDefinition } from "./types";
+import { BelongsToType, HasManyType, HasOneType } from "./types";
 
 // =============================================================================
 // Field Accessor Helper (Proxy-based field extraction)
@@ -74,7 +74,10 @@ function extractFieldName<T>(accessor: (entity: T) => unknown): string {
 const ENTITY_SYMBOL = Symbol("lens:entity");
 
 /** Entity definition with name and fields */
-export interface EntityDef<Name extends string = string, Fields extends EntityDefinition = EntityDefinition> {
+export interface EntityDef<
+	Name extends string = string,
+	Fields extends EntityDefinition = EntityDefinition,
+> {
 	[ENTITY_SYMBOL]: true;
 	/** Entity name (injected from export key if not provided) */
 	_name?: Name;
@@ -120,7 +123,9 @@ export interface EntityDef<Name extends string = string, Fields extends EntityDe
  * export const entities = { User, Post };
  * ```
  */
-export function defineEntity<Fields extends EntityDefinition>(fields: Fields): EntityDef<string, Fields>;
+export function defineEntity<Fields extends EntityDefinition>(
+	fields: Fields,
+): EntityDef<string, Fields>;
 export function defineEntity<Name extends string, Fields extends EntityDefinition>(
 	name: Name,
 	fields: Fields,

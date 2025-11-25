@@ -2,9 +2,9 @@
  * Tests for Svelte Stores
  */
 
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
-import { query, mutation, lazyQuery } from "./stores";
+import { lazyQuery, mutation, query } from "./stores";
 
 // =============================================================================
 // Mock QueryResult
@@ -25,7 +25,9 @@ function createMockQueryResult<T>(initialData: T | null = null) {
 		): Promise<R1 | R2> => {
 			// If already resolved/rejected, return immediately
 			if (resolvedValue !== null) {
-				return Promise.resolve(onFulfilled ? onFulfilled(resolvedValue) : (resolvedValue as unknown as R1));
+				return Promise.resolve(
+					onFulfilled ? onFulfilled(resolvedValue) : (resolvedValue as unknown as R1),
+				);
 			}
 			if (rejectedError !== null) {
 				if (onRejected) {

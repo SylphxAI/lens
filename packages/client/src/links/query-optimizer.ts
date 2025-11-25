@@ -61,11 +61,7 @@ interface FieldCache {
  * ```
  */
 export function queryOptimizerLink(options: QueryOptimizerOptions = {}): Link {
-	const {
-		deduplication = true,
-		incrementalFetch = true,
-		ttl = 5 * 60 * 1000,
-	} = options;
+	const { deduplication = true, incrementalFetch = true, ttl = 5 * 60 * 1000 } = options;
 
 	// Field-level cache: entity:id -> FieldCache
 	const fieldCache = new Map<string, FieldCache>();
@@ -119,9 +115,7 @@ export function queryOptimizerLink(options: QueryOptimizerOptions = {}): Link {
 
 				// Scenario 2: Partial overlap (Incremental Fetching)
 				if (incrementalFetch) {
-					const missingFields = requestedFields.filter(
-						(f) => !cachedFields.includes(f),
-					);
+					const missingFields = requestedFields.filter((f) => !cachedFields.includes(f));
 
 					if (missingFields.length > 0 && missingFields.length < requestedFields.length) {
 						// Fetch only missing fields

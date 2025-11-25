@@ -2,10 +2,10 @@
  * @sylphx/lens-client - Shared Utilities Tests
  */
 
-import { describe, it, expect, beforeEach, mock } from "bun:test";
-import { makeQueryKey, makeQueryKeyWithFields, parseQueryKey } from "./keys";
+import { describe, expect, it } from "bun:test";
 import { BatchScheduler } from "./batching";
 import { RequestDeduplicator } from "./dedup";
+import { makeQueryKey, makeQueryKeyWithFields, parseQueryKey } from "./keys";
 
 // =============================================================================
 // Key Utilities Tests

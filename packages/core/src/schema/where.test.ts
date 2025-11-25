@@ -5,17 +5,10 @@
  * These are compile-time type tests - if they compile, the types are correct.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
+import { belongsTo, createSchema, entity, hasMany } from "./define";
+import type { CreateInput, OrderByInput, Select, UpdateInput, WhereInput } from "./infer";
 import { t } from "./types";
-import { entity, createSchema, hasMany, belongsTo } from "./define";
-import type {
-	WhereInput,
-	OrderByInput,
-	InferEntity,
-	Select,
-	CreateInput,
-	UpdateInput,
-} from "./infer";
 
 // =============================================================================
 // Test Entities (using new entity() API)

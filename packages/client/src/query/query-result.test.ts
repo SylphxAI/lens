@@ -2,9 +2,9 @@
  * Tests for QueryResult
  */
 
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
+import type { OperationContext } from "../links/types";
 import { createQueryResult } from "./query-result";
-import type { OperationContext, OperationResult, NextLink } from "../links/types";
 
 // Helper to create operation context
 function createOp(entity: string, op: string, input: unknown): OperationContext {
@@ -68,11 +68,11 @@ describe("QueryResult", () => {
 			const query = createQueryResult(operation, executeLink);
 
 			try {
-			await query;
-			expect(true).toBe(false); // Should not reach here
-		} catch (error: unknown) {
-			expect((error as Error).message).toBe("Not found");
-		}
+				await query;
+				expect(true).toBe(false); // Should not reach here
+			} catch (error: unknown) {
+				expect((error as Error).message).toBe("Not found");
+			}
 		});
 	});
 

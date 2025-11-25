@@ -4,16 +4,16 @@
  * Creates and validates schemas from definitions.
  */
 
+import type { InferEntity, InferSchemaEntities, InferSelected, Select } from "./infer";
 import type {
+	BelongsToType,
 	EntityDefinition,
 	FieldDefinition,
 	HasManyType,
 	HasOneType,
-	BelongsToType,
 	SchemaDefinition,
 } from "./types";
 import { isRelationType } from "./types";
-import type { InferEntity, InferSchemaEntities, Select, InferSelected } from "./infer";
 
 // =============================================================================
 // Type-Level Relation Validation
@@ -205,8 +205,9 @@ export class Schema<S extends SchemaDefinition> {
 // =============================================================================
 
 /** Helper type that returns never if there are invalid relations, otherwise returns true */
-type HasValidRelations<S extends SchemaDefinition> =
-	InvalidRelationTargets<S> extends never ? true : false;
+type HasValidRelations<S extends SchemaDefinition> = InvalidRelationTargets<S> extends never
+	? true
+	: false;
 
 /** Error type shown when relations are invalid */
 type RelationError<S extends SchemaDefinition> = InvalidRelationTargets<S> extends never

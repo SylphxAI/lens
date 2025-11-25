@@ -2,18 +2,11 @@
  * Tests for React Hooks (Operations-based API)
  */
 
-import { describe, expect, test, beforeEach } from "bun:test";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { describe, expect, test } from "bun:test";
 import { signal } from "@sylphx/lens-client";
-import {
-	useQuery,
-	useMutation,
-	useLazyQuery,
-	type UseQueryResult,
-	type UseMutationResult,
-	type UseLazyQueryResult,
-} from "./hooks";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { useLazyQuery, useMutation, useQuery } from "./hooks";
 
 // =============================================================================
 // Mock QueryResult
@@ -187,7 +180,9 @@ describe("useQuery", () => {
 
 describe("useMutation", () => {
 	test("executes mutation and returns result", async () => {
-		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
+		const mutationFn = async (input: { name: string }): Promise<
+			MutationResult<{ id: string; name: string }>
+		> => {
 			return {
 				data: { id: "new-id", name: input.name },
 			};
@@ -209,7 +204,9 @@ describe("useMutation", () => {
 	});
 
 	test("handles mutation error", async () => {
-		const mutationFn = async (_input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
+		const mutationFn = async (_input: { name: string }): Promise<
+			MutationResult<{ id: string; name: string }>
+		> => {
 			throw new Error("Mutation failed");
 		};
 
@@ -229,7 +226,9 @@ describe("useMutation", () => {
 
 	test("shows loading state during mutation", async () => {
 		let resolveMutation: ((value: MutationResult<{ id: string }>) => void) | null = null;
-		const mutationFn = async (_input: { name: string }): Promise<MutationResult<{ id: string }>> => {
+		const mutationFn = async (_input: { name: string }): Promise<
+			MutationResult<{ id: string }>
+		> => {
 			return new Promise((resolve) => {
 				resolveMutation = resolve;
 			});
@@ -256,7 +255,9 @@ describe("useMutation", () => {
 	});
 
 	test("reset clears mutation state", async () => {
-		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
+		const mutationFn = async (input: { name: string }): Promise<
+			MutationResult<{ id: string; name: string }>
+		> => {
 			return { data: { id: "new-id", name: input.name } };
 		};
 
@@ -293,7 +294,10 @@ describe("useLazyQuery", () => {
 	});
 
 	test("executes query when execute is called", async () => {
-		const mockQuery = createMockQueryResult<{ id: string; name: string }>({ id: "123", name: "John" });
+		const mockQuery = createMockQueryResult<{ id: string; name: string }>({
+			id: "123",
+			name: "John",
+		});
 
 		const { result } = renderHook(() => useLazyQuery(mockQuery));
 
@@ -330,7 +334,10 @@ describe("useLazyQuery", () => {
 	});
 
 	test("reset clears query state", async () => {
-		const mockQuery = createMockQueryResult<{ id: string; name: string }>({ id: "123", name: "John" });
+		const mockQuery = createMockQueryResult<{ id: string; name: string }>({
+			id: "123",
+			name: "John",
+		});
 
 		const { result } = renderHook(() => useLazyQuery(mockQuery));
 

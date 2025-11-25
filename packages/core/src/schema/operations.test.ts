@@ -5,32 +5,31 @@
  * These are compile-time type tests - if they compile, the types are correct.
  */
 
-import { describe, it, expect } from "bun:test";
-import { t } from "./types";
-import { entity, createSchema, hasMany, hasOne, belongsTo } from "./define";
+import { describe, expect, it } from "bun:test";
+import { belongsTo, createSchema, entity, hasMany, hasOne } from "./define";
 import type {
 	// Aggregation
 	AggregateInput,
-	AggregateResult,
 	CountInput,
-	GroupByInput,
-	NumericFields,
-	// Batch operations
-	CreateManyInput,
-	UpdateManyInput,
-	DeleteManyInput,
 	// Relation mutations
 	CreateInputWithRelations,
-	UpdateInputWithRelations,
-	SingleRelationInput,
-	ManyRelationInput,
+	// Batch operations
+	CreateManyInput,
+	DeleteManyInput,
 	// Find types
 	FindFirstInput,
-	FindUniqueInput,
 	FindManyInput,
+	FindUniqueInput,
+	GroupByInput,
+	ManyRelationInput,
+	NumericFields,
+	SingleRelationInput,
+	UpdateInputWithRelations,
+	UpdateManyInput,
 	UpsertInput,
 	WhereUniqueInput,
 } from "./infer";
+import { t } from "./types";
 
 // =============================================================================
 // Test Entities (using new entity() API)
@@ -213,10 +212,7 @@ describe("Batch operation types", () => {
 
 describe("Relation mutation types", () => {
 	it("SingleRelationInput supports connect", () => {
-		type ProfileRelation = SingleRelationInput<
-			(typeof schema)["definition"]["Profile"],
-			Def
-		>;
+		type ProfileRelation = SingleRelationInput<(typeof schema)["definition"]["Profile"], Def>;
 
 		const connect: ProfileRelation = {
 			connect: { id: "profile-123" },
@@ -225,10 +221,7 @@ describe("Relation mutation types", () => {
 	});
 
 	it("SingleRelationInput supports create", () => {
-		type ProfileRelation = SingleRelationInput<
-			(typeof schema)["definition"]["Profile"],
-			Def
-		>;
+		type ProfileRelation = SingleRelationInput<(typeof schema)["definition"]["Profile"], Def>;
 
 		const create: ProfileRelation = {
 			create: {
@@ -239,10 +232,7 @@ describe("Relation mutation types", () => {
 	});
 
 	it("SingleRelationInput supports connectOrCreate", () => {
-		type ProfileRelation = SingleRelationInput<
-			(typeof schema)["definition"]["Profile"],
-			Def
-		>;
+		type ProfileRelation = SingleRelationInput<(typeof schema)["definition"]["Profile"], Def>;
 
 		const connectOrCreate: ProfileRelation = {
 			connectOrCreate: {
@@ -254,10 +244,7 @@ describe("Relation mutation types", () => {
 	});
 
 	it("SingleRelationInput supports disconnect", () => {
-		type ProfileRelation = SingleRelationInput<
-			(typeof schema)["definition"]["Profile"],
-			Def
-		>;
+		type ProfileRelation = SingleRelationInput<(typeof schema)["definition"]["Profile"], Def>;
 
 		const disconnect: ProfileRelation = {
 			disconnect: true,
@@ -300,9 +287,7 @@ describe("Relation mutation types", () => {
 
 		const createMany: PostRelation = {
 			createMany: {
-				data: [
-					{ title: "Post 1", content: "Content 1", views: 0, rating: 0, published: true },
-				],
+				data: [{ title: "Post 1", content: "Content 1", views: 0, rating: 0, published: true }],
 				skipDuplicates: true,
 			},
 		};
@@ -337,9 +322,7 @@ describe("Relation mutation types", () => {
 			role: "user",
 			// Relation mutations
 			posts: {
-				create: [
-					{ title: "First Post", content: "Hello", views: 0, rating: 0, published: true },
-				],
+				create: [{ title: "First Post", content: "Hello", views: 0, rating: 0, published: true }],
 			},
 			profile: {
 				create: { bio: "My bio" },

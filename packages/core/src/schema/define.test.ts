@@ -4,10 +4,10 @@
  * Tests for the Drizzle-style API that uses direct entity references.
  */
 
-import { describe, it, expect } from "bun:test";
-import { t } from "./types";
-import { defineEntity, createSchema, hasMany, hasOne, belongsTo } from "./define";
+import { describe, expect, it } from "bun:test";
+import { belongsTo, createSchema, defineEntity, hasMany, hasOne } from "./define";
 import type { InferEntity } from "./infer";
+import { t } from "./types";
 
 // =============================================================================
 // Test: defineEntity
@@ -178,7 +178,10 @@ describe("Type inference with defineEntity", () => {
 		});
 
 		// Type-level test
-		type UserType = InferEntity<(typeof schema)["definition"]["User"], (typeof schema)["definition"]>;
+		type UserType = InferEntity<
+			(typeof schema)["definition"]["User"],
+			(typeof schema)["definition"]
+		>;
 
 		const user: UserType = {
 			id: "1",

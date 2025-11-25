@@ -6,12 +6,10 @@
  */
 
 import {
-	signal as preactSignal,
+	batch as preactBatch,
 	computed as preactComputed,
 	effect as preactEffect,
-	batch as preactBatch,
-	type Signal as PreactSignal,
-	type ReadonlySignal as PreactReadonlySignal,
+	signal as preactSignal,
 } from "@preact/signals-core";
 
 // =============================================================================
@@ -149,9 +147,6 @@ export function toPromise<T>(sig: Signal<T>): Promise<T> {
 /**
  * Create a signal that derives from multiple signals
  */
-export function derive<T, U>(
-	signals: Signal<T>[],
-	fn: (values: T[]) => U,
-): Signal<U> {
+export function derive<T, U>(signals: Signal<T>[], fn: (values: T[]) => U): Signal<U> {
 	return computed(() => fn(signals.map((s) => s.value)));
 }

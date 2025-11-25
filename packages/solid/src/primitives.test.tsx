@@ -3,17 +3,15 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { createRoot, createSignal } from "solid-js";
-import { createQuery, createMutation, createLazyQuery } from "./primitives";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { createRoot } from "solid-js";
+import { createLazyQuery, createMutation, createQuery } from "./primitives";
 
 // =============================================================================
 // Mock QueryResult
 // =============================================================================
 
-function createMockQueryResult<T>(
-	initialValue: T | null = null,
-): QueryResult<T> & {
+function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T> & {
 	_setValue: (value: T) => void;
 	_setError: (error: Error) => void;
 } {
@@ -145,9 +143,9 @@ describe("createMutation", () => {
 	test("executes mutation and returns result", async () => {
 		await new Promise<void>((resolve) => {
 			createRoot(async (dispose) => {
-				const mutationFn = async (
-					input: { name: string },
-				): Promise<MutationResult<{ id: string; name: string }>> => {
+				const mutationFn = async (input: { name: string }): Promise<
+					MutationResult<{ id: string; name: string }>
+				> => {
 					return { data: { id: "new-id", name: input.name } };
 				};
 
@@ -171,9 +169,9 @@ describe("createMutation", () => {
 	test("handles mutation error", async () => {
 		await new Promise<void>((resolve) => {
 			createRoot(async (dispose) => {
-				const mutationFn = async (
-					_input: { name: string },
-				): Promise<MutationResult<{ id: string }>> => {
+				const mutationFn = async (_input: { name: string }): Promise<
+					MutationResult<{ id: string }>
+				> => {
 					throw new Error("Mutation failed");
 				};
 
@@ -197,9 +195,9 @@ describe("createMutation", () => {
 	test("reset clears mutation state", async () => {
 		await new Promise<void>((resolve) => {
 			createRoot(async (dispose) => {
-				const mutationFn = async (
-					input: { name: string },
-				): Promise<MutationResult<{ id: string; name: string }>> => {
+				const mutationFn = async (input: { name: string }): Promise<
+					MutationResult<{ id: string; name: string }>
+				> => {
 					return { data: { id: "new-id", name: input.name } };
 				};
 

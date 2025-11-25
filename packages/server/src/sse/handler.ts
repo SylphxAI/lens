@@ -5,7 +5,7 @@
  * Connects SSE streams to GraphStateManager.
  */
 
-import { GraphStateManager, type StateClient } from "../state/graph-state-manager";
+import type { GraphStateManager, StateClient } from "../state/graph-state-manager";
 
 // =============================================================================
 // Types
@@ -54,7 +54,10 @@ export interface SSEClientInfo {
 export class SSEHandler {
 	private stateManager: GraphStateManager;
 	private heartbeatInterval: number;
-	private clients = new Map<string, { controller: ReadableStreamDefaultController; heartbeat: ReturnType<typeof setInterval> }>();
+	private clients = new Map<
+		string,
+		{ controller: ReadableStreamDefaultController; heartbeat: ReturnType<typeof setInterval> }
+	>();
 	private clientCounter = 0;
 
 	constructor(config: SSEHandlerConfig) {
@@ -88,7 +91,9 @@ export class SSEHandler {
 				this.stateManager.addClient(stateClient);
 
 				// Send connected event
-				controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`));
+				controller.enqueue(
+					encoder.encode(`event: connected\ndata: ${JSON.stringify({ clientId })}\n\n`),
+				);
 
 				// Setup heartbeat
 				const heartbeat = setInterval(() => {
@@ -111,7 +116,7 @@ export class SSEHandler {
 			headers: {
 				"Content-Type": "text/event-stream",
 				"Cache-Control": "no-cache",
-				"Connection": "keep-alive",
+				Connection: "keep-alive",
 				"Access-Control-Allow-Origin": "*",
 			},
 		});
@@ -178,4 +183,3 @@ export class SSEHandler {
 export function createSSEHandler(config: SSEHandlerConfig): SSEHandler {
 	return new SSEHandler(config);
 }
-

@@ -2,7 +2,7 @@
  * Tests for httpLink with polling support
  */
 
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { httpLink } from "./http";
 import { createOperationContext } from "./types";
 

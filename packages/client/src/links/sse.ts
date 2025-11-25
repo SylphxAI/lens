@@ -5,8 +5,8 @@
  * Updated to support field-level subscriptions protocol.
  */
 
-import type { Link, LinkFn, OperationResult, Observable, Observer, Unsubscribable } from "./types";
-import type { SubscriptionTransport, ServerMessage, UpdateMessage } from "../reactive";
+import type { ServerMessage, SubscriptionTransport, UpdateMessage } from "../reactive";
+import type { Link, LinkFn, Observable, Observer, OperationResult, Unsubscribable } from "./types";
 
 export interface SSELinkOptions {
 	/** Base URL for HTTP operations */
@@ -14,7 +14,9 @@ export interface SSELinkOptions {
 	/** SSE endpoint URL (defaults to url + '/stream') */
 	sseUrl?: string;
 	/** Request headers */
-	headers?: Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
+	headers?:
+		| Record<string, string>
+		| (() => Record<string, string> | Promise<Record<string, string>>);
 	/** Custom fetch implementation */
 	fetch?: typeof fetch;
 	/** Reconnection delay in ms (default: 3000) */
@@ -423,16 +425,11 @@ export function createSSETransport(options: SSELinkOptions): SSESubscriptionTran
  * ```
  */
 export function sseLink(options: SSELinkOptions): Link {
-	const {
-		url,
-		headers = {},
-		fetch: customFetch = fetch,
-	} = options;
+	const { url, headers = {}, fetch: customFetch = fetch } = options;
 
 	return (): LinkFn => {
 		return async (op, _next): Promise<OperationResult> => {
-			const resolvedHeaders =
-				typeof headers === "function" ? await headers() : headers;
+			const resolvedHeaders = typeof headers === "function" ? await headers() : headers;
 
 			// Mutations use HTTP POST
 			if (op.type === "mutation") {

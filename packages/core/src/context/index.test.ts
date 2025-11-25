@@ -4,17 +4,17 @@
  * Tests for AsyncLocalStorage-based context.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import {
-	createContext,
-	useContext,
-	tryUseContext,
-	runWithContext,
-	runWithContextAsync,
 	createComposable,
 	createComposables,
-	hasContext,
+	createContext,
 	extendContext,
+	hasContext,
+	runWithContext,
+	runWithContextAsync,
+	tryUseContext,
+	useContext,
 } from "./index";
 
 // =============================================================================
@@ -248,9 +248,13 @@ describe("Real-world usage pattern", () => {
 	it("works with resolver pattern", async () => {
 		const ctx = createContext<AppContext>();
 
-		const posts = await runWithContextAsync(ctx, { db: mockDb, currentUser: mockUser }, async () => {
-			return getUserPosts();
-		});
+		const posts = await runWithContextAsync(
+			ctx,
+			{ db: mockDb, currentUser: mockUser },
+			async () => {
+				return getUserPosts();
+			},
+		);
 
 		expect(posts).toEqual(["result for: SELECT * FROM posts WHERE authorId = 'user-1'"]);
 	});

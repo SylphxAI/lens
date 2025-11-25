@@ -4,9 +4,9 @@
  * Demonstrates: Server setup with operations + type export for client
  */
 
-import { createUnifiedServer, type InferApi } from "@lens/server";
-import { User, Post, Comment, relations } from "./schema";
-import { queries, mutations } from "./operations";
+import { type InferApi, createUnifiedServer } from "@lens/server";
+import { mutations, queries } from "./operations";
+import { Comment, Post, User, relations } from "./schema";
 
 // =============================================================================
 // Mock Database (use Prisma/Drizzle in production)
@@ -15,15 +15,44 @@ import { queries, mutations } from "./operations";
 const db = {
 	user: {
 		data: new Map([
-			["1", { id: "1", name: "Alice", email: "alice@test.com", role: "admin" as const, createdAt: new Date() }],
-			["2", { id: "2", name: "Bob", email: "bob@test.com", role: "user" as const, createdAt: new Date() }],
-			["3", { id: "3", name: "Charlie", email: "charlie@test.com", role: "vip" as const, createdAt: new Date() }],
+			[
+				"1",
+				{
+					id: "1",
+					name: "Alice",
+					email: "alice@test.com",
+					role: "admin" as const,
+					createdAt: new Date(),
+				},
+			],
+			[
+				"2",
+				{
+					id: "2",
+					name: "Bob",
+					email: "bob@test.com",
+					role: "user" as const,
+					createdAt: new Date(),
+				},
+			],
+			[
+				"3",
+				{
+					id: "3",
+					name: "Charlie",
+					email: "charlie@test.com",
+					role: "vip" as const,
+					createdAt: new Date(),
+				},
+			],
 		]),
 		findUnique: async ({ where }: { where: { id: string } }) => db.user.data.get(where.id) ?? null,
 		findMany: async ({ where, take }: { where?: any; take?: number }) => {
 			let results = Array.from(db.user.data.values());
 			if (where?.name?.contains) {
-				results = results.filter((u) => u.name.toLowerCase().includes(where.name.contains.toLowerCase()));
+				results = results.filter((u) =>
+					u.name.toLowerCase().includes(where.name.contains.toLowerCase()),
+				);
 			}
 			if (where?.id?.in) {
 				results = results.filter((u) => where.id.in.includes(u.id));
@@ -51,8 +80,28 @@ const db = {
 	},
 	post: {
 		data: new Map([
-			["1", { id: "1", title: "Hello World", content: "First post!", published: true, authorId: "1", createdAt: new Date() }],
-			["2", { id: "2", title: "Lens Guide", content: "How to use Lens...", published: true, authorId: "1", createdAt: new Date() }],
+			[
+				"1",
+				{
+					id: "1",
+					title: "Hello World",
+					content: "First post!",
+					published: true,
+					authorId: "1",
+					createdAt: new Date(),
+				},
+			],
+			[
+				"2",
+				{
+					id: "2",
+					title: "Lens Guide",
+					content: "How to use Lens...",
+					published: true,
+					authorId: "1",
+					createdAt: new Date(),
+				},
+			],
 		]),
 		findUnique: async ({ where }: { where: { id: string } }) => db.post.data.get(where.id) ?? null,
 		findMany: async ({ where, orderBy, take }: { where?: any; orderBy?: any; take?: number }) => {

@@ -65,7 +65,11 @@ export function inProcessLink(options: InProcessLinkOptions): Link {
 
 				switch (op.op) {
 					case "get": {
-						const data = await resolvers.get(op.entity, input.id as string, input.select as Record<string, unknown>);
+						const data = await resolvers.get(
+							op.entity,
+							input.id as string,
+							input.select as Record<string, unknown>,
+						);
 						return { data };
 					}
 
@@ -109,15 +113,13 @@ export function inProcessLink(options: InProcessLinkOptions): Link {
 /**
  * Create in-process link from Lens server ExecutionEngine
  */
-export function createInProcessLink(
-	engine: {
-		executeGet: (entity: string, id: string, select?: unknown) => Promise<unknown>;
-		executeList: (entity: string, input: unknown) => Promise<unknown[]>;
-		executeCreate: (entity: string, data: unknown) => Promise<unknown>;
-		executeUpdate: (entity: string, id: string, data: unknown) => Promise<unknown>;
-		executeDelete: (entity: string, id: string) => Promise<void>;
-	},
-): Link {
+export function createInProcessLink(engine: {
+	executeGet: (entity: string, id: string, select?: unknown) => Promise<unknown>;
+	executeList: (entity: string, input: unknown) => Promise<unknown[]>;
+	executeCreate: (entity: string, data: unknown) => Promise<unknown>;
+	executeUpdate: (entity: string, id: string, data: unknown) => Promise<unknown>;
+	executeDelete: (entity: string, id: string) => Promise<void>;
+}): Link {
 	return inProcessLink({
 		resolvers: {
 			get: (entity, id, select) => engine.executeGet(entity, id, select),

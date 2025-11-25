@@ -9,23 +9,23 @@
  */
 
 import {
-	type QueryDef,
-	type MutationDef,
-	type EntityResolvers,
-	type EntityResolversDefinition,
+	type ContextValue,
 	type EntityDef,
 	type EntityDefinition,
+	type EntityResolvers,
+	type EntityResolversDefinition,
+	type FieldType,
+	type MutationDef,
+	type QueryDef,
 	type RelationDef,
 	type RelationTypeWithForeignKey,
-	type ContextValue,
 	type Update,
-	type FieldType,
-	isQueryDef,
-	isMutationDef,
-	isBatchResolver,
 	createContext,
-	runWithContext,
 	createUpdate,
+	isBatchResolver,
+	isMutationDef,
+	isQueryDef,
+	runWithContext,
 } from "@sylphx/lens-core";
 
 /** Selection object type for nested field selection */
@@ -33,7 +33,7 @@ export interface SelectionObject {
 	[key: string]: boolean | SelectionObject | { select: SelectionObject };
 }
 
-import { GraphStateManager, type StateClient } from "../state/graph-state-manager";
+import { GraphStateManager } from "../state/graph-state-manager";
 
 // =============================================================================
 // Types
@@ -50,7 +50,10 @@ export type QueriesMap = Record<string, QueryDef<unknown, unknown>>;
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
 
 /** Relations array type */
-export type RelationsArray = RelationDef<EntityDef<string, EntityDefinition>, Record<string, RelationTypeWithForeignKey>>[];
+export type RelationsArray = RelationDef<
+	EntityDef<string, EntityDefinition>,
+	Record<string, RelationTypeWithForeignKey>
+>[];
 
 /** Server configuration */
 export interface LensServerConfig<TContext extends ContextValue = ContextValue> {
@@ -196,7 +199,8 @@ interface ClientSubscription {
 // =============================================================================
 
 class DataLoader<K, V> {
-	private batch: Map<K, { resolve: (v: V | null) => void; reject: (e: Error) => void }[]> = new Map();
+	private batch: Map<K, { resolve: (v: V | null) => void; reject: (e: Error) => void }[]> =
+		new Map();
 	private scheduled = false;
 
 	constructor(private batchFn: (keys: K[]) => Promise<(V | null)[]>) {}
@@ -254,7 +258,8 @@ class LensServerImpl<
 	Q extends QueriesMap = QueriesMap,
 	M extends MutationsMap = MutationsMap,
 	TContext extends ContextValue = ContextValue,
-> implements LensServer {
+> implements LensServer
+{
 	private queries: Q;
 	private mutations: M;
 	private entities: EntitiesMap;
@@ -281,7 +286,7 @@ class LensServerImpl<
 		this.mutations = (config.mutations ?? {}) as M;
 		this.entities = config.entities ?? {};
 		this.resolvers = config.resolvers;
-		this.contextFactory = config.context ?? (() => ({} as TContext));
+		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
 
 		// Inject entity names from keys (if not already set)
@@ -453,7 +458,10 @@ class LensServerImpl<
 		}
 	}
 
-	private async executeSubscription(conn: ClientConnection, sub: ClientSubscription): Promise<void> {
+	private async executeSubscription(
+		conn: ClientConnection,
+		sub: ClientSubscription,
+	): Promise<void> {
 		const queryDef = this.queries[sub.operation];
 		if (!queryDef) {
 			throw new Error(`Query not found: ${sub.operation}`);
@@ -635,15 +643,14 @@ class LensServerImpl<
 			// If select is provided, inject it into input for executeQuery to process
 			let input = message.input;
 			if (message.select) {
-				input = { ...(message.input as object || {}), $select: message.select };
+				input = { ...((message.input as object) || {}), $select: message.select };
 			}
 
 			const result = await this.executeQuery(message.operation, input);
 
 			// Apply field selection if specified (for backward compatibility with simple field lists)
-			const selected = message.fields && !message.select
-				? this.applySelection(result, message.fields)
-				: result;
+			const selected =
+				message.fields && !message.select ? this.applySelection(result, message.fields) : result;
 
 			conn.ws.send(
 				JSON.stringify({
@@ -1115,7 +1122,11 @@ class LensServerImpl<
 		if (!fieldDef) return fieldName;
 
 		// Check if it's a relation type
-		if (fieldDef._type === "hasMany" || fieldDef._type === "hasOne" || fieldDef._type === "belongsTo") {
+		if (
+			fieldDef._type === "hasMany" ||
+			fieldDef._type === "hasOne" ||
+			fieldDef._type === "belongsTo"
+		) {
 			return (fieldDef as unknown as { _target: string })._target ?? fieldName;
 		}
 
@@ -1157,7 +1168,11 @@ class LensServerImpl<
 			}
 
 			// Relations: recursively serialize
-			if (fieldType._type === "hasMany" || fieldType._type === "belongsTo" || fieldType._type === "hasOne") {
+			if (
+				fieldType._type === "hasMany" ||
+				fieldType._type === "belongsTo" ||
+				fieldType._type === "hasOne"
+			) {
 				const targetEntity = (fieldType as { _target?: string })._target;
 				if (targetEntity && Array.isArray(value)) {
 					result[fieldName] = value.map((item) =>
@@ -1174,7 +1189,9 @@ class LensServerImpl<
 			// Scalar field - call serialize() if method exists
 			if (typeof (fieldType as { serialize?: (v: unknown) => unknown }).serialize === "function") {
 				try {
-					result[fieldName] = (fieldType as { serialize: (v: unknown) => unknown }).serialize(value);
+					result[fieldName] = (fieldType as { serialize: (v: unknown) => unknown }).serialize(
+						value,
+					);
 				} catch (error) {
 					console.warn(`Failed to serialize field ${entityName}.${fieldName}:`, error);
 					result[fieldName] = value;
@@ -1233,7 +1250,7 @@ class LensServerImpl<
 
 		// Execute entity resolvers for nested data
 		if (select && this.resolvers) {
-			result = await this.executeEntityResolvers(entityName, data, select) as T;
+			result = (await this.executeEntityResolvers(entityName, data, select)) as T;
 		}
 
 		// Apply field selection
@@ -1249,10 +1266,7 @@ class LensServerImpl<
 		return result;
 	}
 
-	private computeUpdates(
-		oldData: unknown,
-		newData: unknown,
-	): Record<string, Update> | null {
+	private computeUpdates(oldData: unknown, newData: unknown): Record<string, Update> | null {
 		if (!oldData || !newData) return null;
 		if (typeof oldData !== "object" || typeof newData !== "object") return null;
 
@@ -1305,9 +1319,7 @@ class LensServerImpl<
 // =============================================================================
 
 function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
-	return (
-		value !== null && typeof value === "object" && Symbol.asyncIterator in value
-	);
+	return value !== null && typeof value === "object" && Symbol.asyncIterator in value;
 }
 
 // =============================================================================

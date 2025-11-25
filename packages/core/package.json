@@ -17,16 +17,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"schema",
-		"types",
-		"typescript"
-	],
+	"files": ["dist", "src"],
+	"keywords": ["lens", "schema", "types", "typescript"],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"devDependencies": {

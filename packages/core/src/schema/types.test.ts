@@ -4,22 +4,22 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-	t,
-	IdType,
-	StringType,
-	IntType,
-	FloatType,
+	ArrayType,
+	BelongsToType,
 	BooleanType,
 	DateTimeType,
 	EnumType,
-	ObjectType,
-	ArrayType,
-	HasOneType,
+	FloatType,
 	HasManyType,
-	BelongsToType,
+	HasOneType,
+	IdType,
+	IntType,
+	ObjectType,
+	StringType,
+	isHasManyType,
 	isRelationType,
 	isScalarType,
-	isHasManyType,
+	t,
 } from "./types";
 
 describe("Type Builders (t.*)", () => {

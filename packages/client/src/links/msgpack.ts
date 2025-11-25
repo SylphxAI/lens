@@ -6,7 +6,7 @@
  * binary data, timestamps, and large datasets.
  */
 
-import { encode, decode } from "@msgpack/msgpack";
+import { decode, encode } from "@msgpack/msgpack";
 import type { Link } from "./types";
 
 export interface MsgpackLinkOptions {
@@ -78,9 +78,7 @@ export function msgpackLink(options: MsgpackLinkOptions = {}): Link {
 					const encoded = encode(op.input);
 
 					// Convert to base64 if not binary mode
-					const serialized = binaryMode
-						? encoded.buffer
-						: Buffer.from(encoded).toString("base64");
+					const serialized = binaryMode ? encoded.buffer : Buffer.from(encoded).toString("base64");
 
 					modifiedOp = {
 						...op,

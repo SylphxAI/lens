@@ -4,7 +4,7 @@
  * Tests for entityResolvers() function.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { entityResolvers, isBatchResolver, isEntityResolvers } from "./index";
 
 // =============================================================================

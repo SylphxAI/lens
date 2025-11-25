@@ -5,8 +5,8 @@
  * Also includes WebSocketSubscriptionTransport for reactive systems.
  */
 
-import type { SubscriptionTransport, ServerMessage, UpdateMessage } from "../reactive";
-import type { Link, LinkFn, OperationContext, OperationResult, Observable, Observer, Unsubscribable } from "./types";
+import type { ServerMessage, SubscriptionTransport, UpdateMessage } from "../reactive";
+import type { Link, LinkFn, Observable, Observer, OperationResult, Unsubscribable } from "./types";
 
 // =============================================================================
 // Types

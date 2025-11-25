@@ -9,22 +9,18 @@
  * - Request batching
  */
 
-import type { QueryDef, MutationDef, Update, OptimisticDSL } from "@sylphx/lens-core";
+import type { MutationDef, OptimisticDSL, QueryDef, Update } from "@sylphx/lens-core";
 import { applyUpdate, isOptimisticDSL, normalizeOptimisticDSL } from "@sylphx/lens-core";
-import { ReactiveStore, type EntityState } from "../store/reactive-store";
-import { signal, computed, type Signal, type WritableSignal } from "../signals/signal";
-import {
-	makeQueryKey,
-	makeQueryKeyWithFields,
-	RequestDeduplicator,
-} from "../shared";
 import type {
 	Link,
 	LinkFn,
 	OperationContext as LinkOperationContext,
-	OperationResult,
 	NextLink,
+	OperationResult,
 } from "../links/types";
+import { RequestDeduplicator, makeQueryKey, makeQueryKeyWithFields } from "../shared";
+import { type Signal, type WritableSignal, signal } from "../signals/signal";
+import { ReactiveStore } from "../store/reactive-store";
 
 // =============================================================================
 // Types
@@ -54,7 +50,12 @@ export interface Transport {
 	): { unsubscribe: () => void; updateFields: (add?: string[], remove?: string[]) => void };
 
 	/** Send one-time query */
-	query(operation: string, input: unknown, fields?: string[] | "*", select?: SelectionObject): Promise<unknown>;
+	query(
+		operation: string,
+		input: unknown,
+		fields?: string[] | "*",
+		select?: SelectionObject,
+	): Promise<unknown>;
 
 	/** Send mutation */
 	mutate(operation: string, input: unknown): Promise<unknown>;
@@ -132,7 +133,10 @@ export interface LensClientConfig<
  * const client = createClient<Api>({ links: [...] });
  * ```
  */
-export interface ApiShape<Q extends QueriesMap = QueriesMap, M extends MutationsMap = MutationsMap> {
+export interface ApiShape<
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+> {
 	queries: Q;
 	mutations: M;
 }
@@ -610,7 +614,7 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 					sub.loading.value = false;
 				},
 			},
-			select,  // Pass SelectionObject for nested resolution
+			select, // Pass SelectionObject for nested resolution
 		);
 	}
 
@@ -640,7 +644,13 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 
 			// Check for Observable in meta (set by terminal links like httpLink with polling)
 			const observable = result.meta?.observable as
-				| { subscribe: (obs: { next: (v: unknown) => void; error: (e: Error) => void; complete: () => void }) => { unsubscribe: () => void } }
+				| {
+						subscribe: (obs: {
+							next: (v: unknown) => void;
+							error: (e: Error) => void;
+							complete: () => void;
+						}) => { unsubscribe: () => void };
+				  }
 				| undefined;
 
 			if (observable) {
@@ -755,7 +765,9 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			select: <S extends SelectionObject>(selection: S) => {
 				// Pass full SelectionObject, not just field names
 				// Type assertion needed as actual filtering happens server-side
-				return this.executeQuery<T>(operation, input, selection) as unknown as QueryResult<SelectedType<T, S>>;
+				return this.executeQuery<T>(operation, input, selection) as unknown as QueryResult<
+					SelectedType<T, S>
+				>;
 			},
 
 			then: async <TResult1 = T, TResult2 = never>(
@@ -880,7 +892,9 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		input: TInput,
 	): Promise<MutationResult<TOutput>> {
 		// Get mutation definition for optimistic support
-		const mutationDef = this.mutations[operation as keyof M] as MutationDef<TInput, TOutput> | undefined;
+		const mutationDef = this.mutations[operation as keyof M] as
+			| MutationDef<TInput, TOutput>
+			| undefined;
 
 		// Apply optimistic update (automatic by default)
 		let optId: string | undefined;
@@ -1300,7 +1314,9 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		};
 
 		// Add subscribe method for real-time
-		(accessor as unknown as Record<string, unknown>).subscribe = (callback?: (data: unknown) => void) => {
+		(accessor as unknown as Record<string, unknown>).subscribe = (
+			callback?: (data: unknown) => void,
+		) => {
 			return this.executeQuery(name, undefined).subscribe(callback);
 		};
 

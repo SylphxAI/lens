@@ -4,8 +4,8 @@
  * SolidJS context for Lens client injection.
  */
 
-import { createContext, useContext, type ParentComponent } from "solid-js";
 import type { LensClient } from "@sylphx/lens-client";
+import { type ParentComponent, createContext, useContext } from "solid-js";
 
 // =============================================================================
 // Context
@@ -48,9 +48,7 @@ export interface LensProviderProps {
  */
 export const LensProvider: ParentComponent<LensProviderProps> = (props) => {
 	return (
-		<LensClientContext.Provider value={props.client}>
-			{props.children}
-		</LensClientContext.Provider>
+		<LensClientContext.Provider value={props.client}>{props.children}</LensClientContext.Provider>
 	);
 };
 

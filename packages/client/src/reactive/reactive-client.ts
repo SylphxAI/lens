@@ -8,22 +8,18 @@
  */
 
 import type {
-	SchemaDefinition,
-	InferEntity,
-	Select,
-	InferSelected,
 	CreateInput,
-	WhereInput,
-	OrderByInput,
-	CursorInput,
 	CreateManyResult,
-	UpdateManyResult,
+	CursorInput,
 	DeleteManyResult,
+	InferEntity,
+	InferSelected,
+	OrderByInput,
+	SchemaDefinition,
+	Select,
+	UpdateManyResult,
+	WhereInput,
 } from "@sylphx/lens-core";
-import { EntitySignal } from "./entity-signal";
-import { SubscriptionManager, type SubscriptionTransport } from "./subscription-manager";
-import { QueryResolver, type QueryTransport } from "./query-resolver";
-import { type Signal, computed } from "../signals/signal";
 import {
 	type Link,
 	type LinkFn,
@@ -31,6 +27,10 @@ import {
 	composeLinks,
 	createOperationContext,
 } from "../links";
+import { type Signal, computed } from "../signals/signal";
+import type { EntitySignal } from "./entity-signal";
+import { QueryResolver, type QueryTransport } from "./query-resolver";
+import { SubscriptionManager, type SubscriptionTransport } from "./subscription-manager";
 
 // =============================================================================
 // Types
@@ -72,9 +72,7 @@ export type InferQueryResult<
 	S extends SchemaDefinition,
 	E extends keyof S,
 	Sel extends Select<S[E], S> | undefined,
-> = Sel extends Select<S[E], S>
-	? InferSelected<S[E], Sel, S>
-	: InferEntity<S[E], S>;
+> = Sel extends Select<S[E], S> ? InferSelected<S[E], Sel, S> : InferEntity<S[E], S>;
 
 /** Mutation result */
 export interface MutationResult<T> {
@@ -140,10 +138,16 @@ export interface ReactiveEntityAccessor<
 	delete(id: string): Promise<void>;
 
 	/** Batch create */
-	createMany(args: { data: CreateInput<S[E], S>[]; skipDuplicates?: boolean }): Promise<CreateManyResult>;
+	createMany(args: {
+		data: CreateInput<S[E], S>[];
+		skipDuplicates?: boolean;
+	}): Promise<CreateManyResult>;
 
 	/** Batch update */
-	updateMany(args: { where: WhereInput<S[E]>; data: Partial<Omit<CreateInput<S[E], S>, "id">> }): Promise<UpdateManyResult>;
+	updateMany(args: {
+		where: WhereInput<S[E]>;
+		data: Partial<Omit<CreateInput<S[E], S>, "id">>;
+	}): Promise<UpdateManyResult>;
 
 	/** Batch delete */
 	deleteMany(args: { where: WhereInput<S[E]> }): Promise<DeleteManyResult>;
@@ -244,7 +248,11 @@ class OptimisticTracker {
 
 		// Restore previous data
 		if (entry.previousData) {
-			const sub = this.subscriptions.getOrCreateSubscription(entry.entity, entry.id, entry.previousData);
+			const sub = this.subscriptions.getOrCreateSubscription(
+				entry.entity,
+				entry.id,
+				entry.previousData,
+			);
 			sub.signal.setFields(entry.previousData);
 		} else if (entry.operation === "create") {
 			// Was a create - remove the optimistic entity completely
@@ -262,10 +270,7 @@ class OptimisticTracker {
 /**
  * Create reactive entity accessor
  */
-function createReactiveEntityAccessor<
-	S extends SchemaDefinition,
-	E extends keyof S & string,
->(
+function createReactiveEntityAccessor<S extends SchemaDefinition, E extends keyof S & string>(
 	entityName: E,
 	subscriptions: SubscriptionManager,
 	resolver: QueryResolver,
@@ -509,13 +514,19 @@ function createReactiveEntityAccessor<
 			}
 		},
 
-		async createMany(args: { data: CreateInput<S[E], S>[]; skipDuplicates?: boolean }): Promise<CreateManyResult> {
+		async createMany(args: {
+			data: CreateInput<S[E], S>[];
+			skipDuplicates?: boolean;
+		}): Promise<CreateManyResult> {
 			const result = await execute("mutation", "createMany", args);
 			if (result.error) throw result.error;
 			return result.data as CreateManyResult;
 		},
 
-		async updateMany(args: { where: WhereInput<S[E]>; data: Partial<Omit<CreateInput<S[E], S>, "id">> }): Promise<UpdateManyResult> {
+		async updateMany(args: {
+			where: WhereInput<S[E]>;
+			data: Partial<Omit<CreateInput<S[E], S>, "id">>;
+		}): Promise<UpdateManyResult> {
 			const result = await execute("mutation", "updateMany", args);
 			if (result.error) throw result.error;
 			return result.data as UpdateManyResult;

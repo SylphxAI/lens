@@ -2,7 +2,7 @@
  * Tests for Query Optimizer Link
  */
 
-import { describe, expect, test, mock } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { queryOptimizerLink } from "./query-optimizer";
 import { createOperationContext } from "./types";
 

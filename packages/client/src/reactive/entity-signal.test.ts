@@ -2,9 +2,9 @@
  * @sylphx/lens-client - EntitySignal Tests
  */
 
-import { describe, it, expect, mock } from "bun:test";
-import { EntitySignal, createEntitySignal, deriveEntitySignal } from "./entity-signal";
+import { describe, expect, it, mock } from "bun:test";
 import { effect } from "../signals/signal";
+import { EntitySignal, createEntitySignal, deriveEntitySignal } from "./entity-signal";
 
 describe("EntitySignal", () => {
 	it("creates field-level signals from initial data", () => {
@@ -45,10 +45,7 @@ describe("EntitySignal", () => {
 
 	it("tracks field access", () => {
 		const onFieldAccess = mock(() => {});
-		const entity = new EntitySignal(
-			{ name: "John", bio: "Hello", age: 30 },
-			{ onFieldAccess },
-		);
+		const entity = new EntitySignal({ name: "John", bio: "Hello", age: 30 }, { onFieldAccess });
 
 		// Access name
 		const _ = entity.$.name.value;

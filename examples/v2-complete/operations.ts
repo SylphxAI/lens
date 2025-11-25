@@ -17,9 +17,9 @@
  *   - { updateMany: {...} }       → Cross-entity updates
  */
 
-import { query, mutation } from "@lens/core";
+import { mutation, query } from "@lens/core";
 import { z } from "zod";
-import { User, Post, Comment } from "./schema";
+import { Comment, Post, User } from "./schema";
 
 // =============================================================================
 // Queries - 讀取資料
@@ -50,7 +50,7 @@ export const searchUsers = query()
 		ctx.db.user.findMany({
 			where: { name: { contains: input.query } },
 			take: input.limit ?? 10,
-		})
+		}),
 	);
 
 /**
@@ -72,7 +72,7 @@ export const trendingPosts = query()
 			where: { published: true },
 			orderBy: { createdAt: "desc" },
 			take: input.limit,
-		})
+		}),
 	);
 
 // =============================================================================
@@ -91,7 +91,7 @@ export const updateUser = mutation()
 			name: z.string().optional(),
 			email: z.string().optional(),
 			avatar: z.string().optional(),
-		})
+		}),
 	)
 	.returns(User)
 	// .optimistic('merge') ← auto-derived from "updateUser"
@@ -99,7 +99,7 @@ export const updateUser = mutation()
 		ctx.db.user.update({
 			where: { id: input.id },
 			data: input,
-		})
+		}),
 	);
 
 /**
@@ -112,7 +112,7 @@ export const createPost = mutation()
 		z.object({
 			title: z.string(),
 			content: z.string(),
-		})
+		}),
 	)
 	.returns(Post)
 	.optimistic({ create: { published: false } }) // explicit: set extra field
@@ -122,7 +122,7 @@ export const createPost = mutation()
 				...input,
 				authorId: ctx.currentUser.id,
 			},
-		})
+		}),
 	);
 
 /**
@@ -136,7 +136,7 @@ export const updatePost = mutation()
 			id: z.string(),
 			title: z.string().optional(),
 			content: z.string().optional(),
-		})
+		}),
 	)
 	.returns(Post)
 	// .optimistic('merge') ← auto-derived
@@ -144,7 +144,7 @@ export const updatePost = mutation()
 		ctx.db.post.update({
 			where: { id: input.id },
 			data: { ...input, updatedAt: new Date() },
-		})
+		}),
 	);
 
 /**
@@ -160,7 +160,7 @@ export const publishPost = mutation()
 		ctx.db.post.update({
 			where: { id: input.id },
 			data: { published: true, updatedAt: new Date() },
-		})
+		}),
 	);
 
 /**
@@ -174,7 +174,7 @@ export const bulkPromoteUsers = mutation()
 		z.object({
 			userIds: z.array(z.string()),
 			newRole: z.enum(["user", "admin", "vip"]),
-		})
+		}),
 	)
 	.returns({
 		users: [User],
@@ -211,7 +211,7 @@ export const addComment = mutation()
 		z.object({
 			postId: z.string(),
 			content: z.string(),
-		})
+		}),
 	)
 	.returns(Comment)
 	// .optimistic('create') ← auto-derived from "addComment"
@@ -221,7 +221,7 @@ export const addComment = mutation()
 				...input,
 				authorId: ctx.currentUser.id,
 			},
-		})
+		}),
 	);
 
 // =============================================================================

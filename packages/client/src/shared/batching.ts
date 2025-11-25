@@ -52,7 +52,7 @@ export class BatchScheduler<T> {
 	constructor(processor: BatchProcessor<T>, options: BatchSchedulerOptions = {}) {
 		this.processor = processor;
 		this.delay = options.delay ?? 10;
-		this.maxSize = options.maxSize ?? Infinity;
+		this.maxSize = options.maxSize ?? Number.POSITIVE_INFINITY;
 	}
 
 	/**

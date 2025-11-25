@@ -98,7 +98,7 @@ function invalidateEntity(cache: Map<string, CacheEntry>, entity: string): void 
 
 function findOldestEntry(cache: Map<string, CacheEntry>): string | undefined {
 	let oldest: string | undefined;
-	let oldestTime = Infinity;
+	let oldestTime = Number.POSITIVE_INFINITY;
 
 	for (const [key, entry] of cache) {
 		if (entry.timestamp < oldestTime) {

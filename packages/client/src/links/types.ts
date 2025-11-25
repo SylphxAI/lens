@@ -45,9 +45,7 @@ export interface OperationResult<T = unknown> {
 // =============================================================================
 
 /** Next function to call the next link in chain */
-export type NextLink = (
-	op: OperationContext,
-) => Promise<OperationResult> | OperationResult;
+export type NextLink = (op: OperationContext) => Promise<OperationResult> | OperationResult;
 
 /** Link function - processes operation and calls next */
 export type LinkFn = (

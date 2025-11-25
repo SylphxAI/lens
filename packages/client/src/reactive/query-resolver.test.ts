@@ -2,9 +2,9 @@
  * @sylphx/lens-client - QueryResolver Tests
  */
 
-import { describe, it, expect, mock, beforeEach } from "bun:test";
-import { QueryResolver, createQueryResolver, type QueryTransport } from "./query-resolver";
-import { createSubscriptionManager, type SubscriptionManager } from "./subscription-manager";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { type QueryResolver, type QueryTransport, createQueryResolver } from "./query-resolver";
+import { type SubscriptionManager, createSubscriptionManager } from "./subscription-manager";
 
 describe("QueryResolver", () => {
 	let subscriptionManager: SubscriptionManager;
@@ -121,11 +121,9 @@ describe("QueryResolver", () => {
 
 	describe("releaseQuery", () => {
 		it("unsubscribes fields when released", async () => {
-			const result = await resolver.resolveEntity<{ id: string; name: string }>(
-				"User",
-				"123",
-				["name"],
-			);
+			const result = await resolver.resolveEntity<{ id: string; name: string }>("User", "123", [
+				"name",
+			]);
 
 			// Release
 			resolver.releaseQuery(result.key);
@@ -137,11 +135,9 @@ describe("QueryResolver", () => {
 
 		it("decrements refCount before unsubscribing", async () => {
 			// Create two queries for same data
-			const result1 = await resolver.resolveEntity<{ id: string; name: string }>(
-				"User",
-				"123",
-				["name"],
-			);
+			const result1 = await resolver.resolveEntity<{ id: string; name: string }>("User", "123", [
+				"name",
+			]);
 
 			// Manually increment ref (simulating second subscriber)
 			// In real usage, the second resolveEntity would do this
@@ -187,10 +183,7 @@ describe("QueryResolver", () => {
 
 		it("falls back to individual fetch without batchFetch support", async () => {
 			// Queue multiple fetches (transport without batchFetch)
-			const promises = [
-				resolver.queueFetch("User", "1"),
-				resolver.queueFetch("User", "2"),
-			];
+			const promises = [resolver.queueFetch("User", "1"), resolver.queueFetch("User", "2")];
 
 			const results = await Promise.all(promises);
 
