@@ -893,36 +893,32 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	/**
 	 * Auto-derive optimistic data from mutation input
 	 *
-	 * If input has 'id', use input as optimistic data.
-	 * This automatically merges input fields into the entity with matching id.
+	 * UPDATE (input has id):
+	 *   → Use input as optimistic data, merge into matching entity
 	 *
-	 * For create operations (no id), returns null - use .optimistic() with tempId().
+	 * CREATE (input has no id):
+	 *   → Auto-generate tempId, use as new entity
 	 *
 	 * @example
-	 * // Input: { id: "1", name: "New Name" }
-	 * // Auto-optimistic: merge { name: "New Name" } into entity with id "1"
+	 * // Update: { id: "1", name: "New" } → merge into User:1
+	 * // Create: { title: "Hello" } → { id: "temp_0", title: "Hello" }
 	 */
 	private autoOptimisticFromInput(input: unknown): unknown {
 		if (!input || typeof input !== "object") return null;
 
 		const obj = input as Record<string, unknown>;
 
-		// If input has 'id', use it as optimistic data
-		// applyOptimisticFromMutation will find matching entity and merge
+		// UPDATE: input has 'id' → merge into existing entity
 		if ("id" in obj && typeof obj.id === "string") {
 			return input;
 		}
 
-		// For array inputs (bulk operations), extract items with ids
-		if (Array.isArray(input)) {
-			const withIds = input.filter(
-				(item) => item && typeof item === "object" && "id" in item
-			);
-			return withIds.length > 0 ? withIds : null;
-		}
-
-		// No id = can't auto-derive (create operation needs .optimistic() with tempId)
-		return null;
+		// CREATE: input has no 'id' → auto-generate tempId
+		// This creates a new optimistic entity
+		return {
+			id: `temp_${++this.optimisticCounter}`,
+			...obj,
+		};
 	}
 
 	/**
