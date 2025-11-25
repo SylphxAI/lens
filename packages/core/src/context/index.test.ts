@@ -1,5 +1,5 @@
 /**
- * @lens/core - Context System Tests
+ * @sylphx/core - Context System Tests
  *
  * Tests for AsyncLocalStorage-based context.
  */

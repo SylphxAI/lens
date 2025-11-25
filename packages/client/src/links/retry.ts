@@ -1,5 +1,5 @@
 /**
- * @lens/client - Retry Link
+ * @sylphx/client - Retry Link
  *
  * Automatically retries failed operations.
  */

@@ -1,5 +1,5 @@
 /**
- * @lens/client - ReactiveClient
+ * @sylphx/client - ReactiveClient
  *
  * Reactive client with fine-grained field-level reactivity.
  * Returns EntitySignals with field-level signals ($.field) and computed value.
@@ -19,7 +19,7 @@ import type {
 	CreateManyResult,
 	UpdateManyResult,
 	DeleteManyResult,
-} from "@lens/core";
+} from "@sylphx/core";
 import { EntitySignal } from "./entity-signal";
 import { SubscriptionManager, type SubscriptionTransport } from "./subscription-manager";
 import { QueryResolver, type QueryTransport } from "./query-resolver";

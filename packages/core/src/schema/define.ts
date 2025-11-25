@@ -1,12 +1,12 @@
 /**
- * @lens/core - Two-Phase Schema Definition
+ * @sylphx/core - Two-Phase Schema Definition
  *
  * Drizzle-style API that allows direct entity references instead of strings.
  * This eliminates string-based relation targets and provides full type safety.
  *
  * @example
  * ```typescript
- * import { entity, createSchema, hasMany, belongsTo, t } from '@lens/core';
+ * import { entity, createSchema, hasMany, belongsTo, t } from '@sylphx/core';
  *
  * // Step 1: Define entities (without relations)
  * const User = defineEntity('User', {

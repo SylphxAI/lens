@@ -1,5 +1,5 @@
 /**
- * @lens/client - In-Process Link (Terminal)
+ * @sylphx/client - In-Process Link (Terminal)
  *
  * Terminal link for same-process execution without network.
  */

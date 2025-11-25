@@ -1,5 +1,5 @@
 /**
- * @lens/client - Split Link
+ * @sylphx/client - Split Link
  *
  * Conditionally route operations to different links.
  */

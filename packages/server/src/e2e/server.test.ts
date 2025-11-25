@@ -12,7 +12,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { z } from "zod";
-import { entity, t, query, mutation, type Update, applyUpdate } from "@lens/core";
+import { entity, t, query, mutation, type Update, applyUpdate } from "@sylphx/core";
 import { createServer, type WebSocketLike } from "../server/create";
 
 // =============================================================================

@@ -1,5 +1,5 @@
 /**
- * @lens/core - Entity Resolvers Tests
+ * @sylphx/core - Entity Resolvers Tests
  *
  * Tests for entityResolvers() function.
  */

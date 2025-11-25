@@ -4,7 +4,7 @@
 
 import { describe, expect, test, beforeEach } from "bun:test";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { signal } from "@lens/client";
+import { signal } from "@sylphx/client";
 import {
 	useQuery,
 	useMutation,
@@ -13,7 +13,7 @@ import {
 	type UseMutationResult,
 	type UseLazyQueryResult,
 } from "./hooks";
-import type { QueryResult, MutationResult } from "@lens/client";
+import type { QueryResult, MutationResult } from "@sylphx/client";
 
 // =============================================================================
 // Mock QueryResult

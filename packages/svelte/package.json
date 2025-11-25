@@ -1,5 +1,5 @@
 {
-	"name": "@lens/svelte",
+	"name": "@sylphx/svelte",
 	"version": "0.1.0",
 	"description": "Svelte bindings for Lens API framework",
 	"type": "module",
@@ -30,8 +30,8 @@
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@lens/client": "workspace:*",
-		"@lens/core": "workspace:*"
+		"@sylphx/client": "workspace:*",
+		"@sylphx/core": "workspace:*"
 	},
 	"peerDependencies": {
 		"svelte": ">=4.0.0"

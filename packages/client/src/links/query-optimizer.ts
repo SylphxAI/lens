@@ -1,5 +1,5 @@
 /**
- * @lens/client - Query Optimizer Link
+ * @sylphx/client - Query Optimizer Link
  *
  * Optimizes queries by:
  * 1. Deduplicating simultaneous identical requests

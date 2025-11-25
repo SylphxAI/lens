@@ -1,5 +1,5 @@
 /**
- * @lens/client - Timing Link
+ * @sylphx/client - Timing Link
  *
  * Performance monitoring link for measuring operation duration.
  */

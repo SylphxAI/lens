@@ -1,5 +1,5 @@
 /**
- * @lens/core - Type-Safe Where/OrderBy Tests
+ * @sylphx/core - Type-Safe Where/OrderBy Tests
  *
  * Tests for type inference of WhereInput and OrderByInput.
  * These are compile-time type tests - if they compile, the types are correct.

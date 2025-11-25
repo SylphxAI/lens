@@ -1,5 +1,5 @@
 /**
- * @lens/vue
+ * @sylphx/vue
  *
  * Vue composables for Lens API framework.
  * Uses Vue's Composition API for reactive state management.

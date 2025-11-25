@@ -1,12 +1,12 @@
 /**
- * @lens/client - Select Type Inference Tests
+ * @sylphx/client - Select Type Inference Tests
  *
  * Tests for type inference when using select options.
  * These are compile-time type tests.
  */
 
 import { describe, it, expect } from "bun:test";
-import { t, entity, createSchema, hasMany, belongsTo } from "@lens/core";
+import { t, entity, createSchema, hasMany, belongsTo } from "@sylphx/core";
 import type { InferQueryResult, ListOptions, QueryOptions } from "./client";
 
 // =============================================================================

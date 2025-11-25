@@ -79,13 +79,13 @@ Schema            →  Structure + Relations only
 ## Installation
 
 ```bash
-bun add @lens/core @lens/server @lens/client
+bun add @sylphx/core @sylphx/server @sylphx/client
 
 # Framework adapters
-bun add @lens/react      # React hooks
-bun add @lens/solid      # SolidJS primitives
-bun add @lens/vue        # Vue composables
-bun add @lens/svelte     # Svelte stores
+bun add @sylphx/react      # React hooks
+bun add @sylphx/solid      # SolidJS primitives
+bun add @sylphx/vue        # Vue composables
+bun add @sylphx/svelte     # Svelte stores
 ```
 
 ---
@@ -96,7 +96,7 @@ bun add @lens/svelte     # Svelte stores
 
 ```typescript
 // schema/entities.ts
-import { entity, t } from '@lens/core'
+import { entity, t } from '@sylphx/core'
 
 // Name derived from export key (recommended)
 export const User = entity({
@@ -121,7 +121,7 @@ export const Post = entity('Post', {
 
 ```typescript
 // schema/relations.ts
-import { relation, hasMany, belongsTo } from '@lens/core'
+import { relation, hasMany, belongsTo } from '@sylphx/core'
 import { User, Post } from './entities'
 
 export const relations = [
@@ -138,7 +138,7 @@ export const relations = [
 
 ```typescript
 // operations/queries.ts
-import { query } from '@lens/core'
+import { query } from '@sylphx/core'
 import { z } from 'zod'
 import { User, Post } from '../schema/entities'
 
@@ -167,7 +167,7 @@ export const searchUsers = query()
 
 ```typescript
 // operations/mutations.ts
-import { mutation } from '@lens/core'
+import { mutation } from '@sylphx/core'
 import { z } from 'zod'
 import { Post } from '../schema/entities'
 
@@ -196,7 +196,7 @@ export const updatePost = mutation()
 
 ```typescript
 // resolvers/index.ts
-import { entityResolvers } from '@lens/core'
+import { entityResolvers } from '@sylphx/core'
 
 export const resolvers = entityResolvers({
   User: {
@@ -216,7 +216,7 @@ export const resolvers = entityResolvers({
 
 ```typescript
 // server.ts
-import { createServer } from '@lens/server'
+import { createServer } from '@sylphx/server'
 import * as entities from './schema/entities'
 import { relations } from './schema/relations'
 import * as queries from './operations/queries'
@@ -245,7 +245,7 @@ server.listen(3000)
 
 ```typescript
 // client.ts
-import { createClient, httpLink, websocketLink } from '@lens/client'
+import { createClient, httpLink, websocketLink } from '@sylphx/client'
 import type { AppRouter } from './server'
 
 // Type-safe client with tRPC-style links
@@ -267,8 +267,8 @@ const result = await client.mutations.createPost({ title: 'Hello', content: 'Wor
 
 ```tsx
 // App.tsx
-import { createClient, httpLink } from '@lens/client'
-import { LensProvider } from '@lens/react'
+import { createClient, httpLink } from '@sylphx/client'
+import { LensProvider } from '@sylphx/react'
 import type { AppRouter } from './server'
 
 const client = createClient<AppRouter>({
@@ -286,7 +286,7 @@ function App() {
 
 ```tsx
 // components/UserProfile.tsx
-import { useQuery, useMutation, useLensClient } from '@lens/react'
+import { useQuery, useMutation, useLensClient } from '@sylphx/react'
 import type { AppRouter } from './server'
 
 function UserProfile() {
@@ -336,8 +336,8 @@ function CreatePost() {
 ### React
 
 ```tsx
-import { createClient, httpLink } from '@lens/client'
-import { LensProvider, useQuery, useMutation, useLazyQuery, useLensClient } from '@lens/react'
+import { createClient, httpLink } from '@sylphx/client'
+import { LensProvider, useQuery, useMutation, useLazyQuery, useLensClient } from '@sylphx/react'
 import type { AppRouter } from './server'
 
 const client = createClient<AppRouter>({
@@ -377,8 +377,8 @@ function MyComponent() {
 ### SolidJS
 
 ```tsx
-import { createClient, httpLink } from '@lens/client'
-import { LensProvider, createQuery, createMutation, createLazyQuery, useLensClient } from '@lens/solid'
+import { createClient, httpLink } from '@sylphx/client'
+import { LensProvider, createQuery, createMutation, createLazyQuery, useLensClient } from '@sylphx/solid'
 import type { AppRouter } from './server'
 
 const client = createClient<AppRouter>({
@@ -419,8 +419,8 @@ function MyComponent() {
 
 ```vue
 <script setup lang="ts">
-import { createClient, httpLink } from '@lens/client'
-import { provideLensClient, useQuery, useMutation, useLazyQuery, useLensClient } from '@lens/vue'
+import { createClient, httpLink } from '@sylphx/client'
+import { provideLensClient, useQuery, useMutation, useLazyQuery, useLensClient } from '@sylphx/vue'
 import type { AppRouter } from './server'
 
 // In root component - provide client
@@ -433,7 +433,7 @@ provideLensClient(client)
 
 ```vue
 <script setup lang="ts">
-import { useLensClient, useQuery, useMutation, useLazyQuery } from '@lens/vue'
+import { useLensClient, useQuery, useMutation, useLazyQuery } from '@sylphx/vue'
 import type { AppRouter } from './server'
 
 const client = useLensClient<AppRouter>()
@@ -458,8 +458,8 @@ const { execute, data: searchData } = useLazyQuery(() => client.queries.searchUs
 
 ```svelte
 <script lang="ts">
-  import { createClient, httpLink } from '@lens/client'
-  import { provideLensClient, query, mutation, lazyQuery, useLensClient } from '@lens/svelte'
+  import { createClient, httpLink } from '@sylphx/client'
+  import { provideLensClient, query, mutation, lazyQuery, useLensClient } from '@sylphx/svelte'
   import type { AppRouter } from './server'
 
   // In root component - provide client
@@ -472,7 +472,7 @@ const { execute, data: searchData } = useLazyQuery(() => client.queries.searchUs
 
 ```svelte
 <script lang="ts">
-  import { useLensClient, query, mutation, lazyQuery } from '@lens/svelte'
+  import { useLensClient, query, mutation, lazyQuery } from '@sylphx/svelte'
   import type { AppRouter } from './server'
 
   const client = useLensClient<AppRouter>()
@@ -518,7 +518,7 @@ import {
   // Optimization
   dedupLink,          // Request deduplication
   cacheLink,          // Response caching
-} from '@lens/client'
+} from '@sylphx/client'
 
 const client = createClient<AppRouter>({
   links: [
@@ -533,7 +533,7 @@ const client = createClient<AppRouter>({
 ### Custom Links
 
 ```typescript
-import { Link, LinkFn } from '@lens/client'
+import { Link, LinkFn } from '@sylphx/client'
 
 const timingLink: Link = () => async (op, next) => {
   const start = performance.now()
@@ -557,7 +557,7 @@ const client = createClient<AppRouter>({
 ### Entity Definition
 
 ```typescript
-import { entity, t } from '@lens/core'
+import { entity, t } from '@sylphx/core'
 
 // Name derived from export key (recommended)
 export const User = entity({
@@ -599,7 +599,7 @@ export const User = entity({
 ### Type-Safe Relations
 
 ```typescript
-import { relation, hasMany, belongsTo, hasOne } from '@lens/core'
+import { relation, hasMany, belongsTo, hasOne } from '@sylphx/core'
 
 const relations = [
   relation(User, {
@@ -628,7 +628,7 @@ Operations define entry points. They are NOT limited to CRUD.
 ### Query
 
 ```typescript
-import { query } from '@lens/core'
+import { query } from '@sylphx/core'
 import { z } from 'zod'
 
 // No input
@@ -668,7 +668,7 @@ export const activeUsers = query()
 ### Mutation
 
 ```typescript
-import { mutation } from '@lens/core'
+import { mutation } from '@sylphx/core'
 import { z } from 'zod'
 
 // Simple mutation - auto 'create' optimistic from naming convention!
@@ -719,7 +719,7 @@ export const promoteSomeUsers = mutation()
 Entity Resolvers handle nested data. They are **reused across ALL operations**.
 
 ```typescript
-import { entityResolvers } from '@lens/core'
+import { entityResolvers } from '@sylphx/core'
 
 export const resolvers = entityResolvers({
   User: {
@@ -998,13 +998,13 @@ tempId()                        // Generate temporary ID for optimistic
 
 | Package | Description |
 |---------|-------------|
-| `@lens/core` | Schema, operations, types (zero deps) |
-| `@lens/server` | Execution engine, GraphStateManager |
-| `@lens/client` | Client API, links, reactive store |
-| `@lens/react` | React hooks |
-| `@lens/solid` | SolidJS primitives |
-| `@lens/vue` | Vue composables |
-| `@lens/svelte` | Svelte stores |
+| `@sylphx/core` | Schema, operations, types (zero deps) |
+| `@sylphx/server` | Execution engine, GraphStateManager |
+| `@sylphx/client` | Client API, links, reactive store |
+| `@sylphx/react` | React hooks |
+| `@sylphx/solid` | SolidJS primitives |
+| `@sylphx/vue` | Vue composables |
+| `@sylphx/svelte` | Svelte stores |
 
 ---
 

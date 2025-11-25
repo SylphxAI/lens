@@ -1,12 +1,12 @@
 /**
- * @lens/client - WebSocket Transport
+ * @sylphx/client - WebSocket Transport
  *
  * WebSocket implementation of Transport for Lens client.
  * Implements the operations protocol with field-level subscriptions.
  */
 
 import type { Transport } from "./create";
-import { type Update, applyUpdate } from "@lens/core";
+import { type Update, applyUpdate } from "@sylphx/core";
 
 // =============================================================================
 // Types

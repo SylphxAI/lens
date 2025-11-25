@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { createRoot, createSignal } from "solid-js";
 import { createQuery, createMutation, createLazyQuery } from "./primitives";
-import type { QueryResult, MutationResult } from "@lens/client";
+import type { QueryResult, MutationResult } from "@sylphx/client";
 
 // =============================================================================
 // Mock QueryResult

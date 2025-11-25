@@ -1,11 +1,11 @@
 /**
- * @lens/react - Context Provider
+ * @sylphx/react - Context Provider
  *
  * Provides Lens client to React component tree.
  */
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { LensClient } from "@lens/client";
+import type { LensClient } from "@sylphx/client";
 
 // =============================================================================
 // Context
@@ -35,8 +35,8 @@ export interface LensProviderProps {
  *
  * @example
  * ```tsx
- * import { createClient, httpLink } from '@lens/client';
- * import { LensProvider } from '@lens/react';
+ * import { createClient, httpLink } from '@sylphx/client';
+ * import { LensProvider } from '@sylphx/react';
  * import type { AppRouter } from './server';
  *
  * const client = createClient<AppRouter>({

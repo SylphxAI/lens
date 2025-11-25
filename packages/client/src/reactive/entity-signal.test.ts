@@ -1,5 +1,5 @@
 /**
- * @lens/client - EntitySignal Tests
+ * @sylphx/client - EntitySignal Tests
  */
 
 import { describe, it, expect, mock } from "bun:test";

@@ -1,5 +1,5 @@
 {
-	"name": "@lens/react",
+	"name": "@sylphx/react",
 	"version": "0.1.0",
 	"description": "React bindings for Lens API framework",
 	"type": "module",
@@ -30,8 +30,8 @@
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@lens/client": "workspace:*",
-		"@lens/core": "workspace:*",
+		"@sylphx/client": "workspace:*",
+		"@sylphx/core": "workspace:*",
 		"@preact/signals-react": "^2.2.0"
 	},
 	"peerDependencies": {

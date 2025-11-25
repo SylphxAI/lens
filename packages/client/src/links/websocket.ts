@@ -1,5 +1,5 @@
 /**
- * @lens/client - WebSocket Link (Terminal)
+ * @sylphx/client - WebSocket Link (Terminal)
  *
  * WebSocket terminal link for queries, mutations, and subscriptions.
  * Also includes WebSocketSubscriptionTransport for reactive systems.

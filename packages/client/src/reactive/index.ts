@@ -1,5 +1,5 @@
 /**
- * @lens/client - Reactive System
+ * @sylphx/client - Reactive System
  *
  * Fine-grained reactive primitives for entity subscriptions.
  */

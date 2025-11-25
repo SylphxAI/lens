@@ -1,11 +1,11 @@
 /**
- * @lens/client - Deserialize Link
+ * @sylphx/client - Deserialize Link
  *
  * Automatically deserializes data from server (ISO string → Date, string → Decimal, etc.)
  * Inverse of server-side serialization.
  */
 
-import type { Schema, SchemaDefinition, FieldType } from "@lens/core";
+import type { Schema, SchemaDefinition, FieldType } from "@sylphx/core";
 import type { Link, LinkFn, OperationResult } from "./types";
 
 export interface DeserializeLinkOptions<S extends SchemaDefinition> {

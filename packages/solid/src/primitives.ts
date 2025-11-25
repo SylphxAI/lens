@@ -1,5 +1,5 @@
 /**
- * @lens/solid - Primitives
+ * @sylphx/solid - Primitives
  *
  * SolidJS reactive primitives for Lens queries and mutations.
  * Uses SolidJS fine-grained reactivity for optimal performance.
@@ -12,7 +12,7 @@ import {
 	createMemo,
 	type Accessor,
 } from "solid-js";
-import type { QueryResult, MutationResult } from "@lens/client";
+import type { QueryResult, MutationResult } from "@sylphx/client";
 
 // =============================================================================
 // Types
@@ -79,7 +79,7 @@ export type MutationFn<TInput, TOutput> = (
  *
  * @example
  * ```tsx
- * import { createQuery } from '@lens/solid';
+ * import { createQuery } from '@sylphx/solid';
  *
  * function UserProfile(props: { userId: string }) {
  *   const user = createQuery(() => client.queries.getUser({ id: props.userId }));
@@ -172,7 +172,7 @@ export function createQuery<T>(
  *
  * @example
  * ```tsx
- * import { createMutation } from '@lens/solid';
+ * import { createMutation } from '@sylphx/solid';
  *
  * function CreatePostForm() {
  *   const createPost = createMutation(client.mutations.createPost);
@@ -248,7 +248,7 @@ export function createMutation<TInput, TOutput>(
  *
  * @example
  * ```tsx
- * import { createLazyQuery } from '@lens/solid';
+ * import { createLazyQuery } from '@sylphx/solid';
  *
  * function SearchUsers() {
  *   const [searchTerm, setSearchTerm] = createSignal('');

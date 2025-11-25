@@ -1,5 +1,5 @@
 /**
- * @lens/core - Two-Phase Schema Definition Tests
+ * @sylphx/core - Two-Phase Schema Definition Tests
  *
  * Tests for the Drizzle-style API that uses direct entity references.
  */

@@ -1,5 +1,5 @@
 /**
- * @lens/client - Error Handler Link
+ * @sylphx/client - Error Handler Link
  *
  * Centralized error handling and transformation.
  */

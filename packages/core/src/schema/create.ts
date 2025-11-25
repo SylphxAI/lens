@@ -1,5 +1,5 @@
 /**
- * @lens/core - Schema Creation
+ * @sylphx/core - Schema Creation
  *
  * Creates and validates schemas from definitions.
  */

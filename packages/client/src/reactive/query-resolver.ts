@@ -1,5 +1,5 @@
 /**
- * @lens/client - QueryResolver
+ * @sylphx/client - QueryResolver
  *
  * Resolves queries by deriving from existing subscriptions or fetching new data.
  * Handles query deduplication, request batching, and caching.

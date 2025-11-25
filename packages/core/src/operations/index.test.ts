@@ -1,5 +1,5 @@
 /**
- * @lens/core - Operations API Tests
+ * @sylphx/core - Operations API Tests
  *
  * Tests for the query() and mutation() builder pattern.
  */

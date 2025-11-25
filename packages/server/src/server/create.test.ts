@@ -1,5 +1,5 @@
 /**
- * @lens/server - Server Tests
+ * @sylphx/server - Server Tests
  *
  * Tests for Lens server operations and GraphStateManager integration.
  */
@@ -11,7 +11,7 @@ import {
 	t,
 	query,
 	mutation,
-} from "@lens/core";
+} from "@sylphx/core";
 import { createServer, type WebSocketLike } from "./create";
 
 // =============================================================================

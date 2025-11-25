@@ -1,5 +1,5 @@
 /**
- * @lens/core - Type Inference Utilities
+ * @sylphx/core - Type Inference Utilities
  *
  * Powerful type inference from schema definitions.
  * Enables full end-to-end type safety.

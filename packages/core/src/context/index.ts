@@ -1,12 +1,12 @@
 /**
- * @lens/core - Context System
+ * @sylphx/core - Context System
  *
  * AsyncLocalStorage-based context for implicit dependency injection.
  * Provides Vue-like composables pattern for accessing context.
  *
  * @example
  * ```typescript
- * import { createContext, useContext, runWithContext } from '@lens/core';
+ * import { createContext, useContext, runWithContext } from '@sylphx/core';
  *
  * // Define context type
  * interface AppContext {

@@ -1,5 +1,5 @@
 /**
- * @lens/core - Advanced Operation Type Tests
+ * @sylphx/core - Advanced Operation Type Tests
  *
  * Tests for aggregation, batch, relation mutations, and find types.
  * These are compile-time type tests - if they compile, the types are correct.

@@ -1,5 +1,5 @@
 /**
- * @lens/server
+ * @sylphx/server
  *
  * Server runtime for Lens API framework.
  * Operations-based server with GraphStateManager for reactive updates.

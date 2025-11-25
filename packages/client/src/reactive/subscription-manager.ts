@@ -1,12 +1,12 @@
 /**
- * @lens/client - SubscriptionManager
+ * @sylphx/client - SubscriptionManager
  *
  * Manages field-level subscriptions and server communication.
  * Tracks which fields are subscribed and handles ref counting.
  */
 
-import type { Update, EntityKey } from "@lens/core";
-import { makeEntityKey, parseEntityKey } from "@lens/core";
+import type { Update, EntityKey } from "@sylphx/core";
+import { makeEntityKey, parseEntityKey } from "@sylphx/core";
 import { EntitySignal } from "./entity-signal";
 
 // Re-export for convenience

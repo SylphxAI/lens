@@ -1,5 +1,5 @@
 {
-	"name": "@lens/solid",
+	"name": "@sylphx/solid",
 	"version": "0.1.0",
 	"description": "SolidJS bindings for Lens API framework",
 	"type": "module",
@@ -31,7 +31,7 @@
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@lens/client": "workspace:*"
+		"@sylphx/client": "workspace:*"
 	},
 	"peerDependencies": {
 		"solid-js": ">=1.8.0"

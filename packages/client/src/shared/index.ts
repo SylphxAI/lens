@@ -1,5 +1,5 @@
 /**
- * @lens/client - Shared Utilities
+ * @sylphx/client - Shared Utilities
  *
  * Common infrastructure for key generation, batching, and deduplication.
  */

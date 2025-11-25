@@ -1,5 +1,5 @@
 /**
- * @lens/client - HTTP Link (Terminal)
+ * @sylphx/client - HTTP Link (Terminal)
  *
  * Terminal link that executes operations via HTTP.
  */

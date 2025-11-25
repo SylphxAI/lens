@@ -1,5 +1,5 @@
 /**
- * @lens/client - Signal Implementation
+ * @sylphx/client - Signal Implementation
  *
  * Re-exports Preact Signals with Lens-specific types and utilities.
  * @see https://preactjs.com/guide/v10/signals/

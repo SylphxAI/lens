@@ -1,5 +1,5 @@
 /**
- * @lens/core - Schema Type Builders
+ * @sylphx/core - Schema Type Builders
  *
  * Type-safe DSL for defining entity schemas.
  * Every type supports full TypeScript inference.

@@ -1,5 +1,5 @@
 /**
- * @lens/client - Shared Utilities Tests
+ * @sylphx/client - Shared Utilities Tests
  */
 
 import { describe, it, expect, beforeEach, mock } from "bun:test";

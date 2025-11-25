@@ -1,5 +1,5 @@
 /**
- * @lens/server - SSE Transport Adapter
+ * @sylphx/server - SSE Transport Adapter
  *
  * Thin transport adapter for Server-Sent Events.
  * Connects SSE streams to GraphStateManager.

@@ -1,5 +1,5 @@
 /**
- * @lens/client - QueryResolver Tests
+ * @sylphx/client - QueryResolver Tests
  */
 
 import { describe, it, expect, mock, beforeEach } from "bun:test";

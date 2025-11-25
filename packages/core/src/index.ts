@@ -1,5 +1,5 @@
 /**
- * @lens/core
+ * @sylphx/core
  *
  * Core schema types and utilities for Lens.
  * TypeScript-first reactive API framework.

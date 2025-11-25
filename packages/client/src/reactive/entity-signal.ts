@@ -1,13 +1,13 @@
 /**
- * @lens/client - EntitySignal
+ * @sylphx/client - EntitySignal
  *
  * Fine-grained reactive entity with field-level signals.
  * Enables minimal re-renders and efficient server subscriptions.
  */
 
 import { signal, computed, type Signal, type WritableSignal } from "../signals/signal";
-import type { Update } from "@lens/core";
-import { applyUpdate } from "@lens/core";
+import type { Update } from "@sylphx/core";
+import { applyUpdate } from "@sylphx/core";
 
 // =============================================================================
 // Types

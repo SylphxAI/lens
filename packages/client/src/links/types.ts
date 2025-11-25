@@ -1,5 +1,5 @@
 /**
- * @lens/client - Link Types
+ * @sylphx/client - Link Types
  *
  * Links are composable middleware for request/response processing.
  * Inspired by tRPC's link system.

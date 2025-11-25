@@ -1,5 +1,5 @@
 /**
- * @lens/client - Shared Batching Utilities
+ * @sylphx/client - Shared Batching Utilities
  *
  * Batching infrastructure with configurable delay.
  */

@@ -1,5 +1,5 @@
 /**
- * @lens/server - Graph State Manager
+ * @sylphx/server - Graph State Manager
  *
  * Core orchestration layer that:
  * - Maintains canonical state per entity (server truth)
@@ -9,7 +9,7 @@
  * - Pushes updates to subscribed clients
  */
 
-import { createUpdate, type Update, type EntityKey, makeEntityKey } from "@lens/core";
+import { createUpdate, type Update, type EntityKey, makeEntityKey } from "@sylphx/core";
 
 // Re-export for convenience
 export type { EntityKey };

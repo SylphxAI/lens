@@ -1,5 +1,5 @@
 /**
- * @lens/client - SSE Link (Terminal)
+ * @sylphx/client - SSE Link (Terminal)
  *
  * Terminal link that uses SSE for real-time subscriptions and HTTP for queries/mutations.
  * Updated to support field-level subscriptions protocol.
