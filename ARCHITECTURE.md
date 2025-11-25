@@ -649,11 +649,11 @@ import type { AnalyticsRouter } from '@company/analytics-server'
 type Api = AuthRouter & UserRouter & AnalyticsRouter
 
 const client = await createClient<Api>({
-  transport: route([
-    [op => op.path.startsWith('auth.'), http({ url: '/auth-api' })],
-    [op => op.path.startsWith('analytics.'), http({ url: '/analytics-api' })],
-    http({ url: '/user-api' }),  // fallback
-  ]),
+  transport: route({
+    'auth.*': http({ url: '/auth-api' }),
+    'analytics.*': http({ url: '/analytics-api' }),
+    '*': http({ url: '/user-api' }),  // fallback
+  }),
   plugins: [logger(), auth({ getToken: () => localStorage.token })],
 })
 

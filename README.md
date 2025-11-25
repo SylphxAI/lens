@@ -88,14 +88,11 @@ import type { AnalyticsRouter } from '@company/analytics-server'
 type Api = AuthRouter & MainRouter & AnalyticsRouter
 
 const client = await createClient<Api>({
-  transport: route([
-    // Auth operations → Auth server
-    [op => op.path.startsWith('auth.'), http({ url: '/auth-api' })],
-    // Analytics operations → Analytics server
-    [op => op.path.startsWith('analytics.'), http({ url: '/analytics-api' })],
-    // Everything else → Main server
-    http({ url: '/api' }),
-  ]),
+  transport: route({
+    'auth.*': http({ url: '/auth-api' }),
+    'analytics.*': http({ url: '/analytics-api' }),
+    '*': http({ url: '/api' }),  // fallback
+  }),
 })
 
 // Full type safety across all servers!
