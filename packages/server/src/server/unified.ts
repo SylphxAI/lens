@@ -111,6 +111,8 @@ interface SubscribeMessage {
 	operation: string;
 	input?: unknown;
 	fields: string[] | "*";
+	/** SelectionObject for nested field selection */
+	select?: SelectionObject;
 }
 
 /** Update subscription fields */

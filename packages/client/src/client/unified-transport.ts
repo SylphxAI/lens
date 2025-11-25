@@ -328,6 +328,8 @@ export class WebSocketUnifiedTransport implements UnifiedTransport {
 			onError: (error: Error) => void;
 			onComplete: () => void;
 		},
+		/** SelectionObject for nested field selection */
+		select?: Record<string, unknown>,
 	): { unsubscribe: () => void; updateFields: (add?: string[], remove?: string[]) => void } {
 		const id = this.nextId();
 
@@ -342,13 +344,14 @@ export class WebSocketUnifiedTransport implements UnifiedTransport {
 
 		this.subscriptions.set(id, sub);
 
-		// Send subscribe message
+		// Send subscribe message with SelectionObject
 		this.sendMessage({
 			type: "subscribe",
 			id,
 			operation,
 			input,
 			fields,
+			select,  // Include SelectionObject for nested resolution
 		});
 
 		return {
@@ -374,7 +377,13 @@ export class WebSocketUnifiedTransport implements UnifiedTransport {
 		};
 	}
 
-	async query(operation: string, input: unknown, fields?: string[] | "*"): Promise<unknown> {
+	async query(
+		operation: string,
+		input: unknown,
+		fields?: string[] | "*",
+		/** SelectionObject for nested field selection */
+		select?: Record<string, unknown>,
+	): Promise<unknown> {
 		return new Promise((resolve, reject) => {
 			const id = this.nextId();
 
@@ -391,6 +400,7 @@ export class WebSocketUnifiedTransport implements UnifiedTransport {
 				operation,
 				input,
 				fields,
+				select,  // Include SelectionObject for nested resolution
 			});
 		});
 	}

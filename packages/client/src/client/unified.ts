@@ -37,10 +37,12 @@ export interface UnifiedTransport {
 			onError: (error: Error) => void;
 			onComplete: () => void;
 		},
+		/** SelectionObject for nested field selection */
+		select?: SelectionObject,
 	): { unsubscribe: () => void; updateFields: (add?: string[], remove?: string[]) => void };
 
 	/** Send one-time query */
-	query(operation: string, input: unknown, fields?: string[] | "*"): Promise<unknown>;
+	query(operation: string, input: unknown, fields?: string[] | "*", select?: SelectionObject): Promise<unknown>;
 
 	/** Send mutation */
 	mutate(operation: string, input: unknown): Promise<unknown>;
@@ -337,7 +339,7 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	/**
 	 * Ensure transport subscription exists
 	 */
-	private ensureTransportSubscription(sub: SubscriptionState): void {
+	private ensureTransportSubscription(sub: SubscriptionState, select?: SelectionObject): void {
 		if (sub.transportSub) return;
 
 		const fields = sub.fullRefs > 0 ? "*" : Array.from(sub.fields);
@@ -381,6 +383,7 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 					sub.loading.value = false;
 				},
 			},
+			select,  // Pass SelectionObject for nested resolution
 		);
 	}
 
@@ -394,9 +397,13 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	private executeQuery<T>(
 		operation: string,
 		input: unknown,
-		fields?: string[],
+		select?: SelectionObject,
 	): QueryResult<T> {
+		const fields = select ? this.extractFieldsFromSelection(select) : undefined;
 		const sub = this.getOrCreateSubscription(operation, input, fields);
+
+		// Store selection for this query
+		const currentSelect = select;
 
 		// Create result object
 		const result: QueryResult<T> = {
@@ -415,8 +422,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 					this.subscribeFullEntity(sub);
 				}
 
-				// Ensure transport subscription
-				this.ensureTransportSubscription(sub);
+				// Ensure transport subscription with SelectionObject
+				this.ensureTransportSubscription(sub, currentSelect);
 
 				// Add callback if provided
 				if (callback) {
@@ -450,8 +457,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			},
 
 			select: <S extends SelectionObject>(selection: S) => {
-				const selectedFields = this.extractFieldsFromSelection(selection);
-				return this.executeQuery<T>(operation, input, selectedFields);
+				// Pass full SelectionObject, not just field names
+				return this.executeQuery<T>(operation, input, selection);
 			},
 
 			then: async <TResult1 = T, TResult2 = never>(
@@ -470,8 +477,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 						}
 					}
 
-					// Fetch from server
-					const data = await this.fetchQuery(operation, input, fields);
+					// Fetch from server with full SelectionObject
+					const data = await this.fetchQuery(operation, input, fields, currentSelect);
 
 					// Update subscription data
 					if (!fields) {
@@ -498,6 +505,7 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		operation: string,
 		input: unknown,
 		fields?: string[],
+		select?: SelectionObject,
 	): Promise<unknown> {
 		const key = makeQueryKeyWithFields(operation, input, fields);
 
@@ -507,8 +515,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			return inFlight;
 		}
 
-		// Create promise
-		const promise = this.transport.query(operation, input, fields ?? "*");
+		// Create promise - pass SelectionObject for nested resolution
+		const promise = this.transport.query(operation, input, fields ?? "*", select);
 		this.inFlight.set(key, promise);
 
 		try {
