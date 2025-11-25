@@ -4,14 +4,7 @@
  * Common infrastructure for key generation, batching, and deduplication.
  */
 
-export {
-	type EntityKey,
-	makeEntityKey,
-	parseEntityKey,
-	makeQueryKey,
-	makeQueryKeyWithFields,
-	parseQueryKey,
-} from "./keys";
+export { makeQueryKey, makeQueryKeyWithFields, parseQueryKey } from "./keys";
 
 export {
 	BatchScheduler,

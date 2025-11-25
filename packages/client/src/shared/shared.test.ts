@@ -3,13 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, mock } from "bun:test";
-import {
-	makeEntityKey,
-	parseEntityKey,
-	makeQueryKey,
-	makeQueryKeyWithFields,
-	parseQueryKey,
-} from "./keys";
+import { makeQueryKey, makeQueryKeyWithFields, parseQueryKey } from "./keys";
 import { BatchScheduler } from "./batching";
 import { RequestDeduplicator } from "./dedup";
 
@@ -18,22 +12,6 @@ import { RequestDeduplicator } from "./dedup";
 // =============================================================================
 
 describe("Key Utilities", () => {
-	describe("Entity Keys", () => {
-		it("creates entity key", () => {
-			expect(makeEntityKey("User", "123")).toBe("User:123");
-			expect(makeEntityKey("Post", "abc")).toBe("Post:abc");
-		});
-
-		it("parses entity key", () => {
-			expect(parseEntityKey("User:123")).toEqual({ type: "User", id: "123" });
-			expect(parseEntityKey("Post:abc-def")).toEqual({ type: "Post", id: "abc-def" });
-		});
-
-		it("handles colons in ID", () => {
-			expect(parseEntityKey("User:123:456")).toEqual({ type: "User", id: "123:456" });
-		});
-	});
-
 	describe("Query Keys", () => {
 		it("creates query key without input", () => {
 			expect(makeQueryKey("whoami", undefined)).toBe("whoami:");

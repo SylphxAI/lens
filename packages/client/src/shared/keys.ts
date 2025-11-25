@@ -1,35 +1,9 @@
 /**
  * @lens/client - Shared Key Utilities
  *
- * Key generation for entities and queries.
+ * Key generation for queries.
+ * Note: Entity keys are provided by @lens/core.
  */
-
-// =============================================================================
-// Entity Keys (for store normalization)
-// =============================================================================
-
-export type EntityKey = `${string}:${string}`;
-
-/**
- * Create entity key from type and ID
- */
-export function makeEntityKey(type: string, id: string): EntityKey {
-	return `${type}:${id}`;
-}
-
-/**
- * Parse entity key into type and ID
- */
-export function parseEntityKey(key: EntityKey): { type: string; id: string } {
-	const colonIndex = key.indexOf(":");
-	if (colonIndex === -1) {
-		throw new Error(`Invalid entity key: ${key}`);
-	}
-	return {
-		type: key.slice(0, colonIndex),
-		id: key.slice(colonIndex + 1),
-	};
-}
 
 // =============================================================================
 // Query Keys (for request deduplication)
