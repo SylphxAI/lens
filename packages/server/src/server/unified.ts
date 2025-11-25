@@ -247,9 +247,13 @@ class DataLoader<K, V> {
 // Unified Server Implementation
 // =============================================================================
 
-class UnifiedServerImpl<TContext extends ContextValue> implements UnifiedServer {
-	private queries: QueriesMap;
-	private mutations: MutationsMap;
+class UnifiedServerImpl<
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+	TContext extends ContextValue = ContextValue,
+> implements UnifiedServer {
+	private queries: Q;
+	private mutations: M;
 	private entities: EntitiesMap;
 	private resolvers?: EntityResolvers<EntityResolversDefinition>;
 	private contextFactory: (req?: unknown) => TContext | Promise<TContext>;
@@ -269,9 +273,9 @@ class UnifiedServerImpl<TContext extends ContextValue> implements UnifiedServer 
 	/** Server instance */
 	private server: unknown = null;
 
-	constructor(config: UnifiedServerConfig<TContext>) {
-		this.queries = config.queries ?? {};
-		this.mutations = config.mutations ?? {};
+	constructor(config: UnifiedServerConfig<TContext> & { queries?: Q; mutations?: M }) {
+		this.queries = (config.queries ?? {}) as Q;
+		this.mutations = (config.mutations ?? {}) as M;
 		this.entities = config.entities ?? {};
 		this.resolvers = config.resolvers;
 		this.contextFactory = config.context ?? (() => ({} as TContext));
@@ -1254,14 +1258,63 @@ function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
 }
 
 // =============================================================================
+// Type Inference Utilities (tRPC-style)
+// =============================================================================
+
+/**
+ * Infer input type from a query/mutation definition
+ */
+export type InferInput<T> = T extends QueryDef<infer I, unknown, unknown>
+	? I extends void
+		? void
+		: I
+	: T extends MutationDef<infer I, unknown, unknown>
+		? I
+		: never;
+
+/**
+ * Infer output type from a query/mutation definition
+ */
+export type InferOutput<T> = T extends QueryDef<unknown, infer O, unknown>
+	? O
+	: T extends MutationDef<unknown, infer O, unknown>
+		? O
+		: never;
+
+/**
+ * API type for client inference
+ * Export this type for client-side type safety
+ *
+ * @example
+ * ```typescript
+ * // Server
+ * const server = createUnifiedServer({ queries, mutations });
+ * export type Api = InferApi<typeof server>;
+ *
+ * // Client (only imports TYPE)
+ * import type { Api } from './server';
+ * const client = createClient<Api>({ links: [...] });
+ * ```
+ */
+export type InferApi<T extends UnifiedServer> = T extends UnifiedServerImpl<infer Q, infer M>
+	? { queries: Q; mutations: M }
+	: never;
+
+// =============================================================================
 // Factory
 // =============================================================================
 
 /**
  * Create unified Lens server with Operations API + Optimization Layer
  */
-export function createUnifiedServer<TContext extends ContextValue = ContextValue>(
-	config: UnifiedServerConfig<TContext>,
-): UnifiedServer {
-	return new UnifiedServerImpl(config);
+export function createUnifiedServer<
+	TContext extends ContextValue = ContextValue,
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+>(
+	config: UnifiedServerConfig<TContext> & { queries?: Q; mutations?: M },
+): UnifiedServer & { _types: { queries: Q; mutations: M } } {
+	const server = new UnifiedServerImpl(config) as UnifiedServerImpl<Q, M>;
+	// Attach type marker for inference (stripped at runtime)
+	return server as UnifiedServer & { _types: { queries: Q; mutations: M } };
 }

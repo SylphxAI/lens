@@ -1,57 +1,89 @@
 /**
  * V2 Complete Example - Client
  *
- * Demonstrates all client features:
- * - Flat namespace API (client.whoami vs client.query.whoami)
- * - Field selection (.select())
- * - Subscriptions (real-time updates)
- * - Automatic optimistic updates
- * - Query deduplication (canDerive)
+ * Demonstrates tRPC-style type inference:
+ * - Import TYPE from server (not runtime)
+ * - Links as middleware chain
+ * - Automatic optimistic updates (requires mutation defs)
  */
 
-import { createClient, websocketLink, signal, effect } from "@lens/client";
-import { queries, mutations } from "./operations";
+import {
+	createClient,
+	// Links (middleware chain)
+	loggerLink,
+	retryLink,
+	websocketLink,
+	// Reactive utilities
+	signal,
+	effect,
+} from "@lens/client";
+
+// TYPE-only import from server!
+import type { Api } from "./server";
+
+// For optimistic updates, we need the mutation definitions
+// (they contain the _optimistic function)
+import { mutations } from "./operations";
 
 // =============================================================================
-// Create Client
+// Create Client - tRPC Style
 // =============================================================================
 
-const client = createClient({
-	queries,
+const client = createClient<Api>({
+	// Mutations needed for optimistic updates (contains _optimistic functions)
 	mutations,
-	transport: websocketLink({
-		url: "ws://localhost:3000/ws",
-		// Auto-reconnect on disconnect
-		reconnect: true,
-		reconnectDelay: 1000,
-	}),
-	// Optimistic updates enabled by default
-	optimistic: true,
+
+	// Links = middleware chain (like tRPC)
+	links: [
+		// Logging middleware
+		loggerLink({ enabled: process.env.NODE_ENV === "development" }),
+
+		// Retry on failure
+		retryLink({ retries: 3, delay: 1000 }),
+
+		// Terminal link (must be last)
+		websocketLink({
+			url: "ws://localhost:3000/ws",
+			reconnect: true,
+			reconnectDelay: 1000,
+		}),
+	],
 });
 
 // =============================================================================
-// Basic Usage - One-time Queries
+// Basic Usage - Type-safe from Server Definition
 // =============================================================================
 
 async function basicQueries() {
-	console.log("\n=== Basic Queries ===\n");
+	console.log("\n=== Basic Queries (Type-safe) ===\n");
 
-	// 1. Simple query (no input)
+	// TypeScript knows: whoami() returns User
 	const me = await client.whoami();
 	console.log("Current user:", me);
-	// → { id: "1", name: "Alice", email: "alice@test.com", role: "admin" }
 
-	// 2. Query with input
+	// TypeScript knows: getUser requires { id: string }, returns User
 	const user = await client.getUser({ id: "2" });
-	console.log("User 2:", user);
-	// → { id: "2", name: "Bob", ... }
+	console.log("User:", user);
 
-	// 3. Search query (free-form operation)
+	// TypeScript knows: searchUsers requires { query: string, limit?: number }
 	const results = await client.searchUsers({ query: "al", limit: 5 });
-	console.log("Search results:", results);
-	// → [{ id: "1", name: "Alice", ... }]
+	console.log("Search results:", results.length);
 
-	// 4. Query with field selection (only fetch what you need)
+	// @ts-expect-error - TypeScript catches invalid operations
+	// await client.invalidOperation();
+
+	// @ts-expect-error - TypeScript catches wrong input type
+	// await client.getUser({ wrong: 123 });
+}
+
+// =============================================================================
+// Field Selection
+// =============================================================================
+
+async function fieldSelection() {
+	console.log("\n=== Field Selection ===\n");
+
+	// Only fetch specific fields
 	const post = await client.getPost({ id: "1" }).select({
 		id: true,
 		title: true,
@@ -59,230 +91,115 @@ async function basicQueries() {
 		author: {
 			select: {
 				name: true,
+				role: true,
 			},
 		},
 	});
-	console.log("Post (selected fields):", post);
-	// → { id: "1", title: "Hello World", author: { name: "Alice" } }
+	console.log("Post (selected):", post);
+	// → { id: "1", title: "Hello", author: { name: "Alice", role: "admin" } }
 }
 
 // =============================================================================
-// Subscriptions - Real-time Updates
+// Real-time Subscriptions
 // =============================================================================
 
 async function realtimeSubscriptions() {
 	console.log("\n=== Real-time Subscriptions ===\n");
 
-	// 1. Subscribe to current user (全部 fields)
-	const unsubMe = client.whoami().subscribe((user) => {
-		console.log("whoami updated:", user);
+	// Subscribe to user updates
+	const unsub = client.getUser({ id: "1" }).subscribe((user) => {
+		console.log("User 1 updated:", user?.name);
 	});
 
-	// 2. Subscribe with field selection (只收特定 fields 嘅更新)
-	const unsubUser = client
-		.getUser({ id: "1" })
-		.select({ name: true, role: true })
-		.subscribe((user) => {
-			console.log("User 1 name/role changed:", user);
-		});
-
-	// 3. 最大原則 (Maximum Principle)
-	//    - 如果已經有全部 fields 嘅 subscription
-	//    - 新嘅 field subscription 會 share 同一個 connection
+	// Field-level subscription (Maximum Principle)
 	const unsubName = client
 		.getUser({ id: "1" })
-		.select({ name: true }) // ← shares existing subscription!
+		.select({ name: true })
 		.subscribe((user) => {
-			console.log("User 1 name:", user.name);
+			console.log("Name only:", user?.name);
 		});
 
-	// Clean up after 10 seconds
+	// Clean up after 5 seconds
 	setTimeout(() => {
-		unsubMe();
-		unsubUser();
+		unsub();
 		unsubName();
-		console.log("Unsubscribed all");
-	}, 10000);
+	}, 5000);
 }
 
 // =============================================================================
-// Reactive Signals
+// Mutations with Automatic Optimistic Updates
+// =============================================================================
+
+async function mutationsDemo() {
+	console.log("\n=== Mutations (Optimistic) ===\n");
+
+	// Subscribe to see real-time updates
+	const unsub = client.getUser({ id: "1" }).subscribe((user) => {
+		console.log("User state:", user?.name);
+	});
+
+	await new Promise((r) => setTimeout(r, 100));
+
+	// Mutation with automatic optimistic update
+	// Timeline:
+	// 1. Immediately: UI shows "Alice Updated" (from _optimistic)
+	// 2. ~100ms: Server confirms, UI shows authoritative data
+	// 3. If error: Auto-rollback to previous state
+	console.log("Updating user...");
+	const result = await client.updateUser({
+		id: "1",
+		name: "Alice Updated",
+	});
+	console.log("Server confirmed:", result.data.name);
+
+	// Create with tempId
+	console.log("Creating post...");
+	const post = await client.createPost({
+		title: "New Post",
+		content: "Created with optimistic update!",
+	});
+	console.log("Post created:", post.data.id);
+
+	// Cross-entity optimistic update
+	console.log("Bulk promoting users...");
+	const bulk = await client.bulkPromoteUsers({
+		userIds: ["2", "3"],
+		newRole: "vip",
+	});
+	console.log("Promoted:", bulk.data.count, "users");
+
+	unsub();
+}
+
+// =============================================================================
+// Reactive Signals (for frameworks)
 // =============================================================================
 
 async function reactiveSignals() {
 	console.log("\n=== Reactive Signals ===\n");
 
-	// Get reactive signal
-	const userResult = client.getUser({ id: "1" });
+	const userQuery = client.getUser({ id: "1" });
 
-	// Access signal for reactive frameworks
-	const userSignal = userResult.signal;
-	const loadingSignal = userResult.loading;
-	const errorSignal = userResult.error;
+	// Get reactive signals
+	const userSignal = userQuery.signal;
+	const loadingSignal = userQuery.loading;
+	const errorSignal = userQuery.error;
 
-	// Create derived computation
+	// Computed value
 	const displayName = signal(() => {
-		const user = userSignal.value;
-		const loading = loadingSignal.value;
-		if (loading) return "Loading...";
-		if (!user) return "Unknown";
-		return `${user.name} (${user.role})`;
+		if (loadingSignal.value) return "Loading...";
+		if (errorSignal.value) return "Error!";
+		return userSignal.value?.name ?? "Unknown";
 	});
 
 	// React to changes
 	effect(() => {
-		console.log("Display name:", displayName.value);
+		console.log("Display:", displayName.value);
 	});
 
-	// Subscribe to start receiving updates
-	userResult.subscribe();
+	// Start subscription
+	userQuery.subscribe();
 }
-
-// =============================================================================
-// Mutations with Optimistic Updates
-// =============================================================================
-
-async function mutationsWithOptimistic() {
-	console.log("\n=== Mutations with Optimistic Updates ===\n");
-
-	// First, subscribe to see the updates
-	const unsubscribe = client.getUser({ id: "1" }).subscribe((user) => {
-		console.log("User updated:", user?.name, user?.role);
-	});
-
-	// Wait for initial data
-	await new Promise((r) => setTimeout(r, 100));
-
-	// 1. Simple mutation with automatic optimistic update
-	//    → UI updates IMMEDIATELY, before server response
-	console.log("\nUpdating user name...");
-	const result = await client.updateUser({
-		id: "1",
-		name: "Alice Updated",
-	});
-	console.log("Server confirmed:", result.data);
-
-	// 2. Mutation that might fail - automatic rollback
-	console.log("\nTrying invalid update...");
-	try {
-		await client.updateUser({
-			id: "999", // doesn't exist
-			name: "Ghost",
-		});
-	} catch (error) {
-		console.log("Failed, UI rolled back automatically");
-	}
-
-	// 3. Create with tempId
-	console.log("\nCreating post...");
-	const post = await client.createPost({
-		title: "New Post",
-		content: "Created optimistically!",
-	});
-	console.log("Post created:", post.data);
-	// During mutation: { id: "temp_0", title: "New Post", ... }
-	// After server:    { id: "3", title: "New Post", ... }
-
-	// 4. Manual rollback if needed
-	const updateResult = await client.updatePost({
-		id: "1",
-		title: "Changed Title",
-	});
-	// Can manually rollback if needed
-	// updateResult.rollback?.();
-
-	unsubscribe();
-}
-
-// =============================================================================
-// Cross-Entity Optimistic Updates
-// =============================================================================
-
-async function crossEntityOptimistic() {
-	console.log("\n=== Cross-Entity Optimistic Updates ===\n");
-
-	// Subscribe to multiple users
-	const unsub1 = client.getUser({ id: "2" }).subscribe((u) => console.log("User 2:", u?.role));
-	const unsub2 = client.getUser({ id: "3" }).subscribe((u) => console.log("User 3:", u?.role));
-
-	await new Promise((r) => setTimeout(r, 100));
-
-	// Bulk update - affects multiple entities at once
-	console.log("\nPromoting users to VIP...");
-	const result = await client.bulkPromoteUsers({
-		userIds: ["2", "3"],
-		newRole: "vip",
-	});
-	console.log("Promoted", result.data.count, "users");
-
-	// Both User 2 and User 3 subscriptions updated immediately
-	// with optimistic data, then confirmed with server data
-
-	unsub1();
-	unsub2();
-}
-
-// =============================================================================
-// Query Deduplication (canDerive)
-// =============================================================================
-
-async function queryDeduplication() {
-	console.log("\n=== Query Deduplication ===\n");
-
-	// These requests are deduplicated:
-	// - Same operation + input = shared request
-	// - Field selection: if full subscription exists, derive from it
-
-	console.log("Firing 3 parallel requests for same user...");
-	const [user1, user2, user3] = await Promise.all([
-		client.getUser({ id: "1" }),
-		client.getUser({ id: "1" }),
-		client.getUser({ id: "1" }),
-	]);
-
-	console.log("All resolved from single network request:");
-	console.log("user1 === user2:", user1 === user2); // true (same reference)
-
-	// Field selection derives from existing subscription
-	const fullSub = client.getUser({ id: "1" }).subscribe();
-
-	// This doesn't make a new request - derives from fullSub
-	const nameOnly = await client.getUser({ id: "1" }).select({ name: true });
-	console.log("Derived name:", nameOnly);
-
-	fullSub();
-}
-
-// =============================================================================
-// With React (using @lens/react)
-// =============================================================================
-
-/*
-import { useQuery, useMutation } from '@lens/react';
-
-function UserProfile({ userId }: { userId: string }) {
-  // Automatically subscribes, unsubscribes on unmount
-  const { data: user, loading, error } = useQuery(
-    client.getUser({ id: userId })
-      .select({ name: true, email: true, role: true })
-  );
-
-  const updateUser = useMutation(client.updateUser);
-
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
-
-  return (
-    <div>
-      <h1>{user.name}</h1>
-      <p>{user.email}</p>
-      <button onClick={() => updateUser({ id: userId, role: 'vip' })}>
-        Upgrade to VIP
-      </button>
-    </div>
-  );
-}
-*/
 
 // =============================================================================
 // Run Demo
@@ -291,15 +208,12 @@ function UserProfile({ userId }: { userId: string }) {
 async function main() {
 	try {
 		await basicQueries();
-		await mutationsWithOptimistic();
-		await crossEntityOptimistic();
-		await queryDeduplication();
-
-		// Uncomment to test real-time
+		await fieldSelection();
+		await mutationsDemo();
 		// await realtimeSubscriptions();
 		// await reactiveSignals();
 	} catch (error) {
-		console.error("Demo error:", error);
+		console.error("Error:", error);
 	}
 }
 

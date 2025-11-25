@@ -91,9 +91,15 @@ export interface UnifiedClientConfig<
 	Q extends QueriesMap = QueriesMap,
 	M extends MutationsMap = MutationsMap,
 > {
-	/** Query definitions */
+	/**
+	 * Query definitions (optional if using type inference)
+	 * @deprecated Use type parameter instead: createClient<Api>({ links: [...] })
+	 */
 	queries?: Q;
-	/** Mutation definitions */
+	/**
+	 * Mutation definitions (optional if using type inference)
+	 * @deprecated Use type parameter instead: createClient<Api>({ links: [...] })
+	 */
 	mutations?: M;
 	/** Transport (direct transport, use this OR links) */
 	transport?: UnifiedTransport;
@@ -102,6 +108,26 @@ export interface UnifiedClientConfig<
 	/** Enable optimistic updates */
 	optimistic?: boolean;
 }
+
+/**
+ * API type for client inference (from server)
+ *
+ * @example
+ * ```typescript
+ * import type { Api } from './server';  // TYPE-only import
+ * const client = createClient<Api>({ links: [...] });
+ * ```
+ */
+export interface ApiShape<Q extends QueriesMap = QueriesMap, M extends MutationsMap = MutationsMap> {
+	queries: Q;
+	mutations: M;
+}
+
+/**
+ * Infer API type from server
+ * Use: type Api = typeof server._types
+ */
+export type InferApiFromServer<T> = T extends { _types: infer Shape } ? Shape : never;
 
 /** Query result with subscription support */
 export interface QueryResult<T> {
@@ -929,6 +955,27 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	}
 
 	/**
+	 * Create dynamic accessor (for type-only mode)
+	 * Returns a callable that works as both query and mutation
+	 */
+	createDynamicAccessor(name: string): unknown {
+		// Return a function that:
+		// - Has QueryResult-like interface for subscriptions
+		// - Is callable for one-time execution
+		// The transport determines if it's a query or mutation
+		const accessor = (input?: unknown) => {
+			return this.executeQuery(name, input);
+		};
+
+		// Add subscribe method for real-time
+		(accessor as Record<string, unknown>).subscribe = (callback?: (data: unknown) => void) => {
+			return this.executeQuery(name, undefined).subscribe(callback);
+		};
+
+		return accessor;
+	}
+
+	/**
 	 * Get underlying store
 	 */
 	get $store(): ReactiveStore {
@@ -985,12 +1032,40 @@ export type UnifiedClient<Q extends QueriesMap, M extends MutationsMap> = {
 
 /**
  * Create unified client with flat namespace
+ *
+ * Two usage patterns:
+ *
+ * 1. Type inference from server (recommended):
+ * ```typescript
+ * import type { Api } from './server';
+ * const client = createClient<Api>({
+ *   links: [loggerLink(), websocketLink({ url })],
+ * });
+ * ```
+ *
+ * 2. Direct definitions (deprecated):
+ * ```typescript
+ * const client = createClient({
+ *   queries: { whoami, getUser },
+ *   mutations: { updateUser },
+ *   links: [...],
+ * });
+ * ```
  */
 export function createUnifiedClient<
-	Q extends QueriesMap = QueriesMap,
-	M extends MutationsMap = MutationsMap,
->(config: UnifiedClientConfig<Q, M>): UnifiedClient<Q, M> {
+	TApi extends ApiShape<QueriesMap, MutationsMap> = ApiShape<QueriesMap, MutationsMap>,
+>(
+	config: UnifiedClientConfig<TApi["queries"], TApi["mutations"]>,
+): UnifiedClient<TApi["queries"], TApi["mutations"]> {
+	type Q = TApi["queries"];
+	type M = TApi["mutations"];
+
 	const impl = new UnifiedClientImpl(config);
+
+	// Track known operation names for runtime (if provided)
+	const queryNames = new Set(Object.keys(config.queries ?? {}));
+	const mutationNames = new Set(Object.keys(config.mutations ?? {}));
+	const hasRuntimeInfo = queryNames.size > 0 || mutationNames.size > 0;
 
 	// Create proxy with flat namespace
 	const client = new Proxy({} as UnifiedClient<Q, M>, {
@@ -1002,17 +1077,24 @@ export function createUnifiedClient<
 			if (key === "$queryNames") return () => impl.$queryNames();
 			if (key === "$mutationNames") return () => impl.$mutationNames();
 
-			// Check if it's a query
-			if (config.queries && key in config.queries) {
-				return impl.createQueryAccessor(key as keyof Q);
+			// Skip symbol properties and internals
+			if (typeof prop === "symbol" || key.startsWith("_")) return undefined;
+
+			// If we have runtime info, use it
+			if (hasRuntimeInfo) {
+				if (queryNames.has(key)) {
+					return impl.createQueryAccessor(key as keyof Q);
+				}
+				if (mutationNames.has(key)) {
+					return impl.createMutationAccessor(key as keyof M);
+				}
+				return undefined;
 			}
 
-			// Check if it's a mutation
-			if (config.mutations && key in config.mutations) {
-				return impl.createMutationAccessor(key as keyof M);
-			}
-
-			return undefined;
+			// Type-only mode: create accessor dynamically
+			// Server will validate if operation exists
+			// Type system prevents invalid calls at compile time
+			return impl.createDynamicAccessor(key);
 		},
 	});
 

@@ -1,10 +1,10 @@
 /**
  * V2 Complete Example - Server
  *
- * Demonstrates: Server setup with operations
+ * Demonstrates: Server setup with operations + type export for client
  */
 
-import { createUnifiedServer } from "@lens/server";
+import { createUnifiedServer, type InferApi } from "@lens/server";
 import { User, Post, Comment, relations } from "./schema";
 import { queries, mutations } from "./operations";
 
@@ -144,6 +144,21 @@ const server = createUnifiedServer({
 		heartbeat: 30000,
 	},
 });
+
+// =============================================================================
+// Export API Type (for client type inference)
+// =============================================================================
+
+/**
+ * Client imports this TYPE (not runtime value) for type-safe API access
+ *
+ * Usage in client:
+ * ```typescript
+ * import type { Api } from './server';
+ * const client = createClient<Api>({ links: [...] });
+ * ```
+ */
+export type Api = typeof server._types;
 
 // =============================================================================
 // Start Server

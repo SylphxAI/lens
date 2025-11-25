@@ -126,6 +126,10 @@ export {
 	type RelationsArray as UnifiedRelationsArray,
 	type WebSocketLike as UnifiedWebSocketLike,
 	type SelectionObject,
+	// Type inference utilities (tRPC-style)
+	type InferApi,
+	type InferInput,
+	type InferOutput,
 } from "./server/unified";
 
 // =============================================================================
