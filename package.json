@@ -21,6 +21,7 @@
 		"@biomejs/biome": "^1.9.4",
 		"@changesets/cli": "^2.29.7",
 		"@types/bun": "latest",
+		"bunup": "^0.16.10",
 		"typescript": "^5.9.3"
 	},
 	"keywords": ["typescript", "type-safe", "real-time", "api", "lens", "zod", "graphql", "trpc"],

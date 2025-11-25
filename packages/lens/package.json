@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/client.ts ./src/server.ts --outdir ./dist --target node && bun run build:types",
+    "build": "bunup && bun run build:types",
     "build:types": "tsc --emitDeclarationOnly --outDir ./dist",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
