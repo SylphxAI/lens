@@ -177,6 +177,8 @@ export function normalizeOptimisticDSL(
 /** Query definition */
 export interface QueryDef<TInput = void, TOutput = unknown> {
 	_type: "query";
+	/** Query name (optional - derived from export key if not provided) */
+	_name?: string;
 	_input?: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
 	_resolve?: ResolverFn<TInput, TOutput>;
@@ -195,18 +197,23 @@ export interface QueryBuilder<TInput = void, TOutput = unknown> {
 }
 
 class QueryBuilderImpl<TInput = void, TOutput = unknown> implements QueryBuilder<TInput, TOutput> {
+	private _name?: string;
 	private _inputSchema?: ZodLikeSchema<TInput>;
 	private _outputSpec?: ReturnSpec;
 
+	constructor(name?: string) {
+		this._name = name;
+	}
+
 	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput> {
-		const builder = new QueryBuilderImpl<T, TOutput>();
+		const builder = new QueryBuilderImpl<T, TOutput>(this._name);
 		builder._inputSchema = schema;
 		builder._outputSpec = this._outputSpec;
 		return builder;
 	}
 
 	returns<R extends ReturnSpec>(spec: R): QueryBuilder<TInput, InferReturnType<R>> {
-		const builder = new QueryBuilderImpl<TInput, InferReturnType<R>>();
+		const builder = new QueryBuilderImpl<TInput, InferReturnType<R>>(this._name);
 		builder._inputSchema = this._inputSchema as ZodLikeSchema<TInput> | undefined;
 		builder._outputSpec = spec;
 		return builder;
@@ -215,6 +222,7 @@ class QueryBuilderImpl<TInput = void, TOutput = unknown> implements QueryBuilder
 	resolve(fn: ResolverFn<TInput, TOutput>): QueryDef<TInput, TOutput> {
 		return {
 			_type: "query",
+			_name: this._name,
 			_input: this._inputSchema,
 			_output: this._outputSpec,
 			_resolve: fn,
@@ -225,22 +233,27 @@ class QueryBuilderImpl<TInput = void, TOutput = unknown> implements QueryBuilder
 /**
  * Create a query builder
  *
+ * Name is optional - if not provided, it will be derived from the export key.
+ *
  * @example
  * ```typescript
- * // No input
- * const whoami = query()
+ * // Name derived from export key (recommended)
+ * export const getUser = query()
+ *   .input(z.object({ id: z.string() }))
  *   .returns(User)
- *   .resolve(() => useCurrentUser());
+ *   .resolve(({ input }) => db.user.findUnique({ where: { id: input.id } }));
  *
- * // With input
- * const user = query()
+ * // Explicit name (for edge cases)
+ * export const getUser = query('getUser')
  *   .input(z.object({ id: z.string() }))
  *   .returns(User)
  *   .resolve(({ input }) => db.user.findUnique({ where: { id: input.id } }));
  * ```
  */
-export function query(): QueryBuilder<void, unknown> {
-	return new QueryBuilderImpl();
+export function query(): QueryBuilder<void, unknown>;
+export function query(name: string): QueryBuilder<void, unknown>;
+export function query(name?: string): QueryBuilder<void, unknown> {
+	return new QueryBuilderImpl(name);
 }
 
 // =============================================================================
@@ -250,6 +263,8 @@ export function query(): QueryBuilder<void, unknown> {
 /** Mutation definition */
 export interface MutationDef<TInput = unknown, TOutput = unknown> {
 	_type: "mutation";
+	/** Mutation name (optional - derived from export key if not provided) */
+	_name?: string;
 	_input: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
 	/**
@@ -311,25 +326,30 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 		MutationBuilderWithReturns<TInput, TOutput>,
 		MutationBuilderWithOptimistic<TInput, TOutput>
 {
+	private _name?: string;
 	private _inputSchema?: ZodLikeSchema<TInput>;
 	private _outputSpec?: ReturnSpec;
 	private _optimisticSpec?: OptimisticDSL | OptimisticFn<TInput, TOutput>;
 
+	constructor(name?: string) {
+		this._name = name;
+	}
+
 	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput> {
-		const builder = new MutationBuilderImpl<T, TOutput>();
+		const builder = new MutationBuilderImpl<T, TOutput>(this._name);
 		builder._inputSchema = schema;
 		return builder;
 	}
 
 	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>> {
-		const builder = new MutationBuilderImpl<TInput, InferReturnType<R>>();
+		const builder = new MutationBuilderImpl<TInput, InferReturnType<R>>(this._name);
 		builder._inputSchema = this._inputSchema as ZodLikeSchema<TInput> | undefined;
 		builder._outputSpec = spec;
 		return builder;
 	}
 
 	optimistic(spec: OptimisticDSL | OptimisticFn<TInput, TOutput>): MutationBuilderWithOptimistic<TInput, TOutput> {
-		const builder = new MutationBuilderImpl<TInput, TOutput>();
+		const builder = new MutationBuilderImpl<TInput, TOutput>(this._name);
 		builder._inputSchema = this._inputSchema;
 		builder._outputSpec = this._outputSpec;
 		builder._optimisticSpec = spec;
@@ -342,6 +362,7 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 		}
 		return {
 			_type: "mutation",
+			_name: this._name,
 			_input: this._inputSchema,
 			_output: this._outputSpec,
 			_optimistic: this._optimisticSpec,
@@ -353,17 +374,27 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 /**
  * Create a mutation builder
  *
+ * Name is optional - if not provided, it will be derived from the export key.
+ *
  * @example
  * ```typescript
- * const createPost = mutation()
+ * // Name derived from export key (recommended)
+ * export const createPost = mutation()
  *   .input(z.object({ title: z.string(), content: z.string() }))
  *   .returns(Post)
- *   .optimistic(({ input }) => ({ id: tempId(), ...input }))
+ *   .resolve(({ input }) => db.post.create({ data: input }));
+ *
+ * // Explicit name (for edge cases)
+ * export const createPost = mutation('createPost')
+ *   .input(z.object({ title: z.string(), content: z.string() }))
+ *   .returns(Post)
  *   .resolve(({ input }) => db.post.create({ data: input }));
  * ```
  */
-export function mutation(): MutationBuilder<unknown, unknown> {
-	return new MutationBuilderImpl();
+export function mutation(): MutationBuilder<unknown, unknown>;
+export function mutation(name: string): MutationBuilder<unknown, unknown>;
+export function mutation(name?: string): MutationBuilder<unknown, unknown> {
+	return new MutationBuilderImpl(name);
 }
 
 // =============================================================================

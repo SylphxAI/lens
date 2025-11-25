@@ -5,8 +5,8 @@
 TypeScript-first • Real-time Native • Zero Codegen
 
 ```typescript
-// Define schema
-const User = entity('User', {
+// Define schema (name derived from export key!)
+export const User = entity({
   id: t.id(),
   name: t.string(),
   role: t.enum(['user', 'admin']),
@@ -95,7 +95,8 @@ bun add @lens/react      # React hooks
 // schema/entities.ts
 import { entity, t } from '@lens/core'
 
-export const User = entity('User', {
+// Name derived from export key (recommended)
+export const User = entity({
   id: t.id(),
   name: t.string(),
   email: t.string(),
@@ -103,6 +104,7 @@ export const User = entity('User', {
   createdAt: t.datetime().default(() => new Date()),
 })
 
+// Or explicit name (for edge cases)
 export const Post = entity('Post', {
   id: t.id(),
   title: t.string(),
@@ -162,25 +164,29 @@ export const searchUsers = query()
 
 ```typescript
 // operations/mutations.ts
-import { mutation, tempId } from '@lens/core'
+import { mutation } from '@lens/core'
 import { z } from 'zod'
 import { Post } from '../schema/entities'
 
+// "createPost" → auto 'create' optimistic (from naming convention!)
 export const createPost = mutation()
   .input(z.object({ title: z.string(), content: z.string() }))
   .returns(Post)
-  .optimistic(({ input }) => ({
-    id: tempId(),
-    title: input.title,
-    content: input.content,
-    authorId: useCurrentUser().id,
-    published: false,
-  }))
+  // No .optimistic() needed - auto-derived from "createPost" name!
   .resolve(({ input }) => {
     return useDB().post.create({
       data: { ...input, authorId: useCurrentUser().id },
     })
   })
+
+// "updatePost" → auto 'merge' optimistic
+export const updatePost = mutation()
+  .input(z.object({ id: z.string(), title: z.string().optional() }))
+  .returns(Post)
+  .resolve(({ input }) => useDB().post.update({
+    where: { id: input.id },
+    data: input,
+  }))
 ```
 
 ### 4. Define Entity Resolvers
@@ -297,7 +303,8 @@ function CreatePost() {
 ```typescript
 import { entity, t } from '@lens/core'
 
-const User = entity('User', {
+// Name derived from export key (recommended)
+export const User = entity({
   // Primitives
   id: t.id(),                    // string (required)
   name: t.string(),              // string
@@ -405,19 +412,13 @@ export const activeUsers = query()
 ### Mutation
 
 ```typescript
-import { mutation, tempId } from '@lens/core'
+import { mutation } from '@lens/core'
 import { z } from 'zod'
 
-// Simple mutation
+// Simple mutation - auto 'create' optimistic from naming convention!
 export const createPost = mutation()
   .input(z.object({ title: z.string(), content: z.string() }))
   .returns(Post)
-  .optimistic(({ input }) => ({
-    id: tempId(),
-    title: input.title,
-    content: input.content,
-    published: false,
-  }))
   .resolve(({ input }) => useDB().post.create({ data: input }))
 
 // Multi-entity mutation
@@ -654,23 +655,48 @@ function CreatePost() {
 
 ## Optimistic Updates
 
+### Auto-Derived from Naming Convention (90% of cases!)
+
 ```typescript
+// "updatePost" → auto 'merge' (no .optimistic() needed!)
 export const updatePost = mutation()
   .input(z.object({ id: z.string(), title: z.string() }))
   .returns(Post)
-  .optimistic(({ input }) => ({
-    id: input.id,
-    title: input.title,  // Predict the change
-  }))
   .resolve(({ input }) => useDB().post.update({
     where: { id: input.id },
     data: { title: input.title },
+  }))
+
+// "createPost" → auto 'create' with tempId
+export const createPost = mutation()
+  .input(z.object({ title: z.string() }))
+  .returns(Post)
+  .resolve(({ input }) => useDB().post.create({ data: input }))
+
+// "deletePost" → auto 'delete'
+export const deletePost = mutation()
+  .input(z.object({ id: z.string() }))
+  .returns(Post)
+  .resolve(({ input }) => useDB().post.delete({ where: { id: input.id } }))
+```
+
+### Explicit DSL (for edge cases)
+
+```typescript
+// "publishPost" doesn't match convention, needs explicit DSL
+export const publishPost = mutation()
+  .input(z.object({ id: z.string() }))
+  .returns(Post)
+  .optimistic({ merge: { published: true } })  // Set extra field
+  .resolve(({ input }) => useDB().post.update({
+    where: { id: input.id },
+    data: { published: true },
   }))
 ```
 
 **Flow:**
 1. Client calls mutation
-2. `optimistic()` predicts result → Update cache immediately
+2. Optimistic update predicts result → Update cache immediately
 3. Server executes `resolve()`
 4. Server response replaces optimistic data
 5. On error: Rollback to previous state
@@ -680,24 +706,39 @@ export const updatePost = mutation()
 ## API Summary
 
 ```typescript
-// Schema
-entity(name, fields)            // Define entity
+// Schema (names derived from export keys!)
+entity(fields)                  // Define entity (name from export key)
+entity(name, fields)            // Define entity (explicit name)
 relation(entity, relations)     // Define relations
 t.id(), t.string(), ...         // Field types
 hasMany(Entity, accessor)       // One-to-many
 belongsTo(Entity, accessor)     // Many-to-one
 
-// Operations
-query()                         // Create query builder
+// Operations (names derived from export keys!)
+query()                         // Create query builder (name from export key)
+query(name)                     // Create query builder (explicit name)
   .input(zodSchema)             // Input validation (optional)
   .returns(Entity | [Entity])   // Return type
   .resolve(fn)                  // Resolver function
 
-mutation()                      // Create mutation builder
+mutation()                      // Create mutation builder (name from export key)
+mutation(name)                  // Create mutation builder (explicit name)
   .input(zodSchema)             // Input validation
   .returns(Entity | { ... })    // Return type
-  .optimistic(fn)               // Optimistic prediction (optional)
+  .optimistic(spec)             // Optimistic prediction (optional - auto-derived!)
   .resolve(fn)                  // Resolver function
+
+// Auto-Optimistic from Naming Convention
+// updateX → auto 'merge' (no .optimistic() needed)
+// createX/addX → auto 'create'
+// deleteX/removeX → auto 'delete'
+
+// Explicit Optimistic DSL (for edge cases)
+.optimistic('merge')                        // Merge input into entity
+.optimistic('create')                       // Create with auto tempId
+.optimistic('delete')                       // Mark as deleted
+.optimistic({ merge: { published: true } }) // Merge with extra fields
+.optimistic({ create: { status: 'draft' }}) // Create with extra fields
 
 // Entity Resolvers
 entityResolvers({ Entity: { field: resolver } })
