@@ -666,9 +666,9 @@ class LensServerImpl<
 				throw new Error(`Query ${sub.operation} has no resolver`);
 			}
 
-			const resolverCtx = {
-				input: sub.input,
-				ctx: context, // Pass context directly to resolver (tRPC style)
+			// Add emit and onCleanup to context for subscriptions
+			const contextWithHelpers = {
+				...context,
 				emit: emitData,
 				onCleanup: (fn: () => void) => {
 					sub.cleanups.push(fn);
@@ -679,7 +679,10 @@ class LensServerImpl<
 				},
 			};
 
-			const result = resolver(resolverCtx);
+			const result = resolver({
+				input: sub.input,
+				ctx: contextWithHelpers,
+			});
 
 			if (isAsyncIterable(result)) {
 				// Async generator - stream all values

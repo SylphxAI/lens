@@ -1,19 +1,21 @@
 {
-	"mcp": {
-		"servers": {
-			"context7": {
-				"type": "http",
-				"url": "https://mcp.context7.com/mcp"
-			},
-			"playwright": {
-				"type": "stdio",
-				"command": "npx",
-				"args": ["@playwright/mcp@latest"]
-			},
-			"grep": {
-				"type": "http",
-				"url": "https://mcp.grep.app"
-			}
-		}
-	}
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "http",
+        "url": "https://mcp.context7.com/mcp"
+      },
+      "playwright": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "@playwright/mcp@latest"
+        ]
+      },
+      "grep": {
+        "type": "http",
+        "url": "https://mcp.grep.app"
+      }
+    }
+  }
 }
