@@ -171,23 +171,11 @@ class UnifiedClientImpl {
 }
 ```
 
-### Phase 6: Entity Type Declaration
+### ~~Phase 6: Entity Type Declaration~~ ❌ NOT NEEDED
 
-Allow operations to declare their return entity type for normalization:
-
-```typescript
-// Entity-returning operation
-const getUser = query()
-  .input(z.object({ id: z.string() }))
-  .returns(User)  // ← Entity type known
-  .entity('User')  // ← NEW: Explicit entity declaration
-  .resolve(({ input }) => db.user.find(input.id));
-
-// Non-entity operation (no normalization)
-const getStats = query()
-  .returns(z.object({ count: z.number() }))  // ← Not an entity
-  .resolve(() => ({ count: 42 }));
-```
+> **Reason**: Unified client is operation-centric, not entity-centric.
+> Entity normalization would add complexity without clear benefit.
+> The `.select()` API already provides field-level optimization.
 
 ---
 
@@ -203,15 +191,16 @@ const getStats = query()
 - Keep external API identical
 - All tests should pass
 
-### Step 3: Add EntitySignal Support (additive)
-- Add `$` property to QueryResult
-- Existing code using `.value` continues to work
-- New code can use `$.field`
+### Step 3: Add Optimistic Updates (additive) ✅ DONE
+- Add `OptimisticConfig` type
+- `applyOptimistic()`, `confirmOptimistic()`, `rollbackOptimistic()` methods
+- `executeMutationOptimistic()` for mutations with automatic rollback
 
-### Step 4: Add Optimistic Updates (additive)
-- Add optimistic: true option (default)
-- Mutations become optimistic by default
-- rollback() function returned from mutations
+### ~~Step 4: Add EntitySignal Support~~ ❌ NOT NEEDED
+> **Reason**: `.select()` API already provides field-level subscriptions.
+> - `client.getUser({ id }).select({ name: true })` → only subscribes to `name` field
+> - Server only pushes updates for selected fields
+> - `$.field` would be redundant complexity
 
 ---
 
@@ -232,10 +221,10 @@ const getStats = query()
 
 ## Testing Strategy
 
-1. **All existing tests must pass** - API is unchanged
-2. **Add EntitySignal tests** - `$.field` access
-3. **Add optimistic update tests** - mutation rollback
-4. **Add integration tests** - V1 + unified working together
+1. **All existing tests must pass** - API is unchanged ✅
+2. **Add shared utility tests** - keys, batching, dedup ✅ (16 tests)
+3. **Add Maximum Principle tests** - subscription sharing ✅ (3 tests)
+4. **Add optimistic update tests** - mutation rollback (future)
 
 ---
 
