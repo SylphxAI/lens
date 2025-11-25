@@ -75,8 +75,8 @@ export function useLensClient<Q = unknown, M = unknown>(): LensClient<Q, M> {
 
 	if (!client) {
 		throw new Error(
-			"useLensClient must be used within a LensProvider. " +
-				"Make sure you have wrapped your app with <LensProvider client={...}>",
+			"useLensClient must be used within a <LensProvider>. " +
+				"Make sure to wrap your app with <LensProvider client={client}>.",
 		);
 	}
 

@@ -31,7 +31,10 @@ export {
 export {
 	// Context key
 	LENS_CLIENT_KEY,
-	// Context functions
+	// Context functions (recommended)
+	provideLensClient,
+	useLensClient,
+	// Legacy aliases (deprecated)
 	setLensClient,
 	getLensClient,
 } from "./context";

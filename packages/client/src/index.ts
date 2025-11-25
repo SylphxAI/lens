@@ -84,6 +84,8 @@ export {
 	composeLinks,
 	createOperationContext,
 	// Middleware links
+	deserializeLink,
+	type DeserializeLinkOptions,
 	loggerLink,
 	type LoggerLinkOptions,
 	retryLink,

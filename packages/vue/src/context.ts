@@ -70,8 +70,8 @@ export function useLensClient<Q = unknown, M = unknown>(): LensClient<Q, M> {
 
 	if (!client) {
 		throw new Error(
-			"Lens client not provided. " +
-				"Make sure to call provideLensClient() in a parent component.",
+			"useLensClient must be used within a component that called provideLensClient(). " +
+				"Make sure to call provideLensClient(client) in a parent component.",
 		);
 	}
 
