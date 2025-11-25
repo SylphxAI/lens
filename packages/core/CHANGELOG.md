@@ -1,5 +1,11 @@
 # @sylphx/lens-core
 
+## 1.0.1
+
+### Patch Changes
+
+- 48efc47: Re-release v1.0.1 (npm 1.0.0 version number reserved)
+
 ## 1.0.0
 
 ### Major Changes

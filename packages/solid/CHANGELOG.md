@@ -1,5 +1,13 @@
 # @sylphx/lens-solid
 
+## 1.0.1
+
+### Patch Changes
+
+- 48efc47: Re-release v1.0.1 (npm 1.0.0 version number reserved)
+- Updated dependencies [48efc47]
+  - @sylphx/lens-client@1.0.1
+
 ## 1.0.0
 
 ### Major Changes
