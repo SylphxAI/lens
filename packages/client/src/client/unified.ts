@@ -706,21 +706,32 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 
 	/**
 	 * Execute a mutation
-	 * Automatically applies optimistic update if mutation has _optimistic defined
+	 * Automatically applies optimistic update:
+	 * - Default: auto-derive from input (if input has 'id', merge into matching entity)
+	 * - Custom: use mutation's ._optimistic() for more accurate predictions
 	 */
 	private async executeMutation<TInput, TOutput>(
 		operation: string,
 		input: TInput,
 	): Promise<MutationResult<TOutput>> {
-		// Get mutation definition for optimistic support
+		// Get mutation definition for custom optimistic support
 		const mutationDef = this.mutations[operation as keyof M] as MutationDef<TInput, TOutput> | undefined;
 
-		// Apply optimistic update if enabled and mutation has optimistic handler
+		// Apply optimistic update (automatic by default)
 		let optId: string | undefined;
-		if (this.optimistic && mutationDef?._optimistic) {
-			const optimisticData = mutationDef._optimistic({ input });
+		if (this.optimistic) {
+			let optimisticData: unknown;
+
+			if (mutationDef?._optimistic) {
+				// Custom prediction (optional, for more accurate updates)
+				optimisticData = mutationDef._optimistic({ input });
+			} else {
+				// AUTO: if input has 'id', use input as optimistic data
+				// This merges input fields into the entity with matching id
+				optimisticData = this.autoOptimisticFromInput(input);
+			}
+
 			if (optimisticData) {
-				// Find affected subscriptions and apply optimistic data
 				optId = this.applyOptimisticFromMutation(operation, input, optimisticData);
 			}
 		}
@@ -877,6 +888,41 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		const obj = data as Record<string, unknown>;
 		if ("id" in obj && typeof obj.id === "string") return obj.id;
 		return undefined;
+	}
+
+	/**
+	 * Auto-derive optimistic data from mutation input
+	 *
+	 * If input has 'id', use input as optimistic data.
+	 * This automatically merges input fields into the entity with matching id.
+	 *
+	 * For create operations (no id), returns null - use .optimistic() with tempId().
+	 *
+	 * @example
+	 * // Input: { id: "1", name: "New Name" }
+	 * // Auto-optimistic: merge { name: "New Name" } into entity with id "1"
+	 */
+	private autoOptimisticFromInput(input: unknown): unknown {
+		if (!input || typeof input !== "object") return null;
+
+		const obj = input as Record<string, unknown>;
+
+		// If input has 'id', use it as optimistic data
+		// applyOptimisticFromMutation will find matching entity and merge
+		if ("id" in obj && typeof obj.id === "string") {
+			return input;
+		}
+
+		// For array inputs (bulk operations), extract items with ids
+		if (Array.isArray(input)) {
+			const withIds = input.filter(
+				(item) => item && typeof item === "object" && "id" in item
+			);
+			return withIds.length > 0 ? withIds : null;
+		}
+
+		// No id = can't auto-derive (create operation needs .optimistic() with tempId)
+		return null;
 	}
 
 	/**
