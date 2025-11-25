@@ -20,9 +20,6 @@ export type {
 	Metadata,
 	OperationMeta,
 	OptimisticDSL,
-	// Route types
-	RouteCondition,
-	RouteEntry,
 } from "./types";
 
 // =============================================================================
@@ -61,8 +58,9 @@ export { inProcess, type InProcessTransportOptions, type LensServerInterface } f
 // Route
 export {
 	route,
+	type RouteConfig,
 	routeByType,
 	type RouteByTypeConfig,
+	// Legacy
 	routeByPath,
-	type RouteByPathConfig,
 } from "./route";

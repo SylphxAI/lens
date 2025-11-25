@@ -5,56 +5,81 @@
  * Supports multi-server architectures with automatic metadata merging.
  */
 
-import type {
-	Metadata,
-	Observable,
-	Operation,
-	Result,
-	RouteCondition,
-	RouteEntry,
-	Transport,
-} from "./types";
+import type { Metadata, Observable, Operation, Result, Transport } from "./types";
 
 // =============================================================================
-// Route Transport
+// Route Transport (Glob Pattern)
 // =============================================================================
 
 /**
- * Create route transport for conditional routing.
- *
- * Route transport connects to multiple servers and merges metadata.
- * Requests are routed based on condition functions.
+ * Route configuration with glob-like patterns.
+ * Use '*' as wildcard/fallback.
  *
  * @example
  * ```typescript
- * const client = await createClient<Api>({
- *   transport: route([
- *     [op => op.path.startsWith('auth.'), http({ url: '/auth-api' })],
- *     [op => op.path.startsWith('analytics.'), http({ url: '/analytics-api' })],
- *     http({ url: '/api' }),  // fallback (last entry without condition)
- *   ]),
+ * transport: route({
+ *   'auth.*': http({ url: '/auth-api' }),
+ *   'analytics.*': http({ url: '/analytics-api' }),
+ *   '*': http({ url: '/api' }),  // fallback
  * })
  * ```
  */
-export function route(routes: RouteEntry[]): Transport {
-	if (routes.length === 0) {
-		throw new Error("route() requires at least one transport");
+export type RouteConfig = Record<string, Transport>;
+
+/**
+ * Create route transport with glob-like pattern matching.
+ *
+ * Patterns:
+ * - `'auth.*'` - matches 'auth.login', 'auth.logout', etc.
+ * - `'user.profile.*'` - matches 'user.profile.get', 'user.profile.update'
+ * - `'*'` - matches everything (fallback, should be last)
+ *
+ * @example
+ * ```typescript
+ * // Simple routing
+ * const client = await createClient<Api>({
+ *   transport: route({
+ *     'auth.*': http({ url: '/auth' }),
+ *     '*': http({ url: '/api' }),
+ *   }),
+ * });
+ *
+ * // Mixed with routeByType
+ * const client = await createClient<Api>({
+ *   transport: route({
+ *     'auth.*': http({ url: '/auth' }),
+ *     '*': routeByType({
+ *       default: http({ url: '/api' }),
+ *       subscription: ws({ url: 'ws://localhost:3000' }),
+ *     }),
+ *   }),
+ * });
+ * ```
+ */
+export function route(config: RouteConfig): Transport {
+	const entries = Object.entries(config);
+
+	if (entries.length === 0) {
+		throw new Error("route() requires at least one pattern");
 	}
 
+	// Sort entries: specific patterns first, '*' last
+	const sorted = entries.sort(([a], [b]) => {
+		if (a === "*") return 1;
+		if (b === "*") return -1;
+		// More specific (longer) patterns first
+		return b.length - a.length;
+	});
+
 	return {
-		/**
-		 * Connect to all child transports and merge metadata.
-		 */
 		async connect(): Promise<Metadata> {
 			// Connect all transports in parallel
 			const results = await Promise.all(
-				routes.map(async (entry) => {
-					const transport = getTransport(entry);
+				sorted.map(async ([pattern, transport]) => {
 					try {
 						return await transport.connect();
 					} catch (error) {
-						// Log but don't fail - allow partial connectivity
-						console.warn(`Failed to connect to transport: ${(error as Error).message}`);
+						console.warn(`Failed to connect to ${pattern}: ${(error as Error).message}`);
 						return { version: "unknown", operations: {} } as Metadata;
 					}
 				}),
@@ -62,7 +87,6 @@ export function route(routes: RouteEntry[]): Transport {
 
 			// Merge all metadata
 			const mergedOperations: Record<string, Metadata["operations"][string]> = {};
-
 			for (const metadata of results) {
 				Object.assign(mergedOperations, metadata.operations);
 			}
@@ -73,29 +97,56 @@ export function route(routes: RouteEntry[]): Transport {
 			};
 		},
 
-		/**
-		 * Execute operation by routing to matching transport.
-		 */
 		execute(op: Operation): Promise<Result> | Observable<Result> {
-			const transport = findMatchingTransport(routes, op);
+			const transport = findMatchingTransport(sorted, op.path);
 			return transport.execute(op);
 		},
 	};
 }
 
+/**
+ * Match path against glob-like pattern.
+ */
+function matchPattern(pattern: string, path: string): boolean {
+	// '*' matches everything
+	if (pattern === "*") return true;
+
+	// 'auth.*' matches 'auth.login', 'auth.logout', etc.
+	if (pattern.endsWith(".*")) {
+		const prefix = pattern.slice(0, -1); // 'auth.'
+		return path.startsWith(prefix);
+	}
+
+	// Exact match
+	return pattern === path;
+}
+
+/**
+ * Find transport matching path.
+ */
+function findMatchingTransport(entries: [string, Transport][], path: string): Transport {
+	for (const [pattern, transport] of entries) {
+		if (matchPattern(pattern, path)) {
+			return transport;
+		}
+	}
+
+	throw new Error(`No transport matched for path: ${path}`);
+}
+
 // =============================================================================
-// Route By Type Shorthand
+// Route By Type
 // =============================================================================
 
 /**
  * Route by type configuration.
  */
 export interface RouteByTypeConfig {
-	/** Transport for queries (optional, falls back to default) */
+	/** Transport for queries */
 	query?: Transport;
-	/** Transport for mutations (optional, falls back to default) */
+	/** Transport for mutations */
 	mutation?: Transport;
-	/** Transport for subscriptions (optional, falls back to default) */
+	/** Transport for subscriptions */
 	subscription?: Transport;
 	/** Default transport (required) */
 	default: Transport;
@@ -104,125 +155,87 @@ export interface RouteByTypeConfig {
 /**
  * Create route transport that routes by operation type.
  *
- * Common pattern for splitting subscriptions to WebSocket while
- * using HTTP for queries and mutations.
- *
  * @example
  * ```typescript
- * const client = await createClient<Api>({
- *   transport: routeByType({
- *     default: http({ url: '/api' }),
- *     subscription: ws({ url: 'ws://localhost:3000' }),
- *   }),
+ * transport: routeByType({
+ *   default: http({ url: '/api' }),
+ *   subscription: ws({ url: 'ws://localhost:3000' }),
  * })
  * ```
  */
 export function routeByType(config: RouteByTypeConfig): Transport {
-	const routes: RouteEntry[] = [];
+	const { query, mutation, subscription, default: defaultTransport } = config;
 
-	if (config.query) {
-		routes.push([(op) => op.type === "query", config.query]);
-	}
+	// Collect all unique transports for connect
+	const transports = new Set<Transport>();
+	transports.add(defaultTransport);
+	if (query) transports.add(query);
+	if (mutation) transports.add(mutation);
+	if (subscription) transports.add(subscription);
 
-	if (config.mutation) {
-		routes.push([(op) => op.type === "mutation", config.mutation]);
-	}
+	return {
+		async connect(): Promise<Metadata> {
+			const results = await Promise.all(
+				Array.from(transports).map(async (t) => {
+					try {
+						return await t.connect();
+					} catch (error) {
+						console.warn(`Failed to connect: ${(error as Error).message}`);
+						return { version: "unknown", operations: {} } as Metadata;
+					}
+				}),
+			);
 
-	if (config.subscription) {
-		routes.push([(op) => op.type === "subscription", config.subscription]);
-	}
+			const mergedOperations: Record<string, Metadata["operations"][string]> = {};
+			for (const metadata of results) {
+				Object.assign(mergedOperations, metadata.operations);
+			}
 
-	// Default fallback
-	routes.push(config.default);
+			return {
+				version: results[0]?.version ?? "1.0.0",
+				operations: mergedOperations,
+			};
+		},
 
-	return route(routes);
+		execute(op: Operation): Promise<Result> | Observable<Result> {
+			let transport: Transport;
+
+			switch (op.type) {
+				case "query":
+					transport = query ?? defaultTransport;
+					break;
+				case "mutation":
+					transport = mutation ?? defaultTransport;
+					break;
+				case "subscription":
+					transport = subscription ?? defaultTransport;
+					break;
+				default:
+					transport = defaultTransport;
+			}
+
+			return transport.execute(op);
+		},
+	};
 }
 
 // =============================================================================
-// Route By Path Shorthand
+// Legacy Exports (for backwards compatibility during transition)
 // =============================================================================
 
-/**
- * Route by path configuration.
- */
-export interface RouteByPathConfig {
-	/** Path prefix to transport mapping */
+/** @deprecated Use route() with object syntax instead */
+export function routeByPath(config: {
 	paths: Record<string, Transport>;
-	/** Default transport for unmatched paths */
 	default: Transport;
-}
-
-/**
- * Create route transport that routes by operation path prefix.
- *
- * @example
- * ```typescript
- * const client = await createClient<Api>({
- *   transport: routeByPath({
- *     paths: {
- *       'auth.': http({ url: '/auth-api' }),
- *       'analytics.': http({ url: '/analytics-api' }),
- *     },
- *     default: http({ url: '/api' }),
- *   }),
- * })
- * ```
- */
-export function routeByPath(config: RouteByPathConfig): Transport {
-	const routes: RouteEntry[] = [];
+}): Transport {
+	const routeConfig: RouteConfig = {};
 
 	for (const [prefix, transport] of Object.entries(config.paths)) {
-		routes.push([(op) => op.path.startsWith(prefix), transport]);
+		// Convert 'auth.' to 'auth.*'
+		const pattern = prefix.endsWith(".") ? `${prefix}*` : prefix;
+		routeConfig[pattern] = transport;
 	}
+	routeConfig["*"] = config.default;
 
-	// Default fallback
-	routes.push(config.default);
-
-	return route(routes);
-}
-
-// =============================================================================
-// Internal Helpers
-// =============================================================================
-
-/**
- * Extract transport from route entry.
- */
-function getTransport(entry: RouteEntry): Transport {
-	if (Array.isArray(entry)) {
-		return entry[1];
-	}
-	return entry;
-}
-
-/**
- * Get condition from route entry, if any.
- */
-function getCondition(entry: RouteEntry): RouteCondition | null {
-	if (Array.isArray(entry)) {
-		return entry[0];
-	}
-	return null;
-}
-
-/**
- * Find transport matching operation.
- */
-function findMatchingTransport(routes: RouteEntry[], op: Operation): Transport {
-	for (const entry of routes) {
-		const condition = getCondition(entry);
-
-		// No condition = fallback (matches everything)
-		if (!condition) {
-			return getTransport(entry);
-		}
-
-		// Check condition
-		if (condition(op)) {
-			return getTransport(entry);
-		}
-	}
-
-	// Should never happen if routes are configured correctly
-	throw new Error(`No transport matched for operation: ${op.path}`);
+	return route(routeConfig);
 }

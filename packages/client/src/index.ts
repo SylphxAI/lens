@@ -43,8 +43,6 @@ export {
 	type Observable,
 	type Observer,
 	type Unsubscribable,
-	type RouteCondition,
-	type RouteEntry,
 	// Transports
 	http,
 	type HttpTransportOptions,
@@ -57,10 +55,10 @@ export {
 	type LensServerInterface,
 	// Route
 	route,
+	type RouteConfig,
 	routeByType,
 	type RouteByTypeConfig,
 	routeByPath,
-	type RouteByPathConfig,
 } from "./transport";
 
 // =============================================================================

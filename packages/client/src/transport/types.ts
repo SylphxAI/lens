@@ -129,14 +129,3 @@ export interface Transport {
 	 */
 	execute(op: Operation): Promise<Result> | Observable<Result>;
 }
-
-/**
- * Condition function for routing.
- */
-export type RouteCondition = (op: Operation) => boolean;
-
-/**
- * Route configuration entry.
- * Tuple of [condition, transport] or just transport for fallback.
- */
-export type RouteEntry = [RouteCondition, Transport] | Transport;
