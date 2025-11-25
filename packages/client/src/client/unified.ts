@@ -13,6 +13,11 @@ import type { QueryDef, MutationDef, Update } from "@lens/core";
 import { applyUpdate } from "@lens/core";
 import { ReactiveStore, type EntityState } from "../store/reactive-store";
 import { signal, computed, type Signal } from "../signals/signal";
+import {
+	makeQueryKey,
+	makeQueryKeyWithFields,
+	RequestDeduplicator,
+} from "../shared";
 
 // =============================================================================
 // Types
@@ -125,7 +130,26 @@ export type SelectionObject = Record<string, boolean | SelectionObject | { selec
 /** Mutation result */
 export interface MutationResult<T> {
 	data: T;
+	/** Rollback optimistic update (if applied) */
 	rollback?: () => void;
+}
+
+/** Optimistic update configuration */
+export interface OptimisticConfig<T = unknown> {
+	/** Operation to apply optimistic update to */
+	operation: string;
+	/** Input to identify the subscription */
+	input?: unknown;
+	/** Optimistic data to apply immediately */
+	data: Partial<T>;
+}
+
+/** Pending optimistic entry */
+interface OptimisticEntry {
+	id: string;
+	operation: string;
+	input: unknown;
+	previousData: unknown;
 }
 
 /** Infer input type from query/mutation */
@@ -174,20 +198,7 @@ interface SubscriptionState {
 	callbacks: Set<(data: unknown) => void>;
 }
 
-// =============================================================================
-// Query Key
-// =============================================================================
-
-function makeQueryKey(operation: string, input: unknown): string {
-	const inputStr = input ? JSON.stringify(input) : "";
-	return `${operation}:${inputStr}`;
-}
-
-function makeQueryKeyWithFields(operation: string, input: unknown, fields?: string[]): string {
-	const base = makeQueryKey(operation, input);
-	if (!fields) return base;
-	return `${base}:${fields.sort().join(",")}`;
-}
+// Note: makeQueryKey and makeQueryKeyWithFields imported from shared/keys
 
 // =============================================================================
 // Unified Client Implementation
@@ -216,8 +227,12 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	private batchTimer: ReturnType<typeof setTimeout> | null = null;
 	private readonly batchDelay = 10;
 
-	/** In-flight queries for deduplication */
-	private inFlight = new Map<string, Promise<unknown>>();
+	/** In-flight queries for deduplication (uses shared utility) */
+	private requestDedup = new RequestDeduplicator<unknown>();
+
+	/** Pending optimistic updates */
+	private optimisticUpdates = new Map<string, OptimisticEntry>();
+	private optimisticCounter = 0;
 
 	constructor(config: UnifiedClientConfig<Q, M>) {
 		this.queries = config.queries ?? ({} as Q);
@@ -601,7 +616,7 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	}
 
 	/**
-	 * Fetch query from server (with deduplication)
+	 * Fetch query from server (with deduplication via shared utility)
 	 */
 	private async fetchQuery(
 		operation: string,
@@ -611,32 +626,21 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	): Promise<unknown> {
 		const key = makeQueryKeyWithFields(operation, input, fields);
 
-		// Check in-flight
-		const inFlight = this.inFlight.get(key);
-		if (inFlight) {
-			return inFlight;
-		}
+		// Use shared RequestDeduplicator
+		return this.requestDedup.dedupe(key, async () => {
+			// Create operation context for link chain
+			const ctx: UnifiedOperationContext = {
+				id: `query-${operation}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+				type: "query",
+				operation,
+				input,
+				select,
+				meta: {},
+			};
 
-		// Create operation context for link chain
-		const ctx: UnifiedOperationContext = {
-			id: `query-${operation}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-			type: "query",
-			operation,
-			input,
-			select,
-			meta: {},
-		};
-
-		// Execute through link chain
-		const promise = this.executeWithLinks(ctx);
-		this.inFlight.set(key, promise);
-
-		try {
-			const result = await promise;
-			return result;
-		} finally {
-			this.inFlight.delete(key);
-		}
+			// Execute through link chain
+			return this.executeWithLinks(ctx);
+		});
 	}
 
 	/**
@@ -720,6 +724,127 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		if (!data || typeof data !== "object") return;
 
 		// For now, we rely on the server pushing updates via subscriptions
+	}
+
+	// ===========================================================================
+	// Optimistic Updates
+	// ===========================================================================
+
+	/**
+	 * Apply optimistic update to a subscription
+	 */
+	applyOptimistic(config: OptimisticConfig): string {
+		const key = makeQueryKey(config.operation, config.input);
+		const sub = this.subscriptions.get(key);
+
+		// Generate optimistic ID
+		const optId = `opt_${++this.optimisticCounter}`;
+
+		// Store previous data for rollback
+		const previousData = sub?.data.value ?? null;
+		this.optimisticUpdates.set(optId, {
+			id: optId,
+			operation: config.operation,
+			input: config.input,
+			previousData,
+		});
+
+		// Apply optimistic data
+		if (sub) {
+			const merged = previousData && typeof previousData === "object"
+				? { ...previousData, ...config.data }
+				: config.data;
+			sub.data.value = merged;
+
+			// Notify callbacks
+			for (const callback of sub.callbacks) {
+				callback(merged);
+			}
+		}
+
+		return optId;
+	}
+
+	/**
+	 * Confirm optimistic update with server data
+	 */
+	confirmOptimistic(optId: string, serverData?: unknown): void {
+		const entry = this.optimisticUpdates.get(optId);
+		if (!entry) return;
+
+		// Update with authoritative server data if provided
+		if (serverData !== undefined) {
+			const key = makeQueryKey(entry.operation, entry.input);
+			const sub = this.subscriptions.get(key);
+			if (sub) {
+				sub.data.value = serverData;
+
+				// Notify callbacks
+				for (const callback of sub.callbacks) {
+					callback(serverData);
+				}
+			}
+		}
+
+		this.optimisticUpdates.delete(optId);
+	}
+
+	/**
+	 * Rollback optimistic update
+	 */
+	rollbackOptimistic(optId: string): void {
+		const entry = this.optimisticUpdates.get(optId);
+		if (!entry) return;
+
+		// Restore previous data
+		const key = makeQueryKey(entry.operation, entry.input);
+		const sub = this.subscriptions.get(key);
+		if (sub && entry.previousData !== null) {
+			sub.data.value = entry.previousData;
+
+			// Notify callbacks
+			for (const callback of sub.callbacks) {
+				callback(entry.previousData);
+			}
+		}
+
+		this.optimisticUpdates.delete(optId);
+	}
+
+	/**
+	 * Execute mutation with optimistic update
+	 */
+	async executeMutationOptimistic<TInput, TOutput>(
+		operation: string,
+		input: TInput,
+		optimistic?: OptimisticConfig,
+	): Promise<MutationResult<TOutput>> {
+		// Apply optimistic update if provided
+		let optId: string | undefined;
+		if (optimistic) {
+			optId = this.applyOptimistic(optimistic);
+		}
+
+		try {
+			// Execute mutation
+			const result = await this.executeMutation<TInput, TOutput>(operation, input);
+
+			// Confirm optimistic update with server data
+			if (optId) {
+				this.confirmOptimistic(optId, result.data);
+			}
+
+			return {
+				data: result.data,
+				rollback: optId ? () => this.rollbackOptimistic(optId!) : undefined,
+			};
+		} catch (error) {
+			// Rollback on failure
+			if (optId) {
+				this.rollbackOptimistic(optId);
+			}
+			throw error;
+		}
 	}
 
 	// ===========================================================================
