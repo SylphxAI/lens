@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-svelte",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Svelte bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -17,8 +17,16 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "svelte", "stores", "reactive"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"svelte",
+		"stores",
+		"reactive"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

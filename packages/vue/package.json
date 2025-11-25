@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-vue",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Vue composables for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -17,8 +17,16 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "vue", "composables", "composition-api"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"vue",
+		"composables",
+		"composition-api"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
