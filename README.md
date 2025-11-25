@@ -314,12 +314,21 @@ routeByType({
   subscription: ws({ url: 'ws://localhost:3000' }),
 })
 
-// Route by custom condition
-route([
-  [op => op.path.startsWith('auth.'), http({ url: '/auth' })],
-  [op => op.path.startsWith('analytics.'), http({ url: '/analytics' })],
-  http({ url: '/api' }),  // fallback
-])
+// Route by path pattern
+route({
+  'auth.*': http({ url: '/auth' }),
+  'analytics.*': http({ url: '/analytics' }),
+  '*': http({ url: '/api' }),  // fallback
+})
+
+// Mix both - auth separate, rest with subscriptions on WS
+route({
+  'auth.*': http({ url: '/auth' }),
+  '*': routeByType({
+    default: http({ url: '/api' }),
+    subscription: ws({ url: 'ws://localhost:3000' }),
+  }),
+})
 ```
 
 ### Each Transport Handles All Operation Types
@@ -394,10 +403,10 @@ import type { UserRouter } from '@company/user-server'
 type Api = AuthRouter & UserRouter
 
 const client = await createClient<Api>({
-  transport: route([
-    [op => op.path.startsWith('auth.'), http({ url: '/auth-api' })],
-    http({ url: '/user-api' }),
-  ]),
+  transport: route({
+    'auth.*': http({ url: '/auth-api' }),
+    '*': http({ url: '/user-api' }),
+  }),
 })
 
 // Full type safety!
@@ -725,7 +734,7 @@ http({ url })                     // HTTP transport
 ws({ url })                       // WebSocket transport
 sse({ url })                      // SSE transport
 inProcess({ server })             // In-process transport
-route([...conditions, fallback])  // Conditional routing
+route({ 'path.*': transport })    // Pattern-based routing
 routeByType({ default, subscription?, ... })
 
 // === Server ===
