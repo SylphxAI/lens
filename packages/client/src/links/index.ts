@@ -63,7 +63,6 @@ export {
 // =============================================================================
 
 export { httpLink, httpBatchLink, type HttpLinkOptions } from "./http";
-export { httpLinkV2, type HttpLinkV2Options } from "./http-v2";
 export {
 	sseLink,
 	SSESubscriptionTransport,
@@ -78,33 +77,17 @@ export {
 	type InProcessResolvers,
 } from "./in-process";
 
-export {
-	inProcessLinkV2,
-	createInProcessLinkV2,
-	type InProcessLinkV2Options,
-	type InProcessServerV2,
-} from "./in-process-v2";
-
 // =============================================================================
-// Subscription Transport (WebSocket)
+// WebSocket Link (Terminal)
 // =============================================================================
 
 export {
+	// Terminal link
+	websocketLink,
+	// Subscription transport (for reactive systems)
 	WebSocketSubscriptionTransport,
 	createWebSocketTransport,
-	websocketLink,
+	// Types
 	type WebSocketLinkOptions,
 	type WebSocketState,
 } from "./websocket";
-
-// =============================================================================
-// WebSocket V2 (Operations Protocol)
-// =============================================================================
-
-export {
-	WebSocketTransportV2,
-	createWebSocketTransportV2,
-	websocketLinkV2,
-	type WebSocketLinkV2Options,
-	type WebSocketV2State,
-} from "./websocket-v2";

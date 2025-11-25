@@ -1,11 +1,11 @@
 /**
- * @lens/client - Middleware
+ * @lens/client - Utility Links
  *
- * Middleware for Lens client.
- * These work with the OperationContext.
+ * Non-terminal links for logging, retry, timing, and error handling.
+ * These are middleware that call `next()` to pass to the next link.
  */
 
-import type { MiddlewareFn, Middleware, OperationContext } from "./create";
+import type { Link, LinkFn, OperationContext } from "../links/types";
 
 // =============================================================================
 // Logger Link
@@ -33,16 +33,14 @@ export interface LoggerOptions {
  * @example
  * ```typescript
  * const client = createClient({
- *   queries,
- *   mutations,
  *   links: [
- *     loggerMiddleware({ enabled: process.env.NODE_ENV === "development" }),
+ *     loggerLink({ enabled: process.env.NODE_ENV === "development" }),
  *     websocketLink({ url: "ws://localhost:3000" }),
  *   ],
  * });
  * ```
  */
-export function loggerMiddleware(options: LoggerOptions = {}): Middleware {
+export function loggerLink(options: LoggerOptions = {}): Link {
 	const {
 		enabled = true,
 		prefix = "[Lens]",
@@ -51,30 +49,29 @@ export function loggerMiddleware(options: LoggerOptions = {}): Middleware {
 		logResponse = true,
 	} = options;
 
-	return () => async (ctx, next) => {
+	return (): LinkFn => async (op, next) => {
 		if (!enabled) {
-			return next(ctx);
+			return next(op);
 		}
 
 		const startTime = Date.now();
-		const requestId = ctx.id.slice(-8);
+		const requestId = op.id.slice(-8);
 
 		if (logRequest) {
 			logger.log(
-				`${prefix} → ${ctx.type.toUpperCase()} ${ctx.operation}`,
-				ctx.input !== undefined ? ctx.input : "",
-				ctx.select ? `select: ${JSON.stringify(ctx.select)}` : "",
+				`${prefix} → ${op.type.toUpperCase()} ${op.entity}.${op.op}`,
+				op.input !== undefined ? op.input : "",
 				`[${requestId}]`,
 			);
 		}
 
 		try {
-			const result = await next(ctx);
+			const result = await next(op);
 			const duration = Date.now() - startTime;
 
 			if (logResponse) {
 				logger.log(
-					`${prefix} ← ${ctx.type.toUpperCase()} ${ctx.operation}`,
+					`${prefix} ← ${op.type.toUpperCase()} ${op.entity}.${op.op}`,
 					`${duration}ms`,
 					result,
 					`[${requestId}]`,
@@ -85,7 +82,7 @@ export function loggerMiddleware(options: LoggerOptions = {}): Middleware {
 		} catch (error) {
 			const duration = Date.now() - startTime;
 			logger.error(
-				`${prefix} ✗ ${ctx.type.toUpperCase()} ${ctx.operation}`,
+				`${prefix} ✗ ${op.type.toUpperCase()} ${op.entity}.${op.op}`,
 				`${duration}ms`,
 				error,
 				`[${requestId}]`,
@@ -94,6 +91,9 @@ export function loggerMiddleware(options: LoggerOptions = {}): Middleware {
 		}
 	};
 }
+
+/** @deprecated Use loggerLink instead */
+export const loggerMiddleware = loggerLink;
 
 // =============================================================================
 // Retry Link
@@ -118,16 +118,14 @@ export interface RetryOptions {
  * @example
  * ```typescript
  * const client = createClient({
- *   queries,
- *   mutations,
  *   links: [
- *     retryMiddleware({ maxRetries: 3 }),
+ *     retryLink({ maxRetries: 3 }),
  *     websocketLink({ url: "ws://localhost:3000" }),
  *   ],
  * });
  * ```
  */
-export function retryMiddleware(options: RetryOptions = {}): Middleware {
+export function retryLink(options: RetryOptions = {}): Link {
 	const {
 		maxRetries = 3,
 		baseDelay = 1000,
@@ -136,17 +134,17 @@ export function retryMiddleware(options: RetryOptions = {}): Middleware {
 		shouldRetry = () => true,
 	} = options;
 
-	return () => async (ctx, next) => {
+	return (): LinkFn => async (op, next) => {
 		// Only retry specified operation types
-		if (!retryOn.includes(ctx.type as "query" | "mutation")) {
-			return next(ctx);
+		if (!retryOn.includes(op.type as "query" | "mutation")) {
+			return next(op);
 		}
 
 		let lastError: unknown;
 
 		for (let attempt = 0; attempt <= maxRetries; attempt++) {
 			try {
-				return await next(ctx);
+				return await next(op);
 			} catch (error) {
 				lastError = error;
 
@@ -167,13 +165,16 @@ export function retryMiddleware(options: RetryOptions = {}): Middleware {
 	};
 }
 
+/** @deprecated Use retryLink instead */
+export const retryMiddleware = retryLink;
+
 // =============================================================================
 // Timing Link
 // =============================================================================
 
 export interface TimingOptions {
 	/** Callback when operation completes */
-	onTiming?: (ctx: OperationContext, durationMs: number) => void;
+	onTiming?: (op: OperationContext, durationMs: number) => void;
 	/** Add timing to meta */
 	addToMeta?: boolean;
 }
@@ -181,22 +182,22 @@ export interface TimingOptions {
 /**
  * Timing link for performance monitoring.
  */
-export function timingMiddleware(options: TimingOptions = {}): Middleware {
+export function timingLink(options: TimingOptions = {}): Link {
 	const { onTiming, addToMeta = true } = options;
 
-	return () => async (ctx, next) => {
+	return (): LinkFn => async (op, next) => {
 		const startTime = performance.now();
 
 		try {
-			const result = await next(ctx);
+			const result = await next(op);
 			const duration = performance.now() - startTime;
 
 			if (addToMeta) {
-				ctx.meta.duration = duration;
+				op.meta.duration = duration;
 			}
 
 			if (onTiming) {
-				onTiming(ctx, duration);
+				onTiming(op, duration);
 			}
 
 			return result;
@@ -204,17 +205,20 @@ export function timingMiddleware(options: TimingOptions = {}): Middleware {
 			const duration = performance.now() - startTime;
 
 			if (addToMeta) {
-				ctx.meta.duration = duration;
+				op.meta.duration = duration;
 			}
 
 			if (onTiming) {
-				onTiming(ctx, duration);
+				onTiming(op, duration);
 			}
 
 			throw error;
 		}
 	};
 }
+
+/** @deprecated Use timingLink instead */
+export const timingMiddleware = timingLink;
 
 // =============================================================================
 // Error Handler Link
@@ -222,30 +226,33 @@ export function timingMiddleware(options: TimingOptions = {}): Middleware {
 
 export interface ErrorHandlerOptions {
 	/** Handle error */
-	onError?: (error: unknown, ctx: OperationContext) => void;
+	onError?: (error: unknown, op: OperationContext) => void;
 	/** Transform error */
-	transformError?: (error: unknown, ctx: OperationContext) => unknown;
+	transformError?: (error: unknown, op: OperationContext) => unknown;
 }
 
 /**
  * Error handler link for centralized error handling.
  */
-export function errorHandlerMiddleware(options: ErrorHandlerOptions = {}): Middleware {
+export function errorHandlerLink(options: ErrorHandlerOptions = {}): Link {
 	const { onError, transformError } = options;
 
-	return () => async (ctx, next) => {
+	return (): LinkFn => async (op, next) => {
 		try {
-			return await next(ctx);
+			return await next(op);
 		} catch (error) {
 			if (onError) {
-				onError(error, ctx);
+				onError(error, op);
 			}
 
 			if (transformError) {
-				throw transformError(error, ctx);
+				throw transformError(error, op);
 			}
 
 			throw error;
 		}
 	};
 }
+
+/** @deprecated Use errorHandlerLink instead */
+export const errorHandlerMiddleware = errorHandlerLink;

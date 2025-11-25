@@ -51,7 +51,8 @@ export {
 	createClient,
 	// Types
 	type LensClient,
-	type ClientConfig,
+	type LensClientConfig,
+	type LensClientConfig as ClientConfig, // Alias for compatibility
 	type Transport,
 	type QueryResult,
 	type MutationResult,
@@ -60,18 +61,23 @@ export {
 	type MutationsMap,
 	type InferInput,
 	type InferOutput,
-	// Middleware types
+	// Middleware types (deprecated - use Link from links)
 	type Middleware,
 	type MiddlewareFn,
 	type OperationContext,
 } from "./client/create";
 
 // =============================================================================
-// Client Middleware
+// Links (Utility)
 // =============================================================================
 
 export {
-	// Middleware links
+	// New names (recommended)
+	loggerLink,
+	retryLink,
+	timingLink,
+	errorHandlerLink,
+	// Deprecated aliases
 	loggerMiddleware,
 	retryMiddleware,
 	timingMiddleware,
@@ -84,48 +90,22 @@ export {
 } from "./client/middleware";
 
 // =============================================================================
-// WebSocket Transport
+// WebSocket Transport (Legacy - use websocketLink from links instead)
 // =============================================================================
 
 export {
 	// Class
 	WebSocketTransport,
 	// Factory
-	createWebSocketTransport,
+	createWebSocketTransport as createWebSocketTransportLegacy,
 	websocketTransport,
-	// Alias for convenience
-	websocketTransport as websocketLink,
 	// Types
 	type WebSocketTransportOptions,
-	type WebSocketState,
-	// Alias for convenience
-	type WebSocketTransportOptions as WebSocketLinkOptions,
+	type WebSocketState as WebSocketTransportState,
 } from "./client/transport";
 
 // =============================================================================
-// Client V2 (Alternative: Operations-based with Links)
-// =============================================================================
-
-export {
-	// Factory
-	createClientV2,
-	// Types
-	type ClientV2,
-	type ClientV2Config,
-	type QueriesMap as QueriesMapV2,
-	type MutationsMap as MutationsMapV2,
-	type QueryAccessor,
-	type MutationAccessor,
-	type QueryAccessors,
-	type MutationAccessors,
-	type MutationV2Options,
-	type MutationV2Result,
-	type InferInput as InferInputV2,
-	type InferOutput as InferOutputV2,
-} from "./client/client-v2";
-
-// =============================================================================
-// Links (tRPC-style middleware chain for V2 client)
+// Links (tRPC-style middleware chain)
 // =============================================================================
 
 export {
@@ -144,9 +124,9 @@ export {
 	composeLinks,
 	createOperationContext,
 	// Middleware links
-	loggerLink,
+	loggerLink as loggerLinkV2,
 	type LoggerLinkOptions,
-	retryLink,
+	retryLink as retryLinkV2,
 	type RetryLinkOptions,
 	cacheLink,
 	createCacheStore,
@@ -167,9 +147,6 @@ export {
 	httpLink,
 	httpBatchLink,
 	type HttpLinkOptions,
-	// HTTP V2 (operations protocol)
-	httpLinkV2,
-	type HttpLinkV2Options,
 	sseLink,
 	SSESubscriptionTransport,
 	createSSETransport,
@@ -179,15 +156,10 @@ export {
 	createInProcessLink,
 	type InProcessLinkOptions,
 	type InProcessResolvers,
-	// In-process V2 (operations protocol)
-	inProcessLinkV2,
-	createInProcessLinkV2,
-	type InProcessLinkV2Options,
-	type InProcessServerV2,
-	// WebSocket V2 (operations protocol)
-	WebSocketTransportV2,
-	createWebSocketTransportV2,
-	websocketLinkV2,
-	type WebSocketLinkV2Options,
-	type WebSocketV2State,
+	// WebSocket terminal link
+	websocketLink,
+	WebSocketSubscriptionTransport,
+	createWebSocketTransport,
+	type WebSocketLinkOptions,
+	type WebSocketState,
 } from "./links";

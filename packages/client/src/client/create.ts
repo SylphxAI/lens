@@ -18,6 +18,13 @@ import {
 	makeQueryKeyWithFields,
 	RequestDeduplicator,
 } from "../shared";
+import type {
+	Link,
+	LinkFn,
+	OperationContext as LinkOperationContext,
+	OperationResult,
+	NextLink,
+} from "../links/types";
 
 // =============================================================================
 // Types
@@ -59,13 +66,19 @@ export interface Transport {
 	disconnect(): void;
 }
 
-/** Middleware function */
+/**
+ * Middleware function
+ * @deprecated Use LinkFn from '../links/types' instead
+ */
 export type MiddlewareFn = (
 	ctx: OperationContext,
 	next: (ctx: OperationContext) => Promise<unknown>,
 ) => Promise<unknown>;
 
-/** Middleware factory */
+/**
+ * Middleware factory
+ * @deprecated Use Link from '../links/types' instead
+ */
 export type Middleware = () => MiddlewareFn;
 
 /** Operation context */
@@ -101,10 +114,26 @@ export interface LensClientConfig<
 	 * @deprecated Use type parameter instead: createClient<Api>({ links: [...] })
 	 */
 	mutations?: M;
-	/** Transport (direct transport, use this OR links) */
+	/**
+	 * Transport (direct transport)
+	 * @deprecated Use links instead: links: [loggerLink(), websocketLink({ url })]
+	 */
 	transport?: Transport;
-	/** Links chain (last one should be terminal, use this OR transport) */
-	links?: (Middleware | Transport)[];
+	/**
+	 * Links chain (last one should be terminal link like websocketLink or httpLink)
+	 *
+	 * @example
+	 * ```typescript
+	 * const client = createClient<Api>({
+	 *   links: [
+	 *     loggerLink(),
+	 *     retryLink({ maxRetries: 3 }),
+	 *     websocketLink({ url: 'ws://localhost:3000' }),  // Terminal link
+	 *   ],
+	 * });
+	 * ```
+	 */
+	links?: Link[];
 	/** Enable optimistic updates */
 	optimistic?: boolean;
 }
@@ -223,8 +252,10 @@ interface SubscriptionState {
 class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	private queries: Q;
 	private mutations: M;
-	private transport: Transport;
-	private linkChain: MiddlewareFn[] = [];
+	/** @deprecated Use linkExecutor instead */
+	private transport: Transport | null = null;
+	/** Compiled link chain for executing operations */
+	private linkExecutor: NextLink | null = null;
 	private optimistic: boolean;
 	private store: ReactiveStore;
 
@@ -258,64 +289,93 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 
 		// Handle links or transport config
 		if (config.links && config.links.length > 0) {
-			// Extract terminal link (last one that is a transport)
-			const lastItem = config.links[config.links.length - 1];
-			if (this.isTransport(lastItem)) {
-				this.transport = lastItem;
-				// Build middleware chain from remaining links
-				for (let i = 0; i < config.links.length - 1; i++) {
-					const link = config.links[i];
-					if (!this.isTransport(link)) {
-						this.linkChain.push(link());
-					}
-				}
-			} else {
-				throw new Error("Last link must be a terminal transport (e.g., websocketLink)");
-			}
+			// New Link-based system: all items are Links, last one is terminal
+			// Build link chain from Link factories
+			const linkFns = config.links.map((link) => link());
+
+			// Compose links: first links call next, last link is terminal
+			// Terminal link should NOT call next (it handles the operation)
+			this.linkExecutor = this.composeLinks(linkFns);
 		} else if (config.transport) {
+			// Legacy Transport-based system (backwards compatible)
 			this.transport = config.transport;
 		} else {
 			throw new Error("Must provide either 'transport' or 'links' config");
 		}
 	}
 
-	/** Check if item is a transport */
-	private isTransport(item: Middleware | Transport): item is Transport {
-		return (
-			typeof item === "object" &&
-			"connect" in item &&
-			"disconnect" in item &&
-			"query" in item &&
-			"mutate" in item
-		);
+	/**
+	 * Compose link functions into a single executor.
+	 * Last link is assumed to be terminal (doesn't call next).
+	 */
+	private composeLinks(links: LinkFn[]): NextLink {
+		if (links.length === 0) {
+			throw new Error("At least one link (terminal) is required");
+		}
+
+		// Build chain from right to left
+		// The last link is terminal - we wrap it to not need a next
+		const terminalIndex = links.length - 1;
+		const terminalLink = links[terminalIndex];
+
+		// Terminal link gets a dummy next that throws if called
+		let chain: NextLink = (op) =>
+			terminalLink(op, () => {
+				throw new Error("Terminal link should not call next()");
+			});
+
+		// Add remaining links from right to left (excluding terminal)
+		for (let i = terminalIndex - 1; i >= 0; i--) {
+			const link = links[i];
+			const next = chain;
+			chain = (op) => link(op, next);
+		}
+
+		return chain;
 	}
 
-	/** Execute through link chain */
-	private async executeWithLinks(ctx: OperationContext): Promise<unknown> {
-		// Build execution chain
-		const execute = async (ctx: OperationContext): Promise<unknown> => {
+	/**
+	 * Execute operation through link chain or transport
+	 */
+	private async executeOperation(ctx: OperationContext): Promise<unknown> {
+		// New link-based execution
+		if (this.linkExecutor) {
+			// Convert internal OperationContext to Link's OperationContext
+			const linkOp: LinkOperationContext = {
+				id: ctx.id,
+				type: ctx.type,
+				entity: "_Query", // Operations are treated as custom queries/mutations
+				op: ctx.operation,
+				input: ctx.input,
+				meta: ctx.meta,
+				signal: ctx.signal,
+			};
+
+			const result = await this.linkExecutor(linkOp);
+
+			if (result.error) {
+				throw result.error;
+			}
+
+			return result.data;
+		}
+
+		// Legacy transport-based execution
+		if (this.transport) {
 			if (ctx.type === "query") {
 				return this.transport.query(ctx.operation, ctx.input, "*", ctx.select);
 			} else if (ctx.type === "mutation") {
 				return this.transport.mutate(ctx.operation, ctx.input);
 			}
 			throw new Error(`Unsupported operation type: ${ctx.type}`);
-		};
-
-		// If no middleware, execute directly
-		if (this.linkChain.length === 0) {
-			return execute(ctx);
 		}
 
-		// Build chain from right to left
-		let chain = execute;
-		for (let i = this.linkChain.length - 1; i >= 0; i--) {
-			const link = this.linkChain[i];
-			const next = chain;
-			chain = (ctx) => link(ctx, next);
-		}
+		throw new Error("No executor configured");
+	}
 
-		return chain(ctx);
+	/** @deprecated Use executeOperation instead */
+	private async executeWithLinks(ctx: OperationContext): Promise<unknown> {
+		return this.executeOperation(ctx);
 	}
 
 	// ===========================================================================
@@ -470,12 +530,23 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	}
 
 	/**
-	 * Ensure transport subscription exists
+	 * Ensure subscription exists (transport-based or link-based)
 	 */
 	private ensureTransportSubscription(sub: SubscriptionState, select?: SelectionObject): void {
 		if (sub.transportSub) return;
 
 		const fields = sub.fullRefs > 0 ? "*" : Array.from(sub.fields);
+
+		// Use link-based subscriptions if available
+		if (this.linkExecutor) {
+			this.setupLinkSubscription(sub, select);
+			return;
+		}
+
+		// Legacy transport-based subscription
+		if (!this.transport) {
+			throw new Error("No transport or link executor configured");
+		}
 
 		sub.transportSub = this.transport.subscribe(
 			sub.operation,
@@ -518,6 +589,75 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			},
 			select,  // Pass SelectionObject for nested resolution
 		);
+	}
+
+	/**
+	 * Setup link-based subscription using Observable
+	 * Terminal links return Observable in meta for subscriptions
+	 */
+	private setupLinkSubscription(sub: SubscriptionState, select?: SelectionObject): void {
+		if (!this.linkExecutor) return;
+
+		const linkOp: LinkOperationContext = {
+			id: `sub-${sub.operation}-${Date.now()}`,
+			type: "subscription",
+			entity: "_Query",
+			op: sub.operation,
+			input: sub.input,
+			meta: { select },
+		};
+
+		// Execute subscription operation
+		Promise.resolve(this.linkExecutor(linkOp)).then((result: OperationResult) => {
+			if (result.error) {
+				sub.error.value = result.error;
+				sub.loading.value = false;
+				return;
+			}
+
+			// Check for Observable in meta (set by terminal links like httpLink with polling)
+			const observable = result.meta?.observable as
+				| { subscribe: (obs: { next: (v: unknown) => void; error: (e: Error) => void; complete: () => void }) => { unsubscribe: () => void } }
+				| undefined;
+
+			if (observable) {
+				// Subscribe to Observable
+				const subscription = observable.subscribe({
+					next: (data) => {
+						sub.data.value = data;
+						sub.loading.value = false;
+						sub.error.value = null;
+						for (const callback of sub.callbacks) {
+							callback(data);
+						}
+					},
+					error: (error) => {
+						sub.error.value = error;
+						sub.loading.value = false;
+					},
+					complete: () => {
+						sub.loading.value = false;
+					},
+				});
+
+				sub.transportSub = {
+					unsubscribe: () => subscription.unsubscribe(),
+					updateFields: () => {
+						// Link-based subscriptions don't support dynamic field updates
+						// Re-subscribe with new fields would be needed
+					},
+				};
+			} else {
+				// No observable - just use the initial data (one-shot subscription)
+				sub.data.value = result.data;
+				sub.loading.value = false;
+
+				sub.transportSub = {
+					unsubscribe: () => {},
+					updateFields: () => {},
+				};
+			}
+		});
 	}
 
 	// ===========================================================================
@@ -655,7 +795,7 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			};
 
 			// Execute through link chain
-			return this.executeWithLinks(ctx);
+			return this.executeOperation(ctx);
 		});
 	}
 
@@ -755,7 +895,7 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			};
 
 			// Execute through link chain
-			const result = await this.executeWithLinks(ctx);
+			const result = await this.executeOperation(ctx);
 
 			// Update any affected subscriptions
 			this.updateSubscriptionsFromMutation(result);

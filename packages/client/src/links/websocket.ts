@@ -1,12 +1,12 @@
 /**
- * @lens/client - WebSocket Subscription Link
+ * @lens/client - WebSocket Link (Terminal)
  *
- * WebSocket transport for real-time field-level subscriptions.
- * Integrates with SubscriptionManager for push updates.
+ * WebSocket terminal link for queries, mutations, and subscriptions.
+ * Also includes WebSocketSubscriptionTransport for reactive systems.
  */
 
 import type { SubscriptionTransport, ServerMessage, UpdateMessage } from "../reactive";
-import type { Link, LinkFn, OperationContext, OperationResult, NextLink } from "./types";
+import type { Link, LinkFn, OperationContext, OperationResult, Observable, Observer, Unsubscribable } from "./types";
 
 // =============================================================================
 // Types
@@ -522,50 +522,253 @@ export function createWebSocketTransport(
 }
 
 // =============================================================================
-// WebSocket Link (for Link chain integration)
+// WebSocket Link (Terminal)
 // =============================================================================
 
 /**
- * WebSocket link for real-time subscriptions in Link chain.
+ * WebSocket terminal link for real-time communication.
  *
- * Note: This is a passthrough link that sets up WebSocket transport.
- * Actual subscription handling is done by SubscriptionManager.
+ * Handles all operation types:
+ * - Queries: Send query message, wait for response
+ * - Mutations: Send mutation message, wait for response
+ * - Subscriptions: Return Observable that streams updates
  *
  * @example
  * ```typescript
- * const client = createReactiveClient({
+ * const client = createClient<Api>({
  *   links: [
  *     loggerLink(),
- *     httpLink({ url: "/api" }),
+ *     retryLink({ maxRetries: 3 }),
+ *     websocketLink({ url: "ws://localhost:3000" }),  // Terminal link
  *   ],
  * });
- *
- * // Set up WebSocket separately
- * const wsTransport = createWebSocketTransport({ url: "wss://api.example.com/ws" });
- * await wsTransport.connect();
- * client.$setSubscriptionTransport(wsTransport);
  * ```
  */
 export function websocketLink(options: WebSocketLinkOptions): Link {
-	let transport: WebSocketSubscriptionTransport | null = null;
+	let ws: WebSocket | null = null;
+	let messageIdCounter = 0;
+	let connectionPromise: Promise<void> | null = null;
+	let reconnectAttempts = 0;
+	let isConnected = false;
 
-	return () => {
-		// Initialize transport on first call
-		if (!transport) {
-			transport = new WebSocketSubscriptionTransport(options);
-			// Auto-connect
-			transport.connect().catch((error) => {
-				console.error("WebSocket auto-connect failed:", error);
-			});
+	// Pending requests awaiting response
+	const pending = new Map<
+		string,
+		{
+			resolve: (result: OperationResult) => void;
+			reject: (error: Error) => void;
+			timeout: ReturnType<typeof setTimeout>;
 		}
+	>();
 
-		// This is a passthrough link - it doesn't handle operations
-		// It's only used to set up the WebSocket transport
-		return async (
-			operation: OperationContext,
-			next: NextLink,
-		): Promise<OperationResult> => {
-			return next(operation);
+	// Active subscriptions
+	const subscriptions = new Map<
+		string,
+		{
+			observer: Observer<unknown>;
+			operationId: string;
+		}
+	>();
+
+	const {
+		url,
+		reconnectDelay = 1000,
+		maxReconnectAttempts = 10,
+		connectionTimeout = 5000,
+		onReconnect,
+		onDisconnect,
+	} = options;
+	const requestTimeout = 30000;
+
+	function nextId(): string {
+		return `msg_${++messageIdCounter}`;
+	}
+
+	function connect(): Promise<void> {
+		if (connectionPromise) return connectionPromise;
+		if (ws?.readyState === WebSocket.OPEN) return Promise.resolve();
+
+		connectionPromise = new Promise((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				reject(new Error("WebSocket connection timeout"));
+			}, connectionTimeout);
+
+			try {
+				ws = new WebSocket(url);
+
+				ws.onopen = () => {
+					clearTimeout(timeout);
+					isConnected = true;
+					reconnectAttempts = 0;
+					connectionPromise = null;
+					resolve();
+				};
+
+				ws.onmessage = (event) => {
+					handleMessage(event.data);
+				};
+
+				ws.onclose = () => {
+					isConnected = false;
+					connectionPromise = null;
+					onDisconnect?.();
+					scheduleReconnect();
+				};
+
+				ws.onerror = () => {
+					clearTimeout(timeout);
+					reject(new Error("WebSocket connection failed"));
+				};
+			} catch (error) {
+				clearTimeout(timeout);
+				connectionPromise = null;
+				reject(error);
+			}
+		});
+
+		return connectionPromise;
+	}
+
+	function scheduleReconnect(): void {
+		if (reconnectAttempts >= maxReconnectAttempts) return;
+
+		setTimeout(() => {
+			reconnectAttempts++;
+			connect()
+				.then(() => {
+					onReconnect?.();
+					// Resubscribe active subscriptions
+					for (const [subId, sub] of subscriptions) {
+						sendMessage({
+							type: "subscribe",
+							id: sub.operationId,
+							// Would need to store operation info to resubscribe properly
+						});
+					}
+				})
+				.catch(() => {
+					// Will retry on next disconnect
+				});
+		}, reconnectDelay * Math.pow(2, reconnectAttempts));
+	}
+
+	function sendMessage(message: unknown): void {
+		if (ws?.readyState === WebSocket.OPEN) {
+			ws.send(JSON.stringify(message));
+		}
+	}
+
+	function handleMessage(data: string): void {
+		try {
+			const message = JSON.parse(data) as {
+				type: string;
+				id?: string;
+				data?: unknown;
+				error?: { message: string };
+			};
+
+			switch (message.type) {
+				case "result":
+				case "data": {
+					const p = pending.get(message.id!);
+					if (p) {
+						clearTimeout(p.timeout);
+						pending.delete(message.id!);
+						p.resolve({ data: message.data });
+					}
+					// Also notify subscription if active
+					const sub = subscriptions.get(message.id!);
+					if (sub) {
+						sub.observer.next(message.data);
+					}
+					break;
+				}
+
+				case "error": {
+					const p = pending.get(message.id!);
+					if (p) {
+						clearTimeout(p.timeout);
+						pending.delete(message.id!);
+						p.resolve({ error: new Error(message.error?.message || "Unknown error") });
+					}
+					const sub = subscriptions.get(message.id!);
+					if (sub) {
+						sub.observer.error(new Error(message.error?.message || "Unknown error"));
+						subscriptions.delete(message.id!);
+					}
+					break;
+				}
+
+				case "complete": {
+					const sub = subscriptions.get(message.id!);
+					if (sub) {
+						sub.observer.complete();
+						subscriptions.delete(message.id!);
+					}
+					break;
+				}
+			}
+		} catch (error) {
+			console.error("Failed to parse WebSocket message:", error);
+		}
+	}
+
+	return (): LinkFn => {
+		return async (op, _next): Promise<OperationResult> => {
+			// Ensure connected
+			try {
+				await connect();
+			} catch (error) {
+				return { error: error as Error };
+			}
+
+			const msgId = nextId();
+
+			// Handle subscriptions specially - return Observable
+			if (op.type === "subscription") {
+				const observable: Observable<unknown> = {
+					subscribe(observer: Observer<unknown>): Unsubscribable {
+						// Store subscription
+						subscriptions.set(msgId, { observer, operationId: msgId });
+
+						// Send subscribe message
+						sendMessage({
+							type: "subscribe",
+							id: msgId,
+							entity: op.entity,
+							operation: op.op,
+							input: op.input,
+						});
+
+						return {
+							unsubscribe() {
+								subscriptions.delete(msgId);
+								sendMessage({ type: "unsubscribe", id: msgId });
+							},
+						};
+					},
+				};
+
+				return { data: null, meta: { observable } };
+			}
+
+			// Queries and mutations: send and wait for response
+			return new Promise((resolve) => {
+				const timeout = setTimeout(() => {
+					pending.delete(msgId);
+					resolve({ error: new Error("Request timeout") });
+				}, requestTimeout);
+
+				pending.set(msgId, { resolve, reject: () => {}, timeout });
+
+				sendMessage({
+					type: op.type,
+					id: msgId,
+					entity: op.entity,
+					operation: op.op,
+					input: op.input,
+				});
+			});
 		};
 	};
 }
