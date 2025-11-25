@@ -10,7 +10,7 @@
  */
 
 import type { QueryDef, MutationDef, Update, OptimisticDSL } from "@lens/core";
-import { applyUpdate, isOptimisticDSL } from "@lens/core";
+import { applyUpdate, isOptimisticDSL, normalizeOptimisticDSL } from "@lens/core";
 import { ReactiveStore, type EntityState } from "../store/reactive-store";
 import { signal, computed, type Signal } from "../signals/signal";
 import {
@@ -936,23 +936,24 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	 * The DSL is pure data, interpreted at runtime on the client.
 	 *
 	 * @example
-	 * // { type: 'merge' } + input { id: "1", name: "New" }
+	 * // 'merge' + input { id: "1", name: "New" }
 	 * // → { id: "1", name: "New" }
 	 *
-	 * // { type: 'create' } + input { title: "Hello" }
+	 * // 'create' + input { title: "Hello" }
 	 * // → { id: "temp_0", title: "Hello" }
 	 *
-	 * // { type: 'merge', set: { published: true } } + input { id: "1" }
+	 * // { merge: { published: true } } + input { id: "1" }
 	 * // → { id: "1", published: true }
 	 *
-	 * // { type: 'updateMany', entity: 'User', ids: '$userIds', set: { role: '$newRole' } }
+	 * // { updateMany: { entity: 'User', ids: '$userIds', set: { role: '$newRole' } } }
 	 * // + input { userIds: ["1", "2"], newRole: "admin" }
 	 * // → [{ id: "1", role: "admin" }, { id: "2", role: "admin" }]
 	 */
 	private interpretOptimisticDSL(dsl: OptimisticDSL, input: unknown): unknown {
 		const inputObj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+		const normalized = normalizeOptimisticDSL(dsl);
 
-		switch (dsl.type) {
+		switch (normalized.type) {
 			case "merge": {
 				// Merge input into entity (UPDATE)
 				// Requires input to have 'id'
@@ -962,8 +963,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 				const result: Record<string, unknown> = { ...inputObj };
 
 				// Apply additional 'set' fields (with $ reference resolution)
-				if (dsl.set) {
-					for (const [key, value] of Object.entries(dsl.set)) {
+				if (normalized.set) {
+					for (const [key, value] of Object.entries(normalized.set)) {
 						result[key] = this.resolveReference(value, inputObj);
 					}
 				}
@@ -979,8 +980,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 				};
 
 				// Apply additional 'set' fields
-				if (dsl.set) {
-					for (const [key, value] of Object.entries(dsl.set)) {
+				if (normalized.set) {
+					for (const [key, value] of Object.entries(normalized.set)) {
 						result[key] = this.resolveReference(value, inputObj);
 					}
 				}
@@ -997,14 +998,14 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 
 			case "updateMany": {
 				// Update multiple entities (cross-entity)
-				const idsRef = dsl.ids;
-				const ids = this.resolveReference(idsRef, inputObj);
+				if (!normalized.config) return null;
 
+				const ids = this.resolveReference(normalized.config.ids, inputObj);
 				if (!Array.isArray(ids)) return null;
 
 				// Resolve set fields
 				const setData: Record<string, unknown> = {};
-				for (const [key, value] of Object.entries(dsl.set)) {
+				for (const [key, value] of Object.entries(normalized.config.set)) {
 					setData[key] = this.resolveReference(value, inputObj);
 				}
 
@@ -1017,8 +1018,8 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 
 			case "custom": {
 				// Custom function (escape hatch)
-				if (typeof dsl.fn === "function") {
-					return dsl.fn({ input });
+				if (normalized.fn && typeof normalized.fn === "function") {
+					return normalized.fn({ input });
 				}
 				return null;
 			}

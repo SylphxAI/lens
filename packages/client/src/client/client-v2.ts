@@ -32,7 +32,7 @@
  */
 
 import type { QueryDef, MutationDef, Update, OptimisticDSL } from "@lens/core";
-import { isOptimisticDSL } from "@lens/core";
+import { isOptimisticDSL, normalizeOptimisticDSL } from "@lens/core";
 import { ReactiveStore, type EntityState } from "../store/reactive-store";
 import {
 	type Link,
@@ -211,14 +211,15 @@ let optimisticCounter = 0;
  */
 function interpretOptimisticDSL(dsl: OptimisticDSL, input: unknown): unknown {
 	const inputObj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+	const normalized = normalizeOptimisticDSL(dsl);
 
-	switch (dsl.type) {
+	switch (normalized.type) {
 		case "merge": {
 			const id = inputObj.id;
 			if (typeof id !== "string") return null;
 			const result: Record<string, unknown> = { ...inputObj };
-			if (dsl.set) {
-				for (const [key, value] of Object.entries(dsl.set)) {
+			if (normalized.set) {
+				for (const [key, value] of Object.entries(normalized.set)) {
 					result[key] = resolveReference(value, inputObj);
 				}
 			}
@@ -230,8 +231,8 @@ function interpretOptimisticDSL(dsl: OptimisticDSL, input: unknown): unknown {
 				id: `temp_${++optimisticCounter}`,
 				...inputObj,
 			};
-			if (dsl.set) {
-				for (const [key, value] of Object.entries(dsl.set)) {
+			if (normalized.set) {
+				for (const [key, value] of Object.entries(normalized.set)) {
 					result[key] = resolveReference(value, inputObj);
 				}
 			}
@@ -245,18 +246,19 @@ function interpretOptimisticDSL(dsl: OptimisticDSL, input: unknown): unknown {
 		}
 
 		case "updateMany": {
-			const ids = resolveReference(dsl.ids, inputObj);
+			if (!normalized.config) return null;
+			const ids = resolveReference(normalized.config.ids, inputObj);
 			if (!Array.isArray(ids)) return null;
 			const setData: Record<string, unknown> = {};
-			for (const [key, value] of Object.entries(dsl.set)) {
+			for (const [key, value] of Object.entries(normalized.config.set)) {
 				setData[key] = resolveReference(value, inputObj);
 			}
 			return ids.map((id: unknown) => ({ id, ...setData }));
 		}
 
 		case "custom": {
-			if (typeof dsl.fn === "function") {
-				return dsl.fn({ input });
+			if (normalized.fn && typeof normalized.fn === "function") {
+				return normalized.fn({ input });
 			}
 			return null;
 		}

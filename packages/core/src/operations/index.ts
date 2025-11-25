@@ -80,60 +80,52 @@ export type OptimisticFn<TInput, TOutput> = (ctx: { input: TInput }) => Partial<
 /**
  * Declarative optimistic update DSL
  *
- * Unlike functions, DSL is pure data that can be:
- * 1. Part of the type (transferred via type imports)
- * 2. Interpreted by client at runtime
- * 3. Serializable (no closures)
+ * Simple, minimal syntax for common cases:
+ * - String shorthand: 'merge', 'create', 'delete'
+ * - Object for additional fields: { merge: { published: true } }
+ * - Full object for cross-entity: { updateMany: { ... } }
  *
  * @example
  * ```typescript
- * // Simple merge (UPDATE)
- * .optimistic({ type: 'merge' })
+ * // Simple (90% of cases)
+ * .optimistic('merge')   // UPDATE: merge input into entity
+ * .optimistic('create')  // CREATE: auto tempId
+ * .optimistic('delete')  // DELETE: mark deleted
  *
- * // Create with tempId
- * .optimistic({ type: 'create' })
- *
- * // Set specific fields
- * .optimistic({ type: 'merge', set: { published: true } })
+ * // With additional fields
+ * .optimistic({ merge: { published: true } })
+ * .optimistic({ create: { status: 'draft' } })
  *
  * // Cross-entity update
  * .optimistic({
- *   type: 'updateMany',
- *   entity: 'User',
- *   ids: '$userIds',  // Reference input field
- *   set: { role: '$newRole' }
+ *   updateMany: {
+ *     entity: 'User',
+ *     ids: '$userIds',      // $ = reference input field
+ *     set: { role: '$newRole' }
+ *   }
  * })
  * ```
+ *
+ * Future: Could auto-derive from naming convention:
+ * - updateX → merge
+ * - createX → create
+ * - deleteX → delete
  */
 export type OptimisticDSL =
-	| OptimisticMerge
-	| OptimisticCreate
-	| OptimisticDelete
-	| OptimisticUpdateMany
-	| OptimisticCustom;
+	// String shorthand (simple cases)
+	| "merge"
+	| "create"
+	| "delete"
+	// Object with additional fields
+	| { merge: Record<string, unknown> }
+	| { create: Record<string, unknown> }
+	// Cross-entity
+	| { updateMany: OptimisticUpdateManyConfig }
+	// Escape hatch
+	| { custom: OptimisticFn<unknown, unknown> };
 
-/** Merge input into entity (UPDATE operation) */
-export interface OptimisticMerge {
-	type: "merge";
-	/** Additional fields to set (optional) */
-	set?: Record<string, unknown>;
-}
-
-/** Create new entity with tempId (CREATE operation) */
-export interface OptimisticCreate {
-	type: "create";
-	/** Additional fields to set (optional) */
-	set?: Record<string, unknown>;
-}
-
-/** Delete entity (DELETE operation) */
-export interface OptimisticDelete {
-	type: "delete";
-}
-
-/** Update multiple entities (cross-entity operation) */
-export interface OptimisticUpdateMany {
-	type: "updateMany";
+/** Config for updateMany */
+export interface OptimisticUpdateManyConfig {
 	/** Target entity type */
 	entity: string;
 	/** Input field containing IDs (use $ prefix for references) */
@@ -142,26 +134,40 @@ export interface OptimisticUpdateMany {
 	set: Record<string, unknown>;
 }
 
-/** Custom optimistic (escape hatch - function) */
-export interface OptimisticCustom {
-	type: "custom";
-	/** Function name or handler */
-	fn: OptimisticFn<unknown, unknown>;
+/**
+ * Check if value is an OptimisticDSL
+ */
+export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
+	// String shorthand
+	if (value === "merge" || value === "create" || value === "delete") {
+		return true;
+	}
+	// Object form
+	if (value && typeof value === "object") {
+		const obj = value as Record<string, unknown>;
+		return "merge" in obj || "create" in obj || "updateMany" in obj || "custom" in obj;
+	}
+	return false;
 }
 
 /**
- * Check if value is an OptimisticDSL object
+ * Normalize DSL to internal format for interpreter
  */
-export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
-	if (!value || typeof value !== "object") return false;
-	const obj = value as Record<string, unknown>;
-	return (
-		obj.type === "merge" ||
-		obj.type === "create" ||
-		obj.type === "delete" ||
-		obj.type === "updateMany" ||
-		obj.type === "custom"
-	);
+export function normalizeOptimisticDSL(
+	dsl: OptimisticDSL,
+): { type: "merge" | "create" | "delete" | "updateMany" | "custom"; set?: Record<string, unknown>; config?: OptimisticUpdateManyConfig; fn?: OptimisticFn<unknown, unknown> } {
+	// String shorthand
+	if (dsl === "merge") return { type: "merge" };
+	if (dsl === "create") return { type: "create" };
+	if (dsl === "delete") return { type: "delete" };
+
+	// Object form
+	if ("merge" in dsl) return { type: "merge", set: dsl.merge };
+	if ("create" in dsl) return { type: "create", set: dsl.create };
+	if ("updateMany" in dsl) return { type: "updateMany", config: dsl.updateMany };
+	if ("custom" in dsl) return { type: "custom", fn: dsl.custom };
+
+	return { type: "merge" }; // fallback
 }
 
 // =============================================================================
