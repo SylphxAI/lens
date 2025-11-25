@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-server",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "Server runtime for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -17,8 +17,16 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "server", "resolvers", "graphql"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"server",
+		"resolvers",
+		"graphql"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

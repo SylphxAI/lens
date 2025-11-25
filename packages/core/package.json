@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-core",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "Core schema types and utilities for Lens",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -17,8 +17,16 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "schema", "types", "typescript"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"schema",
+		"types",
+		"typescript"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"devDependencies": {

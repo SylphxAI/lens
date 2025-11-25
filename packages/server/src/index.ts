@@ -25,6 +25,9 @@ export {
 	type ServerMetadata,
 	type OperationMeta,
 	type OperationsMap,
+	// In-process transport types
+	type LensOperation,
+	type LensResult,
 	// Type inference utilities (tRPC-style)
 	type InferApi,
 	type InferInput,

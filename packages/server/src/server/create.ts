@@ -96,10 +96,28 @@ export interface ServerMetadata {
 	operations: OperationsMap;
 }
 
+/** Operation for in-process transport */
+export interface LensOperation {
+	/** Operation path (e.g., 'user.get', 'session.create') */
+	path: string;
+	/** Operation input */
+	input?: unknown;
+}
+
+/** Result from operation execution */
+export interface LensResult<T = unknown> {
+	/** Success data */
+	data?: T;
+	/** Error if operation failed */
+	error?: Error;
+}
+
 /** Lens server interface */
 export interface LensServer {
 	/** Get server metadata for transport handshake */
 	getMetadata(): ServerMetadata;
+	/** Execute operation - auto-detects query vs mutation from registered operations */
+	execute(op: LensOperation): Promise<LensResult>;
 	/** Execute a query (one-time) */
 	executeQuery<TInput, TOutput>(name: string, input?: TInput): Promise<TOutput>;
 	/** Execute a mutation */
@@ -398,6 +416,33 @@ class LensServerImpl<
 			version: this.version,
 			operations: this.buildOperationsMap(),
 		};
+	}
+
+	/**
+	 * Execute operation - auto-detects query vs mutation from registered operations.
+	 * Used by inProcess transport for direct server calls.
+	 */
+	async execute(op: LensOperation): Promise<LensResult> {
+		const { path, input } = op;
+
+		try {
+			// Check if it's a query
+			if (this.queries[path]) {
+				const data = await this.executeQuery(path, input);
+				return { data };
+			}
+
+			// Check if it's a mutation
+			if (this.mutations[path]) {
+				const data = await this.executeMutation(path, input);
+				return { data };
+			}
+
+			// Operation not found
+			return { error: new Error(`Operation not found: ${path}`) };
+		} catch (error) {
+			return { error: error instanceof Error ? error : new Error(String(error)) };
+		}
 	}
 
 	/**

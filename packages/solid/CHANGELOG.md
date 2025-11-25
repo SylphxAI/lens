@@ -1,5 +1,61 @@
 # @sylphx/lens-solid
 
+## 1.1.0
+
+### Minor Changes
+
+- ## New Transport + Plugin Architecture
+
+  ### Breaking Changes
+
+  - `createClient()` now requires `transport` instead of `links`
+  - `createClient()` is now async: `await createClient(config)`
+  - Removed old link system (httpLink, websocketLink, etc.)
+
+  ### New Features
+
+  #### Transport System
+
+  - `http({ url })` - HTTP transport with polling for subscriptions
+  - `ws({ url })` - WebSocket transport with native streaming
+  - `inProcess({ server })` - Direct server calls for testing/SSR
+  - `route({ 'pattern.*': transport })` - Pattern-based routing
+  - `routeByType({ default, subscription })` - Route by operation type
+
+  #### Plugin System
+
+  - `logger()` - Request/response logging
+  - `auth({ getToken })` - Authentication headers
+  - `retry({ attempts })` - Retry with exponential backoff
+  - `cache({ ttl })` - Response caching
+  - `timeout({ ms })` - Request timeout
+
+  #### Multi-Server Support
+
+  - Connect to multiple backends with automatic metadata merging
+  - Full type safety across all servers
+  - Pattern-based routing: `route({ 'auth.*': authServer, '*': mainServer })`
+
+  ### Example
+
+  ```typescript
+  const client = await createClient<Api>({
+    transport: route({
+      "auth.*": http({ url: "/auth" }),
+      "*": routeByType({
+        default: http({ url: "/api" }),
+        subscription: ws({ url: "ws://localhost:3000" }),
+      }),
+    }),
+    plugins: [logger(), auth({ getToken: () => token })],
+  });
+  ```
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-client@1.1.0
+
 ## 1.0.1
 
 ### Patch Changes
