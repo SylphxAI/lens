@@ -215,7 +215,15 @@ describe("client.query", () => {
 			links: [createMockV2Link(createDefaultMockHandlers())],
 		});
 
-		await expect(client.query.failingQuery()).rejects.toThrow("Query failed");
+		// QueryResultV2 is PromiseLike, not Promise - need to await and catch
+		let error: Error | null = null;
+		try {
+			await client.query.failingQuery();
+		} catch (e) {
+			error = e as Error;
+		}
+		expect(error).toBeInstanceOf(Error);
+		expect(error?.message).toBe("Query failed");
 	});
 });
 
@@ -408,5 +416,206 @@ describe("Store Integration", () => {
 		expect(client.$store).toBeDefined();
 		expect(typeof client.$store.getEntity).toBe("function");
 		expect(typeof client.$store.setEntity).toBe("function");
+	});
+});
+
+// =============================================================================
+// Test: Subscribe API (Streaming)
+// =============================================================================
+
+describe("subscribe API", () => {
+	it("subscribe method exists on query result", () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		const result = client.query.getUser({ id: "user-1" });
+		expect(typeof result.subscribe).toBe("function");
+		expect(typeof result.then).toBe("function");
+	});
+
+	it("subscribe calls callback with data (fallback without transport)", async () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		const received: unknown[] = [];
+		let completed = false;
+
+		const unsubscribe = client.query.getUser({ id: "user-1" }).subscribe(
+			(data) => {
+				received.push(data);
+			},
+			{
+				onComplete: () => {
+					completed = true;
+				},
+			},
+		);
+
+		// Wait for async callback
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(received.length).toBe(1);
+		expect(received[0]).toEqual(mockUsers[0]);
+		expect(completed).toBe(true);
+
+		// unsubscribe is no-op without transport
+		unsubscribe();
+	});
+
+	it("subscribe handles error (fallback without transport)", async () => {
+		const failingQuery = query().resolve(() => {
+			throw new Error("Query failed");
+		});
+
+		const client = createClientV2({
+			queries: { failingQuery },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		let errorReceived: Error | null = null;
+
+		client.query.failingQuery().subscribe(
+			() => {},
+			{
+				onError: (error) => {
+					errorReceived = error;
+				},
+			},
+		);
+
+		// Wait for async callback
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(errorReceived).toBeInstanceOf(Error);
+		expect(errorReceived?.message).toBe("Query failed");
+	});
+
+	it("can await same query result that was subscribed", async () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		// Get query result
+		const queryResult = client.query.getUser({ id: "user-1" });
+
+		// Can subscribe
+		const received: unknown[] = [];
+		queryResult.subscribe((data) => received.push(data));
+
+		// Can also await (creates new execution)
+		const awaited = await client.query.getUser({ id: "user-1" });
+
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(awaited).toEqual(mockUsers[0]);
+		expect(received[0]).toEqual(mockUsers[0]);
+	});
+});
+
+// =============================================================================
+// Test: Select API (Frontend-driven field selection)
+// =============================================================================
+
+describe("select API", () => {
+	it("select method exists on query result", () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		const result = client.query.getUser({ id: "user-1" });
+		expect(typeof result.select).toBe("function");
+	});
+
+	it("select returns new QueryResult with selection", () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		const result = client.query.getUser({ id: "user-1" });
+		const withSelect = result.select({ id: true, name: true });
+
+		// Should return a new QueryResult
+		expect(typeof withSelect.then).toBe("function");
+		expect(typeof withSelect.select).toBe("function");
+		expect(typeof withSelect.subscribe).toBe("function");
+	});
+
+	it("select can be chained", () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [createMockV2Link(createDefaultMockHandlers())],
+		});
+
+		const result = client.query
+			.getUser({ id: "user-1" })
+			.select({ id: true })
+			.select({ name: true });
+
+		expect(typeof result.then).toBe("function");
+	});
+
+	it("select passes $select in input to link", async () => {
+		let capturedInput: unknown;
+
+		const mockLink = (): (op: { input: unknown }) => Promise<{ data: unknown }> => {
+			return async (op) => {
+				capturedInput = op.input;
+				return { data: mockUsers[0] };
+			};
+		};
+
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const client = createClientV2({
+			queries: { getUser },
+			links: [mockLink as unknown as Link],
+		});
+
+		await client.query.getUser({ id: "user-1" }).select({ id: true, name: true });
+
+		expect(capturedInput).toEqual({
+			id: "user-1",
+			$select: { id: true, name: true },
+		});
 	});
 });

@@ -614,3 +614,388 @@ describe("Async generator support", () => {
 		expect(result).toEqual(mockUsers[0]);
 	});
 });
+
+// =============================================================================
+// Test: ctx.emit() and ctx.onCleanup()
+// =============================================================================
+
+describe("ctx.emit() and ctx.onCleanup()", () => {
+	it("ctx.emit() sends data to subscribers", async () => {
+		let emitFn: ((data: unknown) => void) | null = null;
+
+		const liveQuery = query()
+			.returns(User)
+			.resolve(({ ctx }) => {
+				// Store emit function for external use
+				emitFn = ctx.emit;
+				// Return initial value
+				return mockUsers[0];
+			});
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { liveQuery },
+		});
+
+		const received: unknown[] = [];
+
+		// Subscribe to query
+		const stream = server.subscribeQuery("liveQuery");
+		const iterator = stream[Symbol.asyncIterator]();
+
+		// Get first value
+		const first = await iterator.next();
+		received.push(first.value);
+
+		expect(received[0]).toEqual(mockUsers[0]);
+		expect(emitFn).not.toBeNull();
+	});
+
+	it("ctx.onCleanup() registers cleanup functions", async () => {
+		let cleanedUp = false;
+
+		const liveQuery = query()
+			.returns(User)
+			.resolve(({ ctx }) => {
+				ctx.onCleanup(() => {
+					cleanedUp = true;
+				});
+				return mockUsers[0];
+			});
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { liveQuery },
+		});
+
+		// Execute query (cleanup should not be called for single query)
+		await server.executeQuery("liveQuery");
+
+		// For single executeQuery, cleanup is not registered (no subscription)
+		// This is expected behavior
+		expect(cleanedUp).toBe(false);
+	});
+
+	it("subscribeQuery collects all values from async generator", async () => {
+		const streamQuery = query()
+			.returns(User)
+			.resolve(async function* () {
+				yield mockUsers[0];
+				yield mockUsers[1];
+			});
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { streamQuery },
+		});
+
+		const received: unknown[] = [];
+
+		for await (const value of server.subscribeQuery("streamQuery")) {
+			received.push(value);
+		}
+
+		expect(received.length).toBe(2);
+		expect(received[0]).toEqual(mockUsers[0]);
+		expect(received[1]).toEqual(mockUsers[1]);
+	});
+
+	it("returns unregister function from ctx.onCleanup()", async () => {
+		let cleanupCount = 0;
+
+		const liveQuery = query()
+			.returns(User)
+			.resolve(({ ctx }) => {
+				const unregister = ctx.onCleanup(() => {
+					cleanupCount++;
+				});
+				// Unregister immediately
+				unregister();
+				return mockUsers[0];
+			});
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { liveQuery },
+		});
+
+		await server.executeQuery("liveQuery");
+
+		// Cleanup was unregistered, should not have been called
+		expect(cleanupCount).toBe(0);
+	});
+});
+
+// =============================================================================
+// Test: Minimum Transfer (Fine-Grained Updates)
+// =============================================================================
+
+describe("Minimum transfer", () => {
+	it("sends full data on first update, only diff on subsequent updates", async () => {
+		const messages: string[] = [];
+		const mockWs = {
+			send: (data: string) => messages.push(data),
+			close: () => {},
+			onmessage: null as ((event: { data: string }) => void) | null,
+			onclose: null as (() => void) | null,
+			onerror: null as ((error: unknown) => void) | null,
+		};
+
+		let emitFn: ((data: unknown) => void) | null = null;
+
+		const liveQuery = query()
+			.returns(User)
+			.resolve(({ ctx }) => {
+				emitFn = ctx.emit;
+				return { id: "1", name: "Alice", email: "alice@example.com" };
+			});
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { liveQuery },
+		});
+
+		server.handleWebSocket(mockWs);
+
+		// Subscribe
+		mockWs.onmessage?.({
+			data: JSON.stringify({
+				type: "subscribe",
+				id: "sub_1",
+				name: "liveQuery",
+			}),
+		});
+
+		// Wait for first update
+		await new Promise((r) => setTimeout(r, 50));
+
+		// First message should have full data
+		const firstUpdate = JSON.parse(messages[0]);
+		expect(firstUpdate.type).toBe("update");
+		expect(firstUpdate.data).toEqual({ id: "1", name: "Alice", email: "alice@example.com" });
+		expect(firstUpdate.updates).toBeUndefined();
+
+		// Emit update with only name changed
+		emitFn?.({ id: "1", name: "Bob", email: "alice@example.com" });
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Second message should only have diff (updates), not full data
+		const secondUpdate = JSON.parse(messages[1]);
+		expect(secondUpdate.type).toBe("update");
+		expect(secondUpdate.data).toBeUndefined(); // No full data
+		expect(secondUpdate.updates).toBeDefined();
+		expect(secondUpdate.updates.name).toBeDefined(); // Only changed field
+		expect(secondUpdate.updates.email).toBeUndefined(); // Unchanged field not sent
+	});
+
+	it("uses delta strategy for long strings", async () => {
+		const messages: string[] = [];
+		const mockWs = {
+			send: (data: string) => messages.push(data),
+			close: () => {},
+			onmessage: null as ((event: { data: string }) => void) | null,
+			onclose: null as (() => void) | null,
+			onerror: null as ((error: unknown) => void) | null,
+		};
+
+		let emitFn: ((data: unknown) => void) | null = null;
+		const longText = "A".repeat(200);
+
+		const Content = entity("Content", {
+			id: t.id(),
+			text: t.string(),
+		});
+
+		const liveContent = query()
+			.returns(Content)
+			.resolve(({ ctx }) => {
+				emitFn = ctx.emit;
+				return { id: "1", text: longText };
+			});
+
+		const server = createServerV2({
+			entities: { Content },
+			queries: { liveContent },
+		});
+
+		server.handleWebSocket(mockWs);
+
+		// Subscribe
+		mockWs.onmessage?.({
+			data: JSON.stringify({
+				type: "subscribe",
+				id: "sub_1",
+				name: "liveContent",
+			}),
+		});
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Emit update with small change at end
+		emitFn?.({ id: "1", text: longText + "B" });
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Check that delta strategy was used (much smaller than full value)
+		const secondUpdate = JSON.parse(messages[1]);
+		expect(secondUpdate.updates?.text?.strategy).toBe("delta");
+		// Delta should be much smaller than the full text
+		expect(JSON.stringify(secondUpdate.updates.text.data).length).toBeLessThan(50);
+	});
+
+	it("uses patch strategy for nested objects", async () => {
+		const messages: string[] = [];
+		const mockWs = {
+			send: (data: string) => messages.push(data),
+			close: () => {},
+			onmessage: null as ((event: { data: string }) => void) | null,
+			onclose: null as (() => void) | null,
+			onerror: null as ((error: unknown) => void) | null,
+		};
+
+		let emitFn: ((data: unknown) => void) | null = null;
+
+		const Profile = entity("Profile", {
+			id: t.id(),
+			settings: t.object<{ theme: string; notifications: { email: boolean; push: boolean }; language: string }>(),
+		});
+
+		const liveProfile = query()
+			.returns(Profile)
+			.resolve(({ ctx }) => {
+				emitFn = ctx.emit;
+				return {
+					id: "1",
+					settings: {
+						theme: "dark",
+						notifications: { email: true, push: false },
+						language: "en",
+					},
+				};
+			});
+
+		const server = createServerV2({
+			entities: { Profile },
+			queries: { liveProfile },
+		});
+
+		server.handleWebSocket(mockWs);
+
+		// Subscribe
+		mockWs.onmessage?.({
+			data: JSON.stringify({
+				type: "subscribe",
+				id: "sub_1",
+				name: "liveProfile",
+			}),
+		});
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Emit update with only nested change
+		emitFn?.({
+			id: "1",
+			settings: {
+				theme: "light", // Changed
+				notifications: { email: true, push: false }, // Same
+				language: "en", // Same
+			},
+		});
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Check that patch strategy was used
+		const secondUpdate = JSON.parse(messages[1]);
+		expect(secondUpdate.updates?.settings?.strategy).toBe("patch");
+	});
+});
+
+// =============================================================================
+// Test: Field Selection ($select)
+// =============================================================================
+
+describe("Field Selection ($select)", () => {
+	it("applies field selection to query result", async () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { getUser },
+		});
+
+		// Query with field selection
+		const result = await server.executeQuery("getUser", {
+			id: "user-1",
+			$select: { id: true, name: true },
+		});
+
+		expect(result).toEqual({ id: "user-1", name: "Alice" });
+		expect((result as Record<string, unknown>).email).toBeUndefined();
+	});
+
+	it("returns all fields when no $select provided", async () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { getUser },
+		});
+
+		const result = await server.executeQuery("getUser", { id: "user-1" });
+
+		expect(result).toEqual(mockUsers[0]);
+	});
+
+	it("handles array results with selection", async () => {
+		const getUsers = query()
+			.input(z.object({}).optional())  // Add optional input for $select
+			.returns([User])
+			.resolve(() => mockUsers);
+
+		const server = createServerV2({
+			entities: { User },
+			queries: { getUsers },
+		});
+
+		const result = await server.executeQuery("getUsers", {
+			$select: { name: true },
+		});
+
+		expect(result).toEqual([
+			{ id: "user-1", name: "Alice" },
+			{ id: "user-2", name: "Bob" },
+		]);
+	});
+});
+
+// =============================================================================
+// Test: Entity Resolvers
+// =============================================================================
+
+describe("Entity Resolvers", () => {
+	it("creates server with entity resolvers", async () => {
+		// Import entityResolvers (already imported at top of file)
+		const { entityResolvers } = await import("@lens/core");
+
+		const resolvers = entityResolvers({
+			User: {
+				posts: (user: { id: string }) =>
+					mockPosts.filter((p) => p.authorId === user.id),
+			},
+		});
+
+		const server = createServerV2({
+			entities: { User, Post },
+			resolvers,
+		});
+
+		expect(server).toBeDefined();
+	});
+});

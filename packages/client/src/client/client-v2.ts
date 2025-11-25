@@ -1,8 +1,11 @@
 /**
- * @lens/client - Client V2 (Operations-based)
+ * @lens/client - Client V2 (Operations-based with Streaming)
  *
  * Operations-based client for Lens API.
- * Supports queries, mutations with optimistic updates.
+ * Supports:
+ * - queries (single result via await)
+ * - subscriptions (streaming via subscribe)
+ * - mutations with optimistic updates
  *
  * @example
  * ```typescript
@@ -12,27 +15,36 @@
  * const client = createClientV2({
  *   queries,
  *   mutations,
- *   links: [websocketLink({ url: 'ws://localhost:3000' })],
+ *   links: [websocketLinkV2({ url: 'ws://localhost:3000' })],
  * });
  *
- * // Type-safe query
- * const user = await client.query.whoami();
+ * // Single result (await)
+ * const user = await client.query.getUser({ id: "1" });
  *
- * // Type-safe mutation with optimistic update
- * const result = await client.mutation.createPost({ title: 'Hello' });
+ * // Streaming (subscribe)
+ * const unsubscribe = client.query.watchUser({ id: "1" }).subscribe((user) => {
+ *   console.log("User updated:", user);
+ * });
+ *
+ * // Mutation with optimistic update
+ * const result = await client.mutation.updateUser({ id: "1", name: "New Name" });
  * ```
  */
 
-import type { QueryDef, MutationDef, isQueryDef, isMutationDef } from "@lens/core";
+import type { QueryDef, MutationDef, Update } from "@lens/core";
 import { ReactiveStore, type EntityState } from "../store/reactive-store";
 import {
 	type Link,
 	type LinkFn,
 	type OperationResult,
-	type NextLink,
 	composeLinks,
 	createOperationContext,
 } from "../links";
+import {
+	type WebSocketTransportV2,
+	type Subscription,
+	type SubscriptionCallback,
+} from "../links/websocket-v2";
 
 // =============================================================================
 // Types
@@ -71,14 +83,66 @@ export interface ClientV2Config<
 	mutations?: M;
 	/** Links (middleware chain) - last one should be terminal */
 	links: Link[];
+	/** WebSocket transport (for subscriptions) */
+	transport?: WebSocketTransportV2;
 	/** Enable optimistic updates (default: true) */
 	optimistic?: boolean;
 }
 
-/** Query accessor - callable function */
+/** Query result - can be awaited or subscribed */
+export interface QueryResultV2<T> extends PromiseLike<T> {
+	/** Subscribe to streaming updates */
+	subscribe(
+		callback: (data: T, updates?: Record<string, Update>) => void,
+		options?: SubscribeOptions,
+	): Unsubscribe;
+
+	/**
+	 * Select specific fields to fetch (frontend-driven field selection).
+	 * Returns a new QueryResult with the selection applied.
+	 *
+	 * @example
+	 * ```typescript
+	 * // Only fetch id and name
+	 * const user = await client.query.getUser({ id: "1" })
+	 *   .select({ id: true, name: true });
+	 *
+	 * // Fetch with nested relations
+	 * const user = await client.query.getUser({ id: "1" })
+	 *   .select({
+	 *     id: true,
+	 *     name: true,
+	 *     posts: { select: { title: true } },
+	 *   });
+	 * ```
+	 */
+	select<S extends SelectionObject>(selection: S): QueryResultV2<T>;
+}
+
+/** Subscribe options */
+export interface SubscribeOptions {
+	/** Called when subscription completes */
+	onComplete?: () => void;
+	/** Called on error */
+	onError?: (error: Error) => void;
+}
+
+/** Selection object type (simplified - see @lens/core for full type) */
+export type SelectionObject = Record<string, boolean | SelectionObject | { select: SelectionObject }>;
+
+/** Query options */
+export interface QueryOptions {
+	/** Field selection */
+	select?: SelectionObject;
+}
+
+/** Unsubscribe function */
+export type Unsubscribe = () => void;
+
+/** Query accessor - returns QueryResult (can await or subscribe) */
 export type QueryAccessor<I, O> = I extends void
-	? () => Promise<O>
-	: (input: I) => Promise<O>;
+	? () => QueryResultV2<O>
+	: (input: I) => QueryResultV2<O>;
 
 /** Mutation accessor - callable function with optimistic support */
 export type MutationAccessor<I, O> = (
@@ -121,6 +185,8 @@ export interface ClientV2<
 	mutation: MutationAccessors<M>;
 	/** Underlying store */
 	$store: ReactiveStore;
+	/** WebSocket transport */
+	$transport?: WebSocketTransportV2;
 	/** Execute raw operation */
 	$execute: (
 		type: "query" | "mutation",
@@ -138,19 +204,107 @@ export interface ClientV2<
 // =============================================================================
 
 /**
- * Create operations-based client V2
+ * Create QueryResult that can be awaited or subscribed
+ */
+function createQueryResult<T>(
+	name: string,
+	input: unknown,
+	execute: (name: string, input: unknown, options?: { select?: SelectionObject }) => Promise<OperationResult>,
+	transport?: WebSocketTransportV2,
+	selection?: SelectionObject,
+): QueryResultV2<T> {
+	// Build execution input with selection
+	const buildInput = () => {
+		if (!selection) return input;
+		// Merge selection into input object for server processing
+		return { ...(input as object || {}), $select: selection };
+	};
+
+	// Create the result object
+	const result: QueryResultV2<T> = {
+		// PromiseLike: await returns single result
+		then<TResult1 = T, TResult2 = never>(
+			onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+			onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+		): PromiseLike<TResult1 | TResult2> {
+			const promise = execute(name, buildInput()).then((result) => {
+				if (result.error) throw result.error;
+				return result.data as T;
+			});
+			return promise.then(onfulfilled, onrejected);
+		},
+
+		// Subscribe: streaming updates
+		subscribe(
+			callback: (data: T, updates?: Record<string, Update>) => void,
+			options?: SubscribeOptions,
+		): Unsubscribe {
+			if (!transport) {
+				// Fallback: execute once and call callback
+				execute(name, buildInput())
+					.then((result) => {
+						if (result.error) {
+							options?.onError?.(result.error);
+						} else {
+							callback(result.data as T);
+							options?.onComplete?.();
+						}
+					})
+					.catch((error) => {
+						options?.onError?.(error);
+					});
+
+				return () => {}; // No-op unsubscribe for non-streaming
+			}
+
+			// Use transport for streaming (pass selection via input)
+			const subscription = transport.subscribe<T>(
+				name,
+				buildInput(),
+				callback,
+				{
+					onComplete: options?.onComplete,
+					onError: options?.onError,
+				},
+			);
+
+			return subscription.unsubscribe;
+		},
+
+		// Select: create new result with field selection
+		select<S extends SelectionObject>(newSelection: S): QueryResultV2<T> {
+			// Merge with existing selection if any
+			const mergedSelection = selection
+				? { ...selection, ...newSelection }
+				: newSelection;
+			return createQueryResult<T>(name, input, execute, transport, mergedSelection);
+		},
+	};
+
+	return result;
+}
+
+/**
+ * Create operations-based client V2 with streaming support
  *
  * @example
  * ```typescript
  * const client = createClientV2({
- *   queries: { whoami, searchUsers },
+ *   queries: { getUser, watchUser, searchUsers },
  *   mutations: { createPost, updatePost },
- *   links: [websocketLink({ url: 'ws://localhost:3000' })],
+ *   links: [websocketLinkV2({ url: 'ws://localhost:3000' })],
  * });
  *
- * // Queries
- * const me = await client.query.whoami();
- * const results = await client.query.searchUsers({ query: 'john' });
+ * // Single result (await)
+ * const user = await client.query.getUser({ id: "1" });
+ *
+ * // Streaming (subscribe)
+ * const unsubscribe = client.query.watchUser({ id: "1" }).subscribe((user) => {
+ *   console.log("User updated:", user);
+ * });
+ *
+ * // Later: stop streaming
+ * unsubscribe();
  *
  * // Mutations with optimistic updates
  * const { data, rollback } = await client.mutation.createPost({
@@ -163,7 +317,13 @@ export function createClientV2<
 	Q extends QueriesMap = QueriesMap,
 	M extends MutationsMap = MutationsMap,
 >(config: ClientV2Config<Q, M>): ClientV2<Q, M> {
-	const { queries = {} as Q, mutations = {} as M, links, optimistic = true } = config;
+	const {
+		queries = {} as Q,
+		mutations = {} as M,
+		links,
+		transport,
+		optimistic = true,
+	} = config;
 
 	// Validate links
 	if (!links || links.length === 0) {
@@ -197,14 +357,15 @@ export function createClientV2<
 	};
 
 	// Create query accessors
-	const queryAccessors: Record<string, (input?: unknown) => Promise<unknown>> = {};
-	for (const [name, queryDef] of Object.entries(queries)) {
-		queryAccessors[name] = async (input?: unknown) => {
-			const result = await execute("query", name, input);
-			if (result.error) {
-				throw result.error;
-			}
-			return result.data;
+	const queryAccessors: Record<string, (input?: unknown) => QueryResultV2<unknown>> = {};
+	for (const [name] of Object.entries(queries)) {
+		queryAccessors[name] = (input?: unknown) => {
+			return createQueryResult(
+				name,
+				input,
+				(n, i) => execute("query", n, i),
+				transport,
+			);
 		};
 	}
 
@@ -263,6 +424,7 @@ export function createClientV2<
 		query: queryAccessors as QueryAccessors<Q>,
 		mutation: mutationAccessors as MutationAccessors<M>,
 		$store: store,
+		$transport: transport,
 		$execute: execute,
 		$queryNames: () => Object.keys(queries),
 		$mutationNames: () => Object.keys(mutations),
