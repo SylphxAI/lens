@@ -1,5 +1,12 @@
 # @sylphx/lens-solid
 
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-client@1.1.1
+
 ## 1.1.0
 
 ### Minor Changes

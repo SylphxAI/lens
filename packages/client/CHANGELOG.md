@@ -1,5 +1,24 @@
 # @sylphx/lens-client
 
+## 1.1.1
+
+### Patch Changes
+
+- ## Lazy Connection
+
+  `createClient()` is now synchronous. Connection happens lazily on first operation.
+
+  ```typescript
+  // Before (async)
+  const client = await createClient({ transport });
+
+  // After (sync!)
+  const client = createClient({ transport });
+  const user = await client.user.get({ id: "123" }); // connects here
+  ```
+
+  This makes framework integration much simpler - no loading states needed in providers.
+
 ## 1.1.0
 
 ### Minor Changes
