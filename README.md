@@ -61,18 +61,21 @@ Lens brings GraphQL concepts to TypeScript:
 Connect to any backend with composable transports:
 
 ```typescript
-// Simple - single server
-const client = await createClient<Api>({
+// Simple - single server (sync creation!)
+const client = createClient<Api>({
   transport: http({ url: '/api' }),
 })
 
 // Real-time - WebSocket for subscriptions
-const client = await createClient<Api>({
+const client = createClient<Api>({
   transport: routeByType({
     default: http({ url: '/api' }),
     subscription: ws({ url: 'ws://localhost:3000' }),
   }),
 })
+
+// Connection happens lazily on first operation
+const user = await client.user.get({ id: '123' })
 ```
 
 ### 🌐 Multi-Server Architecture
@@ -87,7 +90,7 @@ import type { AnalyticsRouter } from '@company/analytics-server'
 // Merge types from different servers
 type Api = AuthRouter & MainRouter & AnalyticsRouter
 
-const client = await createClient<Api>({
+const client = createClient<Api>({
   transport: route({
     'auth.*': http({ url: '/auth-api' }),
     'analytics.*': http({ url: '/analytics-api' }),
@@ -125,7 +128,7 @@ await client.user.update({ id: '123', name: 'New Name' })
 Extend functionality with lifecycle hooks:
 
 ```typescript
-const client = await createClient<Api>({
+const client = createClient<Api>({
   transport: http({ url: '/api' }),
   plugins: [
     logger(),                    // Log requests/responses
@@ -259,8 +262,8 @@ const server = createServer({
 import { createClient, http } from '@sylphx/lens-client'
 import type { AppRouter } from './router'
 
-// Client auto-handshakes to get operation metadata
-export const client = await createClient<AppRouter>({
+// Sync creation - handshake happens on first operation
+export const client = createClient<AppRouter>({
   transport: http({ url: '/api' }),
   plugins: [logger(), auth({ getToken: () => localStorage.token })],
 })
@@ -402,7 +405,7 @@ import type { UserRouter } from '@company/user-server'
 
 type Api = AuthRouter & UserRouter
 
-const client = await createClient<Api>({
+const client = createClient<Api>({
   transport: route({
     'auth.*': http({ url: '/auth-api' }),
     '*': http({ url: '/user-api' }),

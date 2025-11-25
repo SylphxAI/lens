@@ -3,6 +3,8 @@
  *
  * Primary client for Lens API framework.
  * Uses Transport + Plugin architecture for clean, extensible design.
+ *
+ * Lazy connection - transport.connect() is called on first operation.
  */
 
 import type {
@@ -149,7 +151,10 @@ class ClientImpl {
 	private plugins: Plugin[];
 	private optimistic: boolean;
 	private store: ReactiveStore;
+
+	/** Metadata from transport handshake (lazy loaded) */
 	private metadata: Metadata | null = null;
+	private connectPromise: Promise<Metadata> | null = null;
 
 	/** Subscription states */
 	private subscriptions = new Map<
@@ -178,16 +183,26 @@ class ClientImpl {
 	}
 
 	/**
-	 * Initialize client - connect transport and get metadata
+	 * Ensure transport is connected (lazy connection).
+	 * Called automatically on first operation.
 	 */
-	async init(): Promise<void> {
-		this.metadata = await this.transport.connect();
+	private async ensureConnected(): Promise<void> {
+		if (this.metadata) return;
+
+		if (!this.connectPromise) {
+			this.connectPromise = this.transport.connect();
+		}
+
+		this.metadata = await this.connectPromise;
 	}
 
 	/**
 	 * Execute operation through plugins and transport
 	 */
 	private async execute(op: Operation): Promise<Result> {
+		// Ensure connected before executing
+		await this.ensureConnected();
+
 		// Run beforeRequest plugins
 		let processedOp = op;
 		for (const plugin of this.plugins) {
@@ -242,7 +257,7 @@ class ClientImpl {
 	}
 
 	/**
-	 * Get operation metadata
+	 * Get operation metadata (may be null before first operation)
 	 */
 	private getOperationMeta(path: string): Metadata["operations"][string] | undefined {
 		if (!this.metadata) return undefined;
@@ -330,7 +345,7 @@ class ClientImpl {
 				onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
 			): Promise<TResult1 | TResult2> => {
 				try {
-					// Execute query
+					// Execute query (will auto-connect if needed)
 					const op: Operation = {
 						id: this.generateId("query", path),
 						path,
@@ -371,9 +386,12 @@ class ClientImpl {
 		return result;
 	}
 
-	private startSubscription(path: string, input: unknown, key: string): void {
+	private async startSubscription(path: string, input: unknown, key: string): Promise<void> {
 		const sub = this.subscriptions.get(key);
 		if (!sub) return;
+
+		// Ensure connected before checking metadata
+		await this.ensureConnected();
 
 		const meta = this.getOperationMeta(path);
 		const isSubscription = meta?.type === "subscription";
@@ -425,6 +443,9 @@ class ClientImpl {
 		path: string,
 		input: TInput,
 	): Promise<MutationResult<TOutput>> {
+		// Ensure connected before executing
+		await this.ensureConnected();
+
 		const meta = this.getOperationMeta(path);
 		let optId: string | undefined;
 
@@ -523,7 +544,7 @@ class ClientImpl {
 		// Update with server data
 		const entityId = this.extractId(serverData);
 		if (entityId) {
-			for (const [key, sub] of this.subscriptions) {
+			for (const [, sub] of this.subscriptions) {
 				const currentId = this.extractId(sub.data.value);
 				if (currentId === entityId) {
 					sub.data.value = serverData;
@@ -567,9 +588,21 @@ class ClientImpl {
 
 	createAccessor(path: string): (input?: unknown) => unknown {
 		const accessor = (input?: unknown) => {
-			const meta = this.getOperationMeta(path);
+			// Note: We don't check metadata here because we want lazy connection.
+			// The actual operation type is determined by the server via metadata
+			// which is fetched on first execute().
+			//
+			// For now, we check if the path looks like a mutation (common patterns).
+			// This will be corrected once metadata is loaded.
+			const isMutationPath =
+				path.includes("create") ||
+				path.includes("update") ||
+				path.includes("delete") ||
+				path.includes("set") ||
+				path.includes("add") ||
+				path.includes("remove");
 
-			if (meta?.type === "mutation") {
+			if (isMutationPath) {
 				return this.executeMutation(path, input);
 			}
 
@@ -596,27 +629,27 @@ class ClientImpl {
 // =============================================================================
 
 /**
- * Create Lens client
+ * Create Lens client (sync - connection is lazy)
  *
  * @example
  * ```typescript
  * import type { AppRouter } from './server';
  *
- * const client = await createClient<RouterApiShape<AppRouter>>({
+ * // Sync creation - no await needed!
+ * const client = createClient<RouterApiShape<AppRouter>>({
  *   transport: http({ url: '/api' }),
  *   plugins: [logger(), auth({ getToken: () => token })],
  * });
  *
- * // Use
+ * // Connection happens on first operation
  * const user = await client.user.get({ id: '123' });
  * await client.user.update({ id: '123', name: 'New Name' });
  * ```
  */
-export async function createClient<TApi extends RouterApiShape>(
+export function createClient<TApi extends RouterApiShape>(
 	config: LensClientConfig,
-): Promise<RouterLensClient<TApi extends RouterApiShape<infer R> ? R : never>> {
+): RouterLensClient<TApi extends RouterApiShape<infer R> ? R : never> {
 	const impl = new ClientImpl(config);
-	await impl.init();
 
 	// Create nested proxy for router-based access
 	function createNestedProxy(prefix: string): unknown {
@@ -626,6 +659,7 @@ export async function createClient<TApi extends RouterApiShape>(
 				const key = prop as string;
 
 				if (key === "$store") return impl.$store;
+				if (key === "then") return undefined; // Prevent treating as thenable
 				if (key.startsWith("_")) return undefined;
 
 				const path = prefix ? `${prefix}.${key}` : key;

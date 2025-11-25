@@ -17,17 +17,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"solid",
-		"solidjs",
-		"reactive",
-		"signals"
-	],
+	"files": ["dist", "src"],
+	"keywords": ["lens", "solid", "solidjs", "reactive", "signals"],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

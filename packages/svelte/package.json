@@ -17,16 +17,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"svelte",
-		"stores",
-		"reactive"
-	],
+	"files": ["dist", "src"],
+	"keywords": ["lens", "svelte", "stores", "reactive"],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

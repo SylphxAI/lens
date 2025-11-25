@@ -25,10 +25,7 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": [
-		"dist",
-		"src"
-	],
+	"files": ["dist", "src"],
 	"keywords": [
 		"lens",
 		"api",

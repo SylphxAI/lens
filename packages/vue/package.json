@@ -17,16 +17,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"vue",
-		"composables",
-		"composition-api"
-	],
+	"files": ["dist", "src"],
+	"keywords": ["lens", "vue", "composables", "composition-api"],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

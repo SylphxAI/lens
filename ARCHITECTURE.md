@@ -648,7 +648,7 @@ import type { AnalyticsRouter } from '@company/analytics-server'
 // Merge all router types
 type Api = AuthRouter & UserRouter & AnalyticsRouter
 
-const client = await createClient<Api>({
+const client = createClient<Api>({
   transport: route({
     'auth.*': http({ url: '/auth-api' }),
     'analytics.*': http({ url: '/analytics-api' }),
