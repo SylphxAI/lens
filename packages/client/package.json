@@ -25,16 +25,25 @@
 		"lens",
 		"client",
 		"reactive",
-		"signals"
+		"transport",
+		"plugins"
 	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
 		"@sylphx/lens-core": "workspace:*",
-		"@msgpack/msgpack": "^3.1.2",
-		"@preact/signals-core": "^1.8.0"
+		"@msgpack/msgpack": "^3.1.2"
+	},
+	"peerDependencies": {
+		"@preact/signals-core": ">=1.8.0"
+	},
+	"peerDependenciesMeta": {
+		"@preact/signals-core": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
+		"@preact/signals-core": "^1.8.0",
 		"@sylphx/lens-server": "workspace:*",
 		"typescript": "^5.9.3",
 		"zod": "^4.1.13"

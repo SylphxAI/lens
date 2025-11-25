@@ -15,7 +15,6 @@ import type {
 	RouterRoutes,
 } from "@sylphx/lens-core";
 import { normalizeOptimisticDSL } from "@sylphx/lens-core";
-import { ReactiveStore } from "../store/reactive-store";
 import type { Plugin } from "../transport/plugin";
 import type { Metadata, Observable, Operation, Result, Transport } from "../transport/types";
 
@@ -124,14 +123,11 @@ export type InferRouterClientType<TRoutes extends RouterRoutes> = {
 
 /** Router-based client type */
 export type RouterLensClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
-	? InferRouterClientType<TRoutes> & {
-			$store: ReactiveStore;
-		}
+	? InferRouterClientType<TRoutes>
 	: never;
 
 /** Generic client type (for framework adapters) */
 export type LensClient<_Q = unknown, _M = unknown> = {
-	$store: ReactiveStore;
 	[key: string]: unknown;
 };
 
@@ -143,7 +139,6 @@ class ClientImpl {
 	private transport: Transport;
 	private plugins: Plugin[];
 	private optimistic: boolean;
-	private store: ReactiveStore;
 
 	/** Metadata from transport handshake (lazy loaded) */
 	private metadata: Metadata | null = null;
@@ -170,7 +165,6 @@ class ClientImpl {
 		this.transport = config.transport;
 		this.plugins = config.plugins ?? [];
 		this.optimistic = config.optimistic ?? true;
-		this.store = new ReactiveStore();
 	}
 
 	/**
@@ -599,10 +593,6 @@ class ClientImpl {
 
 		return accessor;
 	}
-
-	get $store(): ReactiveStore {
-		return this.store;
-	}
 }
 
 // =============================================================================
@@ -639,7 +629,6 @@ export function createClient<TApi extends RouterApiShape>(
 				if (typeof prop === "symbol") return undefined;
 				const key = prop as string;
 
-				if (key === "$store") return impl.$store;
 				if (key === "then") return undefined; // Prevent treating as thenable
 				if (key.startsWith("_")) return undefined;
 

@@ -30,8 +30,7 @@
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@sylphx/lens-client": "workspace:*",
-		"@sylphx/lens-core": "workspace:*"
+		"@sylphx/lens-client": "workspace:*"
 	},
 	"peerDependencies": {
 		"svelte": ">=4.0.0"

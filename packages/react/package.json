@@ -25,14 +25,12 @@
 		"lens",
 		"react",
 		"hooks",
-		"signals"
+		"reactive"
 	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@sylphx/lens-client": "workspace:*",
-		"@sylphx/lens-core": "workspace:*",
-		"@preact/signals-react": "^2.2.0"
+		"@sylphx/lens-client": "workspace:*"
 	},
 	"peerDependencies": {
 		"react": ">=18.0.0"

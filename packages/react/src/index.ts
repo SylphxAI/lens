@@ -28,9 +28,3 @@ export {
 	type UseQueryOptions,
 	type MutationFn,
 } from "./hooks";
-
-// =============================================================================
-// Re-exports from @preact/signals-react
-// =============================================================================
-
-export { useSignal, useComputed, useSignalEffect } from "@preact/signals-react";
