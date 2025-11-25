@@ -464,3 +464,119 @@ export function isMutationDef(value: unknown): value is MutationDef {
 export function isOperationDef(value: unknown): value is QueryDef | MutationDef {
 	return isQueryDef(value) || isMutationDef(value);
 }
+
+// =============================================================================
+// Router (Namespace Support)
+// =============================================================================
+
+/** Any procedure (query or mutation) */
+export type AnyProcedure = QueryDef<unknown, unknown> | MutationDef<unknown, unknown>;
+
+/** Router routes - can contain procedures or nested routers */
+export type RouterRoutes = {
+	[key: string]: AnyProcedure | RouterDef<RouterRoutes>;
+};
+
+/** Router definition */
+export interface RouterDef<TRoutes extends RouterRoutes = RouterRoutes> {
+	_type: "router";
+	_routes: TRoutes;
+}
+
+/** Check if value is a router definition */
+export function isRouterDef(value: unknown): value is RouterDef {
+	return typeof value === "object" && value !== null && (value as RouterDef)._type === "router";
+}
+
+/**
+ * Create a router for namespacing operations
+ *
+ * Routers allow organizing operations into logical groups with nested access.
+ *
+ * @example
+ * ```typescript
+ * import { router, query, mutation } from '@sylphx/lens-core';
+ * import { z } from 'zod';
+ *
+ * export const appRouter = router({
+ *   user: router({
+ *     get: query()
+ *       .input(z.object({ id: z.string() }))
+ *       .returns(User)
+ *       .resolve(({ input, ctx }) => ctx.db.user.findUnique({ where: { id: input.id } })),
+ *     list: query()
+ *       .returns([User])
+ *       .resolve(({ ctx }) => ctx.db.user.findMany()),
+ *     create: mutation()
+ *       .input(z.object({ name: z.string(), email: z.string() }))
+ *       .returns(User)
+ *       .resolve(({ input, ctx }) => ctx.db.user.create({ data: input })),
+ *   }),
+ *   post: router({
+ *     get: query()
+ *       .input(z.object({ id: z.string() }))
+ *       .returns(Post)
+ *       .resolve(({ input, ctx }) => ctx.db.post.findUnique({ where: { id: input.id } })),
+ *     create: mutation()
+ *       .input(z.object({ title: z.string(), content: z.string() }))
+ *       .returns(Post)
+ *       .resolve(({ input, ctx }) => ctx.db.post.create({ data: input })),
+ *   }),
+ * });
+ *
+ * // Client usage:
+ * // client.user.get({ id: "1" })
+ * // client.user.list()
+ * // client.post.create({ title: "Hello", content: "World" })
+ * ```
+ */
+export function router<TRoutes extends RouterRoutes>(routes: TRoutes): RouterDef<TRoutes> {
+	return {
+		_type: "router",
+		_routes: routes,
+	};
+}
+
+/** Flatten router to dot-notation paths for server processing */
+export function flattenRouter(
+	routerDef: RouterDef,
+	prefix = "",
+): Map<string, AnyProcedure> {
+	const result = new Map<string, AnyProcedure>();
+
+	for (const [key, value] of Object.entries(routerDef._routes)) {
+		const path = prefix ? `${prefix}.${key}` : key;
+
+		if (isRouterDef(value)) {
+			// Recursively flatten nested routers
+			const nested = flattenRouter(value, path);
+			for (const [nestedPath, procedure] of nested) {
+				result.set(nestedPath, procedure);
+			}
+		} else {
+			// It's a procedure (query or mutation)
+			result.set(path, value);
+		}
+	}
+
+	return result;
+}
+
+// =============================================================================
+// Type Inference for Router
+// =============================================================================
+
+/** Infer the client type from a router definition */
+export type InferRouterClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
+	? {
+			[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
+				? InferRouterClient<RouterDef<TNestedRoutes>>
+				: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
+					? TInput extends void
+						? () => Promise<TOutput>
+						: (input: TInput) => Promise<TOutput>
+					: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
+						? (input: TInput) => Promise<TOutput>
+						: never;
+		}
+	: never;

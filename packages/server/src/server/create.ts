@@ -19,12 +19,15 @@ import {
 	type QueryDef,
 	type RelationDef,
 	type RelationTypeWithForeignKey,
+	type RouterDef,
 	type Update,
 	createContext,
 	createUpdate,
+	flattenRouter,
 	isBatchResolver,
 	isMutationDef,
 	isQueryDef,
+	isRouterDef,
 	runWithContext,
 } from "@sylphx/lens-core";
 
@@ -61,9 +64,11 @@ export interface LensServerConfig<TContext extends ContextValue = ContextValue> 
 	entities?: EntitiesMap;
 	/** Relation definitions */
 	relations?: RelationsArray;
-	/** Query definitions */
+	/** Router definition (namespaced operations) */
+	router?: RouterDef;
+	/** Query definitions (flat, legacy) */
 	queries?: QueriesMap;
-	/** Mutation definitions */
+	/** Mutation definitions (flat, legacy) */
 	mutations?: MutationsMap;
 	/** Entity resolvers */
 	resolvers?: EntityResolvers<EntityResolversDefinition>;
@@ -282,8 +287,24 @@ class LensServerImpl<
 	private server: unknown = null;
 
 	constructor(config: LensServerConfig<TContext> & { queries?: Q; mutations?: M }) {
-		this.queries = (config.queries ?? {}) as Q;
-		this.mutations = (config.mutations ?? {}) as M;
+		// Start with flat queries/mutations (legacy)
+		const queries: QueriesMap = { ...(config.queries ?? {}) };
+		const mutations: MutationsMap = { ...(config.mutations ?? {}) };
+
+		// Flatten router into queries/mutations (if provided)
+		if (config.router) {
+			const flattened = flattenRouter(config.router);
+			for (const [path, procedure] of flattened) {
+				if (isQueryDef(procedure)) {
+					queries[path] = procedure;
+				} else if (isMutationDef(procedure)) {
+					mutations[path] = procedure;
+				}
+			}
+		}
+
+		this.queries = queries as Q;
+		this.mutations = mutations as M;
 		this.entities = config.entities ?? {};
 		this.resolvers = config.resolvers;
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
@@ -303,16 +324,14 @@ class LensServerImpl<
 				(def as { _name?: string })._name = name;
 
 				// Auto-derive optimistic from naming convention if not explicitly set
-				// Future: Could auto-derive from naming convention:
-				// - updateX → merge
-				// - createX / addX → create
-				// - deleteX / removeX → delete
+				// For namespaced routes (e.g., "user.create"), check the last segment
+				const lastSegment = name.includes(".") ? name.split(".").pop()! : name;
 				if (!def._optimistic) {
-					if (name.startsWith("update")) {
+					if (lastSegment.startsWith("update")) {
 						(def as { _optimistic?: string })._optimistic = "merge";
-					} else if (name.startsWith("create") || name.startsWith("add")) {
+					} else if (lastSegment.startsWith("create") || lastSegment.startsWith("add")) {
 						(def as { _optimistic?: string })._optimistic = "create";
-					} else if (name.startsWith("delete") || name.startsWith("remove")) {
+					} else if (lastSegment.startsWith("delete") || lastSegment.startsWith("remove")) {
 						(def as { _optimistic?: string })._optimistic = "delete";
 					}
 				}

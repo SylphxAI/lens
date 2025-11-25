@@ -9,13 +9,16 @@ import { z } from "zod";
 import { entity } from "../schema/define";
 import { t } from "../schema/types";
 import {
+	flattenRouter,
 	isMutationDef,
 	isOperationDef,
 	isQueryDef,
+	isRouterDef,
 	isTempId,
 	mutation,
 	query,
 	resetTempIdCounter,
+	router,
 	tempId,
 } from "./index";
 
@@ -323,5 +326,146 @@ describe("Input validation", () => {
 		// Invalid input
 		const invalid = schema.safeParse({ id: 123 });
 		expect(invalid.success).toBe(false);
+	});
+});
+
+// =============================================================================
+// Test: router() Builder
+// =============================================================================
+
+describe("router() builder", () => {
+	it("creates a router with queries and mutations", () => {
+		const appRouter = router({
+			user: router({
+				get: query()
+					.input(z.object({ id: z.string() }))
+					.returns(User)
+					.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" })),
+				list: query()
+					.returns([User])
+					.resolve(() => []),
+				create: mutation()
+					.input(z.object({ name: z.string(), email: z.string() }))
+					.returns(User)
+					.resolve(({ input }) => ({ id: "1", ...input })),
+			}),
+			post: router({
+				get: query()
+					.input(z.object({ id: z.string() }))
+					.returns(Post)
+					.resolve(({ input }) => ({
+						id: input.id,
+						title: "Title",
+						content: "Content",
+						authorId: "1",
+					})),
+			}),
+		});
+
+		expect(appRouter._type).toBe("router");
+		expect(appRouter._routes).toBeDefined();
+		expect(isRouterDef(appRouter)).toBe(true);
+		expect(isRouterDef(appRouter._routes.user)).toBe(true);
+		expect(isRouterDef(appRouter._routes.post)).toBe(true);
+	});
+
+	it("isRouterDef identifies router definitions", () => {
+		const r = router({
+			test: query()
+				.returns(User)
+				.resolve(() => ({ id: "1", name: "John", email: "john@example.com" })),
+		});
+
+		expect(isRouterDef(r)).toBe(true);
+		expect(isRouterDef({})).toBe(false);
+		expect(isRouterDef(null)).toBe(false);
+		expect(isRouterDef({ _type: "query" })).toBe(false);
+	});
+
+	it("flattenRouter converts nested router to flat map", () => {
+		const appRouter = router({
+			user: router({
+				get: query()
+					.input(z.object({ id: z.string() }))
+					.returns(User)
+					.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" })),
+				create: mutation()
+					.input(z.object({ name: z.string(), email: z.string() }))
+					.returns(User)
+					.resolve(({ input }) => ({ id: "1", ...input })),
+			}),
+			post: router({
+				get: query()
+					.input(z.object({ id: z.string() }))
+					.returns(Post)
+					.resolve(({ input }) => ({
+						id: input.id,
+						title: "Title",
+						content: "Content",
+						authorId: "1",
+					})),
+				comment: router({
+					list: query()
+						.returns([User])
+						.resolve(() => []),
+				}),
+			}),
+		});
+
+		const flattened = flattenRouter(appRouter);
+
+		expect(flattened.size).toBe(4);
+		expect(flattened.has("user.get")).toBe(true);
+		expect(flattened.has("user.create")).toBe(true);
+		expect(flattened.has("post.get")).toBe(true);
+		expect(flattened.has("post.comment.list")).toBe(true);
+
+		// Verify types
+		expect(isQueryDef(flattened.get("user.get"))).toBe(true);
+		expect(isMutationDef(flattened.get("user.create"))).toBe(true);
+		expect(isQueryDef(flattened.get("post.comment.list"))).toBe(true);
+	});
+
+	it("supports deeply nested routers", () => {
+		const appRouter = router({
+			api: router({
+				v1: router({
+					user: router({
+						profile: router({
+							get: query()
+								.returns(User)
+								.resolve(() => ({ id: "1", name: "John", email: "john@example.com" })),
+						}),
+					}),
+				}),
+			}),
+		});
+
+		const flattened = flattenRouter(appRouter);
+
+		expect(flattened.size).toBe(1);
+		expect(flattened.has("api.v1.user.profile.get")).toBe(true);
+	});
+
+	it("handles mixed flat and nested operations", () => {
+		const appRouter = router({
+			// Flat operation at root
+			health: query()
+				.returns(User) // Using User as placeholder
+				.resolve(() => ({ id: "ok", name: "healthy", email: "" })),
+			// Nested namespace
+			user: router({
+				get: query()
+					.input(z.object({ id: z.string() }))
+					.returns(User)
+					.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" })),
+			}),
+		});
+
+		const flattened = flattenRouter(appRouter);
+
+		expect(flattened.size).toBe(2);
+		expect(flattened.has("health")).toBe(true);
+		expect(flattened.has("user.get")).toBe(true);
 	});
 });

@@ -134,7 +134,76 @@ export const relations = [
 ]
 ```
 
-### 3. Define Operations
+### 3. Define Operations (Router-based - Recommended)
+
+Use `router()` to organize operations into namespaces for better organization:
+
+```typescript
+// router.ts
+import { router, query, mutation } from '@sylphx/lens-core'
+import { z } from 'zod'
+import { User, Post } from './schema/entities'
+
+export const appRouter = router({
+  user: router({
+    // client.user.me()
+    me: query()
+      .returns(User)
+      .resolve(({ ctx }) => ctx.currentUser),
+
+    // client.user.get({ id: "1" })
+    get: query()
+      .input(z.object({ id: z.string() }))
+      .returns(User)
+      .resolve(({ input, ctx }) => ctx.db.user.findUnique({
+        where: { id: input.id }
+      })),
+
+    // client.user.search({ query: "john" })
+    search: query()
+      .input(z.object({ query: z.string(), limit: z.number().optional() }))
+      .returns([User])
+      .resolve(({ input, ctx }) => ctx.db.user.findMany({
+        where: { name: { contains: input.query } },
+        take: input.limit ?? 10,
+      })),
+  }),
+
+  post: router({
+    // client.post.get({ id: "1" })
+    get: query()
+      .input(z.object({ id: z.string() }))
+      .returns(Post)
+      .resolve(({ input, ctx }) => ctx.db.post.findUnique({
+        where: { id: input.id }
+      })),
+
+    // client.post.create({ title: "Hello", content: "World" })
+    // "create" → auto 'create' optimistic (from naming convention!)
+    create: mutation()
+      .input(z.object({ title: z.string(), content: z.string() }))
+      .returns(Post)
+      .resolve(({ input, ctx }) => ctx.db.post.create({
+        data: { ...input, authorId: ctx.currentUser.id },
+      })),
+
+    // client.post.update({ id: "1", title: "Updated" })
+    // "update" → auto 'merge' optimistic
+    update: mutation()
+      .input(z.object({ id: z.string(), title: z.string().optional() }))
+      .returns(Post)
+      .resolve(({ input, ctx }) => ctx.db.post.update({
+        where: { id: input.id },
+        data: input,
+      })),
+  }),
+})
+
+export type AppRouter = typeof appRouter
+```
+
+<details>
+<summary>Flat Operations (Legacy)</summary>
 
 ```typescript
 // operations/queries.ts
@@ -154,15 +223,6 @@ export const user = query()
   .resolve(({ input, ctx }) => ctx.db.user.findUnique({
     where: { id: input.id }
   }))
-
-// Custom logic
-export const searchUsers = query()
-  .input(z.object({ query: z.string(), limit: z.number().optional() }))
-  .returns([User])
-  .resolve(({ input, ctx }) => ctx.db.user.findMany({
-    where: { name: { contains: input.query } },
-    take: input.limit ?? 10,
-  }))
 ```
 
 ```typescript
@@ -171,26 +231,15 @@ import { mutation } from '@sylphx/lens-core'
 import { z } from 'zod'
 import { Post } from '../schema/entities'
 
-// "createPost" → auto 'create' optimistic (from naming convention!)
 export const createPost = mutation()
   .input(z.object({ title: z.string(), content: z.string() }))
   .returns(Post)
-  // No .optimistic() needed - auto-derived from "createPost" name!
-  .resolve(({ input, ctx }) => {
-    return ctx.db.post.create({
-      data: { ...input, authorId: ctx.currentUser.id },
-    })
-  })
-
-// "updatePost" → auto 'merge' optimistic
-export const updatePost = mutation()
-  .input(z.object({ id: z.string(), title: z.string().optional() }))
-  .returns(Post)
-  .resolve(({ input, ctx }) => ctx.db.post.update({
-    where: { id: input.id },
-    data: input,
+  .resolve(({ input, ctx }) => ctx.db.post.create({
+    data: { ...input, authorId: ctx.currentUser.id },
   }))
 ```
+
+</details>
 
 ### 4. Define Entity Resolvers
 
@@ -219,24 +268,19 @@ export const resolvers = entityResolvers({
 import { createServer } from '@sylphx/lens-server'
 import * as entities from './schema/entities'
 import { relations } from './schema/relations'
-import * as queries from './operations/queries'
-import * as mutations from './operations/mutations'
+import { appRouter } from './router'
 import { resolvers } from './resolvers'
 
 export const server = createServer({
   entities,
   relations,
-  queries,
-  mutations,
+  router: appRouter,  // Use router for namespaced operations
   resolvers,
   context: async (req) => ({
     db: prisma,
     currentUser: await getUserFromToken(req.headers.authorization),
   }),
 })
-
-// Export router type for client
-export type AppRouter = typeof server.router
 
 server.listen(3000)
 ```
@@ -245,11 +289,11 @@ server.listen(3000)
 
 ```typescript
 // client.ts
-import { createClient, httpLink, websocketLink } from '@sylphx/lens-client'
-import type { AppRouter } from './server'
+import { createClient, httpLink, websocketLink, RouterApiShape } from '@sylphx/lens-client'
+import type { AppRouter } from './router'
 
-// Type-safe client with tRPC-style links
-export const client = createClient<AppRouter>({
+// Type-safe client with namespaced operations
+export const client = createClient<RouterApiShape<AppRouter>>({
   links: [
     httpLink({ url: '/api' }),
     // Or for real-time:
@@ -257,10 +301,10 @@ export const client = createClient<AppRouter>({
   ],
 })
 
-// Direct usage (async/await)
-const me = await client.queries.whoami()
-const user = await client.queries.user({ id: '123' })
-const result = await client.mutations.createPost({ title: 'Hello', content: 'World' })
+// Namespaced usage (async/await)
+const me = await client.user.me()
+const user = await client.user.get({ id: '123' })
+const post = await client.post.create({ title: 'Hello', content: 'World' })
 ```
 
 ### 7. Use in React
@@ -998,24 +1042,31 @@ t.custom(definition)            // custom serialization
 .optional()                     // T | undefined (field may not exist)
 .default(value)                 // Default value
 
-// Operations (names derived from export keys!)
-query()                         // Create query builder (name from export key)
-query(name)                     // Create query builder (explicit name)
+// Operations
+query()                         // Create query builder
   .input(zodSchema)             // Input validation (optional)
   .returns(Entity | [Entity])   // Return type
   .resolve(fn)                  // Resolver function
 
-mutation()                      // Create mutation builder (name from export key)
-mutation(name)                  // Create mutation builder (explicit name)
+mutation()                      // Create mutation builder
   .input(zodSchema)             // Input validation
   .returns(Entity | { ... })    // Return type
   .optimistic(spec)             // Optimistic prediction (optional - auto-derived!)
   .resolve(fn)                  // Resolver function
 
+// Router (namespaced operations - recommended!)
+router({                        // Create namespace
+  user: router({                // Nested namespace
+    get: query()...,            // client.user.get()
+    create: mutation()...,      // client.user.create()
+  }),
+  post: router({ ... }),
+})
+
 // Auto-Optimistic from Naming Convention
-// updateX → auto 'merge' (no .optimistic() needed)
-// createX/addX → auto 'create'
-// deleteX/removeX → auto 'delete'
+// update → auto 'merge' (no .optimistic() needed)
+// create/add → auto 'create'
+// delete/remove → auto 'delete'
 
 // Explicit Optimistic DSL (for edge cases)
 .optimistic('merge')                        // Merge input into entity
@@ -1024,10 +1075,10 @@ mutation(name)                  // Create mutation builder (explicit name)
 .optimistic({ merge: { published: true } }) // Merge with extra fields
 .optimistic({ create: { status: 'draft' }}) // Create with extra fields
 
-// Client
-createClient<AppRouter>({ links: [...] })   // Create type-safe client
-client.queries.operationName(input)         // Execute query
-client.mutations.operationName(input)       // Execute mutation
+// Client (with router)
+createClient<RouterApiShape<AppRouter>>({ links: [...] })
+client.user.get({ id: '1' })               // Namespaced query
+client.post.create({ title: 'Hi' })        // Namespaced mutation
 
 // Links
 httpLink({ url })               // HTTP transport

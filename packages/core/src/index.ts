@@ -223,19 +223,26 @@ export {
 	// Builders
 	query,
 	mutation,
+	router,
 	// Helpers
 	tempId,
 	resetTempIdCounter,
 	isTempId,
+	flattenRouter,
 	// Type guards
 	isQueryDef,
 	isMutationDef,
 	isOperationDef,
+	isRouterDef,
 	isOptimisticDSL,
 	normalizeOptimisticDSL,
 	// Types
 	type QueryDef,
 	type MutationDef,
+	type RouterDef,
+	type RouterRoutes,
+	type AnyProcedure,
+	type InferRouterClient,
 	type QueryBuilder,
 	type MutationBuilder,
 	type ResolverContext,

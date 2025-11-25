@@ -9,8 +9,15 @@
  * - Request batching
  */
 
-import type { MutationDef, OptimisticDSL, QueryDef, Update } from "@sylphx/lens-core";
-import { applyUpdate, isOptimisticDSL, normalizeOptimisticDSL } from "@sylphx/lens-core";
+import type {
+	MutationDef,
+	OptimisticDSL,
+	QueryDef,
+	RouterDef,
+	RouterRoutes,
+	Update,
+} from "@sylphx/lens-core";
+import { applyUpdate, isOptimisticDSL, isRouterDef, normalizeOptimisticDSL } from "@sylphx/lens-core";
 import type {
 	Link,
 	LinkFn,
@@ -146,6 +153,37 @@ export interface ApiShape<
  * Use: type Api = typeof server._types
  */
 export type InferApiFromServer<T> = T extends { _types: infer Shape } ? Shape : never;
+
+/**
+ * Router-based API shape for namespaced operations
+ *
+ * @example
+ * ```typescript
+ * import type { AppRouter } from './server';  // TYPE-only import
+ * const client = createClient<RouterApiShape<AppRouter>>({ links: [...] });
+ * // client.user.get({ id: "1" })
+ * // client.post.create({ title: "Hello" })
+ * ```
+ */
+export interface RouterApiShape<TRouter extends RouterDef = RouterDef> {
+	router: TRouter;
+}
+
+/** Check if API shape is router-based */
+export type IsRouterApi<T> = T extends RouterApiShape ? true : false;
+
+/** Infer client type from router routes */
+export type InferRouterClientType<TRoutes extends RouterRoutes> = {
+	[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
+		? InferRouterClientType<TNestedRoutes>
+		: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
+			? TInput extends void
+				? QueryAccessorFn<QueryDef<void, TOutput>>
+				: QueryAccessorFn<QueryDef<TInput, TOutput>>
+			: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
+				? MutationAccessorFn<MutationDef<TInput, TOutput>>
+				: never;
+};
 
 /** Selection object */
 export interface SelectionObject {
@@ -1374,24 +1412,44 @@ export type LensClient<Q extends QueriesMap, M extends MutationsMap> = {
 	$mutationNames(): string[];
 };
 
+/** Router-based lens client type with nested namespaces */
+export type RouterLensClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
+	? InferRouterClientType<TRoutes> & {
+			$store: ReactiveStore;
+			$queryNames(): string[];
+			$mutationNames(): string[];
+		}
+	: never;
+
 // =============================================================================
 // Factory
 // =============================================================================
 
 /**
- * Create Lens client with flat namespace
+ * Create Lens client with flat or router-based namespace
  *
- * Two usage patterns:
+ * Three usage patterns:
  *
- * 1. Type inference from server (recommended):
+ * 1. Router-based (recommended for new projects):
+ * ```typescript
+ * import type { AppRouter } from './server';
+ * const client = createClient<RouterApiShape<AppRouter>>({
+ *   links: [loggerLink(), websocketLink({ url })],
+ * });
+ * // client.user.get({ id: "1" })
+ * // client.post.create({ title: "Hello" })
+ * ```
+ *
+ * 2. Flat API (legacy):
  * ```typescript
  * import type { Api } from './server';
  * const client = createClient<Api>({
  *   links: [loggerLink(), websocketLink({ url })],
  * });
+ * // client.getUser({ id: "1" })
  * ```
  *
- * 2. Direct definitions (deprecated):
+ * 3. Direct definitions (deprecated):
  * ```typescript
  * const client = createClient({
  *   queries: { whoami, getUser },
@@ -1400,14 +1458,13 @@ export type LensClient<Q extends QueriesMap, M extends MutationsMap> = {
  * });
  * ```
  */
-export function createClient<
-	TApi extends ApiShape<QueriesMap, MutationsMap> = ApiShape<QueriesMap, MutationsMap>,
->(
-	config: LensClientConfig<TApi["queries"], TApi["mutations"]>,
-): LensClient<TApi["queries"], TApi["mutations"]> {
-	type Q = TApi["queries"];
-	type M = TApi["mutations"];
-
+export function createClient<TApi extends ApiShape | RouterApiShape>(
+	config: LensClientConfig,
+): TApi extends RouterApiShape<infer TRouter>
+	? RouterLensClient<TRouter>
+	: TApi extends ApiShape<infer Q, infer M>
+		? LensClient<Q, M>
+		: never {
 	const impl = new ClientImpl(config);
 
 	// Track known operation names for runtime (if provided)
@@ -1415,36 +1472,98 @@ export function createClient<
 	const mutationNames = new Set(Object.keys(config.mutations ?? {}));
 	const hasRuntimeInfo = queryNames.size > 0 || mutationNames.size > 0;
 
-	// Create proxy with flat namespace
-	const client = new Proxy({} as LensClient<Q, M>, {
-		get(target, prop) {
-			const key = prop as string;
+	/**
+	 * Create a nested proxy for router-based access
+	 * Supports: client.user.get(), client.post.comment.list()
+	 */
+	function createNestedProxy(prefix: string): unknown {
+		return new Proxy(
+			{},
+			{
+				get(_target, prop) {
+					const key = prop as string;
 
-			// Built-in properties
-			if (key === "$store") return impl.$store;
-			if (key === "$queryNames") return () => impl.$queryNames();
-			if (key === "$mutationNames") return () => impl.$mutationNames();
+					// Skip symbol properties and internals
+					if (typeof prop === "symbol" || key.startsWith("_")) return undefined;
 
-			// Skip symbol properties and internals
-			if (typeof prop === "symbol" || key.startsWith("_")) return undefined;
+					// Build the full path (e.g., "user.get", "post.comment.list")
+					const path = prefix ? `${prefix}.${key}` : key;
 
-			// If we have runtime info, use it
-			if (hasRuntimeInfo) {
-				if (queryNames.has(key)) {
-					return impl.createQueryAccessor(key as keyof Q);
+					// Check if this might be a namespace (return another nested proxy)
+					// or a procedure (return an accessor function)
+					// Since we don't have runtime type info, we create a callable proxy
+					// that can be both called as a function AND accessed as an object
+					return createCallableProxy(path);
+				},
+			},
+		);
+	}
+
+	/**
+	 * Create a proxy that works both as a function (for leaf procedures)
+	 * and as an object (for nested namespaces)
+	 */
+	function createCallableProxy(path: string): unknown {
+		// Create the accessor function for this path
+		const accessor = impl.createDynamicAccessor(path) as object;
+
+		// Return a proxy that can be both called and accessed
+		return new Proxy(accessor, {
+			get(target, prop) {
+				const key = prop as string;
+
+				// Handle promise methods for thenable interface
+				if (key === "then" || key === "catch" || key === "finally") {
+					return undefined; // Let it be treated as non-thenable until called
 				}
-				if (mutationNames.has(key)) {
-					return impl.createMutationAccessor(key as keyof M);
-				}
-				return undefined;
-			}
 
-			// Type-only mode: create accessor dynamically
-			// Server will validate if operation exists
-			// Type system prevents invalid calls at compile time
-			return impl.createDynamicAccessor(key);
+				// Skip symbol properties
+				if (typeof prop === "symbol") return Reflect.get(target, prop);
+
+				// For any property access, create nested path
+				const nestedPath = `${path}.${key}`;
+				return createCallableProxy(nestedPath);
+			},
+			apply(target, thisArg, args) {
+				// When called as a function, execute the accessor
+				return Reflect.apply(target as (...args: unknown[]) => unknown, thisArg, args);
+			},
+		});
+	}
+
+	// Create proxy with support for both flat and nested namespaces
+	const client = new Proxy(
+		{},
+		{
+			get(_target, prop) {
+				const key = prop as string;
+
+				// Built-in properties
+				if (key === "$store") return impl.$store;
+				if (key === "$queryNames") return () => impl.$queryNames();
+				if (key === "$mutationNames") return () => impl.$mutationNames();
+
+				// Skip symbol properties and internals
+				if (typeof prop === "symbol" || key.startsWith("_")) return undefined;
+
+				// If we have runtime info, use it (flat mode)
+				if (hasRuntimeInfo) {
+					if (queryNames.has(key)) {
+						return impl.createQueryAccessor(key);
+					}
+					if (mutationNames.has(key)) {
+						return impl.createMutationAccessor(key);
+					}
+					return undefined;
+				}
+
+				// Type-only mode: create callable proxy for nested access
+				// This supports both flat (client.getUser) and nested (client.user.get)
+				return createCallableProxy(key);
+			},
 		},
-	});
+	);
 
-	return client;
+	// biome-ignore lint/suspicious/noExplicitAny: Generic return type
+	return client as any;
 }
