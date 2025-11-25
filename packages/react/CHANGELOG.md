@@ -1,5 +1,11 @@
 # @sylphx/lens-react
 
+## 1.0.3
+
+### Patch Changes
+
+- Fix framework dependencies being bundled instead of externalized. React bundle reduced from 109KB to 4KB. This fixes "Invalid hook call" errors when using with React 19.2.0 or different React versions.
+
 ## 1.0.2
 
 ### Patch Changes
