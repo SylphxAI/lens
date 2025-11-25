@@ -246,15 +246,6 @@ type RelationError<S extends SchemaDefinition> = InvalidRelationTargets<S> exten
  * // { id: string; name: string; email: string; posts: Post[] }
  * ```
  */
-/**
- * @deprecated Use entity() + createSchema() from './define' instead.
- * This string-based API will be removed in a future version.
- */
-export function createSchemaLegacy<S extends SchemaDefinition>(
-	definition: HasValidRelations<S> extends true ? S : RelationError<S>,
-): Schema<S> {
-	return new Schema(definition as S);
-}
 
 // =============================================================================
 // Type Helpers (re-exported for convenience)
