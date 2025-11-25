@@ -134,17 +134,7 @@ export interface MutationResult<T> {
 	rollback?: () => void;
 }
 
-/** Optimistic update configuration */
-export interface OptimisticConfig<T = unknown> {
-	/** Operation to apply optimistic update to */
-	operation: string;
-	/** Input to identify the subscription */
-	input?: unknown;
-	/** Optimistic data to apply immediately */
-	data: Partial<T>;
-}
-
-/** Pending optimistic entry */
+/** Pending optimistic entry (internal) */
 interface OptimisticEntry {
 	id: string;
 	operation: string;
@@ -690,29 +680,57 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 
 	/**
 	 * Execute a mutation
+	 * Automatically applies optimistic update if mutation has _optimistic defined
 	 */
 	private async executeMutation<TInput, TOutput>(
 		operation: string,
 		input: TInput,
 	): Promise<MutationResult<TOutput>> {
-		// Create operation context for link chain
-		const ctx: UnifiedOperationContext = {
-			id: `mutation-${operation}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-			type: "mutation",
-			operation,
-			input,
-			meta: {},
-		};
+		// Get mutation definition for optimistic support
+		const mutationDef = this.mutations[operation as keyof M] as MutationDef<TInput, TOutput> | undefined;
 
-		// Execute through link chain
-		const result = await this.executeWithLinks(ctx);
+		// Apply optimistic update if enabled and mutation has optimistic handler
+		let optId: string | undefined;
+		if (this.optimistic && mutationDef?._optimistic) {
+			const optimisticData = mutationDef._optimistic({ input });
+			if (optimisticData) {
+				// Find affected subscriptions and apply optimistic data
+				optId = this.applyOptimisticFromMutation(operation, input, optimisticData);
+			}
+		}
 
-		// Update any affected subscriptions
-		this.updateSubscriptionsFromMutation(result);
+		try {
+			// Create operation context for link chain
+			const ctx: UnifiedOperationContext = {
+				id: `mutation-${operation}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+				type: "mutation",
+				operation,
+				input,
+				meta: {},
+			};
 
-		return {
-			data: result as TOutput,
-		};
+			// Execute through link chain
+			const result = await this.executeWithLinks(ctx);
+
+			// Update any affected subscriptions
+			this.updateSubscriptionsFromMutation(result);
+
+			// Confirm optimistic update with server data
+			if (optId) {
+				this.confirmOptimistic(optId, result);
+			}
+
+			return {
+				data: result as TOutput,
+				rollback: optId ? () => this.rollbackOptimistic(optId!) : undefined,
+			};
+		} catch (error) {
+			// Rollback on failure
+			if (optId) {
+				this.rollbackOptimistic(optId);
+			}
+			throw error;
+		}
 	}
 
 	/**
@@ -727,61 +745,87 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	}
 
 	// ===========================================================================
-	// Optimistic Updates
+	// Optimistic Updates (automatic via mutation._optimistic)
 	// ===========================================================================
 
 	/**
-	 * Apply optimistic update to a subscription
+	 * Apply optimistic update from mutation to affected subscriptions
+	 * Finds subscriptions by matching entity ID in optimistic data
 	 */
-	applyOptimistic(config: OptimisticConfig): string {
-		const key = makeQueryKey(config.operation, config.input);
-		const sub = this.subscriptions.get(key);
-
-		// Generate optimistic ID
+	private applyOptimisticFromMutation(
+		_operation: string,
+		_input: unknown,
+		optimisticData: unknown,
+	): string {
 		const optId = `opt_${++this.optimisticCounter}`;
 
-		// Store previous data for rollback
-		const previousData = sub?.data.value ?? null;
-		this.optimisticUpdates.set(optId, {
-			id: optId,
-			operation: config.operation,
-			input: config.input,
-			previousData,
-		});
+		// Track all affected subscriptions for rollback
+		const affectedSubs: Array<{ key: string; previousData: unknown }> = [];
 
-		// Apply optimistic data
-		if (sub) {
-			const merged = previousData && typeof previousData === "object"
-				? { ...previousData, ...config.data }
-				: config.data;
-			sub.data.value = merged;
+		// If optimistic data has an ID, find subscriptions with matching entity
+		const dataId = this.extractId(optimisticData);
 
-			// Notify callbacks
-			for (const callback of sub.callbacks) {
-				callback(merged);
+		for (const [key, sub] of this.subscriptions) {
+			const currentData = sub.data.value;
+			const currentId = this.extractId(currentData);
+
+			// Match by ID
+			if (dataId && currentId === dataId) {
+				affectedSubs.push({ key, previousData: currentData });
+
+				// Merge optimistic data
+				const merged = currentData && typeof currentData === "object"
+					? { ...currentData, ...(optimisticData as object) }
+					: optimisticData;
+				sub.data.value = merged;
+
+				// Notify callbacks
+				for (const callback of sub.callbacks) {
+					callback(merged);
+				}
 			}
 		}
+
+		// Store for rollback
+		this.optimisticUpdates.set(optId, {
+			id: optId,
+			operation: _operation,
+			input: _input,
+			previousData: affectedSubs,
+		});
 
 		return optId;
 	}
 
 	/**
+	 * Extract ID from entity data
+	 */
+	private extractId(data: unknown): string | undefined {
+		if (!data || typeof data !== "object") return undefined;
+		const obj = data as Record<string, unknown>;
+		if ("id" in obj && typeof obj.id === "string") return obj.id;
+		return undefined;
+	}
+
+	/**
 	 * Confirm optimistic update with server data
 	 */
-	confirmOptimistic(optId: string, serverData?: unknown): void {
+	private confirmOptimistic(optId: string, serverData?: unknown): void {
 		const entry = this.optimisticUpdates.get(optId);
 		if (!entry) return;
 
-		// Update with authoritative server data if provided
+		// Update affected subscriptions with server data
 		if (serverData !== undefined) {
-			const key = makeQueryKey(entry.operation, entry.input);
-			const sub = this.subscriptions.get(key);
-			if (sub) {
-				sub.data.value = serverData;
-
-				// Notify callbacks
-				for (const callback of sub.callbacks) {
-					callback(serverData);
+			const serverId = this.extractId(serverData);
+			if (serverId) {
+				for (const [_key, sub] of this.subscriptions) {
+					const currentId = this.extractId(sub.data.value);
+					if (currentId === serverId) {
+						sub.data.value = serverData;
+						for (const callback of sub.callbacks) {
+							callback(serverData);
+						}
+					}
 				}
 			}
 		}
@@ -792,59 +836,25 @@ class UnifiedClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 	/**
 	 * Rollback optimistic update
 	 */
-	rollbackOptimistic(optId: string): void {
+	private rollbackOptimistic(optId: string): void {
 		const entry = this.optimisticUpdates.get(optId);
 		if (!entry) return;
 
-		// Restore previous data
-		const key = makeQueryKey(entry.operation, entry.input);
-		const sub = this.subscriptions.get(key);
-		if (sub && entry.previousData !== null) {
-			sub.data.value = entry.previousData;
-
-			// Notify callbacks
-			for (const callback of sub.callbacks) {
-				callback(entry.previousData);
+		// Restore previous data for all affected subscriptions
+		const affectedSubs = entry.previousData as Array<{ key: string; previousData: unknown }>;
+		if (Array.isArray(affectedSubs)) {
+			for (const { key, previousData } of affectedSubs) {
+				const sub = this.subscriptions.get(key);
+				if (sub && previousData !== null) {
+					sub.data.value = previousData;
+					for (const callback of sub.callbacks) {
+						callback(previousData);
+					}
+				}
 			}
 		}
 
 		this.optimisticUpdates.delete(optId);
-	}
-
-	/**
-	 * Execute mutation with optimistic update
-	 */
-	async executeMutationOptimistic<TInput, TOutput>(
-		operation: string,
-		input: TInput,
-		optimistic?: OptimisticConfig,
-	): Promise<MutationResult<TOutput>> {
-		// Apply optimistic update if provided
-		let optId: string | undefined;
-		if (optimistic) {
-			optId = this.applyOptimistic(optimistic);
-		}
-
-		try {
-			// Execute mutation
-			const result = await this.executeMutation<TInput, TOutput>(operation, input);
-
-			// Confirm optimistic update with server data
-			if (optId) {
-				this.confirmOptimistic(optId, result.data);
-			}
-
-			return {
-				data: result.data,
-				rollback: optId ? () => this.rollbackOptimistic(optId!) : undefined,
-			};
-		} catch (error) {
-			// Rollback on failure
-			if (optId) {
-				this.rollbackOptimistic(optId);
-			}
-			throw error;
-		}
 	}
 
 	// ===========================================================================

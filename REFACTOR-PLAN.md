@@ -191,10 +191,15 @@ class UnifiedClientImpl {
 - Keep external API identical
 - All tests should pass
 
-### Step 3: Add Optimistic Updates (additive) ✅ DONE
-- Add `OptimisticConfig` type
-- `applyOptimistic()`, `confirmOptimistic()`, `rollbackOptimistic()` methods
-- `executeMutationOptimistic()` for mutations with automatic rollback
+### Step 3: Automatic Optimistic Updates ✅ DONE
+- **No manual configuration needed** - uses `mutation()._optimistic()` from definition
+- When executing mutation, if `mutationDef._optimistic` exists:
+  - Calls `_optimistic({ input })` to get predicted data
+  - Finds subscriptions with matching entity ID
+  - Applies optimistic data immediately (instant UI feedback)
+  - On success: confirms with server data
+  - On failure: rollbacks to previous data automatically
+- Same API as V2 `mutation().optimistic(...)` - zero configuration
 
 ### ~~Step 4: Add EntitySignal Support~~ ❌ NOT NEEDED
 > **Reason**: `.select()` API already provides field-level subscriptions.

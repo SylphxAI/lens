@@ -216,8 +216,6 @@ export {
 	type UnifiedLink,
 	type UnifiedLinkFn,
 	type UnifiedOperationContext,
-	// Optimistic update types
-	type OptimisticConfig,
 } from "./client/unified";
 
 export {
