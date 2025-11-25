@@ -1,5 +1,13 @@
 # @sylphx/lens-client
 
+## 1.0.3
+
+### Patch Changes
+
+- Fix workspace:\* dependencies not being resolved in published packages. Added custom publish script to properly resolve internal dependencies before publishing.
+- Updated dependencies
+  - @sylphx/lens-core@1.0.3
+
 ## 1.0.2
 
 ### Patch Changes

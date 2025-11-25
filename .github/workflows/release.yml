@@ -15,6 +15,6 @@ jobs:
     with:
       build-command: 'bun run build'
       test-command: 'bun run test'
-      create-github-releases: true
+      create-github-releases: false
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
