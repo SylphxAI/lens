@@ -6,7 +6,7 @@
 	"type": "module",
 	"workspaces": ["packages/*"],
 	"scripts": {
-		"build": "bun run --filter '*' build",
+		"build": "bun run --filter '@sylphx/lens-core' build && bun run --filter '@sylphx/lens-client' --filter '@sylphx/lens-server' build && bun run --filter '@sylphx/lens-react' --filter '@sylphx/lens-solid' --filter '@sylphx/lens-vue' --filter '@sylphx/lens-svelte' build && bun run --filter '@sylphx/lens' build",
 		"test": "bun run --filter '*' test",
 		"test:watch": "bun test --watch",
 		"lint": "biome check .",
