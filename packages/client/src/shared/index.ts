@@ -1,7 +1,7 @@
 /**
  * @lens/client - Shared Utilities
  *
- * Common infrastructure used by both V1 reactive layer and Lens client.
+ * Common infrastructure for key generation, batching, and deduplication.
  */
 
 export {

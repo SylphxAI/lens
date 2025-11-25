@@ -66,8 +66,6 @@ export {
 	type ValidatedSchemaDefinition,
 	// Errors
 	SchemaValidationError,
-	// Legacy (deprecated)
-	createSchemaLegacy,
 } from "./schema/create";
 
 // =============================================================================

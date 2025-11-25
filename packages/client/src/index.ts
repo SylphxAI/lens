@@ -61,9 +61,6 @@ export {
 	type MutationsMap,
 	type InferInput,
 	type InferOutput,
-	// Middleware types (deprecated - use Link from links)
-	type Middleware,
-	type MiddlewareFn,
 	type OperationContext,
 } from "./client/create";
 
@@ -106,6 +103,10 @@ export {
 	deserializeMsgpack,
 	compareSizes,
 	type MsgpackLinkOptions,
+	timingLink,
+	type TimingLinkOptions,
+	errorHandlerLink,
+	type ErrorHandlerLinkOptions,
 	// Terminal links
 	httpLink,
 	httpBatchLink,
@@ -126,24 +127,3 @@ export {
 	type WebSocketLinkOptions,
 	type WebSocketState,
 } from "./links";
-
-// =============================================================================
-// Legacy Exports (deprecated - use links instead)
-// =============================================================================
-
-export {
-	// WebSocket Transport (deprecated - use websocketLink from links)
-	WebSocketTransport,
-	createWebSocketTransport as createWebSocketTransportLegacy,
-	websocketTransport,
-	type WebSocketTransportOptions,
-	type WebSocketState as WebSocketTransportState,
-} from "./client/transport";
-
-export {
-	// Timing & Error handling (not yet in new links)
-	timingLink,
-	errorHandlerLink,
-	type TimingOptions,
-	type ErrorHandlerOptions,
-} from "./client/middleware";

@@ -192,51 +192,6 @@ describe("Type inference with defineEntity", () => {
 });
 
 // =============================================================================
-// Test: Comparison with String-based API
-// =============================================================================
-
-describe("Comparison: String vs Direct Reference", () => {
-	it("both APIs produce the same schema", () => {
-		// String-based (legacy)
-		const { createSchemaLegacy } = require("./create");
-		const stringSchema = createSchemaLegacy({
-			User: {
-				id: t.id(),
-				name: t.string(),
-				posts: t.hasMany("Post"),
-			},
-			Post: {
-				id: t.id(),
-				title: t.string(),
-				author: t.belongsTo("User"),
-			},
-		});
-
-		// Direct reference (new way)
-		const User = defineEntity("User", {
-			id: t.id(),
-			name: t.string(),
-		});
-
-		const Post = defineEntity("Post", {
-			id: t.id(),
-			title: t.string(),
-		});
-
-		const directSchema = createSchema({
-			User: User.with({ posts: hasMany(Post) }),
-			Post: Post.with({ author: belongsTo(User) }),
-		});
-
-		// Both should have same structure
-		expect(stringSchema.entities.size).toBe(directSchema.entities.size);
-		expect(stringSchema.getEntity("User")?.relations.get("posts")?.target).toBe(
-			directSchema.getEntity("User")?.relations.get("posts")?.target,
-		);
-	});
-});
-
-// =============================================================================
 // Test: Simplified API (entity instead of defineEntity)
 // =============================================================================
 

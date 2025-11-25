@@ -1,75 +1,63 @@
 /**
  * @lens/svelte - Stores
  *
- * Svelte stores that wrap Lens client for reactive data access.
+ * Svelte stores that wrap Lens QueryResult for reactive data access.
  * Integrates with Svelte's store contract (subscribe method).
  */
 
-import { readable, type Readable } from "svelte/store";
-import type { Client, InferQueryResult } from "@lens/client";
-import type { SchemaDefinition, Select } from "@lens/core";
-import { getLensClient } from "./context";
+import { readable, writable, type Readable, type Writable } from "svelte/store";
+import type { QueryResult, MutationResult } from "@lens/client";
 
 // =============================================================================
 // Types
 // =============================================================================
 
-/** Entity store options */
-export interface EntityStoreOptions<
-	S extends SchemaDefinition,
-	E extends keyof S,
-	Sel extends Select<S[E], S> | undefined = undefined,
-> {
-	select?: Sel;
-}
-
-/** List store options */
-export interface ListStoreOptions<
-	S extends SchemaDefinition,
-	E extends keyof S,
-	Sel extends Select<S[E], S> | undefined = undefined,
-> {
-	where?: Record<string, unknown>;
-	orderBy?: Record<string, "asc" | "desc">;
-	take?: number;
-	skip?: number;
-	select?: Sel;
-}
-
-/** Entity store value */
-export interface EntityStoreValue<T> {
+/** Query store value */
+export interface QueryStoreValue<T> {
 	data: T | null;
 	loading: boolean;
 	error: Error | null;
 }
 
-/** List store value */
-export interface ListStoreValue<T> {
-	data: T[];
+/** Mutation store value */
+export interface MutationStoreValue<TOutput> {
+	data: TOutput | null;
 	loading: boolean;
 	error: Error | null;
 }
 
-/** Entity store type */
-export type EntityStore<T> = Readable<EntityStoreValue<T>>;
+/** Query store type */
+export type QueryStore<T> = Readable<QueryStoreValue<T>> & {
+	refetch: () => void;
+};
 
-/** List store type */
-export type ListStore<T> = Readable<ListStoreValue<T>>;
+/** Mutation store type */
+export type MutationStore<TInput, TOutput> = Readable<MutationStoreValue<TOutput>> & {
+	mutate: (input: TInput) => Promise<MutationResult<TOutput>>;
+	reset: () => void;
+};
+
+/** Query store options */
+export interface QueryStoreOptions {
+	/** Skip the query (don't execute) */
+	skip?: boolean;
+}
 
 // =============================================================================
-// entity() - Single Entity Store
+// query() - Query Store
 // =============================================================================
 
 /**
- * Create a readable store for a single entity.
- * Automatically subscribes to entity changes and updates the store.
+ * Create a readable store from a QueryResult.
+ * Automatically subscribes to query updates.
  *
  * @example
  * ```svelte
  * <script lang="ts">
- *   import { entity } from '@lens/svelte';
+ *   import { query } from '@lens/svelte';
+ *   import { client } from './client';
  *
- *   const userStore = entity('User', '123', { select: { name: true, email: true } });
+ *   const userStore = query(client.queries.getUser({ id: '123' }));
  * </script>
  *
  * {#if $userStore.loading}
@@ -78,137 +66,200 @@ export type ListStore<T> = Readable<ListStoreValue<T>>;
  *   <p>Error: {$userStore.error.message}</p>
  * {:else if $userStore.data}
  *   <h1>{$userStore.data.name}</h1>
- *   <p>{$userStore.data.email}</p>
  * {/if}
  * ```
  */
-export function entity<
-	S extends SchemaDefinition,
-	E extends keyof S & string,
-	Sel extends Select<S[E], S> | undefined = undefined,
->(
-	entityName: E,
-	id: string,
-	options?: EntityStoreOptions<S, E, Sel>,
-	client?: Client<S>,
-): EntityStore<InferQueryResult<S, E, Sel>> {
-	type ResultType = InferQueryResult<S, E, Sel>;
+export function query<T>(
+	queryResult: QueryResult<T>,
+	options?: QueryStoreOptions,
+): QueryStore<T> {
+	let refetchFn: (() => void) | null = null;
 
-	return readable<EntityStoreValue<ResultType>>(
-		{ data: null, loading: true, error: null },
+	const store = readable<QueryStoreValue<T>>(
+		{ data: null, loading: !options?.skip, error: null },
 		(set) => {
-			const lensClient = client ?? getLensClient<S>();
-			const accessor = (lensClient as Record<string, unknown>)[entityName] as {
-				get: (id: string, options?: { select?: unknown }) => {
-					value: { data: ResultType | null; loading: boolean; error: Error | null };
-					subscribe: (cb: (value: unknown) => void) => () => void;
-				};
+			if (options?.skip) {
+				set({ data: null, loading: false, error: null });
+				return () => {};
+			}
+
+			// Subscribe to query updates
+			const unsubscribe = queryResult.subscribe((value) => {
+				set({ data: value, loading: false, error: null });
+			});
+
+			// Handle initial load via promise
+			queryResult.then(
+				(value) => {
+					set({ data: value, loading: false, error: null });
+				},
+				(err) => {
+					const error = err instanceof Error ? err : new Error(String(err));
+					set({ data: null, loading: false, error });
+				},
+			);
+
+			// Refetch function
+			refetchFn = () => {
+				set({ data: null, loading: true, error: null });
+				queryResult.then(
+					(value) => {
+						set({ data: value, loading: false, error: null });
+					},
+					(err) => {
+						const error = err instanceof Error ? err : new Error(String(err));
+						set({ data: null, loading: false, error });
+					},
+				);
 			};
 
-			// Get entity signal
-			const entitySignal = accessor.get(id, options);
-
-			// Set initial value
-			set({
-				data: entitySignal.value.data,
-				loading: entitySignal.value.loading,
-				error: entitySignal.value.error,
-			});
-
-			// Subscribe to changes
-			const unsubscribe = entitySignal.subscribe((value: unknown) => {
-				const state = value as { data: ResultType | null; loading: boolean; error: Error | null };
-				set({
-					data: state.data,
-					loading: state.loading,
-					error: state.error,
-				});
-			});
-
-			// Cleanup
 			return () => {
 				unsubscribe();
-				lensClient.$store.release(entityName, id);
+				refetchFn = null;
 			};
 		},
 	);
+
+	return {
+		subscribe: store.subscribe,
+		refetch: () => refetchFn?.(),
+	};
 }
 
 // =============================================================================
-// list() - Entity List Store
+// mutation() - Mutation Store
 // =============================================================================
 
+/** Mutation function type */
+export type MutationFn<TInput, TOutput> = (
+	input: TInput,
+) => Promise<MutationResult<TOutput>>;
+
 /**
- * Create a readable store for an entity list.
- * Automatically subscribes to list changes and updates the store.
+ * Create a store for executing mutations with loading/error state.
  *
  * @example
  * ```svelte
  * <script lang="ts">
- *   import { list } from '@lens/svelte';
+ *   import { mutation } from '@lens/svelte';
+ *   import { client } from './client';
  *
- *   const usersStore = list('User', {
- *     where: { isActive: true },
- *     orderBy: { name: 'asc' },
- *     take: 10,
- *   });
+ *   const createPost = mutation(client.mutations.createPost);
+ *
+ *   async function handleSubmit() {
+ *     try {
+ *       const result = await createPost.mutate({ title: 'Hello' });
+ *       console.log('Created:', result.data);
+ *     } catch (err) {
+ *       console.error('Failed:', err);
+ *     }
+ *   }
  * </script>
  *
- * {#if $usersStore.loading}
- *   <p>Loading...</p>
- * {:else}
- *   <ul>
- *     {#each $usersStore.data as user}
- *       <li>{user.name}</li>
- *     {/each}
- *   </ul>
+ * <button on:click={handleSubmit} disabled={$createPost.loading}>
+ *   {$createPost.loading ? 'Creating...' : 'Create'}
+ * </button>
+ * {#if $createPost.error}
+ *   <p class="error">{$createPost.error.message}</p>
  * {/if}
  * ```
  */
-export function list<
-	S extends SchemaDefinition,
-	E extends keyof S & string,
-	Sel extends Select<S[E], S> | undefined = undefined,
->(
-	entityName: E,
-	options?: ListStoreOptions<S, E, Sel>,
-	client?: Client<S>,
-): ListStore<InferQueryResult<S, E, Sel>> {
-	type ResultType = InferQueryResult<S, E, Sel>;
+export function mutation<TInput, TOutput>(
+	mutationFn: MutationFn<TInput, TOutput>,
+): MutationStore<TInput, TOutput> {
+	const store = writable<MutationStoreValue<TOutput>>({
+		data: null,
+		loading: false,
+		error: null,
+	});
 
-	return readable<ListStoreValue<ResultType>>(
-		{ data: [], loading: true, error: null },
-		(set) => {
-			const lensClient = client ?? getLensClient<S>();
-			const accessor = (lensClient as Record<string, unknown>)[entityName] as {
-				list: (options?: unknown) => {
-					value: { data: ResultType[] | null; loading: boolean; error: Error | null };
-					subscribe: (cb: (value: unknown) => void) => () => void;
-				};
-			};
+	const mutate = async (input: TInput): Promise<MutationResult<TOutput>> => {
+		store.set({ data: null, loading: true, error: null });
 
-			// Get list signal
-			const listSignal = accessor.list(options);
+		try {
+			const result = await mutationFn(input);
+			store.set({ data: result.data, loading: false, error: null });
+			return result;
+		} catch (err) {
+			const error = err instanceof Error ? err : new Error(String(err));
+			store.set({ data: null, loading: false, error });
+			throw error;
+		}
+	};
 
-			// Set initial value
-			set({
-				data: listSignal.value.data ?? [],
-				loading: listSignal.value.loading,
-				error: listSignal.value.error,
-			});
+	const reset = () => {
+		store.set({ data: null, loading: false, error: null });
+	};
 
-			// Subscribe to changes
-			const unsubscribe = listSignal.subscribe((value: unknown) => {
-				const state = value as { data: ResultType[] | null; loading: boolean; error: Error | null };
-				set({
-					data: state.data ?? [],
-					loading: state.loading,
-					error: state.error,
-				});
-			});
+	return {
+		subscribe: store.subscribe,
+		mutate,
+		reset,
+	};
+}
 
-			// Cleanup
-			return unsubscribe;
-		},
-	);
+// =============================================================================
+// lazyQuery() - Lazy Query Store
+// =============================================================================
+
+/** Lazy query store type */
+export type LazyQueryStore<T> = Readable<QueryStoreValue<T>> & {
+	execute: () => Promise<T>;
+	reset: () => void;
+};
+
+/**
+ * Create a store for executing queries on demand.
+ *
+ * @example
+ * ```svelte
+ * <script lang="ts">
+ *   import { lazyQuery } from '@lens/svelte';
+ *   import { client } from './client';
+ *
+ *   let searchTerm = '';
+ *   const searchStore = lazyQuery(client.queries.searchUsers({ query: searchTerm }));
+ *
+ *   async function handleSearch() {
+ *     const results = await searchStore.execute();
+ *     console.log('Found:', results);
+ *   }
+ * </script>
+ *
+ * <input bind:value={searchTerm} />
+ * <button on:click={handleSearch} disabled={$searchStore.loading}>
+ *   Search
+ * </button>
+ * ```
+ */
+export function lazyQuery<T>(queryResult: QueryResult<T>): LazyQueryStore<T> {
+	const store = writable<QueryStoreValue<T>>({
+		data: null,
+		loading: false,
+		error: null,
+	});
+
+	const execute = async (): Promise<T> => {
+		store.set({ data: null, loading: true, error: null });
+
+		try {
+			const result = await queryResult;
+			store.set({ data: result, loading: false, error: null });
+			return result;
+		} catch (err) {
+			const error = err instanceof Error ? err : new Error(String(err));
+			store.set({ data: null, loading: false, error });
+			throw error;
+		}
+	};
+
+	const reset = () => {
+		store.set({ data: null, loading: false, error: null });
+	};
+
+	return {
+		subscribe: store.subscribe,
+		execute,
+		reset,
+	};
 }

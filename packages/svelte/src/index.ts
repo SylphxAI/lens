@@ -11,13 +11,17 @@
 
 export {
 	// Store factories
-	entity,
-	list,
+	query,
+	mutation,
+	lazyQuery,
 	// Types
-	type EntityStore,
-	type ListStore,
-	type EntityStoreOptions,
-	type ListStoreOptions,
+	type QueryStore,
+	type MutationStore,
+	type LazyQueryStore,
+	type QueryStoreValue,
+	type MutationStoreValue,
+	type QueryStoreOptions,
+	type MutationFn,
 } from "./stores";
 
 // =============================================================================
@@ -30,23 +34,4 @@ export {
 	// Context functions
 	setLensClient,
 	getLensClient,
-	// Reactive client context
-	REACTIVE_LENS_CLIENT_KEY,
-	setReactiveLensClient,
-	getReactiveLensClient,
 } from "./context";
-
-// =============================================================================
-// Reactive Stores (Fine-grained)
-// =============================================================================
-
-export {
-	// Reactive store factories
-	reactiveEntity,
-	reactiveList,
-	// Types
-	type ReactiveEntityStore,
-	type ReactiveListStore,
-	type ReactiveEntityStoreOptions,
-	type ReactiveListStoreOptions,
-} from "./reactive-stores";

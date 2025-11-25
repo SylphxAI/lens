@@ -2,7 +2,7 @@
  * @lens/react
  *
  * React bindings for Lens API framework.
- * Hooks, context provider, and signal integration.
+ * Hooks and context provider for reactive data access.
  */
 
 // =============================================================================
@@ -28,32 +28,6 @@ export {
 	type UseQueryOptions,
 	type MutationFn,
 } from "./hooks";
-
-// =============================================================================
-// Reactive Hooks (Fine-grained reactivity with signals)
-// =============================================================================
-
-export {
-	// Context & Provider
-	ReactiveLensProvider,
-	useReactiveLensClient,
-	type ReactiveLensProviderProps,
-} from "./reactive-context";
-
-export {
-	// Entity hooks with field-level signals
-	useReactiveEntity,
-	useReactiveList,
-	// Field signal hook
-	useFieldSignal,
-	// Mutation hook
-	useReactiveMutation,
-	// Types
-	type UseReactiveEntityResult,
-	type UseReactiveListResult,
-	type UpdateMutationInput,
-	type DeleteMutationInput,
-} from "./reactive-hooks";
 
 // =============================================================================
 // Re-exports from @preact/signals-react

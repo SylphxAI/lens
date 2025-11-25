@@ -66,21 +66,6 @@ export interface Transport {
 	disconnect(): void;
 }
 
-/**
- * Middleware function
- * @deprecated Use LinkFn from '../links/types' instead
- */
-export type MiddlewareFn = (
-	ctx: OperationContext,
-	next: (ctx: OperationContext) => Promise<unknown>,
-) => Promise<unknown>;
-
-/**
- * Middleware factory
- * @deprecated Use Link from '../links/types' instead
- */
-export type Middleware = () => MiddlewareFn;
-
 /** Operation context */
 export interface OperationContext {
 	/** Unique operation ID */

@@ -218,9 +218,6 @@ export function createSchema<S extends SchemaInput>(definition: S): Schema<S> {
 	return new Schema(definition);
 }
 
-/** @deprecated Use createSchema instead */
-export const createSchemaFrom = createSchema;
-
 // =============================================================================
 // Convenience: Relation Helpers on Entity
 // =============================================================================

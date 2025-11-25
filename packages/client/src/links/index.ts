@@ -57,6 +57,8 @@ export {
 	compareSizes,
 	type MsgpackLinkOptions,
 } from "./msgpack";
+export { timingLink, type TimingLinkOptions } from "./timing";
+export { errorHandlerLink, type ErrorHandlerLinkOptions } from "./error-handler";
 
 // =============================================================================
 // Terminal Links
