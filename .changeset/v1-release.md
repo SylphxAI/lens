@@ -20,6 +20,14 @@ First stable release of Lens - bringing GraphQL concepts to TypeScript with zero
 - Operations API (`query()`, `mutation()`) with fluent builder pattern
 - Auto-derived optimistic updates from naming conventions
 - Full TypeScript type inference
+- Complete type system:
+  - Primitives: `t.id()`, `t.string()`, `t.int()`, `t.float()`, `t.boolean()`
+  - Date/Time: `t.datetime()`, `t.date()`
+  - Precision: `t.decimal()`, `t.bigint()`
+  - Binary: `t.bytes()`
+  - Flexible: `t.json()`, `t.enum()`, `t.object<T>()`, `t.array()`
+  - Custom: `t.custom()` with `defineType()`
+- Field modifiers: `.nullable()`, `.optional()`, `.default()`
 
 ## @sylphx/lens-client
 

@@ -22,13 +22,24 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 	abstract readonly _tsType: T;
 
 	protected _nullable = false;
+	protected _optional = false;
 	protected _default?: T;
 
-	/** Make this field nullable */
+	/** Make this field nullable (value can be null) */
 	nullable(): NullableType<this> {
 		const clone = Object.create(this);
 		clone._nullable = true;
 		return clone as NullableType<this>;
+	}
+
+	/**
+	 * Make this field optional (may not be included in response)
+	 * Use for input types where a field is not required
+	 */
+	optional(): OptionalType<this> {
+		const clone = Object.create(this);
+		clone._optional = true;
+		return clone as OptionalType<this>;
 	}
 
 	/** Set default value */
@@ -41,6 +52,11 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 	/** Check if field is nullable */
 	isNullable(): boolean {
 		return this._nullable;
+	}
+
+	/** Check if field is optional */
+	isOptional(): boolean {
+		return this._optional;
 	}
 
 	/** Get default value */
@@ -74,6 +90,12 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 /** Wrapper type for nullable fields */
 export type NullableType<T extends FieldType> = T & {
 	_tsType: T["_tsType"] | null;
+};
+
+/** Wrapper type for optional fields (undefined, not included in response) */
+export type OptionalType<T extends FieldType> = T & {
+	_tsType: T["_tsType"] | undefined;
+	_optional: true;
 };
 
 /** Wrapper type for fields with defaults */
@@ -187,6 +209,144 @@ export class DecimalType extends FieldType<number, string> {
 
 	validate(value: unknown): boolean {
 		return typeof value === "number" && !Number.isNaN(value) && Number.isFinite(value);
+	}
+}
+
+/** Date field type (date only, no time - serialized as YYYY-MM-DD) */
+export class DateType extends FieldType<Date, string> {
+	readonly _type = "date" as const;
+	readonly _tsType!: Date;
+
+	/**
+	 * Serialize Date → YYYY-MM-DD string
+	 * @example Date(2024-01-15) → "2024-01-15"
+	 */
+	serialize(value: Date): string {
+		if (!(value instanceof Date)) {
+			throw new Error(`Expected Date instance, got ${typeof value}`);
+		}
+		return value.toISOString().split("T")[0];
+	}
+
+	/**
+	 * Deserialize YYYY-MM-DD string → Date (at midnight UTC)
+	 * @example "2024-01-15" → Date(2024-01-15T00:00:00.000Z)
+	 */
+	deserialize(value: string): Date {
+		if (typeof value !== "string") {
+			throw new Error(`Expected string, got ${typeof value}`);
+		}
+		const date = new Date(`${value}T00:00:00.000Z`);
+		if (Number.isNaN(date.getTime())) {
+			throw new Error(`Invalid date string: ${value}`);
+		}
+		return date;
+	}
+
+	validate(value: unknown): boolean {
+		return value instanceof Date && !Number.isNaN(value.getTime());
+	}
+}
+
+/** BigInt field type (serialized as string for precision) */
+export class BigIntType extends FieldType<bigint, string> {
+	readonly _type = "bigint" as const;
+	readonly _tsType!: bigint;
+
+	/**
+	 * Serialize BigInt → string
+	 * @example 9007199254740993n → "9007199254740993"
+	 *
+	 * **Why string?** BigInt exceeds JSON number limits.
+	 * String preserves exact value during transport.
+	 */
+	serialize(value: bigint): string {
+		if (typeof value !== "bigint") {
+			throw new Error(`Expected bigint, got ${typeof value}`);
+		}
+		return value.toString();
+	}
+
+	/**
+	 * Deserialize string → BigInt
+	 * @example "9007199254740993" → 9007199254740993n
+	 */
+	deserialize(value: string): bigint {
+		if (typeof value !== "string") {
+			throw new Error(`Expected string, got ${typeof value}`);
+		}
+		try {
+			return BigInt(value);
+		} catch {
+			throw new Error(`Invalid bigint string: ${value}`);
+		}
+	}
+
+	validate(value: unknown): boolean {
+		return typeof value === "bigint";
+	}
+}
+
+/** Bytes field type (serialized as base64 string) */
+export class BytesType extends FieldType<Uint8Array, string> {
+	readonly _type = "bytes" as const;
+	readonly _tsType!: Uint8Array;
+
+	/**
+	 * Serialize Uint8Array → base64 string
+	 * @example Uint8Array([72, 101, 108, 108, 111]) → "SGVsbG8="
+	 */
+	serialize(value: Uint8Array): string {
+		if (!(value instanceof Uint8Array)) {
+			throw new Error(`Expected Uint8Array, got ${typeof value}`);
+		}
+		// Use btoa for browser, Buffer for Node
+		if (typeof btoa === "function") {
+			return btoa(String.fromCharCode(...value));
+		}
+		return Buffer.from(value).toString("base64");
+	}
+
+	/**
+	 * Deserialize base64 string → Uint8Array
+	 * @example "SGVsbG8=" → Uint8Array([72, 101, 108, 108, 111])
+	 */
+	deserialize(value: string): Uint8Array {
+		if (typeof value !== "string") {
+			throw new Error(`Expected string, got ${typeof value}`);
+		}
+		// Use atob for browser, Buffer for Node
+		if (typeof atob === "function") {
+			const binary = atob(value);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i++) {
+				bytes[i] = binary.charCodeAt(i);
+			}
+			return bytes;
+		}
+		return new Uint8Array(Buffer.from(value, "base64"));
+	}
+
+	validate(value: unknown): boolean {
+		return value instanceof Uint8Array;
+	}
+}
+
+/** JSON field type (arbitrary JSON data, typed as unknown) */
+export class JsonType extends FieldType<unknown> {
+	readonly _type = "json" as const;
+	readonly _tsType!: unknown;
+
+	/**
+	 * JSON passes through as-is (already JSON-serializable)
+	 * Use for schemaless/dynamic data where type isn't known at compile time
+	 */
+	serialize(value: unknown): unknown {
+		return value;
+	}
+
+	deserialize(value: unknown): unknown {
+		return value;
 	}
 }
 
@@ -407,8 +567,20 @@ export const t = {
 	/** Date/time value (auto-serialized as ISO string) */
 	datetime: () => new DateTimeType(),
 
+	/** Date only, no time (serialized as YYYY-MM-DD) */
+	date: () => new DateType(),
+
 	/** Decimal/currency value (auto-serialized as string for precision) */
 	decimal: () => new DecimalType(),
+
+	/** BigInt value (auto-serialized as string for precision) */
+	bigint: () => new BigIntType(),
+
+	/** Binary data (auto-serialized as base64 string) */
+	bytes: () => new BytesType(),
+
+	/** Arbitrary JSON data (schemaless, typed as unknown) */
+	json: () => new JsonType(),
 
 	/** Enum with specific values */
 	enum: <const T extends readonly string[]>(values: T) => new EnumType(values),

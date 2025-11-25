@@ -569,32 +569,71 @@ export const User = entity({
   active: t.boolean(),           // boolean
 
   // Date/Time
-  createdAt: t.datetime(),       // Date (ISO string)
-  birthDate: t.date(),           // Date (date only)
+  createdAt: t.datetime(),       // Date (serialized as ISO string)
+  birthDate: t.date(),           // Date (serialized as YYYY-MM-DD)
 
   // Large Numbers
-  balance: t.decimal(),          // Decimal (string)
-  bigValue: t.bigint(),          // BigInt (string)
+  balance: t.decimal(),          // number (serialized as string for precision)
+  bigValue: t.bigint(),          // bigint (serialized as string)
 
   // Binary
-  avatar: t.bytes(),             // Uint8Array (base64)
+  avatar: t.bytes(),             // Uint8Array (serialized as base64)
 
   // Enums
   role: t.enum(['user', 'admin']),
 
-  // JSON
-  metadata: t.json(),            // any
+  // JSON (schemaless)
+  metadata: t.json(),            // unknown
 
-  // Optional
-  bio: t.string().optional(),    // string | null
+  // Typed object
+  settings: t.object<{ theme: string; notifications: boolean }>(),
 
-  // Computed (isomorphic - runs client + server)
-  slug: t.string().compute(u => slugify(u.name)),
+  // Modifiers
+  bio: t.string().nullable(),    // string | null (value can be null)
+  nickname: t.string().optional(), // string | undefined (field may not exist)
 
-  // Default (isomorphic)
+  // Default value
   createdAt: t.datetime().default(() => new Date()),
 })
 ```
+
+### Custom Types
+
+Define reusable custom types with `defineType()`:
+
+```typescript
+import { defineType, t } from '@sylphx/lens-core'
+
+// Define a reusable custom type
+const Point = defineType({
+  name: 'Point',
+  // Serialize: runtime value → JSON-safe transport
+  serialize: (p: { lat: number; lng: number }) => ({ lat: p.lat, lng: p.lng }),
+  // Deserialize: transport → runtime value
+  deserialize: (data) => ({ lat: data.lat, lng: data.lng }),
+  // Optional validation
+  validate: (v) => typeof v === 'object' && 'lat' in v && 'lng' in v,
+})
+
+// Use in entity
+export const Store = entity({
+  id: t.id(),
+  name: t.string(),
+  location: t.custom(Point),  // ✅ Reusable!
+})
+
+export const Event = entity({
+  id: t.id(),
+  title: t.string(),
+  venue: t.custom(Point),     // ✅ Same type!
+})
+```
+
+**Why `defineType()`?**
+- Reusability - define once, use in multiple entities
+- Consistency - same serialization logic everywhere
+- Type safety - TypeScript infers correct types
+- Shareable - create type libraries as packages
 
 ### Type-Safe Relations
 
@@ -936,9 +975,30 @@ export const publishPost = mutation()
 entity(fields)                  // Define entity (name from export key)
 entity(name, fields)            // Define entity (explicit name)
 relation(entity, relations)     // Define relations
-t.id(), t.string(), ...         // Field types
 hasMany(Entity, accessor)       // One-to-many
 belongsTo(Entity, accessor)     // Many-to-one
+
+// Field Types
+t.id()                          // string (primary key)
+t.string()                      // string
+t.int()                         // number (integer)
+t.float()                       // number (floating point)
+t.boolean()                     // boolean
+t.datetime()                    // Date ↔ ISO string
+t.date()                        // Date ↔ YYYY-MM-DD
+t.decimal()                     // number ↔ string (precision)
+t.bigint()                      // bigint ↔ string
+t.bytes()                       // Uint8Array ↔ base64
+t.enum(['a', 'b'])              // union type
+t.json()                        // unknown (schemaless)
+t.object<T>()                   // typed object
+t.array(t.string())             // array of type
+t.custom(definition)            // custom serialization
+
+// Modifiers
+.nullable()                     // T | null (value can be null)
+.optional()                     // T | undefined (field may not exist)
+.default(value)                 // Default value
 
 // Operations (names derived from export keys!)
 query()                         // Create query builder (name from export key)

@@ -2,210 +2,276 @@
  * Tests for Svelte Stores
  */
 
-import { describe, expect, test, mock, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach } from "bun:test";
 import { get } from "svelte/store";
-import { signal } from "@sylphx/lens-client";
-import { entity, list } from "./stores";
-
-// No context mocking needed - we pass client directly to store functions
+import { query, mutation, lazyQuery } from "./stores";
 
 // =============================================================================
-// Mock Client
+// Mock QueryResult
 // =============================================================================
 
-function createMockClient() {
-	const entitySignal = signal({
-		data: null as { id: string; name: string; email: string } | null,
-		loading: true,
-		error: null as Error | null,
-		stale: false,
-		refCount: 0,
-	});
+function createMockQueryResult<T>(initialData: T | null = null) {
+	const subscribers = new Set<(value: T) => void>();
+	let currentData = initialData;
+	let pendingResolvers: Array<{ resolve: (v: T) => void; reject: (e: Error) => void }> = [];
+	let resolvedValue: T | null = null;
+	let rejectedError: Error | null = null;
 
-	const listSignal = signal({
-		data: null as { id: string; name: string; email: string }[] | null,
-		loading: true,
-		error: null as Error | null,
-		stale: false,
-		refCount: 0,
-	});
+	const result = {
+		// Promise-like - called each time .then is invoked
+		then: <R1, R2>(
+			onFulfilled?: ((value: T) => R1) | null,
+			onRejected?: ((err: Error) => R2) | null,
+		): Promise<R1 | R2> => {
+			// If already resolved/rejected, return immediately
+			if (resolvedValue !== null) {
+				return Promise.resolve(onFulfilled ? onFulfilled(resolvedValue) : (resolvedValue as unknown as R1));
+			}
+			if (rejectedError !== null) {
+				if (onRejected) {
+					return Promise.resolve(onRejected(rejectedError));
+				}
+				return Promise.reject(rejectedError);
+			}
 
-	return {
-		User: {
-			get: mock((_id: string, _options?: unknown) => entitySignal),
-			list: mock((_options?: unknown) => listSignal),
+			// Otherwise wait for resolution
+			return new Promise<R1 | R2>((resolve, reject) => {
+				pendingResolvers.push({
+					resolve: (value: T) => {
+						resolve(onFulfilled ? onFulfilled(value) : (value as unknown as R1));
+					},
+					reject: (err: Error) => {
+						if (onRejected) {
+							resolve(onRejected(err));
+						} else {
+							reject(err);
+						}
+					},
+				});
+			});
 		},
-		$store: {
-			release: mock(() => {}),
+		// Subscribable
+		subscribe: (callback: (value: T) => void) => {
+			subscribers.add(callback);
+			if (currentData !== null) {
+				callback(currentData);
+			}
+			return () => {
+				subscribers.delete(callback);
+			};
 		},
 		// Test helpers
-		_entitySignal: entitySignal,
-		_listSignal: listSignal,
-		_setUserData: (data: { id: string; name: string; email: string } | null) => {
-			entitySignal.value = {
-				...entitySignal.value,
-				data,
-				loading: false,
-			};
+		_resolve: (value: T) => {
+			currentData = value;
+			resolvedValue = value;
+			for (const { resolve } of pendingResolvers) {
+				resolve(value);
+			}
+			pendingResolvers = [];
+			for (const cb of subscribers) cb(value);
 		},
-		_setListData: (data: { id: string; name: string; email: string }[]) => {
-			listSignal.value = {
-				...listSignal.value,
-				data,
-				loading: false,
-			};
+		_reject: (err: Error) => {
+			rejectedError = err;
+			for (const { reject } of pendingResolvers) {
+				reject(err);
+			}
+			pendingResolvers = [];
 		},
 	};
+
+	return result;
 }
 
 // =============================================================================
 // Tests
 // =============================================================================
 
-describe("entity()", () => {
+describe("query()", () => {
 	test("creates a readable store with initial loading state", () => {
-		const client = createMockClient();
-
-		const userStore = entity("User", "123", undefined, client as never);
-		const value = get(userStore);
+		const mockResult = createMockQueryResult<{ id: string; name: string }>();
+		const store = query(mockResult as never);
+		const value = get(store);
 
 		expect(value.loading).toBe(true);
 		expect(value.data).toBe(null);
 		expect(value.error).toBe(null);
 	});
 
-	test("updates store when signal changes", () => {
-		const client = createMockClient();
+	test("updates store when query resolves", async () => {
+		const mockResult = createMockQueryResult<{ id: string; name: string }>();
+		const store = query(mockResult as never);
 
-		const userStore = entity("User", "123", undefined, client as never);
+		// Subscribe to trigger the query
+		const unsubscribe = store.subscribe(() => {});
 
-		// Simulate data loaded
-		client._setUserData({ id: "123", name: "John", email: "john@test.com" });
+		// Resolve the query
+		mockResult._resolve({ id: "123", name: "John" });
 
-		const value = get(userStore);
+		// Wait for async update
+		await new Promise((r) => setTimeout(r, 10));
+
+		const value = get(store);
 		expect(value.loading).toBe(false);
-		expect(value.data).toEqual({ id: "123", name: "John", email: "john@test.com" });
-	});
-
-	test("calls client.get with correct parameters", () => {
-		const client = createMockClient();
-
-		const userStore = entity("User", "123", { select: { name: true } }, client as never);
-		// Must subscribe for the store to start
-		const unsubscribe = userStore.subscribe(() => {});
-
-		expect(client.User.get).toHaveBeenCalledWith("123", { select: { name: true } });
+		expect(value.data).toEqual({ id: "123", name: "John" });
 
 		unsubscribe();
 	});
 
-	test("subscribes to signal changes", () => {
-		const client = createMockClient();
+	test("handles query errors", async () => {
+		const mockResult = createMockQueryResult<{ id: string }>();
+		const store = query(mockResult as never);
 
-		const userStore = entity("User", "123", undefined, client as never);
-		const values: Array<{ loading: boolean; data: unknown }> = [];
+		// Subscribe to trigger the query
+		const unsubscribe = store.subscribe(() => {});
 
-		// Subscribe to store
-		const unsubscribe = userStore.subscribe((value) => {
-			values.push({ loading: value.loading, data: value.data });
-		});
+		// Reject the query
+		mockResult._reject(new Error("Network error"));
 
-		// Initial state
-		expect(values[0].loading).toBe(true);
+		// Wait for async update
+		await new Promise((r) => setTimeout(r, 10));
 
-		// Simulate data loaded
-		client._setUserData({ id: "123", name: "John", email: "john@test.com" });
-
-		expect(values[1].loading).toBe(false);
-		expect(values[1].data).toEqual({ id: "123", name: "John", email: "john@test.com" });
+		const value = get(store);
+		expect(value.loading).toBe(false);
+		expect(value.error?.message).toBe("Network error");
+		expect(value.data).toBe(null);
 
 		unsubscribe();
 	});
 
-	test("releases store on unsubscribe", () => {
-		const client = createMockClient();
+	test("skips query when skip option is true", () => {
+		const mockResult = createMockQueryResult<{ id: string }>();
+		const store = query(mockResult as never, { skip: true });
+		const value = get(store);
 
-		const userStore = entity("User", "123", undefined, client as never);
-		const unsubscribe = userStore.subscribe(() => {});
-
-		unsubscribe();
-
-		expect(client.$store.release).toHaveBeenCalledWith("User", "123");
+		expect(value.loading).toBe(false);
+		expect(value.data).toBe(null);
 	});
 });
 
-describe("list()", () => {
-	test("creates a readable store with initial loading state", () => {
-		const client = createMockClient();
+describe("mutation()", () => {
+	test("creates a store with initial idle state", () => {
+		const mutationFn = async (_input: { title: string }) => ({
+			data: { id: "1", title: "Test" },
+		});
+		const store = mutation(mutationFn);
+		const value = get(store);
 
-		const usersStore = list("User", undefined, client as never);
-		const value = get(usersStore);
-
-		expect(value.loading).toBe(true);
-		expect(value.data).toEqual([]);
+		expect(value.loading).toBe(false);
+		expect(value.data).toBe(null);
 		expect(value.error).toBe(null);
 	});
 
-	test("updates store when signal changes", () => {
-		const client = createMockClient();
+	test("shows loading state during mutation", async () => {
+		let resolvePromise: (value: { data: { id: string } }) => void;
+		const mutationFn = (_input: { title: string }) =>
+			new Promise<{ data: { id: string } }>((resolve) => {
+				resolvePromise = resolve;
+			});
 
-		const usersStore = list("User", undefined, client as never);
+		const store = mutation(mutationFn);
+		const values: boolean[] = [];
 
-		// Simulate data loaded
-		client._setListData([
-			{ id: "1", name: "John", email: "john@test.com" },
-			{ id: "2", name: "Jane", email: "jane@test.com" },
-		]);
+		// Subscribe to track loading states
+		store.subscribe((v) => values.push(v.loading));
 
-		const value = get(usersStore);
+		// Start mutation
+		const promise = store.mutate({ title: "Test" });
+
+		// Should be loading
+		expect(get(store).loading).toBe(true);
+
+		// Resolve
+		resolvePromise!({ data: { id: "1" } });
+		await promise;
+
+		// Should not be loading
+		expect(get(store).loading).toBe(false);
+		expect(get(store).data).toEqual({ id: "1" });
+	});
+
+	test("handles mutation errors", async () => {
+		const mutationFn = async (_input: { title: string }) => {
+			throw new Error("Mutation failed");
+		};
+
+		const store = mutation(mutationFn);
+
+		await expect(store.mutate({ title: "Test" })).rejects.toThrow("Mutation failed");
+
+		const value = get(store);
 		expect(value.loading).toBe(false);
-		expect(value.data).toHaveLength(2);
-		expect(value.data[0].name).toBe("John");
+		expect(value.error?.message).toBe("Mutation failed");
 	});
 
-	test("calls client.list with options", () => {
-		const client = createMockClient();
-
-		const usersStore = list(
-			"User",
-			{
-				where: { isActive: true },
-				take: 10,
-			},
-			client as never,
-		);
-		// Must subscribe for the store to start
-		const unsubscribe = usersStore.subscribe(() => {});
-
-		expect(client.User.list).toHaveBeenCalledWith({
-			where: { isActive: true },
-			take: 10,
+	test("reset clears the state", async () => {
+		const mutationFn = async (_input: { title: string }) => ({
+			data: { id: "1", title: "Test" },
 		});
 
-		unsubscribe();
+		const store = mutation(mutationFn);
+		await store.mutate({ title: "Test" });
+
+		// Data should be set
+		expect(get(store).data).toEqual({ id: "1", title: "Test" });
+
+		// Reset
+		store.reset();
+
+		const value = get(store);
+		expect(value.data).toBe(null);
+		expect(value.loading).toBe(false);
+		expect(value.error).toBe(null);
+	});
+});
+
+describe("lazyQuery()", () => {
+	test("creates a store with idle state (not loading)", () => {
+		const mockResult = createMockQueryResult<{ id: string }>();
+		const store = lazyQuery(mockResult as never);
+		const value = get(store);
+
+		expect(value.loading).toBe(false);
+		expect(value.data).toBe(null);
+		expect(value.error).toBe(null);
 	});
 
-	test("subscribes to signal changes", () => {
-		const client = createMockClient();
+	test("execute triggers the query", async () => {
+		const mockResult = createMockQueryResult<{ id: string; name: string }>();
+		const store = lazyQuery(mockResult as never);
 
-		const usersStore = list("User", undefined, client as never);
-		const values: Array<{ loading: boolean; data: unknown[] }> = [];
+		// Execute should start loading
+		const promise = store.execute();
 
-		// Subscribe to store
-		const unsubscribe = usersStore.subscribe((value) => {
-			values.push({ loading: value.loading, data: value.data });
-		});
+		// Should be loading
+		expect(get(store).loading).toBe(true);
 
-		// Initial state
-		expect(values[0].loading).toBe(true);
-		expect(values[0].data).toEqual([]);
+		// Resolve
+		mockResult._resolve({ id: "123", name: "John" });
+		const result = await promise;
 
-		// Simulate data loaded
-		client._setListData([{ id: "1", name: "John", email: "john@test.com" }]);
+		// Should have data
+		expect(result).toEqual({ id: "123", name: "John" });
+		expect(get(store).data).toEqual({ id: "123", name: "John" });
+		expect(get(store).loading).toBe(false);
+	});
 
-		expect(values[1].loading).toBe(false);
-		expect(values[1].data).toHaveLength(1);
+	test("reset clears the state", async () => {
+		const mockResult = createMockQueryResult<{ id: string }>();
+		const store = lazyQuery(mockResult as never);
 
-		unsubscribe();
+		// Execute and resolve
+		const promise = store.execute();
+		mockResult._resolve({ id: "123" });
+		await promise;
+
+		// Data should be set
+		expect(get(store).data).toEqual({ id: "123" });
+
+		// Reset
+		store.reset();
+
+		const value = get(store);
+		expect(value.data).toBe(null);
+		expect(value.loading).toBe(false);
 	});
 });
