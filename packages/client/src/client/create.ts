@@ -1,33 +1,22 @@
 /**
  * @sylphx/lens-client - Lens Client
  *
- * Primary client for Lens API framework:
- * - Flat namespace (client.whoami() instead of client.query.whoami())
- * - Query deduplication via canDerive
- * - Field-level subscriptions with refCount
- * - EntitySignal for fine-grained reactivity
- * - Request batching
+ * Primary client for Lens API framework.
+ * Uses Transport + Plugin architecture for clean, extensible design.
  */
 
 import type {
+	OptimisticDSL as CoreOptimisticDSL,
 	MutationDef,
-	OptimisticDSL,
 	QueryDef,
 	RouterDef,
 	RouterRoutes,
-	Update,
 } from "@sylphx/lens-core";
-import { applyUpdate, isOptimisticDSL, normalizeOptimisticDSL } from "@sylphx/lens-core";
-import type {
-	Link,
-	LinkFn,
-	OperationContext as LinkOperationContext,
-	NextLink,
-	OperationResult,
-} from "../links/types";
-import { RequestDeduplicator, makeQueryKey, makeQueryKeyWithFields } from "../shared";
+import { normalizeOptimisticDSL } from "@sylphx/lens-core";
 import { type Signal, type WritableSignal, signal } from "../signals/signal";
 import { ReactiveStore } from "../store/reactive-store";
+import type { Plugin } from "../transport/plugin";
+import type { Metadata, Observable, Operation, Result, Transport } from "../transport/types";
 
 // =============================================================================
 // Types
@@ -39,191 +28,49 @@ export type QueriesMap = Record<string, QueryDef<unknown, unknown>>;
 /** Mutation map type */
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
 
-/** Transport interface */
-export interface Transport {
-	/** Send subscribe message */
-	subscribe(
-		operation: string,
-		input: unknown,
-		fields: string[] | "*",
-		callbacks: {
-			onData: (data: unknown) => void;
-			onUpdate: (updates: Record<string, Update>) => void;
-			onError: (error: Error) => void;
-			onComplete: () => void;
-		},
-		/** SelectionObject for nested field selection */
-		select?: SelectionObject,
-	): { unsubscribe: () => void; updateFields: (add?: string[], remove?: string[]) => void };
-
-	/** Send one-time query */
-	query(
-		operation: string,
-		input: unknown,
-		fields?: string[] | "*",
-		select?: SelectionObject,
-	): Promise<unknown>;
-
-	/** Send mutation */
-	mutate(operation: string, input: unknown): Promise<unknown>;
-
-	/** Connect */
-	connect(): Promise<void>;
-
-	/** Disconnect */
-	disconnect(): void;
-}
-
-/** Operation context */
-export interface OperationContext {
-	/** Unique operation ID */
-	id: string;
-	/** Operation type */
-	type: "query" | "mutation" | "subscription";
-	/** Operation name */
-	operation: string;
-	/** Operation input */
-	input: unknown;
-	/** Field selection */
-	select?: SelectionObject;
-	/** Custom metadata (can be extended by links) */
-	meta: Record<string, unknown>;
-	/** AbortSignal for cancellation */
-	signal?: AbortSignal;
-}
-
-/** Operation metadata from server */
-export interface OperationMeta {
-	type: "query" | "mutation";
-	optimistic?: unknown; // OptimisticDSL
-}
-
-/** Nested operations structure from server */
-export type OperationsMap = {
-	[key: string]: OperationMeta | OperationsMap;
-};
-
-/** Client configuration */
-export interface LensClientConfig<
-	Q extends QueriesMap = QueriesMap,
-	M extends MutationsMap = MutationsMap,
-> {
-	/**
-	 * Query definitions (optional if using type inference)
-	 * @deprecated Use type parameter instead: createClient<Api>({ links: [...] })
-	 */
-	queries?: Q;
-	/**
-	 * Mutation definitions (optional if using type inference)
-	 * @deprecated Use type parameter instead: createClient<Api>({ links: [...] })
-	 */
-	mutations?: M;
-	/**
-	 * Transport (direct transport)
-	 * @deprecated Use links instead: links: [loggerLink(), websocketLink({ url })]
-	 */
-	transport?: Transport;
-	/**
-	 * Links chain (last one should be terminal link like websocketLink or httpLink)
-	 *
-	 * @example
-	 * ```typescript
-	 * const client = createClient<Api>({
-	 *   links: [
-	 *     loggerLink(),
-	 *     retryLink({ maxRetries: 3 }),
-	 *     websocketLink({ url: 'ws://localhost:3000' }),  // Terminal link
-	 *   ],
-	 * });
-	 * ```
-	 */
-	links?: Link[];
-	/** Enable optimistic updates */
-	optimistic?: boolean;
-	/**
-	 * URL to fetch operations metadata from server
-	 * Used for type-only mode to get operation types and optimistic configs
-	 *
-	 * @example
-	 * ```typescript
-	 * const client = createClient<Api>({
-	 *   url: 'http://localhost:3000/api',  // Will fetch from /api/operations
-	 *   links: [httpLink({ url: 'http://localhost:3000/api' })],
-	 * });
-	 * ```
-	 */
-	url?: string;
-}
-
-/**
- * API type for client inference (from server)
- *
- * @example
- * ```typescript
- * import type { Api } from './server';  // TYPE-only import
- * const client = createClient<Api>({ links: [...] });
- * ```
- */
-export interface ApiShape<
-	Q extends QueriesMap = QueriesMap,
-	M extends MutationsMap = MutationsMap,
-> {
-	queries: Q;
-	mutations: M;
-}
-
-/**
- * Infer API type from server
- * Use: type Api = typeof server._types
- */
-export type InferApiFromServer<T> = T extends { _types: infer Shape } ? Shape : never;
-
-/**
- * Router-based API shape for namespaced operations
- *
- * @example
- * ```typescript
- * import type { AppRouter } from './server';  // TYPE-only import
- * const client = createClient<RouterApiShape<AppRouter>>({ links: [...] });
- * // client.user.get({ id: "1" })
- * // client.post.create({ title: "Hello" })
- * ```
- */
-export interface RouterApiShape<TRouter extends RouterDef = RouterDef> {
-	router: TRouter;
-}
-
-/** Check if API shape is router-based */
-export type IsRouterApi<T> = T extends RouterApiShape ? true : false;
-
-/** Infer client type from router routes */
-export type InferRouterClientType<TRoutes extends RouterRoutes> = {
-	[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
-		? InferRouterClientType<TNestedRoutes>
-		: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
-			? TInput extends void
-				? QueryAccessorFn<QueryDef<void, TOutput>>
-				: QueryAccessorFn<QueryDef<TInput, TOutput>>
-			: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
-				? MutationAccessorFn<MutationDef<TInput, TOutput>>
-				: never;
-};
-
-/** Selection object */
+/** Selection object for field selection */
 export interface SelectionObject {
 	[key: string]: boolean | SelectionObject | { select: SelectionObject };
 }
 
-/**
- * Infer selected type from selection object
- *
- * @example
- * ```typescript
- * type User = { id: string, name: string, email: string };
- * type Selected = SelectedType<User, { id: true, name: true }>;
- * // Selected = { id: string, name: string }
- * ```
- */
+/** Client configuration */
+export interface LensClientConfig {
+	/** Transport for server communication */
+	transport: Transport;
+	/** Plugins for request/response processing */
+	plugins?: Plugin[];
+	/** Enable optimistic updates (default: true) */
+	optimistic?: boolean;
+}
+
+/** Query result with reactive subscription support */
+export interface QueryResult<T> {
+	/** Current value */
+	readonly value: T | null;
+	/** Reactive signal */
+	readonly signal: Signal<T | null>;
+	/** Loading state */
+	readonly loading: Signal<boolean>;
+	/** Error state */
+	readonly error: Signal<Error | null>;
+	/** Subscribe to updates */
+	subscribe(callback?: (data: T) => void): () => void;
+	/** Select specific fields */
+	select<S extends SelectionObject>(selection: S): QueryResult<SelectedType<T, S>>;
+	/** Promise interface */
+	then<TResult1 = T, TResult2 = never>(
+		onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+		onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+	): Promise<TResult1 | TResult2>;
+}
+
+/** Mutation result */
+export interface MutationResult<T> {
+	data: T;
+	rollback?: () => void;
+}
+
+/** Infer selected type from selection object */
 export type SelectedType<T, S extends SelectionObject> = {
 	[K in keyof S & keyof T]: S[K] extends true
 		? T[K]
@@ -242,51 +89,7 @@ export type SelectedType<T, S extends SelectionObject> = {
 				: never;
 };
 
-/** Query result with subscription support */
-export interface QueryResult<T> {
-	/** Get current value (triggers fetch if not subscribed) */
-	readonly value: T | null;
-	/** Signal for reactive access */
-	readonly signal: Signal<T | null>;
-	/** Loading state */
-	readonly loading: Signal<boolean>;
-	/** Error state */
-	readonly error: Signal<Error | null>;
-	/** Subscribe to updates */
-	subscribe(callback?: (data: T) => void): () => void;
-	/**
-	 * Select specific fields (with type inference)
-	 *
-	 * @example
-	 * ```typescript
-	 * const user = await api.getUser({ id }).select({ name: true });
-	 * // user is { name: string }
-	 * ```
-	 */
-	select<S extends SelectionObject>(selection: S): QueryResult<SelectedType<T, S>>;
-	/** Promise interface */
-	then<TResult1 = T, TResult2 = never>(
-		onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
-		onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-	): Promise<TResult1 | TResult2>;
-}
-
-/** Mutation result */
-export interface MutationResult<T> {
-	data: T;
-	/** Rollback optimistic update (if applied) */
-	rollback?: () => void;
-}
-
-/** Pending optimistic entry (internal) */
-interface OptimisticEntry {
-	id: string;
-	operation: string;
-	input: unknown;
-	previousData: unknown;
-}
-
-/** Infer input type from query/mutation */
+/** Infer input type */
 export type InferInput<T> = T extends QueryDef<infer I, unknown>
 	? I extends void
 		? void
@@ -295,7 +98,7 @@ export type InferInput<T> = T extends QueryDef<infer I, unknown>
 		? I
 		: never;
 
-/** Infer output type from query/mutation */
+/** Infer output type */
 export type InferOutput<T> = T extends QueryDef<unknown, infer O>
 	? O
 	: T extends MutationDef<unknown, infer O>
@@ -303,539 +106,181 @@ export type InferOutput<T> = T extends QueryDef<unknown, infer O>
 		: never;
 
 // =============================================================================
-// Subscription State
+// Router Types
 // =============================================================================
 
-interface SubscriptionState {
-	/** Operation name */
-	operation: string;
-	/** Input */
-	input: unknown;
-	/** Fields being subscribed */
-	fields: Set<string>;
-	/** Full entity subscription count */
-	fullRefs: number;
-	/** Per-field ref counts */
-	fieldRefs: Map<string, number>;
-	/** Current data */
-	data: WritableSignal<unknown>;
-	/** Loading state */
-	loading: WritableSignal<boolean>;
-	/** Error state */
-	error: WritableSignal<Error | null>;
-	/** Transport subscription */
-	transportSub?: {
-		unsubscribe: () => void;
-		updateFields: (add?: string[], remove?: string[]) => void;
-	};
-	/** Callbacks waiting for data */
-	callbacks: Set<(data: unknown) => void>;
+/** Router-based API shape */
+export interface RouterApiShape<TRouter extends RouterDef = RouterDef> {
+	router: TRouter;
 }
 
-// Note: makeQueryKey and makeQueryKeyWithFields imported from shared/keys
+/** Infer client type from router routes */
+export type InferRouterClientType<TRoutes extends RouterRoutes> = {
+	[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
+		? InferRouterClientType<TNestedRoutes>
+		: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
+			? TInput extends void
+				? () => QueryResult<TOutput>
+				: (input: TInput) => QueryResult<TOutput>
+			: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
+				? (input: TInput) => Promise<MutationResult<TOutput>>
+				: never;
+};
+
+/** Router-based client type */
+export type RouterLensClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
+	? InferRouterClientType<TRoutes> & {
+			$store: ReactiveStore;
+		}
+	: never;
+
+/** Generic client type (for framework adapters) */
+export type LensClient<_Q = unknown, _M = unknown> = {
+	$store: ReactiveStore;
+	[key: string]: unknown;
+};
 
 // =============================================================================
 // Client Implementation
 // =============================================================================
 
-class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
-	private queries: Q;
-	private mutations: M;
-	/** @deprecated Use linkExecutor instead */
-	private transport: Transport | null = null;
-	/** Compiled link chain for executing operations */
-	private linkExecutor: NextLink | null = null;
+class ClientImpl {
+	private transport: Transport;
+	private plugins: Plugin[];
 	private optimistic: boolean;
 	private store: ReactiveStore;
+	private metadata: Metadata | null = null;
 
-	/** Operations metadata from server (for type-only mode) */
-	private operationsMetadata: OperationsMap | null = null;
-	private operationsMetadataPromise: Promise<void> | null = null;
-	private operationsUrl: string | null = null;
+	/** Subscription states */
+	private subscriptions = new Map<
+		string,
+		{
+			data: WritableSignal<unknown>;
+			loading: WritableSignal<boolean>;
+			error: WritableSignal<Error | null>;
+			callbacks: Set<(data: unknown) => void>;
+			unsubscribe?: () => void;
+		}
+	>();
 
-	/** Subscription states by query key */
-	private subscriptions = new Map<string, SubscriptionState>();
-
-	/** Pending requests for batching */
-	private pendingQueries: Array<{
-		key: string;
-		operation: string;
-		input: unknown;
-		fields?: string[];
-		resolve: (data: unknown) => void;
-		reject: (error: Error) => void;
-	}> = [];
-	private batchTimer: ReturnType<typeof setTimeout> | null = null;
-	private readonly batchDelay = 10;
-
-	/** In-flight queries for deduplication (uses shared utility) */
-	private requestDedup = new RequestDeduplicator<unknown>();
-
-	/** Pending optimistic updates */
-	private optimisticUpdates = new Map<string, OptimisticEntry>();
+	/** Optimistic update tracking */
 	private optimisticCounter = 0;
+	private optimisticUpdates = new Map<
+		string,
+		{ previousData: Map<string, unknown>; operation: string }
+	>();
 
-	constructor(config: LensClientConfig<Q, M>) {
-		this.queries = config.queries ?? ({} as Q);
-		this.mutations = config.mutations ?? ({} as M);
+	constructor(config: LensClientConfig) {
+		this.transport = config.transport;
+		this.plugins = config.plugins ?? [];
 		this.optimistic = config.optimistic ?? true;
 		this.store = new ReactiveStore();
-		this.operationsUrl = config.url ?? null;
-
-		// Auto-fetch operations metadata if URL provided
-		if (this.operationsUrl) {
-			this.operationsMetadataPromise = this.fetchOperationsMetadata();
-		}
-
-		// Handle links or transport config
-		if (config.links && config.links.length > 0) {
-			// New Link-based system: all items are Links, last one is terminal
-			// Build link chain from Link factories
-			const linkFns = config.links.map((link) => link());
-
-			// Compose links: first links call next, last link is terminal
-			// Terminal link should NOT call next (it handles the operation)
-			this.linkExecutor = this.composeLinks(linkFns);
-		} else if (config.transport) {
-			// Legacy Transport-based system (backwards compatible)
-			this.transport = config.transport;
-		} else {
-			throw new Error("Must provide either 'transport' or 'links' config");
-		}
 	}
 
 	/**
-	 * Compose link functions into a single executor.
-	 * Last link is assumed to be terminal (doesn't call next).
+	 * Initialize client - connect transport and get metadata
 	 */
-	private composeLinks(links: LinkFn[]): NextLink {
-		if (links.length === 0) {
-			throw new Error("At least one link (terminal) is required");
-		}
-
-		// Build chain from right to left
-		// The last link is terminal - we wrap it to not need a next
-		const terminalIndex = links.length - 1;
-		const terminalLink = links[terminalIndex];
-
-		// Terminal link gets a dummy next that throws if called
-		let chain: NextLink = (op) =>
-			terminalLink(op, () => {
-				throw new Error("Terminal link should not call next()");
-			});
-
-		// Add remaining links from right to left (excluding terminal)
-		for (let i = terminalIndex - 1; i >= 0; i--) {
-			const link = links[i];
-			const next = chain;
-			chain = (op) => link(op, next);
-		}
-
-		return chain;
+	async init(): Promise<void> {
+		this.metadata = await this.transport.connect();
 	}
 
 	/**
-	 * Fetch operations metadata from server
+	 * Execute operation through plugins and transport
 	 */
-	private async fetchOperationsMetadata(): Promise<void> {
-		if (!this.operationsUrl) return;
-
-		try {
-			const response = await fetch(`${this.operationsUrl}/operations`);
-			if (response.ok) {
-				const data = (await response.json()) as { operations: OperationsMap };
-				this.operationsMetadata = data.operations;
-			}
-		} catch {
-			// Silently fail - operations will work without metadata
-			// just without optimistic updates in type-only mode
-		}
-	}
-
-	/**
-	 * Get operation metadata from server response
-	 * Handles nested paths like "user.get" or "post.comment.create"
-	 */
-	private getOperationMeta(operation: string): OperationMeta | null {
-		if (!this.operationsMetadata) return null;
-
-		const parts = operation.split(".");
-		let current: OperationsMap | OperationMeta = this.operationsMetadata;
-
-		for (const part of parts) {
-			if (!current || typeof current !== "object" || "type" in current) {
-				return null;
-			}
-			current = current[part] as OperationsMap | OperationMeta;
-		}
-
-		if (current && typeof current === "object" && "type" in current) {
-			return current as OperationMeta;
-		}
-
-		return null;
-	}
-
-	/**
-	 * Ensure operations metadata is loaded before use
-	 */
-	private async ensureOperationsMetadata(): Promise<void> {
-		if (this.operationsMetadataPromise) {
-			await this.operationsMetadataPromise;
-		}
-	}
-
-	/**
-	 * Execute operation through link chain or transport
-	 */
-	private async executeOperation(ctx: OperationContext): Promise<unknown> {
-		// New link-based execution
-		if (this.linkExecutor) {
-			// Convert internal OperationContext to Link's OperationContext
-			const linkOp: LinkOperationContext = {
-				id: ctx.id,
-				type: ctx.type,
-				entity: "_Query", // Operations are treated as custom queries/mutations
-				op: ctx.operation,
-				input: ctx.input,
-				meta: ctx.meta,
-				signal: ctx.signal,
-			};
-
-			const result = await this.linkExecutor(linkOp);
-
-			if (result.error) {
-				throw result.error;
-			}
-
-			return result.data;
-		}
-
-		// Legacy transport-based execution
-		if (this.transport) {
-			if (ctx.type === "query") {
-				return this.transport.query(ctx.operation, ctx.input, "*", ctx.select);
-			} else if (ctx.type === "mutation") {
-				return this.transport.mutate(ctx.operation, ctx.input);
-			}
-			throw new Error(`Unsupported operation type: ${ctx.type}`);
-		}
-
-		throw new Error("No executor configured");
-	}
-
-	/** @deprecated Use executeOperation instead */
-	private async executeWithLinks(ctx: OperationContext): Promise<unknown> {
-		return this.executeOperation(ctx);
-	}
-
-	// ===========================================================================
-	// Query Resolution
-	// ===========================================================================
-
-	/**
-	 * Check if a query can be derived from existing subscription
-	 */
-	private canDerive(operation: string, input: unknown, fields?: string[]): boolean {
-		const baseKey = makeQueryKey(operation, input);
-		const baseSub = this.subscriptions.get(baseKey);
-
-		if (!baseSub) return false;
-
-		// If base subscription has all fields, we can derive any subset
-		if (baseSub.fullRefs > 0) return true;
-
-		// If requesting specific fields, check if they're all subscribed
-		if (fields) {
-			return fields.every((f) => baseSub.fields.has(f));
-		}
-
-		return false;
-	}
-
-	/**
-	 * Get or create subscription for a query
-	 */
-	private getOrCreateSubscription(
-		operation: string,
-		input: unknown,
-		fields?: string[],
-	): SubscriptionState {
-		const key = makeQueryKey(operation, input);
-
-		if (!this.subscriptions.has(key)) {
-			const sub: SubscriptionState = {
-				operation,
-				input,
-				fields: new Set(),
-				fullRefs: 0,
-				fieldRefs: new Map(),
-				data: signal<unknown>(null),
-				loading: signal(true),
-				error: signal<Error | null>(null),
-				callbacks: new Set(),
-			};
-			this.subscriptions.set(key, sub);
-		}
-
-		return this.subscriptions.get(key)!;
-	}
-
-	/**
-	 * Subscribe to specific fields
-	 */
-	private subscribeFields(sub: SubscriptionState, fields: string[]): void {
-		const newFields: string[] = [];
-
-		for (const field of fields) {
-			const currentRef = sub.fieldRefs.get(field) ?? 0;
-			sub.fieldRefs.set(field, currentRef + 1);
-
-			if (currentRef === 0) {
-				sub.fields.add(field);
-				newFields.push(field);
+	private async execute(op: Operation): Promise<Result> {
+		// Run beforeRequest plugins
+		let processedOp = op;
+		for (const plugin of this.plugins) {
+			if (plugin.beforeRequest) {
+				processedOp = await plugin.beforeRequest(processedOp);
 			}
 		}
 
-		// Notify transport of new fields
-		if (newFields.length > 0 && sub.transportSub) {
-			sub.transportSub.updateFields(newFields, undefined);
+		// Execute through transport
+		const resultOrObservable = this.transport.execute(processedOp);
+
+		// Handle Observable (subscription)
+		if (this.isObservable(resultOrObservable)) {
+			return { data: resultOrObservable };
 		}
-	}
 
-	/**
-	 * Unsubscribe from specific fields
-	 */
-	private unsubscribeFields(sub: SubscriptionState, fields: string[]): void {
-		const removedFields: string[] = [];
+		// Handle Promise (query/mutation)
+		let result = await resultOrObservable;
 
-		for (const field of fields) {
-			const currentRef = sub.fieldRefs.get(field) ?? 0;
-			if (currentRef <= 1) {
-				sub.fieldRefs.delete(field);
-				sub.fields.delete(field);
-				removedFields.push(field);
-			} else {
-				sub.fieldRefs.set(field, currentRef - 1);
+		// Run afterResponse plugins
+		for (const plugin of this.plugins) {
+			if (plugin.afterResponse) {
+				result = await plugin.afterResponse(result, processedOp);
 			}
 		}
 
-		// Notify transport of removed fields
-		if (removedFields.length > 0 && sub.transportSub) {
-			sub.transportSub.updateFields(undefined, removedFields);
-		}
-
-		// Check if subscription can be cleaned up
-		this.maybeCleanupSubscription(sub);
-	}
-
-	/**
-	 * Subscribe to full entity
-	 */
-	private subscribeFullEntity(sub: SubscriptionState): void {
-		sub.fullRefs++;
-
-		// If first full subscription, ensure transport is subscribed to all
-		if (sub.fullRefs === 1 && sub.transportSub) {
-			sub.transportSub.updateFields(["*"], undefined);
-		}
-	}
-
-	/**
-	 * Unsubscribe from full entity
-	 */
-	private unsubscribeFullEntity(sub: SubscriptionState): void {
-		if (sub.fullRefs > 0) {
-			sub.fullRefs--;
-		}
-
-		// 最大原則 (Maximum Principle):
-		// When full subscription disposes but field subscriptions remain,
-		// reconfigure transport from "*" to specific fields only
-		if (sub.fullRefs === 0 && sub.fieldRefs.size > 0 && sub.transportSub) {
-			// Get the remaining subscribed fields
-			const remainingFields = Array.from(sub.fields);
-
-			// Tell transport to switch from "*" to specific fields
-			// This is a "downgrade" - we no longer need all fields
-			sub.transportSub.updateFields(remainingFields, ["*"]);
-		}
-
-		this.maybeCleanupSubscription(sub);
-	}
-
-	/**
-	 * Cleanup subscription if no more refs
-	 */
-	private maybeCleanupSubscription(sub: SubscriptionState): void {
-		if (sub.fullRefs === 0 && sub.fieldRefs.size === 0 && sub.callbacks.size === 0) {
-			// Unsubscribe from transport
-			if (sub.transportSub) {
-				sub.transportSub.unsubscribe();
-			}
-
-			// Remove from map
-			const key = makeQueryKey(sub.operation, sub.input);
-			this.subscriptions.delete(key);
-		}
-	}
-
-	/**
-	 * Ensure subscription exists (transport-based or link-based)
-	 */
-	private ensureTransportSubscription(sub: SubscriptionState, select?: SelectionObject): void {
-		if (sub.transportSub) return;
-
-		const fields = sub.fullRefs > 0 ? "*" : Array.from(sub.fields);
-
-		// Use link-based subscriptions if available
-		if (this.linkExecutor) {
-			this.setupLinkSubscription(sub, select);
-			return;
-		}
-
-		// Legacy transport-based subscription
-		if (!this.transport) {
-			throw new Error("No transport or link executor configured");
-		}
-
-		sub.transportSub = this.transport.subscribe(
-			sub.operation,
-			sub.input,
-			fields,
-			{
-				onData: (data) => {
-					sub.data.value = data;
-					sub.loading.value = false;
-					sub.error.value = null;
-
-					// Notify callbacks
-					for (const callback of sub.callbacks) {
-						callback(data);
+		// Handle errors through plugins
+		if (result.error) {
+			const error = result.error;
+			for (const plugin of this.plugins) {
+				if (plugin.onError) {
+					try {
+						result = await plugin.onError(error, processedOp, () => this.execute(processedOp));
+						if (!result.error) break; // Error handled
+					} catch (e) {
+						result = { error: e as Error };
 					}
-				},
-				onUpdate: (updates) => {
-					// Apply updates to current data
-					const current = sub.data.value;
-					if (current && typeof current === "object") {
-						const updated = { ...(current as Record<string, unknown>) };
-						for (const [field, update] of Object.entries(updates)) {
-							updated[field] = applyUpdate(updated[field], update);
-						}
-						sub.data.value = updated;
+				}
+			}
+		}
 
-						// Notify callbacks
-						for (const callback of sub.callbacks) {
-							callback(updated);
-						}
-					}
-				},
-				onError: (error) => {
-					sub.error.value = error;
-					sub.loading.value = false;
-				},
-				onComplete: () => {
-					sub.loading.value = false;
-				},
-			},
-			select, // Pass SelectionObject for nested resolution
+		return result;
+	}
+
+	private isObservable(value: unknown): value is Observable<Result> {
+		return (
+			value !== null &&
+			typeof value === "object" &&
+			"subscribe" in value &&
+			typeof (value as Observable<Result>).subscribe === "function"
 		);
 	}
 
 	/**
-	 * Setup link-based subscription using Observable
-	 * Terminal links return Observable in meta for subscriptions
+	 * Get operation metadata
 	 */
-	private setupLinkSubscription(sub: SubscriptionState, select?: SelectionObject): void {
-		if (!this.linkExecutor) return;
+	private getOperationMeta(path: string): Metadata["operations"][string] | undefined {
+		if (!this.metadata) return undefined;
+		return this.metadata.operations[path];
+	}
 
-		const linkOp: LinkOperationContext = {
-			id: `sub-${sub.operation}-${Date.now()}`,
-			type: "subscription",
-			entity: "_Query",
-			op: sub.operation,
-			input: sub.input,
-			meta: { select },
-		};
+	/**
+	 * Generate unique operation ID
+	 */
+	private generateId(type: string, path: string): string {
+		return `${type}-${path}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+	}
 
-		// Execute subscription operation
-		Promise.resolve(this.linkExecutor(linkOp)).then((result: OperationResult) => {
-			if (result.error) {
-				sub.error.value = result.error;
-				sub.loading.value = false;
-				return;
-			}
-
-			// Check for Observable in meta (set by terminal links like httpLink with polling)
-			const observable = result.meta?.observable as
-				| {
-						subscribe: (obs: {
-							next: (v: unknown) => void;
-							error: (e: Error) => void;
-							complete: () => void;
-						}) => { unsubscribe: () => void };
-				  }
-				| undefined;
-
-			if (observable) {
-				// Subscribe to Observable
-				const subscription = observable.subscribe({
-					next: (data) => {
-						sub.data.value = data;
-						sub.loading.value = false;
-						sub.error.value = null;
-						for (const callback of sub.callbacks) {
-							callback(data);
-						}
-					},
-					error: (error) => {
-						sub.error.value = error;
-						sub.loading.value = false;
-					},
-					complete: () => {
-						sub.loading.value = false;
-					},
-				});
-
-				sub.transportSub = {
-					unsubscribe: () => subscription.unsubscribe(),
-					updateFields: () => {
-						// Link-based subscriptions don't support dynamic field updates
-						// Re-subscribe with new fields would be needed
-					},
-				};
-			} else {
-				// No observable - just use the initial data (one-shot subscription)
-				sub.data.value = result.data;
-				sub.loading.value = false;
-
-				sub.transportSub = {
-					unsubscribe: () => {},
-					updateFields: () => {},
-				};
-			}
-		});
+	/**
+	 * Create query key for caching/dedup
+	 */
+	private makeQueryKey(path: string, input: unknown): string {
+		return `${path}:${JSON.stringify(input ?? null)}`;
 	}
 
 	// ===========================================================================
 	// Query Execution
 	// ===========================================================================
 
-	/**
-	 * Execute a query with optional field selection
-	 */
-	private executeQuery<T>(
-		operation: string,
-		input: unknown,
-		select?: SelectionObject,
-	): QueryResult<T> {
-		const fields = select ? this.extractFieldsFromSelection(select) : undefined;
-		const sub = this.getOrCreateSubscription(operation, input, fields);
+	executeQuery<T>(path: string, input: unknown, select?: SelectionObject): QueryResult<T> {
+		const key = this.makeQueryKey(path, input);
 
-		// Store selection for this query
-		const currentSelect = select;
+		// Get or create subscription state
+		if (!this.subscriptions.has(key)) {
+			this.subscriptions.set(key, {
+				data: signal<unknown>(null),
+				loading: signal(true),
+				error: signal<Error | null>(null),
+				callbacks: new Set(),
+			});
+		}
+		const sub = this.subscriptions.get(key)!;
 
-		// Create result object
 		const result: QueryResult<T> = {
 			get value() {
 				return sub.data.value as T | null;
@@ -845,51 +290,37 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 			error: sub.error,
 
 			subscribe: (callback?: (data: T) => void) => {
-				// Subscribe to fields or full entity
-				if (fields) {
-					this.subscribeFields(sub, fields);
-				} else {
-					this.subscribeFullEntity(sub);
-				}
-
-				// Ensure transport subscription with SelectionObject
-				this.ensureTransportSubscription(sub, currentSelect);
-
-				// Add callback if provided
+				// Add callback
 				if (callback) {
-					const wrappedCallback = (data: unknown) => callback(data as T);
-					sub.callbacks.add(wrappedCallback);
+					const wrapped = (data: unknown) => callback(data as T);
+					sub.callbacks.add(wrapped);
 
-					// If data already available, call immediately
+					// If data available, call immediately
 					if (sub.data.value !== null) {
 						callback(sub.data.value as T);
 					}
-
-					// Return unsubscribe function
-					return () => {
-						sub.callbacks.delete(wrappedCallback);
-						if (fields) {
-							this.unsubscribeFields(sub, fields);
-						} else {
-							this.unsubscribeFullEntity(sub);
-						}
-					};
 				}
 
-				// Return unsubscribe without callback
+				// Start subscription if not started
+				if (!sub.unsubscribe) {
+					this.startSubscription(path, input, key);
+				}
+
 				return () => {
-					if (fields) {
-						this.unsubscribeFields(sub, fields);
-					} else {
-						this.unsubscribeFullEntity(sub);
+					if (callback) {
+						const wrapped = (data: unknown) => callback(data as T);
+						sub.callbacks.delete(wrapped);
+					}
+					// Cleanup if no more callbacks
+					if (sub.callbacks.size === 0 && sub.unsubscribe) {
+						sub.unsubscribe();
+						sub.unsubscribe = undefined;
 					}
 				};
 			},
 
 			select: <S extends SelectionObject>(selection: S) => {
-				// Pass full SelectionObject, not just field names
-				// Type assertion needed as actual filtering happens server-side
-				return this.executeQuery<T>(operation, input, selection) as unknown as QueryResult<
+				return this.executeQuery<T>(path, input, selection) as unknown as QueryResult<
 					SelectedType<T, S>
 				>;
 			},
@@ -899,27 +330,36 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 				onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
 			): Promise<TResult1 | TResult2> => {
 				try {
-					// Check if we can derive from existing
-					if (this.canDerive(operation, input, fields)) {
-						const existingSub = this.subscriptions.get(makeQueryKey(operation, input))!;
-						if (existingSub.data.value !== null) {
-							const data = fields
-								? this.applyFieldSelection(existingSub.data.value, fields)
-								: existingSub.data.value;
-							return onfulfilled ? onfulfilled(data as T) : (data as unknown as TResult1);
-						}
+					// Execute query
+					const op: Operation = {
+						id: this.generateId("query", path),
+						path,
+						type: "query",
+						input,
+						meta: select ? { select } : {},
+					};
+
+					const response = await this.execute(op);
+
+					if (response.error) {
+						throw response.error;
 					}
 
-					// Fetch from server with full SelectionObject
-					const data = await this.fetchQuery(operation, input, fields, currentSelect);
+					// Update subscription state
+					sub.data.value = response.data;
+					sub.loading.value = false;
 
-					// Update subscription data
-					if (!fields) {
-						sub.data.value = data;
+					// Notify callbacks
+					for (const cb of sub.callbacks) {
+						cb(response.data);
 					}
 
-					return onfulfilled ? onfulfilled(data as T) : (data as unknown as TResult1);
+					return onfulfilled
+						? onfulfilled(response.data as T)
+						: (response.data as unknown as TResult1);
 				} catch (error) {
+					sub.error.value = error as Error;
+					sub.loading.value = false;
 					if (onrejected) {
 						return onrejected(error);
 					}
@@ -931,155 +371,93 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		return result;
 	}
 
-	/**
-	 * Fetch query from server (with deduplication via shared utility)
-	 */
-	private async fetchQuery(
-		operation: string,
-		input: unknown,
-		fields?: string[],
-		select?: SelectionObject,
-	): Promise<unknown> {
-		const key = makeQueryKeyWithFields(operation, input, fields);
+	private startSubscription(path: string, input: unknown, key: string): void {
+		const sub = this.subscriptions.get(key);
+		if (!sub) return;
 
-		// Use shared RequestDeduplicator
-		return this.requestDedup.dedupe(key, async () => {
-			// Create operation context for link chain
-			const ctx: OperationContext = {
-				id: `query-${operation}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-				type: "query",
-				operation,
+		const meta = this.getOperationMeta(path);
+		const isSubscription = meta?.type === "subscription";
+
+		if (isSubscription) {
+			// Real subscription - use Observable
+			const op: Operation = {
+				id: this.generateId("subscription", path),
+				path,
+				type: "subscription",
 				input,
-				select,
-				meta: {},
 			};
 
-			// Execute through link chain
-			return this.executeOperation(ctx);
-		});
-	}
+			const resultOrObservable = this.transport.execute(op);
 
-	/**
-	 * Extract field names from selection object
-	 */
-	private extractFieldsFromSelection(selection: SelectionObject): string[] {
-		const fields: string[] = [];
+			if (this.isObservable(resultOrObservable)) {
+				const subscription = resultOrObservable.subscribe({
+					next: (result) => {
+						if (result.data !== undefined) {
+							sub.data.value = result.data;
+							sub.loading.value = false;
+							for (const cb of sub.callbacks) {
+								cb(result.data);
+							}
+						}
+					},
+					error: (error) => {
+						sub.error.value = error;
+						sub.loading.value = false;
+					},
+					complete: () => {
+						sub.loading.value = false;
+					},
+				});
 
-		for (const [key, value] of Object.entries(selection)) {
-			if (value === true) {
-				fields.push(key);
-			} else if (typeof value === "object" && value !== null) {
-				// Nested selection - just include the field name
-				fields.push(key);
+				sub.unsubscribe = () => subscription.unsubscribe();
 			}
+		} else {
+			// Query - just fetch once
+			this.executeQuery(path, input).then(() => {});
 		}
-
-		return fields;
-	}
-
-	/**
-	 * Apply field selection to data
-	 */
-	private applyFieldSelection(data: unknown, fields: string[]): unknown {
-		if (!data || typeof data !== "object") return data;
-
-		const result: Record<string, unknown> = {};
-		const obj = data as Record<string, unknown>;
-
-		// Always include id
-		if ("id" in obj) {
-			result.id = obj.id;
-		}
-
-		for (const field of fields) {
-			if (field in obj) {
-				result[field] = obj[field];
-			}
-		}
-
-		return result;
 	}
 
 	// ===========================================================================
 	// Mutation Execution
 	// ===========================================================================
 
-	/**
-	 * Execute a mutation
-	 * Automatically applies optimistic update:
-	 * - DSL: Declarative spec interpreted at runtime (recommended for type-only imports)
-	 * - Function: Legacy callback (requires runtime import)
-	 * - Auto: If no optimistic specified, derive from input
-	 */
-	private async executeMutation<TInput, TOutput>(
-		operation: string,
+	async executeMutation<TInput, TOutput>(
+		path: string,
 		input: TInput,
 	): Promise<MutationResult<TOutput>> {
-		// Ensure operations metadata is loaded (for type-only mode)
-		await this.ensureOperationsMetadata();
-
-		// Get optimistic config from:
-		// 1. Mutation definition (definition mode)
-		// 2. Operations metadata (type-only mode)
-		const mutationDef = this.mutations[operation as keyof M] as
-			| MutationDef<TInput, TOutput>
-			| undefined;
-		const operationMeta = this.getOperationMeta(operation);
-
-		// Apply optimistic update (automatic by default)
+		const meta = this.getOperationMeta(path);
 		let optId: string | undefined;
-		if (this.optimistic) {
-			let optimisticData: unknown;
 
-			// Check mutation definition first (definition mode), then metadata (type-only mode)
-			const optimisticSpec = mutationDef?._optimistic ?? operationMeta?.optimistic;
-
-			if (optimisticSpec) {
-				if (isOptimisticDSL(optimisticSpec)) {
-					// DSL: Interpret declarative spec (works with type-only imports)
-					optimisticData = this.interpretOptimisticDSL(optimisticSpec, input);
-				} else if (typeof optimisticSpec === "function") {
-					// Function: Legacy callback (requires runtime import)
-					optimisticData = optimisticSpec({ input });
-				}
-			} else {
-				// AUTO: if input has 'id', use input as optimistic data
-				// This merges input fields into the entity with matching id
-				optimisticData = this.autoOptimisticFromInput(input);
-			}
-
-			if (optimisticData) {
-				optId = this.applyOptimisticFromMutation(operation, input, optimisticData);
-			}
+		// Apply optimistic update
+		if (this.optimistic && meta?.optimistic) {
+			optId = this.applyOptimistic(path, input, meta.optimistic as CoreOptimisticDSL);
 		}
 
 		try {
-			// Create operation context for link chain
-			const ctx: OperationContext = {
-				id: `mutation-${operation}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			const op: Operation = {
+				id: this.generateId("mutation", path),
+				path,
 				type: "mutation",
-				operation,
 				input,
-				meta: {},
 			};
 
-			// Execute through link chain
-			const result = await this.executeOperation(ctx);
+			const response = await this.execute(op);
 
-			// Update any affected subscriptions
-			this.updateSubscriptionsFromMutation(result);
+			if (response.error) {
+				throw response.error;
+			}
 
-			// Confirm optimistic update with server data
+			// Confirm optimistic with server data
 			if (optId) {
-				this.confirmOptimistic(optId, result);
+				this.confirmOptimistic(optId, response.data);
 			}
 
 			return {
-				data: result as TOutput,
+				data: response.data as TOutput,
 				rollback: optId ? () => this.rollbackOptimistic(optId!) : undefined,
 			};
 		} catch (error) {
-			// Rollback on failure
+			// Rollback on error
 			if (optId) {
 				this.rollbackOptimistic(optId);
 			}
@@ -1087,296 +465,70 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		}
 	}
 
-	/**
-	 * Update subscriptions when mutation returns data
-	 */
-	private updateSubscriptionsFromMutation(data: unknown): void {
-		// This is a simplified version - in production, you'd want
-		// the server to tell you which entities were affected
-		if (!data || typeof data !== "object") return;
-
-		// For now, we rely on the server pushing updates via subscriptions
-	}
-
 	// ===========================================================================
-	// Optimistic Updates (automatic via mutation._optimistic)
+	// Optimistic Updates
 	// ===========================================================================
 
-	/**
-	 * Apply optimistic update from mutation to affected subscriptions
-	 * Handles: single entity, array of entities, multi-type returns
-	 */
-	private applyOptimisticFromMutation(
-		_operation: string,
-		_input: unknown,
-		optimisticData: unknown,
-	): string {
+	private applyOptimistic(path: string, input: unknown, dsl: CoreOptimisticDSL): string {
 		const optId = `opt_${++this.optimisticCounter}`;
+		const affectedSubs = new Map<string, unknown>();
 
-		// Track all affected subscriptions for rollback
-		const affectedSubs: Array<{ key: string; previousData: unknown }> = [];
+		// Interpret DSL to get optimistic data
+		const optimisticData = this.interpretDSL(dsl, input);
+		if (!optimisticData) return optId;
 
-		// Extract all entities from optimistic data (handles nested structures)
-		const entities = this.extractEntities(optimisticData);
-
-		// Apply each entity to matching subscriptions
-		for (const entity of entities) {
-			const entityId = this.extractId(entity);
-			if (!entityId) continue;
-
+		// Find and update affected subscriptions
+		const entityId = this.extractId(optimisticData);
+		if (entityId) {
 			for (const [key, sub] of this.subscriptions) {
-				const currentData = sub.data.value;
+				const currentId = this.extractId(sub.data.value);
+				if (currentId === entityId) {
+					affectedSubs.set(key, sub.data.value);
+					sub.data.value =
+						typeof sub.data.value === "object"
+							? { ...sub.data.value, ...(optimisticData as object) }
+							: optimisticData;
 
-				// Check if subscription data matches this entity
-				if (this.matchesEntity(currentData, entityId)) {
-					// Only record once per subscription
-					if (!affectedSubs.some((s) => s.key === key)) {
-						affectedSubs.push({ key, previousData: currentData });
-					}
-
-					// Merge optimistic data into current data
-					const merged =
-						currentData && typeof currentData === "object"
-							? { ...currentData, ...(entity as object) }
-							: entity;
-					sub.data.value = merged;
-
-					// Notify callbacks
-					for (const callback of sub.callbacks) {
-						callback(merged);
+					for (const cb of sub.callbacks) {
+						cb(sub.data.value);
 					}
 				}
 			}
 		}
 
-		// Store for rollback
-		this.optimisticUpdates.set(optId, {
-			id: optId,
-			operation: _operation,
-			input: _input,
-			previousData: affectedSubs,
-		});
-
+		this.optimisticUpdates.set(optId, { previousData: affectedSubs, operation: path });
 		return optId;
 	}
 
-	/**
-	 * Extract all entities from optimistic data
-	 * Handles: { id } | [{ id }] | { users: [{ id }], posts: [{ id }] }
-	 */
-	private extractEntities(data: unknown): unknown[] {
-		if (!data || typeof data !== "object") return [];
-
-		// Single entity with ID
-		if (this.extractId(data)) {
-			return [data];
-		}
-
-		// Array of entities
-		if (Array.isArray(data)) {
-			return data.filter((item) => this.extractId(item));
-		}
-
-		// Multi-type return: { users: [...], posts: [...] }
-		const entities: unknown[] = [];
-		for (const value of Object.values(data as Record<string, unknown>)) {
-			if (Array.isArray(value)) {
-				entities.push(...value.filter((item) => this.extractId(item)));
-			} else if (this.extractId(value)) {
-				entities.push(value);
-			}
-		}
-		return entities;
-	}
-
-	/**
-	 * Check if subscription data matches entity ID
-	 */
-	private matchesEntity(data: unknown, entityId: string): boolean {
-		const dataId = this.extractId(data);
-		return dataId === entityId;
-	}
-
-	/**
-	 * Extract ID from entity data
-	 */
-	private extractId(data: unknown): string | undefined {
-		if (!data || typeof data !== "object") return undefined;
-		const obj = data as Record<string, unknown>;
-		if ("id" in obj && typeof obj.id === "string") return obj.id;
-		return undefined;
-	}
-
-	/**
-	 * Auto-derive optimistic data from mutation input
-	 *
-	 * UPDATE (input has id):
-	 *   → Use input as optimistic data, merge into matching entity
-	 *
-	 * CREATE (input has no id):
-	 *   → Auto-generate tempId, use as new entity
-	 *
-	 * @example
-	 * // Update: { id: "1", name: "New" } → merge into User:1
-	 * // Create: { title: "Hello" } → { id: "temp_0", title: "Hello" }
-	 */
-	private autoOptimisticFromInput(input: unknown): unknown {
-		if (!input || typeof input !== "object") return null;
-
-		const obj = input as Record<string, unknown>;
-
-		// UPDATE: input has 'id' → merge into existing entity
-		if ("id" in obj && typeof obj.id === "string") {
-			return input;
-		}
-
-		// CREATE: input has no 'id' → auto-generate tempId
-		// This creates a new optimistic entity
-		return {
-			id: `temp_${++this.optimisticCounter}`,
-			...obj,
-		};
-	}
-
-	/**
-	 * Interpret OptimisticDSL to compute optimistic data
-	 *
-	 * This allows declarative optimistic updates that work with type-only imports.
-	 * The DSL is pure data, interpreted at runtime on the client.
-	 *
-	 * @example
-	 * // 'merge' + input { id: "1", name: "New" }
-	 * // → { id: "1", name: "New" }
-	 *
-	 * // 'create' + input { title: "Hello" }
-	 * // → { id: "temp_0", title: "Hello" }
-	 *
-	 * // { merge: { published: true } } + input { id: "1" }
-	 * // → { id: "1", published: true }
-	 *
-	 * // { updateMany: { entity: 'User', ids: '$userIds', set: { role: '$newRole' } } }
-	 * // + input { userIds: ["1", "2"], newRole: "admin" }
-	 * // → [{ id: "1", role: "admin" }, { id: "2", role: "admin" }]
-	 */
-	private interpretOptimisticDSL(dsl: OptimisticDSL, input: unknown): unknown {
+	private interpretDSL(dsl: CoreOptimisticDSL, input: unknown): unknown {
 		const inputObj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
 		const normalized = normalizeOptimisticDSL(dsl);
 
 		switch (normalized.type) {
-			case "merge": {
-				// Merge input into entity (UPDATE)
-				// Requires input to have 'id'
-				const id = inputObj.id;
-				if (typeof id !== "string") return null;
-
-				const result: Record<string, unknown> = { ...inputObj };
-
-				// Apply additional 'set' fields (with $ reference resolution)
-				if (normalized.set) {
-					for (const [key, value] of Object.entries(normalized.set)) {
-						result[key] = this.resolveReference(value, inputObj);
-					}
-				}
-
-				return result;
-			}
-
-			case "create": {
-				// Create new entity with tempId
-				const result: Record<string, unknown> = {
-					id: `temp_${++this.optimisticCounter}`,
-					...inputObj,
-				};
-
-				// Apply additional 'set' fields
-				if (normalized.set) {
-					for (const [key, value] of Object.entries(normalized.set)) {
-						result[key] = this.resolveReference(value, inputObj);
-					}
-				}
-
-				return result;
-			}
-
-			case "delete": {
-				// Delete entity - mark as deleted
-				const id = inputObj.id;
-				if (typeof id !== "string") return null;
-				return { id, _deleted: true };
-			}
-
-			case "updateMany": {
-				// Update multiple entities (cross-entity)
-				if (!normalized.config) return null;
-
-				const ids = this.resolveReference(normalized.config.ids, inputObj);
-				if (!Array.isArray(ids)) return null;
-
-				// Resolve set fields
-				const setData: Record<string, unknown> = {};
-				for (const [key, value] of Object.entries(normalized.config.set)) {
-					setData[key] = this.resolveReference(value, inputObj);
-				}
-
-				// Create optimistic entity for each ID
-				return ids.map((id: unknown) => ({
-					id,
-					...setData,
-				}));
-			}
-
-			case "custom": {
-				// Custom function (escape hatch)
-				if (normalized.fn && typeof normalized.fn === "function") {
-					return normalized.fn({ input });
-				}
-				return null;
-			}
-
+			case "merge":
+				return inputObj.id ? inputObj : null;
+			case "create":
+				return { id: `temp_${++this.optimisticCounter}`, ...inputObj };
+			case "delete":
+				return inputObj.id ? { id: inputObj.id, _deleted: true } : null;
 			default:
 				return null;
 		}
 	}
 
-	/**
-	 * Resolve $ references in DSL values
-	 *
-	 * @example
-	 * resolveReference('$newRole', { newRole: 'admin' }) → 'admin'
-	 * resolveReference('literal', {}) → 'literal'
-	 * resolveReference(true, {}) → true
-	 */
-	private resolveReference(value: unknown, input: Record<string, unknown>): unknown {
-		// String starting with $ is a reference to input field
-		if (typeof value === "string" && value.startsWith("$")) {
-			const fieldName = value.slice(1);
-			return input[fieldName];
-		}
-		// Otherwise, return literal value
-		return value;
-	}
-
-	/**
-	 * Confirm optimistic update with server data
-	 * Handles multi-entity server responses
-	 */
-	private confirmOptimistic(optId: string, serverData?: unknown): void {
+	private confirmOptimistic(optId: string, serverData: unknown): void {
 		const entry = this.optimisticUpdates.get(optId);
 		if (!entry) return;
 
-		// Update affected subscriptions with authoritative server data
-		if (serverData !== undefined) {
-			const entities = this.extractEntities(serverData);
-			for (const entity of entities) {
-				const entityId = this.extractId(entity);
-				if (!entityId) continue;
-
-				for (const [_key, sub] of this.subscriptions) {
-					if (this.matchesEntity(sub.data.value, entityId)) {
-						sub.data.value = entity;
-						for (const callback of sub.callbacks) {
-							callback(entity);
-						}
+		// Update with server data
+		const entityId = this.extractId(serverData);
+		if (entityId) {
+			for (const [key, sub] of this.subscriptions) {
+				const currentId = this.extractId(sub.data.value);
+				if (currentId === entityId) {
+					sub.data.value = serverData;
+					for (const cb of sub.callbacks) {
+						cb(serverData);
 					}
 				}
 			}
@@ -1385,288 +537,113 @@ class ClientImpl<Q extends QueriesMap, M extends MutationsMap> {
 		this.optimisticUpdates.delete(optId);
 	}
 
-	/**
-	 * Rollback optimistic update
-	 */
 	private rollbackOptimistic(optId: string): void {
 		const entry = this.optimisticUpdates.get(optId);
 		if (!entry) return;
 
-		// Restore previous data for all affected subscriptions
-		const affectedSubs = entry.previousData as Array<{ key: string; previousData: unknown }>;
-		if (Array.isArray(affectedSubs)) {
-			for (const { key, previousData } of affectedSubs) {
-				const sub = this.subscriptions.get(key);
-				if (sub && previousData !== null) {
-					sub.data.value = previousData;
-					for (const callback of sub.callbacks) {
-						callback(previousData);
-					}
+		// Restore previous data
+		for (const [key, previousData] of entry.previousData) {
+			const sub = this.subscriptions.get(key);
+			if (sub) {
+				sub.data.value = previousData;
+				for (const cb of sub.callbacks) {
+					cb(previousData);
 				}
 			}
 		}
 
 		this.optimisticUpdates.delete(optId);
+	}
+
+	private extractId(data: unknown): string | undefined {
+		if (!data || typeof data !== "object") return undefined;
+		const obj = data as Record<string, unknown>;
+		return typeof obj.id === "string" ? obj.id : undefined;
 	}
 
 	// ===========================================================================
 	// Public API
 	// ===========================================================================
 
-	/**
-	 * Create query accessor
-	 */
-	createQueryAccessor<K extends keyof Q>(name: K): QueryAccessorFn<Q[K]> {
-		return ((input?: InferInput<Q[K]>) => {
-			return this.executeQuery<InferOutput<Q[K]>>(name as string, input);
-		}) as QueryAccessorFn<Q[K]>;
-	}
-
-	/**
-	 * Create mutation accessor
-	 */
-	createMutationAccessor<K extends keyof M>(name: K): MutationAccessorFn<M[K]> {
-		return (async (input: InferInput<M[K]>) => {
-			return this.executeMutation<InferInput<M[K]>, InferOutput<M[K]>>(name as string, input);
-		}) as MutationAccessorFn<M[K]>;
-	}
-
-	/**
-	 * Create dynamic accessor (for type-only mode)
-	 * Returns a callable that works as both query and mutation
-	 */
-	createDynamicAccessor(name: string): unknown {
-		// Return a function that:
-		// - Has QueryResult-like interface for subscriptions
-		// - Is callable for one-time execution
-		// Uses operations metadata to determine if it's a query or mutation
-		const accessor = async (input?: unknown) => {
-			// Ensure metadata is loaded
-			await this.ensureOperationsMetadata();
-
-			// Check operation type from metadata
-			const meta = this.getOperationMeta(name);
+	createAccessor(path: string): (input?: unknown) => unknown {
+		const accessor = (input?: unknown) => {
+			const meta = this.getOperationMeta(path);
 
 			if (meta?.type === "mutation") {
-				return this.executeMutation(name, input);
+				return this.executeMutation(path, input);
 			}
 
-			// Default to query (for backwards compatibility and type-only without metadata)
-			return this.executeQuery(name, input);
+			return this.executeQuery(path, input);
 		};
 
-		// Add subscribe method for real-time
+		// Add subscribe method
 		(accessor as unknown as Record<string, unknown>).subscribe = (
 			callback?: (data: unknown) => void,
 		) => {
-			return this.executeQuery(name, undefined).subscribe(callback);
+			return this.executeQuery(path, undefined).subscribe(callback);
 		};
 
 		return accessor;
 	}
 
-	/**
-	 * Get underlying store
-	 */
 	get $store(): ReactiveStore {
 		return this.store;
 	}
-
-	/**
-	 * Get query names
-	 */
-	$queryNames(): string[] {
-		return Object.keys(this.queries);
-	}
-
-	/**
-	 * Get mutation names
-	 */
-	$mutationNames(): string[] {
-		return Object.keys(this.mutations);
-	}
 }
-
-// =============================================================================
-// Accessor Types
-// =============================================================================
-
-type QueryAccessorFn<T> = T extends QueryDef<infer I, infer O>
-	? I extends void
-		? () => QueryResult<O>
-		: (input: I) => QueryResult<O>
-	: never;
-
-type MutationAccessorFn<T> = T extends MutationDef<infer I, infer O>
-	? (input: I) => Promise<MutationResult<O>>
-	: never;
-
-// =============================================================================
-// Client Type
-// =============================================================================
-
-/** Lens client type with flat namespace */
-export type LensClient<Q extends QueriesMap, M extends MutationsMap> = {
-	[K in keyof Q]: QueryAccessorFn<Q[K]>;
-} & {
-	[K in keyof M]: MutationAccessorFn<M[K]>;
-} & {
-	$store: ReactiveStore;
-	$queryNames(): string[];
-	$mutationNames(): string[];
-};
-
-/** Router-based lens client type with nested namespaces */
-export type RouterLensClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
-	? InferRouterClientType<TRoutes> & {
-			$store: ReactiveStore;
-			$queryNames(): string[];
-			$mutationNames(): string[];
-		}
-	: never;
 
 // =============================================================================
 // Factory
 // =============================================================================
 
 /**
- * Create Lens client with flat or router-based namespace
+ * Create Lens client
  *
- * Three usage patterns:
- *
- * 1. Router-based (recommended for new projects):
+ * @example
  * ```typescript
  * import type { AppRouter } from './server';
- * const client = createClient<RouterApiShape<AppRouter>>({
- *   links: [loggerLink(), websocketLink({ url })],
- * });
- * // client.user.get({ id: "1" })
- * // client.post.create({ title: "Hello" })
- * ```
  *
- * 2. Flat API (legacy):
- * ```typescript
- * import type { Api } from './server';
- * const client = createClient<Api>({
- *   links: [loggerLink(), websocketLink({ url })],
+ * const client = await createClient<RouterApiShape<AppRouter>>({
+ *   transport: http({ url: '/api' }),
+ *   plugins: [logger(), auth({ getToken: () => token })],
  * });
- * // client.getUser({ id: "1" })
- * ```
  *
- * 3. Direct definitions (deprecated):
- * ```typescript
- * const client = createClient({
- *   queries: { whoami, getUser },
- *   mutations: { updateUser },
- *   links: [...],
- * });
+ * // Use
+ * const user = await client.user.get({ id: '123' });
+ * await client.user.update({ id: '123', name: 'New Name' });
  * ```
  */
-export function createClient<TApi extends ApiShape | RouterApiShape>(
+export async function createClient<TApi extends RouterApiShape>(
 	config: LensClientConfig,
-): TApi extends RouterApiShape<infer TRouter>
-	? RouterLensClient<TRouter>
-	: TApi extends ApiShape<infer Q, infer M>
-		? LensClient<Q, M>
-		: never {
+): Promise<RouterLensClient<TApi extends RouterApiShape<infer R> ? R : never>> {
 	const impl = new ClientImpl(config);
+	await impl.init();
 
-	// Track known operation names for runtime (if provided)
-	const queryNames = new Set(Object.keys(config.queries ?? {}));
-	const mutationNames = new Set(Object.keys(config.mutations ?? {}));
-	const hasRuntimeInfo = queryNames.size > 0 || mutationNames.size > 0;
-
-	/**
-	 * Create a nested proxy for router-based access
-	 * Supports: client.user.get(), client.post.comment.list()
-	 */
+	// Create nested proxy for router-based access
 	function createNestedProxy(prefix: string): unknown {
-		return new Proxy(
-			{},
-			{
-				get(_target, prop) {
-					const key = prop as string;
-
-					// Skip symbol properties and internals
-					if (typeof prop === "symbol" || key.startsWith("_")) return undefined;
-
-					// Build the full path (e.g., "user.get", "post.comment.list")
-					const path = prefix ? `${prefix}.${key}` : key;
-
-					// Check if this might be a namespace (return another nested proxy)
-					// or a procedure (return an accessor function)
-					// Since we don't have runtime type info, we create a callable proxy
-					// that can be both called as a function AND accessed as an object
-					return createCallableProxy(path);
-				},
-			},
-		);
-	}
-
-	/**
-	 * Create a proxy that works both as a function (for leaf procedures)
-	 * and as an object (for nested namespaces)
-	 */
-	function createCallableProxy(path: string): unknown {
-		// Create the accessor function for this path
-		const accessor = impl.createDynamicAccessor(path) as object;
-
-		// Return a proxy that can be both called and accessed
-		return new Proxy(accessor, {
-			get(target, prop) {
-				const key = prop as string;
-
-				// Handle promise methods for thenable interface
-				if (key === "then" || key === "catch" || key === "finally") {
-					return undefined; // Let it be treated as non-thenable until called
-				}
-
-				// Skip symbol properties
-				if (typeof prop === "symbol") return Reflect.get(target, prop);
-
-				// For any property access, create nested path
-				const nestedPath = `${path}.${key}`;
-				return createCallableProxy(nestedPath);
-			},
-			apply(target, thisArg, args) {
-				// When called as a function, execute the accessor
-				return Reflect.apply(target as (...args: unknown[]) => unknown, thisArg, args);
-			},
-		});
-	}
-
-	// Create proxy with support for both flat and nested namespaces
-	const client = new Proxy(
-		{},
-		{
+		const handler: ProxyHandler<() => void> = {
 			get(_target, prop) {
+				if (typeof prop === "symbol") return undefined;
 				const key = prop as string;
 
-				// Built-in properties
 				if (key === "$store") return impl.$store;
-				if (key === "$queryNames") return () => impl.$queryNames();
-				if (key === "$mutationNames") return () => impl.$mutationNames();
+				if (key.startsWith("_")) return undefined;
 
-				// Skip symbol properties and internals
-				if (typeof prop === "symbol" || key.startsWith("_")) return undefined;
-
-				// If we have runtime info, use it (flat mode)
-				if (hasRuntimeInfo) {
-					if (queryNames.has(key)) {
-						return impl.createQueryAccessor(key);
-					}
-					if (mutationNames.has(key)) {
-						return impl.createMutationAccessor(key);
-					}
-					return undefined;
-				}
-
-				// Type-only mode: create callable proxy for nested access
-				// This supports both flat (client.getUser) and nested (client.user.get)
-				return createCallableProxy(key);
+				const path = prefix ? `${prefix}.${key}` : key;
+				return createNestedProxy(path);
 			},
-		},
-	);
+			apply(_target, _thisArg, args: unknown[]) {
+				const accessor = impl.createAccessor(prefix);
+				return accessor(args[0]);
+			},
+		};
+		return new Proxy(() => {}, handler);
+	}
 
-	return client as any;
+	return createNestedProxy("") as RouterLensClient<
+		TApi extends RouterApiShape<infer R> ? R : never
+	>;
 }
+
+// Re-export types
+export type { Transport, Operation, Result, Metadata } from "../transport/types";
+export type { Plugin } from "../transport/plugin";

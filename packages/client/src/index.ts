@@ -2,40 +2,49 @@
  * @sylphx/lens-client
  *
  * Reactive client for Lens API framework.
- * Transport system, plugins, signals, and store for real-time data access.
+ * Transport + Plugin architecture for clean, extensible design.
  */
 
 // =============================================================================
-// Transport System
+// Client
 // =============================================================================
 
 export {
-	// Core types
+	// Factory
+	createClient,
+	// Types
+	type LensClientConfig,
+	type LensClient,
+	type QueryResult,
+	type MutationResult,
+	type SelectionObject,
+	type SelectedType,
+	type RouterApiShape,
+	type RouterLensClient,
+	type InferRouterClientType,
+	type QueriesMap,
+	type MutationsMap,
+	type InferInput,
+	type InferOutput,
+} from "./client/create";
+
+// =============================================================================
+// Transport
+// =============================================================================
+
+export {
+	// Types
 	type Transport,
 	type Operation,
 	type Result,
 	type Metadata,
 	type OperationMeta,
 	type OptimisticDSL,
-	// Observable types
 	type Observable,
 	type Observer,
 	type Unsubscribable,
-	// Route types
 	type RouteCondition,
 	type RouteEntry,
-	// Plugins
-	type Plugin,
-	logger,
-	type LoggerPluginOptions,
-	auth,
-	type AuthPluginOptions,
-	retry,
-	type RetryPluginOptions,
-	cache,
-	type CachePluginOptions,
-	timeout,
-	type TimeoutPluginOptions,
 	// Transports
 	http,
 	type HttpTransportOptions,
@@ -46,7 +55,7 @@ export {
 	inProcess,
 	type InProcessTransportOptions,
 	type LensServerInterface,
-	// Route transports
+	// Route
 	route,
 	routeByType,
 	type RouteByTypeConfig,
@@ -55,7 +64,27 @@ export {
 } from "./transport";
 
 // =============================================================================
-// Signals (powered by @preact/signals-core)
+// Plugins
+// =============================================================================
+
+export {
+	// Types
+	type Plugin,
+	// Built-in plugins
+	logger,
+	type LoggerPluginOptions,
+	auth,
+	type AuthPluginOptions,
+	retry,
+	type RetryPluginOptions,
+	cache,
+	type CachePluginOptions,
+	timeout,
+	type TimeoutPluginOptions,
+} from "./transport";
+
+// =============================================================================
+// Signals
 // =============================================================================
 
 export {
@@ -64,50 +93,25 @@ export {
 	type WritableSignal,
 	type Subscriber,
 	type Unsubscribe,
-	// Factory functions
+	// Functions
 	signal,
 	computed,
 	effect,
 	batch,
-	// Utilities
 	isSignal,
 	toPromise,
 	derive,
 } from "./signals/signal";
 
 // =============================================================================
-// Reactive Store
+// Store
 // =============================================================================
 
 export {
-	// Class
 	ReactiveStore,
-	// Factory
 	createStore,
-	// Types
 	type EntityKey,
 	type EntityState,
 	type OptimisticEntry as StoreOptimisticEntry,
 	type StoreConfig,
 } from "./store/reactive-store";
-
-// =============================================================================
-// Client (Primary API)
-// =============================================================================
-
-export {
-	// Factory (recommended)
-	createClient,
-	// Types
-	type LensClient,
-	type LensClientConfig,
-	type LensClientConfig as ClientConfig, // Alias for compatibility
-	type QueryResult,
-	type MutationResult,
-	type SelectionObject,
-	type QueriesMap,
-	type MutationsMap,
-	type InferInput,
-	type InferOutput,
-	type OperationContext,
-} from "./client/create";
