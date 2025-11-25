@@ -1,0 +1,52 @@
+{
+	"name": "@sylphx/lens",
+	"version": "0.1.0",
+	"description": "Type-safe, real-time API framework - GraphQL concepts in TypeScript with zero codegen",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./client": {
+			"import": "./dist/client.js",
+			"types": "./dist/client.d.ts"
+		},
+		"./server": {
+			"import": "./dist/server.js",
+			"types": "./dist/server.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bun build ./src/index.ts ./src/client.ts ./src/server.ts --outdir ./dist --target node && bun run build:types",
+		"build:types": "tsc --emitDeclarationOnly --outDir ./dist",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"api",
+		"graphql",
+		"trpc",
+		"typescript",
+		"type-safe",
+		"real-time",
+		"reactive"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-core": "workspace:*",
+		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/lens-server": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	}
+}

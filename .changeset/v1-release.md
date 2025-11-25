@@ -1,4 +1,5 @@
 ---
+"@sylphx/lens": major
 "@sylphx/lens-core": major
 "@sylphx/lens-client": major
 "@sylphx/lens-server": major
