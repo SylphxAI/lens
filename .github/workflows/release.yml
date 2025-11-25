@@ -11,9 +11,7 @@ jobs:
   release:
     uses: SylphxAI/.github/.github/workflows/publish-npm.yml@main
     with:
-      build_command: bun run build
-      test_command: bun test
-      version_command: bun run version
-      publish_command: bun run release
+      build-command: bun run build
+      test-command: bun run test
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -9,15 +9,15 @@
 	],
 	"scripts": {
 		"build": "bun run --filter '*' build",
-		"test": "cd packages/core && bun test && cd ../client && bun test && cd ../server && bun test && cd ../react && bun test",
+		"test": "bun run --filter '*' test",
 		"test:watch": "bun test --watch",
 		"lint": "biome check .",
 		"lint:fix": "biome check --fix .",
 		"format": "biome format --write .",
 		"typecheck": "bun run --filter '*' typecheck",
 		"changeset": "changeset",
-		"version": "changeset version",
-		"release": "bun run build && changeset publish"
+		"version-packages": "changeset version",
+		"release": "changeset publish"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
