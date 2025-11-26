@@ -165,6 +165,18 @@ class ClientImpl {
 		this.transport = config.transport;
 		this.plugins = config.plugins ?? [];
 		this.optimistic = config.optimistic ?? true;
+
+		// Start handshake immediately (eager, but don't block)
+		// Errors are caught - will retry on first operation if needed
+		this.connectPromise = this.transport.connect();
+		this.connectPromise
+			.then((metadata) => {
+				this.metadata = metadata;
+			})
+			.catch(() => {
+				// Connection failed - will retry on first operation
+				this.connectPromise = null;
+			});
 	}
 
 	/**
@@ -579,45 +591,93 @@ class ClientImpl {
 
 	createAccessor(path: string): (input?: unknown) => unknown {
 		const accessor = (input?: unknown) => {
-			// Check metadata first if available (after first connection)
-			const meta = this.getOperationMeta(path);
-			if (meta) {
-				if (meta.type === "mutation") {
-					return this.executeMutation(path, input);
-				}
-				return this.executeQuery(path, input);
+			// Return a deferred result that waits for metadata before deciding query vs mutation.
+			// This allows sync return while deferring the actual execution.
+			const key = this.makeQueryKey(path, input);
+
+			// Get or create subscription state for queries
+			if (!this.subscriptions.has(key)) {
+				this.subscriptions.set(key, {
+					data: null,
+					callbacks: new Set(),
+				});
 			}
+			const sub = this.subscriptions.get(key)!;
 
-			// No metadata yet (lazy connection) - use pattern detection as fallback.
-			// Query patterns are more predictable than mutation patterns, so we
-			// detect queries and default to mutation for everything else.
-			// This ensures custom mutations like "publish", "archive", etc. work correctly.
-			const lastSegment = path.split(".").pop() ?? path;
-			const isQueryPath =
-				lastSegment === "get" ||
-				lastSegment === "list" ||
-				lastSegment === "find" ||
-				lastSegment === "search" ||
-				lastSegment === "count" ||
-				lastSegment === "exists" ||
-				lastSegment.startsWith("get") ||
-				lastSegment.startsWith("list") ||
-				lastSegment.startsWith("find") ||
-				lastSegment.startsWith("by") ||
-				lastSegment.startsWith("search");
+			const result = {
+				// Current cached value (null until loaded)
+				get value() {
+					return sub.data;
+				},
 
-			if (isQueryPath) {
-				return this.executeQuery(path, input);
-			}
+				// Subscribe to updates - defers until metadata is ready
+				subscribe: (callback?: (data: unknown) => void) => {
+					if (callback) {
+						const wrapped = (data: unknown) => callback(data);
+						sub.callbacks.add(wrapped);
 
-			return this.executeMutation(path, input);
-		};
+						// If data available, call immediately
+						if (sub.data !== null) {
+							callback(sub.data);
+						}
+					}
 
-		// Add subscribe method
-		(accessor as unknown as Record<string, unknown>).subscribe = (
-			callback?: (data: unknown) => void,
-		) => {
-			return this.executeQuery(path, undefined).subscribe(callback);
+					// Ensure connected and start subscription
+					this.ensureConnected().then(() => {
+						const meta = this.getOperationMeta(path);
+						if (meta?.type === "mutation") {
+							console.warn(`subscribe() called on mutation: ${path}`);
+							return;
+						}
+						// Start query subscription
+						if (!sub.unsubscribe) {
+							this.startSubscription(path, input, key);
+						}
+					});
+
+					return () => {
+						if (callback) {
+							sub.callbacks.delete(callback as (data: unknown) => void);
+						}
+						if (sub.callbacks.size === 0 && sub.unsubscribe) {
+							sub.unsubscribe();
+							sub.unsubscribe = undefined;
+						}
+					};
+				},
+
+				// Thenable - allows await, defers decision until metadata ready
+				then: async <TResult1 = unknown, TResult2 = never>(
+					onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+					onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+				): Promise<TResult1 | TResult2> => {
+					try {
+						// Wait for metadata
+						await this.ensureConnected();
+						const meta = this.getOperationMeta(path);
+
+						if (meta?.type === "mutation") {
+							// Execute as mutation
+							const mutationResult = await this.executeMutation(path, input);
+							return onfulfilled
+								? onfulfilled(mutationResult)
+								: (mutationResult as unknown as TResult1);
+						}
+
+						// Execute as query
+						const queryResult = this.executeQuery(path, input);
+						const data = await queryResult;
+						return onfulfilled ? onfulfilled(data) : (data as unknown as TResult1);
+					} catch (error) {
+						if (onrejected) {
+							return onrejected(error);
+						}
+						throw error;
+					}
+				},
+			};
+
+			return result;
 		};
 
 		return accessor;
@@ -629,7 +689,10 @@ class ClientImpl {
 // =============================================================================
 
 /**
- * Create Lens client (sync - connection is lazy)
+ * Create Lens client (sync return, eager handshake)
+ *
+ * Connection starts immediately in background. First operation waits
+ * for handshake to complete, then uses metadata to determine operation type.
  *
  * @example
  * ```typescript
@@ -641,7 +704,7 @@ class ClientImpl {
  *   plugins: [logger(), auth({ getToken: () => token })],
  * });
  *
- * // Connection happens on first operation
+ * // First operation waits for handshake, then executes
  * const user = await client.user.get({ id: '123' });
  * await client.user.update({ id: '123', name: 'New Name' });
  * ```

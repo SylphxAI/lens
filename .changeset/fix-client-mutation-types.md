@@ -3,18 +3,21 @@
 "@sylphx/lens-client": patch
 ---
 
-fix(client): correct mutation detection and type inference
+fix(client): correct mutation detection with eager handshake
 
-Three fixes for client-side mutation handling:
+Architectural improvement for operation type detection:
 
-1. **InferRouterClient type mismatch**: Updated `InferRouterClient` in core to correctly type:
-   - Queries return `QueryResultType<TOutput>` (thenable with reactive features)
-   - Mutations return `Promise<MutationResultType<TOutput>>` (with `data` and optional `rollback`)
+1. **Eager handshake**: Connection starts immediately in constructor (non-blocking).
+   First operation waits for handshake to complete, then uses server metadata
+   to determine operation type. No more pattern matching guesswork.
 
-2. **Nested metadata lookup**: Fixed `getOperationMeta()` to navigate nested operations structure
-   (e.g., `"post.publish"` → `metadata.operations.post.publish`)
+2. **Deferred execution**: `createAccessor` returns a unified result object that
+   defers the query/mutation decision until metadata is available. Both `.then()`
+   and `.subscribe()` wait for metadata internally.
 
-3. **Mutation path detection**: Changed from mutation pattern matching to query pattern matching.
-   Query patterns are more predictable (`get`, `list`, `find`, `by*`, `search`, etc.), so we
-   detect queries and default to mutation for everything else. This correctly handles custom
-   mutations like `publish`, `archive`, `enable`, etc.
+3. **InferRouterClient types**: Updated to correctly return:
+   - Queries: `QueryResultType<TOutput>` (thenable with `.subscribe()`, `.value`)
+   - Mutations: `Promise<MutationResultType<TOutput>>` (with `data` and `rollback`)
+
+4. **Nested metadata lookup**: Fixed `getOperationMeta()` to navigate nested
+   operations structure (e.g., `"post.publish"` → `metadata.operations.post.publish`)
