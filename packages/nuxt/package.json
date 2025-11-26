@@ -1,0 +1,44 @@
+{
+	"name": "@sylphx/lens-nuxt",
+	"version": "1.0.0",
+	"description": "Nuxt 3 integration for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external vue --external nuxt --external @sylphx/lens-vue --external @sylphx/lens-client && tsc --emitDeclarationOnly --declaration --outDir ./dist",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"nuxt",
+		"vue",
+		"ssr"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/lens-vue": "workspace:*"
+	},
+	"peerDependencies": {
+		"nuxt": ">=3.0.0",
+		"vue": ">=3.0.0"
+	},
+	"devDependencies": {
+		"nuxt": "^3.17.4",
+		"typescript": "^5.9.3",
+		"vue": "^3.5.16"
+	}
+}

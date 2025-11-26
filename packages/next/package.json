@@ -1,0 +1,51 @@
+{
+	"name": "@sylphx/lens-next",
+	"version": "1.0.0",
+	"description": "Next.js integration for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./server": {
+			"import": "./dist/server.js",
+			"types": "./dist/server.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bun build ./src/index.ts ./src/server.ts ./src/hydration.tsx --outdir ./dist --target browser --external react --external next --external @sylphx/lens-react --external @sylphx/lens-client --external @sylphx/lens-server && tsc --emitDeclarationOnly --declaration --outDir ./dist",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"next",
+		"nextjs",
+		"react",
+		"ssr"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/lens-react": "workspace:*",
+		"@sylphx/lens-server": "workspace:*"
+	},
+	"peerDependencies": {
+		"next": ">=13.0.0",
+		"react": ">=18.0.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.1.6",
+		"next": "^15.3.3",
+		"react": "^19.1.0",
+		"typescript": "^5.9.3"
+	}
+}

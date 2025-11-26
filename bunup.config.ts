@@ -29,10 +29,12 @@ export default defineWorkspace([
 		name: "svelte",
 		root: "packages/svelte",
 	},
-	// Preact and Solid packages excluded due to bunup v0.16.10 bug with JSX/TSX files
-	// They use bun build + tsc in package.json instead
-	// {
-	// 	name: "solid",
-	// 	root: "packages/solid",
-	// },
+	// JSX packages excluded due to bunup v0.16.10 bug with JSX/TSX files
+	// They use bun build + tsc in package.json instead:
+	// - packages/solid (Solid.js primitives)
+	// - packages/preact (Preact hooks & signals)
+	// - packages/solidstart (SolidStart integration)
+	// - packages/fresh (Fresh/Deno integration)
+	// - packages/next (Next.js integration)
+	// - packages/nuxt (Nuxt integration)
 ]);
