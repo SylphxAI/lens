@@ -14,7 +14,7 @@ import { getContext, setContext } from "svelte";
 /**
  * Context key for Lens client
  */
-export const LENS_CLIENT_KEY = Symbol("lens-client");
+export const LENS_CLIENT_KEY: unique symbol = Symbol("lens-client");
 
 /**
  * Provide Lens client to component tree via Svelte context.
@@ -71,6 +71,6 @@ export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 
 // Legacy aliases for backwards compatibility
 /** @deprecated Use provideLensClient instead */
-export const setLensClient = provideLensClient;
+export const setLensClient: typeof provideLensClient = provideLensClient;
 /** @deprecated Use useLensClient instead */
-export const getLensClient = useLensClient;
+export const getLensClient: typeof useLensClient = useLensClient;

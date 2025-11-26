@@ -35,6 +35,14 @@ export interface HttpTransportOptions {
 // =============================================================================
 
 /**
+ * HTTP transport function with server method
+ */
+export interface HttpTransport {
+	(options: HttpTransportOptions): Transport;
+	server(options: HttpServerTransportOptions): ServerTransport;
+}
+
+/**
  * Create HTTP transport.
  *
  * Handles:
@@ -49,7 +57,7 @@ export interface HttpTransportOptions {
  * })
  * ```
  */
-export function http(options: HttpTransportOptions): Transport {
+export const http: HttpTransport = function http(options: HttpTransportOptions): Transport {
 	const { url, headers: defaultHeaders = {}, fetch: fetchImpl = fetch, polling = {} } = options;
 
 	const { interval: pollInterval = 1000, maxRetries = 3 } = polling;

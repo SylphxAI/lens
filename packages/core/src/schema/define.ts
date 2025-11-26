@@ -71,7 +71,7 @@ function extractFieldName<T>(accessor: (entity: T) => unknown): string {
 // =============================================================================
 
 /** Symbol to identify entity definitions */
-const ENTITY_SYMBOL = Symbol("lens:entity");
+const ENTITY_SYMBOL: unique symbol = Symbol("lens:entity");
 
 /** Entity definition with name and fields */
 export interface EntityDef<
@@ -190,7 +190,7 @@ function createEntityDef<Name extends string, Fields extends EntityDefinition>(
  * export const entities = { User };  // "User" becomes the entity name
  * ```
  */
-export const entity = defineEntity;
+export const entity: typeof defineEntity = defineEntity;
 
 /** Check if value is an EntityDef */
 export function isEntityDef(value: unknown): value is EntityDef<string, EntityDefinition> {

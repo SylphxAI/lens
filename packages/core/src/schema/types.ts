@@ -550,61 +550,63 @@ export class BelongsToType<Target extends string> extends FieldType<RelationBran
  */
 export const t = {
 	/** Primary key (string UUID/CUID) */
-	id: () => new IdType(),
+	id: (): IdType => new IdType(),
 
 	/** Text field */
-	string: () => new StringType(),
+	string: (): StringType => new StringType(),
 
 	/** Integer number */
-	int: () => new IntType(),
+	int: (): IntType => new IntType(),
 
 	/** Floating point number */
-	float: () => new FloatType(),
+	float: (): FloatType => new FloatType(),
 
 	/** Boolean value */
-	boolean: () => new BooleanType(),
+	boolean: (): BooleanType => new BooleanType(),
 
 	/** Date/time value (auto-serialized as ISO string) */
-	datetime: () => new DateTimeType(),
+	datetime: (): DateTimeType => new DateTimeType(),
 
 	/** Date only, no time (serialized as YYYY-MM-DD) */
-	date: () => new DateType(),
+	date: (): DateType => new DateType(),
 
 	/** Decimal/currency value (auto-serialized as string for precision) */
-	decimal: () => new DecimalType(),
+	decimal: (): DecimalType => new DecimalType(),
 
 	/** BigInt value (auto-serialized as string for precision) */
-	bigint: () => new BigIntType(),
+	bigint: (): BigIntType => new BigIntType(),
 
 	/** Binary data (auto-serialized as base64 string) */
-	bytes: () => new BytesType(),
+	bytes: (): BytesType => new BytesType(),
 
 	/** Arbitrary JSON data (schemaless, typed as unknown) */
-	json: () => new JsonType(),
+	json: (): JsonType => new JsonType(),
 
 	/** Enum with specific values */
-	enum: <const T extends readonly string[]>(values: T) => new EnumType(values),
+	enum: <const T extends readonly string[]>(values: T): EnumType<T[number]> =>
+		new EnumType(values),
 
 	/** Typed object/JSON */
-	object: <T>() => new ObjectType<T>(),
+	object: <T>(): ObjectType<T> => new ObjectType<T>(),
 
 	/** Array of a type */
-	array: <T>(itemType: FieldType<T>) => new ArrayType(itemType),
+	array: <T>(itemType: FieldType<T>): ArrayType<T> => new ArrayType(itemType),
 
 	/** Custom type with user-defined serialization (use defineType() to create) */
-	custom: <T, SerializedT = T>(definition: CustomTypeDefinition<T, SerializedT>) =>
-		new CustomType(definition),
+	custom: <T, SerializedT = T>(
+		definition: CustomTypeDefinition<T, SerializedT>,
+	): CustomType<T, SerializedT> => new CustomType(definition),
 
 	// Relations
 
 	/** One-to-one relation (owns) */
-	hasOne: <T extends string>(target: T) => new HasOneType(target),
+	hasOne: <T extends string>(target: T): HasOneType<T> => new HasOneType(target),
 
 	/** One-to-many relation */
-	hasMany: <T extends string>(target: T) => new HasManyType(target),
+	hasMany: <T extends string>(target: T): HasManyType<T> => new HasManyType(target),
 
 	/** Many-to-one relation (foreign key) */
-	belongsTo: <T extends string>(target: T) => new BelongsToType(target),
+	belongsTo: <T extends string>(target: T): BelongsToType<T> => new BelongsToType(target),
 } as const;
 
 // =============================================================================

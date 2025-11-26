@@ -45,6 +45,14 @@ interface WsMessage {
 // =============================================================================
 
 /**
+ * WebSocket transport function with server method
+ */
+export interface WsTransport {
+	(options: WsTransportOptions): Transport;
+	server(options: WsServerTransportOptions): ServerTransport;
+}
+
+/**
  * Create WebSocket transport.
  *
  * Handles:
@@ -59,7 +67,7 @@ interface WsMessage {
  * })
  * ```
  */
-export function ws(options: WsTransportOptions): Transport {
+export const ws: WsTransport = function ws(options: WsTransportOptions): Transport {
 	const { url, reconnect = {}, timeout = 10000 } = options;
 
 	const {
