@@ -252,7 +252,10 @@ export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown> 
 	_name?: string;
 	_input?: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
-	_resolve?: ResolverFn<TInput, TOutput, any>;
+	/** Method syntax for bivariance - allows flexible context types */
+	_resolve?(
+		ctx: ResolverContext<TInput, TOutput, TContext>,
+	): TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;
 }
 
 /** Query builder - fluent interface */
@@ -351,7 +354,10 @@ export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unk
 	 * - Function: Legacy, requires runtime import
 	 */
 	_optimistic?: OptimisticDSL | OptimisticFn<TInput, TOutput>;
-	_resolve: ResolverFn<TInput, TOutput, any>;
+	/** Method syntax for bivariance - allows flexible context types */
+	_resolve(
+		ctx: ResolverContext<TInput, TOutput, TContext>,
+	): TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;
 }
 
 /** Mutation builder - fluent interface */
