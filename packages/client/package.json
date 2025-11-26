@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-client",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Reactive client for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -16,8 +16,17 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "client", "reactive", "transport", "plugins"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"client",
+		"reactive",
+		"transport",
+		"plugins"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
