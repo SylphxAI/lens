@@ -120,7 +120,10 @@ function resolveQuery<T>(input: QueryInput<T>): QueryResult<T> | null | undefine
  * }
  * ```
  */
-export function useQuery<T>(queryInput: QueryInput<T>, options?: UseQueryOptions): UseQueryResult<T> {
+export function useQuery<T>(
+	queryInput: QueryInput<T>,
+	options?: UseQueryOptions,
+): UseQueryResult<T> {
 	// Resolve query (handles accessor functions)
 	const query = useMemo(() => resolveQuery(queryInput), [queryInput]);
 

@@ -36,9 +36,9 @@
  * ```
  */
 
+import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
-import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import { createSignal, createResource, type Accessor } from "solid-js";
+import { type Accessor, createResource, createSignal } from "solid-js";
 
 // =============================================================================
 // Types
@@ -76,7 +76,9 @@ export interface LensSolidStartInstance<TClient> {
 
 	/** Create a mutation */
 	createMutation: <TInput, TOutput>(
-		mutationFn: (client: TClient) => (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>,
+		mutationFn: (
+			client: TClient,
+		) => (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>,
 	) => {
 		mutate: (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>;
 		data: Accessor<TOutput | null>;
@@ -87,7 +89,10 @@ export interface LensSolidStartInstance<TClient> {
 
 	/** Create a server-side query (for route data) */
 	serverQuery: <TArgs extends unknown[], TResult>(
-		queryFn: (client: TClient, ...args: TArgs) => import("@sylphx/lens-client").QueryResult<TResult>,
+		queryFn: (
+			client: TClient,
+			...args: TArgs
+		) => import("@sylphx/lens-client").QueryResult<TResult>,
 	) => (...args: TArgs) => Promise<TResult>;
 }
 
@@ -227,7 +232,11 @@ async function handleQuery(server: LensServer, path: string, url: URL): Promise<
 	}
 }
 
-async function handleMutation(server: LensServer, path: string, request: Request): Promise<Response> {
+async function handleMutation(
+	server: LensServer,
+	path: string,
+	request: Request,
+): Promise<Response> {
 	try {
 		const body = await request.json();
 		const input = body.input;
@@ -297,7 +306,7 @@ function handleSSE(server: LensServer, path: string, url: URL): Response {
 // Solid Primitives
 // =============================================================================
 
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
 
 function createCreateQuery<TClient>(getClient: () => TClient) {
 	return function createQuery<T>(

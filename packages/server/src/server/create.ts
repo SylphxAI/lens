@@ -10,7 +10,6 @@
 
 import {
 	type ContextValue,
-	type Emit,
 	type EmitCommand,
 	type EntityDef,
 	type EntityDefinition,
@@ -679,7 +678,10 @@ class LensServerImpl<
 				const entityName = this.getEntityNameFromOutput(queryDef._output);
 				if (entityName) {
 					// For entity-typed outputs, use GraphStateManager
-					const entities = this.extractEntities(entityName, command.type === "full" ? command.data : {});
+					const entities = this.extractEntities(
+						entityName,
+						command.type === "full" ? command.data : {},
+					);
 					for (const { entity, id } of entities) {
 						this.stateManager.processCommand(entity, id, command);
 					}
@@ -1630,5 +1632,7 @@ export function createServer<
 ): LensServer & { _types: { queries: Q; mutations: M; context: TContext } } {
 	const server = new LensServerImpl(config) as LensServerImpl<Q, M, TContext>;
 	// Attach type marker for inference (stripped at runtime)
-	return server as unknown as LensServer & { _types: { queries: Q; mutations: M; context: TContext } };
+	return server as unknown as LensServer & {
+		_types: { queries: Q; mutations: M; context: TContext };
+	};
 }

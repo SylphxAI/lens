@@ -29,9 +29,9 @@
  * ```
  */
 
+import type { Emit } from "../emit/index";
 import type { EntityDef } from "../schema/define";
 import type { EntityDefinition } from "../schema/types";
-import type { Emit } from "../emit/index";
 
 // =============================================================================
 // Type Definitions
@@ -65,7 +65,11 @@ export type InferReturnType<R extends ReturnSpec> = R extends ZodLikeSchema<infe
 		: R extends [EntityDef<string, infer F>]
 			? { [K in keyof F]: unknown }[]
 			: R extends Record<string, unknown>
-				? { [K in keyof R]: R[K] extends [EntityDef<string, EntityDefinition>] ? unknown[] : unknown }
+				? {
+						[K in keyof R]: R[K] extends [EntityDef<string, EntityDefinition>]
+							? unknown[]
+							: unknown;
+					}
 				: never;
 
 /**
@@ -248,7 +252,6 @@ export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown> 
 	_name?: string;
 	_input?: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
-	// biome-ignore lint/suspicious/noExplicitAny: Context type is erased at runtime
 	_resolve?: ResolverFn<TInput, TOutput, any>;
 }
 
@@ -348,7 +351,6 @@ export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unk
 	 * - Function: Legacy, requires runtime import
 	 */
 	_optimistic?: OptimisticDSL | OptimisticFn<TInput, TOutput>;
-	// biome-ignore lint/suspicious/noExplicitAny: Context type is erased at runtime
 	_resolve: ResolverFn<TInput, TOutput, any>;
 }
 
@@ -361,7 +363,9 @@ export interface MutationBuilder<TInput = unknown, TOutput = unknown, TContext =
 /** Mutation builder after input is defined */
 export interface MutationBuilderWithInput<TInput, TOutput = unknown, TContext = unknown> {
 	/** Define return type (optional - for entity outputs) */
-	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>, TContext>;
+	returns<R extends ReturnSpec>(
+		spec: R,
+	): MutationBuilderWithReturns<TInput, InferReturnType<R>, TContext>;
 
 	/**
 	 * Define resolver function directly (without .returns())
@@ -432,7 +436,9 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 		return builder;
 	}
 
-	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>, TContext> {
+	returns<R extends ReturnSpec>(
+		spec: R,
+	): MutationBuilderWithReturns<TInput, InferReturnType<R>, TContext> {
 		const builder = new MutationBuilderImpl<TInput, InferReturnType<R>, TContext>(this._name);
 		builder._inputSchema = this._inputSchema as ZodLikeSchema<TInput> | undefined;
 		builder._outputSpec = spec;
@@ -491,8 +497,12 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
  * ```
  */
 export function mutation<TContext = unknown>(): MutationBuilder<unknown, unknown, TContext>;
-export function mutation<TContext = unknown>(name: string): MutationBuilder<unknown, unknown, TContext>;
-export function mutation<TContext = unknown>(name?: string): MutationBuilder<unknown, unknown, TContext> {
+export function mutation<TContext = unknown>(
+	name: string,
+): MutationBuilder<unknown, unknown, TContext>;
+export function mutation<TContext = unknown>(
+	name?: string,
+): MutationBuilder<unknown, unknown, TContext> {
 	return new MutationBuilderImpl<unknown, unknown, TContext>(name);
 }
 
@@ -556,7 +566,9 @@ export function isOperationDef(value: unknown): value is QueryDef | MutationDef 
 // =============================================================================
 
 /** Any procedure (query or mutation) */
-export type AnyProcedure = QueryDef<unknown, unknown, unknown> | MutationDef<unknown, unknown, unknown>;
+export type AnyProcedure =
+	| QueryDef<unknown, unknown, unknown>
+	| MutationDef<unknown, unknown, unknown>;
 
 /** Router routes - can contain procedures or nested routers */
 export type RouterRoutes = {
@@ -575,7 +587,9 @@ export interface RouterDef<TRoutes extends RouterRoutes = RouterRoutes, TContext
  * Convert union type to intersection type
  * { a: 1 } | { b: 2 } => { a: 1 } & { b: 2 } => { a: 1; b: 2 }
  */
-type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (x: infer I) => void
+type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (
+	x: infer I,
+) => void
 	? I
 	: never;
 

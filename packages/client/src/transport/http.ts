@@ -110,7 +110,7 @@ export const http: HttpTransport = function http(options: HttpTransportOptions):
 			});
 		},
 	};
-}
+};
 
 // =============================================================================
 // Internal Helpers

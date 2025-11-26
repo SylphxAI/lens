@@ -10,13 +10,13 @@
  */
 
 import {
-	type EntityKey,
-	type Update,
-	type EmitCommand,
-	type InternalFieldUpdate,
 	type ArrayOperation,
-	createUpdate,
+	type EmitCommand,
+	type EntityKey,
+	type InternalFieldUpdate,
+	type Update,
 	applyUpdate,
+	createUpdate,
 	makeEntityKey,
 } from "@sylphx/lens-core";
 

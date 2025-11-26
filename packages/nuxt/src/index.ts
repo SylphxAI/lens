@@ -33,9 +33,9 @@
  * ```
  */
 
+import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
-import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import { ref, computed, type ComputedRef } from "vue";
+import { type ComputedRef, computed, ref } from "vue";
 
 // =============================================================================
 // Types
@@ -57,7 +57,11 @@ export interface LensNuxtConfig {
 
 export interface LensNuxtInstance<TClient> {
 	/** Event handler for Nuxt server routes */
-	handler: (event: { node: { req: Request; res: any }; method: string; path: string }) => Promise<any>;
+	handler: (event: {
+		node: { req: Request; res: any };
+		method: string;
+		path: string;
+	}) => Promise<any>;
 
 	/** Typed client for client-side usage */
 	client: TClient;
@@ -82,7 +86,9 @@ export interface LensNuxtInstance<TClient> {
 
 	/** SSR-safe mutation composable */
 	useMutation: <TInput, TOutput>(
-		mutationFn: (client: TClient) => (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>,
+		mutationFn: (
+			client: TClient,
+		) => (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>,
 	) => {
 		data: ComputedRef<TOutput | null>;
 		pending: ComputedRef<boolean>;
@@ -263,7 +269,7 @@ async function handleMutation(
 // Vue Composables
 // =============================================================================
 
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
 
 function createUseQuery<TClient>(getClient: () => TClient) {
 	return async function useQuery<T>(

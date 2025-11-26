@@ -3,11 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import {
-	createLensNuxt,
-	type CreateLensNuxtOptions,
-	type LensNuxtInstance,
-} from "./index";
+import { createLensNuxt } from "./index";
 
 // Mock server for testing
 const createMockServer = () => ({
@@ -84,8 +80,9 @@ describe("useMutation composable factory", () => {
 		const server = createMockServer();
 		const lens = createLensNuxt({ server: server as any });
 
-		const mutation = lens.useMutation((client) => (input: { id: string }) =>
-			Promise.resolve({ data: { id: input.id, name: "Created" } }),
+		const mutation = lens.useMutation(
+			(client) => (input: { id: string }) =>
+				Promise.resolve({ data: { id: input.id, name: "Created" } }),
 		);
 
 		expect(mutation.mutate).toBeDefined();
@@ -101,8 +98,9 @@ describe("useMutation composable factory", () => {
 		const server = createMockServer();
 		const lens = createLensNuxt({ server: server as any });
 
-		const mutation = lens.useMutation((client) => (input: { id: string }) =>
-			Promise.resolve({ data: { id: input.id, name: "Created" } }),
+		const mutation = lens.useMutation(
+			(client) => (input: { id: string }) =>
+				Promise.resolve({ data: { id: input.id, name: "Created" } }),
 		);
 
 		expect(mutation.data.value).toBe(null);
@@ -114,8 +112,9 @@ describe("useMutation composable factory", () => {
 		const server = createMockServer();
 		const lens = createLensNuxt({ server: server as any });
 
-		const mutation = lens.useMutation((client) => (input: { id: string }) =>
-			Promise.resolve({ data: { id: input.id, name: "Created" } }),
+		const mutation = lens.useMutation(
+			(client) => (input: { id: string }) =>
+				Promise.resolve({ data: { id: input.id, name: "Created" } }),
 		);
 
 		mutation.reset();

@@ -61,8 +61,8 @@
  * ```
  */
 
+import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
-import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
 import type { ReactNode } from "react";
 
 // =============================================================================
@@ -108,9 +108,7 @@ export interface LensNextInstance<TClient> {
 	};
 
 	/** Hook: Lazy query (execute on demand) */
-	useLazyQuery: <T>(
-		queryFn: (client: TClient) => import("@sylphx/lens-client").QueryResult<T>,
-	) => {
+	useLazyQuery: <T>(queryFn: (client: TClient) => import("@sylphx/lens-client").QueryResult<T>) => {
 		data: T | null;
 		loading: boolean;
 		error: Error | null;
@@ -267,7 +265,11 @@ async function handleQuery(server: LensServer, path: string, url: URL): Promise<
 	}
 }
 
-async function handleMutation(server: LensServer, path: string, request: Request): Promise<Response> {
+async function handleMutation(
+	server: LensServer,
+	path: string,
+	request: Request,
+): Promise<Response> {
 	try {
 		const body = await request.json();
 		const input = body.input;
@@ -339,8 +341,8 @@ function handleSSE(server: LensServer, path: string, url: URL): Response {
 // React Hooks (Inline Implementation)
 // =============================================================================
 
-import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 // Context for client
 const LensClientContext = createContext<unknown>(null);

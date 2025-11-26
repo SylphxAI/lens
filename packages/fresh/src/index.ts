@@ -51,8 +51,8 @@
  * ```
  */
 
+import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
-import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
 
 // =============================================================================
 // Types
@@ -110,7 +110,9 @@ export interface LensFreshInstance<TClient> {
 
 	/** Mutation hook for islands */
 	useMutation: <TInput, TOutput>(
-		mutationFn: (client: TClient) => (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>,
+		mutationFn: (
+			client: TClient,
+		) => (input: TInput) => Promise<import("@sylphx/lens-client").MutationResult<TOutput>>,
 	) => {
 		data: TOutput | null;
 		loading: boolean;
@@ -345,8 +347,8 @@ function handleSSE(server: LensServer, path: string, req: Request): Response {
 // Preact Hooks
 // =============================================================================
 
-import { useState, useEffect, useCallback, useRef } from "preact/hooks";
-import type { QueryResult, MutationResult } from "@sylphx/lens-client";
+import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 function createUseIslandQuery<TClient>(
 	client: TClient,
@@ -369,6 +371,7 @@ function createUseIslandQuery<TClient>(
 
 		const mountedRef = useRef(true);
 
+		// biome-ignore lint/correctness/useExhaustiveDependencies: client and queryFn are stable references from closure
 		useEffect(() => {
 			mountedRef.current = true;
 
@@ -412,6 +415,7 @@ function createUseIslandQuery<TClient>(
 			};
 		}, [options?.skip, initialData]);
 
+		// biome-ignore lint/correctness/useExhaustiveDependencies: client and queryFn are stable references from closure
 		const refetch = useCallback(() => {
 			if (options?.skip) return;
 

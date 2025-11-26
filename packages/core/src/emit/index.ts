@@ -377,10 +377,7 @@ export function createEmitArray<T extends readonly unknown[]>(
  * @param isArray - Whether the output type is an array
  * @returns Emit instance (EmitArray or EmitObject)
  */
-export function createEmit<T>(
-	handler: (command: EmitCommand) => void,
-	isArray: boolean = false,
-): Emit<T> {
+export function createEmit<T>(handler: (command: EmitCommand) => void, isArray = false): Emit<T> {
 	if (isArray) {
 		return createEmitArray<T & readonly unknown[]>(handler) as Emit<T>;
 	}

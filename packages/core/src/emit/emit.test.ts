@@ -1,15 +1,8 @@
 /**
  * Tests for type-safe Emit API
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-	createEmit,
-	createEmitObject,
-	createEmitArray,
-	type EmitCommand,
-	type EmitObject,
-	type EmitArray,
-} from "./index";
+import { describe, expect, it, vi } from "vitest";
+import { createEmit, createEmitArray, createEmitObject } from "./index";
 
 describe("createEmitObject", () => {
 	it("should emit full data", () => {

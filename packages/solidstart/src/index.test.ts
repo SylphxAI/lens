@@ -4,13 +4,10 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-	createLensSolidStart,
-	createLensQuery,
 	createLensMutation,
-	createServerQuery_legacy,
+	createLensSolidStart,
 	createServerAction,
-	type CreateLensSolidStartOptions,
-	type LensSolidStartInstance,
+	createServerQuery_legacy,
 } from "./index";
 
 // Mock server for testing

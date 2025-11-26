@@ -3,14 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import {
-	createLensNext,
-	fetchQuery,
-	dehydrate,
-	type DehydratedState,
-	type CreateLensNextOptions,
-	type LensNextInstance,
-} from "./index";
+import { type DehydratedState, createLensNext, dehydrate, fetchQuery } from "./index";
 
 // Mock server for testing
 const createMockServer = () => ({

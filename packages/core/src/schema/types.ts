@@ -583,8 +583,7 @@ export const t = {
 	json: (): JsonType => new JsonType(),
 
 	/** Enum with specific values */
-	enum: <const T extends readonly string[]>(values: T): EnumType<T> =>
-		new EnumType(values),
+	enum: <const T extends readonly string[]>(values: T): EnumType<T> => new EnumType(values),
 
 	/** Typed object/JSON */
 	object: <T>(): ObjectType<T> => new ObjectType<T>(),

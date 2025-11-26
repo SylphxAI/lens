@@ -47,10 +47,7 @@ export interface LensHandlerOptions {
  * export const POST = handler;
  * ```
  */
-export function createLensHandler(
-	server: LensServer,
-	options?: LensHandlerOptions,
-) {
+export function createLensHandler(server: LensServer, options?: LensHandlerOptions) {
 	const basePath = options?.basePath ?? "/api/lens";
 
 	return async (request: Request): Promise<Response> => {
@@ -75,11 +72,7 @@ export function createLensHandler(
 	};
 }
 
-async function handleQuery(
-	server: LensServer,
-	path: string,
-	url: URL,
-): Promise<Response> {
+async function handleQuery(server: LensServer, path: string, url: URL): Promise<Response> {
 	try {
 		const inputParam = url.searchParams.get("input");
 		const input = inputParam ? JSON.parse(inputParam) : undefined;
@@ -129,11 +122,7 @@ async function handleMutation(
 	}
 }
 
-function handleSSE(
-	server: LensServer,
-	path: string,
-	request: Request,
-): Response {
+function handleSSE(server: LensServer, path: string, request: Request): Response {
 	const url = new URL(request.url);
 	const inputParam = url.searchParams.get("input");
 	const input = inputParam ? JSON.parse(inputParam) : undefined;

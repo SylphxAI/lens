@@ -6,7 +6,7 @@
  * Provides context for passing server-fetched data to client components.
  */
 
-import { createContext, useContext, type ReactNode } from "react";
+import { type ReactNode, createContext, useContext } from "react";
 import type { DehydratedState } from "./index";
 
 // =============================================================================
@@ -47,11 +47,7 @@ export interface HydrationBoundaryProps {
  * ```
  */
 export function HydrationBoundary({ state, children }: HydrationBoundaryProps) {
-	return (
-		<HydrationContext.Provider value={state}>
-			{children}
-		</HydrationContext.Provider>
-	);
+	return <HydrationContext.Provider value={state}>{children}</HydrationContext.Provider>;
 }
 
 // =============================================================================

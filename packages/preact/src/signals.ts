@@ -22,8 +22,8 @@
  * ```
  */
 
+import { type Signal, effect, signal } from "@preact/signals";
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
-import { type Signal, computed, effect, signal } from "@preact/signals";
 
 // =============================================================================
 // Query Input Types

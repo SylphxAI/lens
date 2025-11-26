@@ -339,7 +339,7 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): Transpo
 			return sendAndWait(op);
 		},
 	};
-}
+};
 
 // =============================================================================
 // Server Transport
