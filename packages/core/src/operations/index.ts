@@ -20,11 +20,11 @@
  *   .returns(User)
  *   .resolve(({ input, ctx }) => ctx.db.user.findUnique({ where: { id: input.id } }));
  *
- * // Mutation with optimistic updates
+ * // Mutation with optimistic updates (DSL)
  * export const createPost = mutation()
  *   .input(z.object({ title: z.string(), content: z.string() }))
  *   .returns(Post)
- *   .optimistic(({ input }) => ({ id: tempId(), ...input }))
+ *   .optimistic('create')  // Auto-generates tempId, serializable for client
  *   .resolve(({ input, ctx }) => ctx.db.post.create({ data: input }));
  * ```
  */
@@ -138,9 +138,6 @@ export type ResolverFn<TInput, TOutput, TContext = unknown> =
 	| ((ctx: ResolverContext<TInput, TOutput, TContext>) => TOutput)
 	| ((ctx: ResolverContext<TInput, TOutput, TContext>) => AsyncGenerator<TOutput>);
 
-/** Optimistic function type (legacy - still supported) */
-export type OptimisticFn<TInput, TOutput> = (ctx: { input: TInput }) => Partial<TOutput>;
-
 // =============================================================================
 // Optimistic DSL (Declarative - for type-only client imports)
 // =============================================================================
@@ -188,9 +185,7 @@ export type OptimisticDSL =
 	| { merge: Record<string, unknown> }
 	| { create: Record<string, unknown> }
 	// Cross-entity
-	| { updateMany: OptimisticUpdateManyConfig }
-	// Escape hatch
-	| { custom: OptimisticFn<unknown, unknown> };
+	| { updateMany: OptimisticUpdateManyConfig };
 
 /** Config for updateMany */
 export interface OptimisticUpdateManyConfig {
@@ -222,10 +217,9 @@ export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
  * Normalize DSL to internal format for interpreter
  */
 export function normalizeOptimisticDSL(dsl: OptimisticDSL): {
-	type: "merge" | "create" | "delete" | "updateMany" | "custom";
+	type: "merge" | "create" | "delete" | "updateMany";
 	set?: Record<string, unknown>;
 	config?: OptimisticUpdateManyConfig;
-	fn?: OptimisticFn<unknown, unknown>;
 } {
 	// String shorthand
 	if (dsl === "merge") return { type: "merge" };
@@ -236,7 +230,6 @@ export function normalizeOptimisticDSL(dsl: OptimisticDSL): {
 	if ("merge" in dsl) return { type: "merge", set: dsl.merge };
 	if ("create" in dsl) return { type: "create", set: dsl.create };
 	if ("updateMany" in dsl) return { type: "updateMany", config: dsl.updateMany };
-	if ("custom" in dsl) return { type: "custom", fn: dsl.custom };
 
 	return { type: "merge" }; // fallback
 }
@@ -348,12 +341,8 @@ export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unk
 	_name?: string;
 	_input: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
-	/**
-	 * Optimistic update specification
-	 * - DSL object: Declarative, works with type-only imports
-	 * - Function: Legacy, requires runtime import
-	 */
-	_optimistic?: OptimisticDSL | OptimisticFn<TInput, TOutput>;
+	/** Optimistic update DSL (declarative, serializable for client) */
+	_optimistic?: OptimisticDSL;
 	/** Method syntax for bivariance - allows flexible context types */
 	_resolve(
 		ctx: ResolverContext<TInput, TOutput, TContext>,
@@ -392,23 +381,17 @@ export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown>
 	/**
 	 * Define optimistic update (optional)
 	 *
-	 * @param spec - DSL object (recommended) or function (legacy)
+	 * DSL is serializable and sent to client via handshake metadata.
 	 *
-	 * @example DSL (works with type-only imports)
+	 * @example
 	 * ```typescript
-	 * .optimistic({ type: 'merge' })
-	 * .optimistic({ type: 'create' })
-	 * .optimistic({ type: 'merge', set: { published: true } })
-	 * ```
-	 *
-	 * @example Function (legacy, requires runtime import)
-	 * ```typescript
-	 * .optimistic(({ input }) => ({ id: input.id, ...input }))
+	 * .optimistic('merge')   // UPDATE: merge input into entity
+	 * .optimistic('create')  // CREATE: auto tempId
+	 * .optimistic('delete')  // DELETE: mark deleted
+	 * .optimistic({ merge: { published: true } })  // With additional fields
 	 * ```
 	 */
-	optimistic(
-		spec: OptimisticDSL | OptimisticFn<TInput, TOutput>,
-	): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
+	optimistic(spec: OptimisticDSL): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
 
 	/** Define resolver function */
 	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
@@ -430,7 +413,7 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 	private _name?: string;
 	private _inputSchema?: ZodLikeSchema<TInput>;
 	private _outputSpec?: ReturnSpec;
-	private _optimisticSpec?: OptimisticDSL | OptimisticFn<TInput, TOutput>;
+	private _optimisticSpec?: OptimisticDSL;
 
 	constructor(name?: string) {
 		this._name = name;
@@ -451,9 +434,7 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 		return builder;
 	}
 
-	optimistic(
-		spec: OptimisticDSL | OptimisticFn<TInput, TOutput>,
-	): MutationBuilderWithOptimistic<TInput, TOutput, TContext> {
+	optimistic(spec: OptimisticDSL): MutationBuilderWithOptimistic<TInput, TOutput, TContext> {
 		const builder = new MutationBuilderImpl<TInput, TOutput, TContext>(this._name);
 		builder._inputSchema = this._inputSchema;
 		builder._outputSpec = this._outputSpec;
@@ -465,12 +446,13 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 		if (!this._inputSchema) {
 			throw new Error("Mutation requires input schema. Use .input(schema) first.");
 		}
+
 		return {
 			_type: "mutation",
 			_name: this._name,
 			_input: this._inputSchema,
 			_output: this._outputSpec,
-			_optimistic: this._optimisticSpec as OptimisticDSL | OptimisticFn<TInput, TOut> | undefined,
+			_optimistic: this._optimisticSpec,
 			_resolve: fn,
 		};
 	}
@@ -520,14 +502,15 @@ let tempIdCounter = 0;
 
 /**
  * Generate a temporary ID for optimistic updates.
- * The server will replace this with the real ID.
+ * Used internally by 'create' DSL to generate placeholder IDs.
  *
  * @example
  * ```typescript
- * .optimistic(({ input }) => ({
- *   id: tempId(),  // Will be "temp_0", "temp_1", etc.
- *   title: input.title,
- * }))
+ * // Typically used internally by the 'create' DSL:
+ * .optimistic('create')  // Auto-generates tempId
+ *
+ * // Manual usage (advanced):
+ * tempId()  // Returns "temp_0", "temp_1", etc.
  * ```
  */
 export function tempId(): string {

@@ -248,7 +248,6 @@ export {
 	type MutationBuilder,
 	type ResolverContext,
 	type ResolverFn,
-	type OptimisticFn,
 	type ReturnSpec,
 	type ZodLikeSchema,
 	// Optimistic DSL types

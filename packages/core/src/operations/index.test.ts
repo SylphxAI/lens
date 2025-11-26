@@ -145,17 +145,11 @@ describe("mutation() builder", () => {
 		expect(createPost._optimistic).toBeUndefined();
 	});
 
-	it("creates a mutation with optimistic updates", () => {
-		resetTempIdCounter();
-
+	it("creates a mutation with optimistic DSL", () => {
 		const createPost = mutation()
 			.input(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
-			.optimistic(({ input }) => ({
-				id: tempId(),
-				title: input.title,
-				content: input.content,
-			}))
+			.optimistic("create")
 			.resolve(({ input }) => ({
 				id: "real-id",
 				title: input.title,
@@ -164,13 +158,23 @@ describe("mutation() builder", () => {
 			}));
 
 		expect(createPost._type).toBe("mutation");
-		expect(createPost._optimistic).toBeDefined();
+		expect(createPost._optimistic).toBe("create");
+	});
 
-		// Test optimistic function
-		const optimistic = createPost._optimistic!({ input: { title: "Hello", content: "World" } });
-		expect(optimistic.id).toBe("temp_0");
-		expect(optimistic.title).toBe("Hello");
-		expect(optimistic.content).toBe("World");
+	it("creates a mutation with optimistic DSL object", () => {
+		const updatePost = mutation()
+			.input(z.object({ id: z.string(), title: z.string() }))
+			.returns(Post)
+			.optimistic({ merge: { updatedAt: "now" } })
+			.resolve(({ input }) => ({
+				id: input.id,
+				title: input.title,
+				content: "content",
+				authorId: "user-1",
+			}));
+
+		expect(updatePost._type).toBe("mutation");
+		expect(updatePost._optimistic).toEqual({ merge: { updatedAt: "now" } });
 	});
 
 	it("executes resolver function", async () => {
