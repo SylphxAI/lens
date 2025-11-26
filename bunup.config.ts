@@ -29,8 +29,8 @@ export default defineWorkspace([
 		name: "svelte",
 		root: "packages/svelte",
 	},
-	// Solid package excluded due to bunup v0.16.10 bug with JSX/TSX files
-	// Uses bun build in package.json instead
+	// Preact and Solid packages excluded due to bunup v0.16.10 bug with JSX/TSX files
+	// They use bun build + tsc in package.json instead
 	// {
 	// 	name: "solid",
 	// 	root: "packages/solid",

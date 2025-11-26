@@ -15,7 +15,7 @@
     },
     "packages/client": {
       "name": "@sylphx/lens-client",
-      "version": "1.0.2",
+      "version": "1.0.4",
       "dependencies": {
         "@msgpack/msgpack": "^3.1.2",
         "@sylphx/lens-core": "workspace:*",
@@ -35,7 +35,7 @@
     },
     "packages/core": {
       "name": "@sylphx/lens-core",
-      "version": "1.0.2",
+      "version": "1.0.4",
       "devDependencies": {
         "typescript": "^5.9.3",
         "zod": "^4.1.13",
@@ -43,7 +43,7 @@
     },
     "packages/lens": {
       "name": "@sylphx/lens",
-      "version": "1.0.2",
+      "version": "1.0.4",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-core": "workspace:*",
@@ -53,9 +53,23 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/preact": {
+      "name": "@sylphx/lens-preact",
+      "version": "1.0.0",
+      "dependencies": {
+        "@sylphx/lens-client": "workspace:*",
+      },
+      "devDependencies": {
+        "preact": "^10.25.4",
+        "typescript": "^5.9.3",
+      },
+      "peerDependencies": {
+        "preact": ">=10.0.0",
+      },
+    },
     "packages/react": {
       "name": "@sylphx/lens-react",
-      "version": "1.0.3",
+      "version": "1.2.0",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -74,7 +88,7 @@
     },
     "packages/server": {
       "name": "@sylphx/lens-server",
-      "version": "1.0.2",
+      "version": "1.0.4",
       "dependencies": {
         "@sylphx/lens-core": "workspace:*",
       },
@@ -85,7 +99,7 @@
     },
     "packages/solid": {
       "name": "@sylphx/lens-solid",
-      "version": "1.0.3",
+      "version": "1.2.0",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -100,7 +114,7 @@
     },
     "packages/svelte": {
       "name": "@sylphx/lens-svelte",
-      "version": "1.0.3",
+      "version": "1.2.0",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -117,7 +131,7 @@
     },
     "packages/vue": {
       "name": "@sylphx/lens-vue",
-      "version": "1.0.3",
+      "version": "1.2.0",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -443,6 +457,8 @@
 
     "@sylphx/lens-core": ["@sylphx/lens-core@workspace:packages/core"],
 
+    "@sylphx/lens-preact": ["@sylphx/lens-preact@workspace:packages/preact"],
+
     "@sylphx/lens-react": ["@sylphx/lens-react@workspace:packages/react"],
 
     "@sylphx/lens-server": ["@sylphx/lens-server@workspace:packages/server"],
@@ -754,6 +770,8 @@
     "pify": ["pify@4.0.1", "", {}, "sha512-uB80kBFb/tfd68bVleG9T5GGsGPjJrLAUpR5PZIrhBnIaRTQRjqdJSsIKkOP6OAIFbj7GOrcudc5pNjZ+geV2g=="],
 
     "postcss": ["postcss@8.5.6", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg=="],
+
+    "preact": ["preact@10.27.2", "", {}, "sha512-5SYSgFKSyhCbk6SrXyMpqjb5+MQBgfvEKE/OC+PujcY34sOpqtr+0AZQtPYx5IA6VxynQ7rUPCtKzyovpj9Bpg=="],
 
     "prettier": ["prettier@2.8.8", "", { "bin": { "prettier": "bin-prettier.js" } }, "sha512-tdN8qQGvNjw4CHbY+XXk0JgCXn9QiF21a55rBe5LJAU+kDyC4WQn4+awm2Xfk2lQMk5fKup9XgzTZtGkjBdP9Q=="],
 

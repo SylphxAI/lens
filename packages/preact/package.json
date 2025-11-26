@@ -1,0 +1,41 @@
+{
+	"name": "@sylphx/lens-preact",
+	"version": "1.1.0",
+	"description": "Preact bindings for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external preact && tsc --emitDeclarationOnly --declaration --outDir ./dist",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"preact",
+		"hooks",
+		"reactive"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-client": "workspace:*"
+	},
+	"peerDependencies": {
+		"preact": ">=10.0.0"
+	},
+	"devDependencies": {
+		"preact": "^10.25.4",
+		"typescript": "^5.9.3"
+	}
+}
