@@ -31,6 +31,7 @@
 
 import type { EntityDef } from "../schema/define";
 import type { EntityDefinition } from "../schema/types";
+import type { Emit } from "../emit/index";
 
 // =============================================================================
 // Type Definitions
@@ -58,23 +59,71 @@ export type InferReturnType<R extends ReturnSpec> = R extends EntityDef<string, 
 			? { [K in keyof R]: R[K] extends [EntityDef<string, EntityDefinition>] ? unknown[] : unknown }
 			: never;
 
-/** Resolver context - passed directly to resolver function (tRPC style) */
-export interface ResolverContext<TInput = unknown, TContext = unknown> {
+/**
+ * Resolver context - passed directly to resolver function (tRPC style)
+ *
+ * @typeParam TInput - Validated input type from .input() schema
+ * @typeParam TOutput - Output type (inferred from .returns() or resolver return)
+ * @typeParam TContext - User-defined context type from createServer({ context })
+ *
+ * @example
+ * ```typescript
+ * // Basic query
+ * resolve(({ input, ctx }) => ctx.db.user.find(input.id))
+ *
+ * // Subscription with emit
+ * resolve(({ input, ctx, emit, onCleanup }) => {
+ *   const unsub = ctx.db.user.onChange(input.id, (data) => {
+ *     emit.merge({ name: data.name })  // Update specific field
+ *   })
+ *   onCleanup(unsub)
+ *   return ctx.db.user.find(input.id)
+ * })
+ * ```
+ */
+export interface ResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
 	/** Parsed and validated input */
 	input: TInput;
+
 	/** User-defined context (db, user, etc.) - set via createServer({ context }) */
 	ctx: TContext;
-	/** Emit data for subscriptions */
-	emit?: (data: unknown) => void;
-	/** Register cleanup function for subscriptions */
-	onCleanup?: (fn: () => void) => () => void;
+
+	/**
+	 * Emit state updates to subscribed clients.
+	 *
+	 * Available methods:
+	 * - `emit(data)` - Merge full data
+	 * - `emit.merge(partial)` - Merge partial update
+	 * - `emit.replace(data)` - Replace entire state
+	 * - `emit.set(field, value)` - Set single field
+	 * - `emit.delta(field, ops)` - Apply text delta to string field
+	 * - `emit.patch(field, ops)` - Apply JSON Patch to object field
+	 * - `emit.batch(updates)` - Batch multiple field updates
+	 *
+	 * Only available in subscription context.
+	 */
+	emit: Emit<TOutput>;
+
+	/**
+	 * Register cleanup function called when client unsubscribes.
+	 * Returns a function to manually remove the cleanup.
+	 *
+	 * @example
+	 * ```typescript
+	 * const unsub = ctx.db.onChange(id, handler)
+	 * onCleanup(unsub)  // Called when client disconnects
+	 * ```
+	 *
+	 * Only available in subscription context.
+	 */
+	onCleanup: (fn: () => void) => () => void;
 }
 
 /** Resolver function type */
 export type ResolverFn<TInput, TOutput, TContext = unknown> =
-	| ((ctx: ResolverContext<TInput, TContext>) => Promise<TOutput>)
-	| ((ctx: ResolverContext<TInput, TContext>) => TOutput)
-	| ((ctx: ResolverContext<TInput, TContext>) => AsyncGenerator<TOutput>);
+	| ((ctx: ResolverContext<TInput, TOutput, TContext>) => Promise<TOutput>)
+	| ((ctx: ResolverContext<TInput, TOutput, TContext>) => TOutput)
+	| ((ctx: ResolverContext<TInput, TOutput, TContext>) => AsyncGenerator<TOutput>);
 
 /** Optimistic function type (legacy - still supported) */
 export type OptimisticFn<TInput, TOutput> = (ctx: { input: TInput }) => Partial<TOutput>;

@@ -80,21 +80,21 @@ const getUser = query()
   .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
 ```
 
-### 2. Push Updates with `ctx.emit()`
+### 2. Push Updates with `emit`
 
 For fine-grained control over when updates are sent:
 
 ```typescript
 const watchUser = query()
   .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .resolve(({ input, ctx, emit, onCleanup }) => {
     // Subscribe to external data source
     const unsubscribe = db.user.onChange(input.id, (user) => {
-      ctx.emit(user)  // Push update to subscribed clients
+      emit(user)  // Push update to subscribed clients
     })
 
     // Cleanup when client disconnects
-    ctx.onCleanup(unsubscribe)
+    onCleanup(unsubscribe)
 
     // Return initial data
     return db.user.find(input.id)
@@ -113,6 +113,75 @@ const streamMessages = query()
     }
   })
 ```
+
+---
+
+## Emit API
+
+The `emit` parameter provides methods for pushing state updates to subscribed clients:
+
+```typescript
+resolve(({ input, ctx, emit, onCleanup }) => {
+  // Full data update (merge mode)
+  emit({ title: "Hello", content: "World" })
+
+  // Merge partial update
+  emit.merge({ title: "Updated" })
+
+  // Replace entire state
+  emit.replace({ title: "New", content: "Fresh" })
+
+  // Set single field
+  emit.set("title", "New Title")
+
+  // Delta for string fields (e.g., LLM streaming)
+  emit.delta("content", [{ position: 0, insert: "Hello " }])
+
+  // JSON Patch for object fields
+  emit.patch("metadata", [{ op: "add", path: "/views", value: 100 }])
+
+  // Batch multiple updates
+  emit.batch([
+    { field: "title", strategy: "value", data: "New" },
+    { field: "content", strategy: "delta", data: [{ position: 0, insert: "!" }] },
+  ])
+
+  return initialData
+})
+```
+
+### LLM Streaming Example
+
+```typescript
+const chat = query()
+  .input(z.object({ prompt: z.string() }))
+  .resolve(async ({ input, ctx, emit, onCleanup }) => {
+    const stream = ctx.ai.stream(input.prompt)
+
+    stream.on("token", (token) => {
+      // Efficiently append to content field
+      emit.delta("content", [{ position: Infinity, insert: token }])
+    })
+
+    onCleanup(() => stream.close())
+
+    return { content: "" }  // Initial empty state
+  })
+```
+
+---
+
+## Update Strategies
+
+The server automatically selects optimal transfer strategies:
+
+| Strategy | Use Case | Data Type |
+|----------|----------|-----------|
+| `value` | Full replacement | Primitives, short strings (<100 chars) |
+| `delta` | Character-level diff | Long strings (≥100 chars), ~57% savings |
+| `patch` | JSON Patch RFC 6902 | Objects (≥50 chars), ~99% savings |
+
+**Note:** The emit API describes HOW business state changed. The server independently decides the optimal transfer strategy per-client based on data characteristics.
 
 ---
 

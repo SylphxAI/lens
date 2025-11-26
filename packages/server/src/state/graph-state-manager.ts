@@ -9,7 +9,15 @@
  * - Pushes updates to subscribed clients
  */
 
-import { type EntityKey, type Update, createUpdate, makeEntityKey } from "@sylphx/lens-core";
+import {
+	type EntityKey,
+	type Update,
+	type EmitCommand,
+	type InternalFieldUpdate,
+	createUpdate,
+	applyUpdate,
+	makeEntityKey,
+} from "@sylphx/lens-core";
 
 // Re-export for convenience
 export type { EntityKey };
@@ -246,6 +254,101 @@ export class GraphStateManager {
 	}
 
 	/**
+	 * Emit a field-level update with a specific strategy.
+	 * Applies the update to canonical state and pushes to clients.
+	 *
+	 * @param entity - Entity name
+	 * @param id - Entity ID
+	 * @param field - Field name to update
+	 * @param update - Update with strategy (value/delta/patch)
+	 */
+	emitField(entity: string, id: string, field: string, update: Update): void {
+		const key = this.makeKey(entity, id);
+
+		// Get or create canonical state
+		let currentCanonical = this.canonical.get(key);
+		if (!currentCanonical) {
+			currentCanonical = {};
+		}
+
+		// Apply update to canonical state based on strategy
+		const oldValue = currentCanonical[field];
+		const newValue = applyUpdate(oldValue, update);
+		currentCanonical = { ...currentCanonical, [field]: newValue };
+
+		this.canonical.set(key, currentCanonical);
+
+		// Push updates to all subscribed clients
+		const subscribers = this.entitySubscribers.get(key);
+		if (!subscribers) return;
+
+		for (const clientId of subscribers) {
+			this.pushFieldToClient(clientId, entity, id, key, field, newValue);
+		}
+	}
+
+	/**
+	 * Emit multiple field updates in a batch.
+	 * More efficient than multiple emitField calls.
+	 *
+	 * @param entity - Entity name
+	 * @param id - Entity ID
+	 * @param updates - Array of field updates
+	 */
+	emitBatch(entity: string, id: string, updates: InternalFieldUpdate[]): void {
+		const key = this.makeKey(entity, id);
+
+		// Get or create canonical state
+		let currentCanonical = this.canonical.get(key);
+		if (!currentCanonical) {
+			currentCanonical = {};
+		}
+
+		// Apply all updates to canonical state
+		const changedFields: string[] = [];
+		for (const { field, update } of updates) {
+			const oldValue = currentCanonical[field];
+			const newValue = applyUpdate(oldValue, update);
+			currentCanonical[field] = newValue;
+			changedFields.push(field);
+		}
+
+		this.canonical.set(key, currentCanonical);
+
+		// Push updates to all subscribed clients
+		const subscribers = this.entitySubscribers.get(key);
+		if (!subscribers) return;
+
+		for (const clientId of subscribers) {
+			this.pushFieldsToClient(clientId, entity, id, key, changedFields, currentCanonical);
+		}
+	}
+
+	/**
+	 * Process an EmitCommand from the Emit API.
+	 * Routes to appropriate emit method.
+	 *
+	 * @param entity - Entity name
+	 * @param id - Entity ID
+	 * @param command - Emit command from resolver
+	 */
+	processCommand(entity: string, id: string, command: EmitCommand): void {
+		switch (command.type) {
+			case "full":
+				this.emit(entity, id, command.data as Record<string, unknown>, {
+					replace: command.replace,
+				});
+				break;
+			case "field":
+				this.emitField(entity, id, command.field, command.update);
+				break;
+			case "batch":
+				this.emitBatch(entity, id, command.updates);
+				break;
+		}
+	}
+
+	/**
 	 * Get current canonical state for an entity
 	 */
 	getState(entity: string, id: string): Record<string, unknown> | undefined {
@@ -324,6 +427,131 @@ export class GraphStateManager {
 
 		// Update client's last known state
 		for (const field of fieldsToCheck) {
+			if (newState[field] !== undefined) {
+				clientEntityState.lastState[field] = newState[field];
+			}
+		}
+	}
+
+	/**
+	 * Push a single field update to a client.
+	 * Computes optimal transfer strategy.
+	 */
+	private pushFieldToClient(
+		clientId: string,
+		entity: string,
+		id: string,
+		key: EntityKey,
+		field: string,
+		newValue: unknown,
+	): void {
+		const client = this.clients.get(clientId);
+		if (!client) return;
+
+		const clientStateMap = this.clientStates.get(clientId);
+		if (!clientStateMap) return;
+
+		const clientEntityState = clientStateMap.get(key);
+		if (!clientEntityState) return;
+
+		const { lastState, fields } = clientEntityState;
+
+		// Check if client is subscribed to this field
+		if (fields !== "*" && !fields.has(field)) {
+			return;
+		}
+
+		const oldValue = lastState[field];
+
+		// Skip if unchanged
+		if (oldValue === newValue) return;
+		if (
+			typeof oldValue === "object" &&
+			typeof newValue === "object" &&
+			JSON.stringify(oldValue) === JSON.stringify(newValue)
+		) {
+			return;
+		}
+
+		// Compute optimal update for transfer
+		const update = createUpdate(oldValue, newValue);
+
+		// Send update
+		client.send({
+			type: "update",
+			entity,
+			id,
+			updates: { [field]: update },
+		});
+
+		// Update client's last known state
+		clientEntityState.lastState[field] = newValue;
+	}
+
+	/**
+	 * Push multiple field updates to a client.
+	 * Computes optimal transfer strategy for each field.
+	 */
+	private pushFieldsToClient(
+		clientId: string,
+		entity: string,
+		id: string,
+		key: EntityKey,
+		changedFields: string[],
+		newState: Record<string, unknown>,
+	): void {
+		const client = this.clients.get(clientId);
+		if (!client) return;
+
+		const clientStateMap = this.clientStates.get(clientId);
+		if (!clientStateMap) return;
+
+		const clientEntityState = clientStateMap.get(key);
+		if (!clientEntityState) return;
+
+		const { lastState, fields } = clientEntityState;
+
+		// Compute updates for changed fields
+		const updates: Record<string, Update> = {};
+		let hasChanges = false;
+
+		for (const field of changedFields) {
+			// Check if client is subscribed to this field
+			if (fields !== "*" && !fields.has(field)) {
+				continue;
+			}
+
+			const oldValue = lastState[field];
+			const newValue = newState[field];
+
+			// Skip if unchanged
+			if (oldValue === newValue) continue;
+			if (
+				typeof oldValue === "object" &&
+				typeof newValue === "object" &&
+				JSON.stringify(oldValue) === JSON.stringify(newValue)
+			) {
+				continue;
+			}
+
+			// Compute optimal update for transfer
+			const update = createUpdate(oldValue, newValue);
+			updates[field] = update;
+			hasChanges = true;
+		}
+
+		if (!hasChanges) return;
+
+		// Send update
+		client.send({
+			type: "update",
+			entity,
+			id,
+			updates,
+		});
+
+		// Update client's last known state
+		for (const field of changedFields) {
 			if (newState[field] !== undefined) {
 				clientEntityState.lastState[field] = newState[field];
 			}

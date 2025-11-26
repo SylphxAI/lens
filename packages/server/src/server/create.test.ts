@@ -644,8 +644,8 @@ describe("Minimum Transfer", () => {
 
 		const liveQuery = query()
 			.returns(User)
-			.resolve(({ ctx }) => {
-				emitFn = ctx.emit;
+			.resolve(({ emit }) => {
+				emitFn = emit;
 				return { id: "1", name: "Alice", email: "alice@example.com" };
 			});
 
@@ -681,13 +681,13 @@ describe("Minimum Transfer", () => {
 		}
 	});
 
-	it("sends updates via ctx.emit", async () => {
+	it("sends updates via emit", async () => {
 		let emitFn: ((data: unknown) => void) | null = null;
 
 		const liveQuery = query()
 			.returns(User)
-			.resolve(({ ctx }) => {
-				emitFn = ctx.emit;
+			.resolve(({ emit }) => {
+				emitFn = emit;
 				return { id: "1", name: "Alice", email: "alice@example.com" };
 			});
 
@@ -723,17 +723,17 @@ describe("Minimum Transfer", () => {
 });
 
 // =============================================================================
-// Test: ctx.onCleanup
+// Test: onCleanup
 // =============================================================================
 
-describe("ctx.onCleanup", () => {
+describe("onCleanup", () => {
 	it("calls cleanup function on unsubscribe", async () => {
 		let cleanedUp = false;
 
 		const liveQuery = query()
 			.returns(User)
-			.resolve(({ ctx }) => {
-				ctx.onCleanup(() => {
+			.resolve(({ onCleanup }) => {
+				onCleanup(() => {
 					cleanedUp = true;
 				});
 				return mockUsers[0];
@@ -772,8 +772,8 @@ describe("ctx.onCleanup", () => {
 
 		const liveQuery = query()
 			.returns(User)
-			.resolve(({ ctx }) => {
-				ctx.onCleanup(() => {
+			.resolve(({ onCleanup }) => {
+				onCleanup(() => {
 					cleanedUp = true;
 				});
 				return mockUsers[0];

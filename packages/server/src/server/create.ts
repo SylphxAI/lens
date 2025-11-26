@@ -10,6 +10,8 @@
 
 import {
 	type ContextValue,
+	type Emit,
+	type EmitCommand,
 	type EntityDef,
 	type EntityDefinition,
 	type EntityResolvers,
@@ -22,6 +24,7 @@ import {
 	type RouterDef,
 	type Update,
 	createContext,
+	createEmit,
 	createUpdate,
 	flattenRouter,
 	isBatchResolver,
@@ -666,22 +669,37 @@ class LensServerImpl<
 				throw new Error(`Query ${sub.operation} has no resolver`);
 			}
 
-			// Add emit and onCleanup to context for subscriptions
-			const contextWithHelpers = {
-				...context,
-				emit: emitData,
-				onCleanup: (fn: () => void) => {
-					sub.cleanups.push(fn);
-					return () => {
-						const idx = sub.cleanups.indexOf(fn);
-						if (idx >= 0) sub.cleanups.splice(idx, 1);
-					};
-				},
+			// Create emit API for this subscription
+			const emit = createEmit((command: EmitCommand) => {
+				// Route emit commands to appropriate handler
+				const entityName = this.getEntityNameFromOutput(queryDef._output);
+				if (entityName) {
+					// For entity-typed outputs, use GraphStateManager
+					const entities = this.extractEntities(entityName, command.type === "full" ? command.data : {});
+					for (const { entity, id } of entities) {
+						this.stateManager.processCommand(entity, id, command);
+					}
+				}
+				// Also emit the raw data for operation-level updates
+				if (command.type === "full") {
+					emitData(command.data);
+				}
+			});
+
+			// Create onCleanup function
+			const onCleanup = (fn: () => void) => {
+				sub.cleanups.push(fn);
+				return () => {
+					const idx = sub.cleanups.indexOf(fn);
+					if (idx >= 0) sub.cleanups.splice(idx, 1);
+				};
 			};
 
 			const result = resolver({
 				input: sub.input,
-				ctx: contextWithHelpers,
+				ctx: context,
+				emit,
+				onCleanup,
 			});
 
 			if (isAsyncIterable(result)) {
@@ -892,14 +910,16 @@ class LensServerImpl<
 					throw new Error(`Query ${name} has no resolver`);
 				}
 
-				const resolverCtx = {
-					input: cleanInput as TInput,
-					ctx: context, // Pass context directly to resolver (tRPC style)
-					emit: () => {},
-					onCleanup: () => () => {},
-				};
+				// Create no-op emit for one-shot queries (emit is only meaningful in subscriptions)
+				const emit = createEmit(() => {});
+				const onCleanup = () => () => {};
 
-				const result = resolver(resolverCtx);
+				const result = resolver({
+					input: cleanInput as TInput,
+					ctx: context,
+					emit,
+					onCleanup,
+				});
 
 				let data: TOutput;
 				if (isAsyncIterable(result)) {
@@ -944,9 +964,15 @@ class LensServerImpl<
 					throw new Error(`Mutation ${name} has no resolver`);
 				}
 
+				// Create no-op emit for mutations (emit is primarily for subscriptions)
+				const emit = createEmit(() => {});
+				const onCleanup = () => () => {};
+
 				const result = await resolver({
 					input: input as TInput,
-					ctx: context, // Pass context directly to resolver (tRPC style)
+					ctx: context,
+					emit,
+					onCleanup,
 				});
 
 				// Emit to GraphStateManager

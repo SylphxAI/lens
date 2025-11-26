@@ -306,14 +306,14 @@ describe("E2E - Subscriptions", () => {
 		expect(received[0]).toMatchObject({ name: "Alice" });
 	});
 
-	it("subscribe receives updates via ctx.emit", async () => {
+	it("subscribe receives updates via emit", async () => {
 		let emitFn: ((data: unknown) => void) | null = null;
 
 		const watchUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input, ctx }) => {
-				emitFn = ctx.emit;
+			.resolve(({ input, emit }) => {
+				emitFn = emit;
 				return mockUsers.find((u) => u.id === input.id) ?? null;
 			});
 
@@ -355,8 +355,8 @@ describe("E2E - Subscriptions", () => {
 		const watchUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input, ctx }) => {
-				emitFn = ctx.emit;
+			.resolve(({ input, emit }) => {
+				emitFn = emit;
 				return mockUsers.find((u) => u.id === input.id) ?? null;
 			});
 
@@ -447,7 +447,7 @@ describe("E2E - Server API", () => {
 });
 
 // =============================================================================
-// Test: Cleanup (ctx.onCleanup)
+// Test: Cleanup (onCleanup)
 // =============================================================================
 
 describe("E2E - Cleanup", () => {
@@ -457,8 +457,8 @@ describe("E2E - Cleanup", () => {
 		const watchUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input, ctx }) => {
-				ctx.onCleanup(() => {
+			.resolve(({ input, onCleanup }) => {
+				onCleanup(() => {
 					cleanedUp = true;
 				});
 				return mockUsers.find((u) => u.id === input.id) ?? null;
@@ -497,8 +497,8 @@ describe("E2E - GraphStateManager", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input, ctx }) => {
-				emitFn = ctx.emit;
+			.resolve(({ input, emit }) => {
+				emitFn = emit;
 				return mockUsers.find((u) => u.id === input.id) ?? null;
 			});
 

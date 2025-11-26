@@ -275,6 +275,20 @@ export {
 } from "./resolvers/index";
 
 // =============================================================================
+// Emit API
+// =============================================================================
+
+export {
+	// Factory
+	createEmit,
+	// Types
+	type Emit,
+	type FieldUpdate,
+	type EmitCommand,
+	type InternalFieldUpdate,
+} from "./emit/index";
+
+// =============================================================================
 // Context System (Internal - used by server)
 // =============================================================================
 
