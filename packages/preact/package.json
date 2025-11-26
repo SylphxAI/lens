@@ -9,10 +9,14 @@
 		".": {
 			"import": "./dist/index.js",
 			"types": "./dist/index.d.ts"
+		},
+		"./signals": {
+			"import": "./dist/signals.js",
+			"types": "./dist/signals.d.ts"
 		}
 	},
 	"scripts": {
-		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external preact && tsc --emitDeclarationOnly --declaration --outDir ./dist",
+		"build": "bun build ./src/index.ts ./src/signals.ts --outdir ./dist --target browser --external preact --external @preact/signals && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
@@ -32,9 +36,16 @@
 		"@sylphx/lens-client": "workspace:*"
 	},
 	"peerDependencies": {
-		"preact": ">=10.0.0"
+		"preact": ">=10.0.0",
+		"@preact/signals": ">=1.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@preact/signals": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
+		"@preact/signals": "^2.0.0",
 		"preact": "^10.25.4",
 		"typescript": "^5.9.3"
 	}
