@@ -37,6 +37,7 @@ export {
 	type RouterRoutes,
 	type ResolverFn,
 	type ResolverContext,
+	type InferRouterContext,
 } from "@sylphx/lens-core";
 
 // =============================================================================

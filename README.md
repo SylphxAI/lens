@@ -847,7 +847,15 @@ This gives you:
 - **Full autocomplete** on `ctx` in all resolvers
 - **Type errors** when accessing non-existent properties
 - **Single source of truth** for context type across your codebase
-- **Type-safe server creation** - context function must return the correct type
+
+> **Note:** You can also use `createServer` directly - it automatically infers the context type from the router:
+> ```typescript
+> // Context type is inferred from router's procedures!
+> const server = createServer({
+>   router: appRouter,
+>   context: () => ({ db: prisma, user: null }),  // Type-checked against router's context
+> })
+> ```
 
 ---
 

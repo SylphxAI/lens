@@ -17,6 +17,7 @@ import {
 	type EntityResolvers,
 	type EntityResolversDefinition,
 	type FieldType,
+	type InferRouterContext,
 	type MutationDef,
 	type QueryDef,
 	type RelationDef,
@@ -72,20 +73,23 @@ export type OperationsMap = {
 };
 
 /** Server configuration */
-export interface LensServerConfig<TContext extends ContextValue = ContextValue> {
+export interface LensServerConfig<
+	TContext extends ContextValue = ContextValue,
+	TRouter extends RouterDef = RouterDef,
+> {
 	/** Entity definitions */
 	entities?: EntitiesMap;
 	/** Relation definitions */
 	relations?: RelationsArray;
-	/** Router definition (namespaced operations) */
-	router?: RouterDef;
+	/** Router definition (namespaced operations) - context type is inferred */
+	router?: TRouter;
 	/** Query definitions (flat, legacy) */
 	queries?: QueriesMap;
 	/** Mutation definitions (flat, legacy) */
 	mutations?: MutationsMap;
 	/** Entity resolvers */
 	resolvers?: EntityResolvers<EntityResolversDefinition>;
-	/** Context factory */
+	/** Context factory - must return the context type expected by the router */
 	context?: (req?: unknown) => TContext | Promise<TContext>;
 	/** Server version */
 	version?: string;
@@ -1547,16 +1551,84 @@ export type InferApi<T extends LensServer> = T extends LensServerImpl<infer Q, i
 // =============================================================================
 
 /**
- * Create Lens server with Operations API + Optimization Layer
+ * Config helper type that infers context from router
  */
+export type ServerConfigWithInferredContext<
+	TRouter extends RouterDef,
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+> = {
+	entities?: EntitiesMap;
+	relations?: RelationsArray;
+	router: TRouter;
+	queries?: Q;
+	mutations?: M;
+	resolvers?: EntityResolvers<EntityResolversDefinition>;
+	/** Context factory - type is inferred from router's procedures */
+	context?: (req?: unknown) => InferRouterContext<TRouter> | Promise<InferRouterContext<TRouter>>;
+	version?: string;
+};
+
+/**
+ * Config without router (legacy flat queries/mutations)
+ */
+export type ServerConfigLegacy<
+	TContext extends ContextValue = ContextValue,
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+> = {
+	entities?: EntitiesMap;
+	relations?: RelationsArray;
+	router?: undefined;
+	queries?: Q;
+	mutations?: M;
+	resolvers?: EntityResolvers<EntityResolversDefinition>;
+	context?: (req?: unknown) => TContext | Promise<TContext>;
+	version?: string;
+};
+
+/**
+ * Create Lens server with Operations API + Optimization Layer
+ *
+ * When using a router with typed context (from initLens), the context
+ * function's return type is automatically enforced to match.
+ *
+ * @example
+ * ```typescript
+ * // Context type is inferred from router's procedures
+ * const server = createServer({
+ *   router: appRouter,  // RouterDef with MyContext
+ *   context: () => ({
+ *     db: prisma,
+ *     user: null,
+ *   }),  // Must match MyContext!
+ * })
+ * ```
+ */
+export function createServer<
+	TRouter extends RouterDef,
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+>(
+	config: ServerConfigWithInferredContext<TRouter, Q, M>,
+): LensServer & { _types: { queries: Q; mutations: M; context: InferRouterContext<TRouter> } };
+
+export function createServer<
+	TContext extends ContextValue = ContextValue,
+	Q extends QueriesMap = QueriesMap,
+	M extends MutationsMap = MutationsMap,
+>(
+	config: ServerConfigLegacy<TContext, Q, M>,
+): LensServer & { _types: { queries: Q; mutations: M; context: TContext } };
+
 export function createServer<
 	TContext extends ContextValue = ContextValue,
 	Q extends QueriesMap = QueriesMap,
 	M extends MutationsMap = MutationsMap,
 >(
 	config: LensServerConfig<TContext> & { queries?: Q; mutations?: M },
-): LensServer & { _types: { queries: Q; mutations: M } } {
-	const server = new LensServerImpl(config) as LensServerImpl<Q, M>;
+): LensServer & { _types: { queries: Q; mutations: M; context: TContext } } {
+	const server = new LensServerImpl(config) as LensServerImpl<Q, M, TContext>;
 	// Attach type marker for inference (stripped at runtime)
-	return server as unknown as LensServer & { _types: { queries: Q; mutations: M } };
+	return server as unknown as LensServer & { _types: { queries: Q; mutations: M; context: TContext } };
 }

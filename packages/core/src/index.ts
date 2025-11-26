@@ -251,6 +251,7 @@ export {
 	type RouterRoutes,
 	type AnyProcedure,
 	type InferRouterClient,
+	type InferRouterContext,
 	type QueryBuilder,
 	type MutationBuilder,
 	type ResolverContext,

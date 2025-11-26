@@ -164,7 +164,8 @@ function createLensServerBuilder(): LensServerBuilder {
 						createServer<Q extends QueriesMap, M extends MutationsMap>(
 							config: LensServerInstanceConfig<TContext, Q, M>,
 						) {
-							return createServer<TContext, Q, M>(config as LensServerConfig<TContext> & { queries?: Q; mutations?: M });
+							// biome-ignore lint/suspicious/noExplicitAny: Context is already typed from initLens
+							return createServer(config as any) as LensServer & { _types: { queries: Q; mutations: M; context: TContext } };
 						},
 					};
 				},

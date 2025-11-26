@@ -547,18 +547,43 @@ export function isOperationDef(value: unknown): value is QueryDef | MutationDef 
 // =============================================================================
 
 /** Any procedure (query or mutation) */
-export type AnyProcedure = QueryDef<unknown, unknown> | MutationDef<unknown, unknown>;
+export type AnyProcedure = QueryDef<unknown, unknown, unknown> | MutationDef<unknown, unknown, unknown>;
 
 /** Router routes - can contain procedures or nested routers */
 export type RouterRoutes = {
-	[key: string]: AnyProcedure | RouterDef<RouterRoutes>;
+	[key: string]: AnyProcedure | RouterDef;
 };
 
-/** Router definition */
-export interface RouterDef<TRoutes extends RouterRoutes = RouterRoutes> {
+/** Router definition with context type */
+export interface RouterDef<TRoutes extends RouterRoutes = RouterRoutes, TContext = unknown> {
 	_type: "router";
 	_routes: TRoutes;
+	/** Phantom type for context inference */
+	_context?: TContext;
 }
+
+/** Extract context type from a single value (procedure, router, or routes object) */
+type ExtractContextFromValue<T> = T extends QueryDef<unknown, unknown, infer C>
+	? C
+	: T extends MutationDef<unknown, unknown, infer C>
+		? C
+		: T extends RouterDef<infer _R, infer C>
+			? C
+			: unknown;
+
+/** Extract context type from routes object - gets first non-unknown context */
+type ExtractContextFromRoutes<T> = T extends Record<string, infer V>
+	? ExtractContextFromValue<V>
+	: unknown;
+
+/** Extract context type from router or routes */
+export type InferRouterContext<T> = T extends RouterDef<infer R, infer C>
+	? unknown extends C
+		? ExtractContextFromRoutes<R>
+		: C
+	: T extends Record<string, unknown>
+		? ExtractContextFromRoutes<T>
+		: unknown;
 
 /** Check if value is a router definition */
 export function isRouterDef(value: unknown): value is RouterDef {
@@ -568,46 +593,42 @@ export function isRouterDef(value: unknown): value is RouterDef {
 /**
  * Create a router for namespacing operations
  *
- * Routers allow organizing operations into logical groups with nested access.
+ * The router automatically infers the context type from its routes.
+ * When used with createServer, the context function must return
+ * a matching type.
  *
  * @example
  * ```typescript
  * import { router, query, mutation } from '@sylphx/lens-core';
  * import { z } from 'zod';
  *
- * export const appRouter = router({
- *   user: router({
- *     get: query()
- *       .input(z.object({ id: z.string() }))
- *       .returns(User)
- *       .resolve(({ input, ctx }) => ctx.db.user.findUnique({ where: { id: input.id } })),
- *     list: query()
- *       .returns([User])
- *       .resolve(({ ctx }) => ctx.db.user.findMany()),
- *     create: mutation()
- *       .input(z.object({ name: z.string(), email: z.string() }))
- *       .returns(User)
- *       .resolve(({ input, ctx }) => ctx.db.user.create({ data: input })),
- *   }),
- *   post: router({
- *     get: query()
- *       .input(z.object({ id: z.string() }))
- *       .returns(Post)
- *       .resolve(({ input, ctx }) => ctx.db.post.findUnique({ where: { id: input.id } })),
- *     create: mutation()
- *       .input(z.object({ title: z.string(), content: z.string() }))
- *       .returns(Post)
- *       .resolve(({ input, ctx }) => ctx.db.post.create({ data: input })),
- *   }),
- * });
+ * // Using typed lens instance
+ * const lens = initLens.context<MyContext>().create()
  *
- * // Client usage:
- * // client.user.get({ id: "1" })
- * // client.user.list()
- * // client.post.create({ title: "Hello", content: "World" })
+ * export const appRouter = router({
+ *   user: {
+ *     get: lens.query()
+ *       .input(z.object({ id: z.string() }))
+ *       .resolve(({ input, ctx }) => ctx.db.user.find(input.id)),
+ *     create: lens.mutation()
+ *       .input(z.object({ name: z.string() }))
+ *       .resolve(({ input, ctx }) => ctx.db.user.create(input)),
+ *   },
+ * });
+ * // appRouter is RouterDef<..., MyContext>
+ *
+ * // createServer will enforce context type
+ * const server = createServer({
+ *   router: appRouter,
+ *   context: () => ({
+ *     db: prisma,  // Must match MyContext!
+ *   }),
+ * })
  * ```
  */
-export function router<TRoutes extends RouterRoutes>(routes: TRoutes): RouterDef<TRoutes> {
+export function router<TRoutes extends RouterRoutes>(
+	routes: TRoutes,
+): RouterDef<TRoutes, InferRouterContext<TRoutes>> {
 	return {
 		_type: "router",
 		_routes: routes,
