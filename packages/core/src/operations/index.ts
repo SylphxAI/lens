@@ -715,6 +715,31 @@ export function flattenRouter(routerDef: RouterDef, prefix = ""): Map<string, An
 // Type Inference for Router
 // =============================================================================
 
+/**
+ * Query result type (thenable with reactive features)
+ * Matches the client's QueryResult interface
+ */
+export interface QueryResultType<T> {
+	/** Current value (for peeking without subscribing) */
+	readonly value: T | null;
+	/** Subscribe to updates */
+	subscribe(callback?: (data: T) => void): () => void;
+	/** Promise interface - allows await */
+	then<TResult1 = T, TResult2 = never>(
+		onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+		onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+	): Promise<TResult1 | TResult2>;
+}
+
+/**
+ * Mutation result type
+ * Matches the client's MutationResult interface
+ */
+export interface MutationResultType<T> {
+	data: T;
+	rollback?: () => void;
+}
+
 /** Infer the client type from a router definition */
 export type InferRouterClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
 	? {
@@ -722,10 +747,10 @@ export type InferRouterClient<TRouter extends RouterDef> = TRouter extends Route
 				? InferRouterClient<RouterDef<TNestedRoutes>>
 				: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
 					? TInput extends void
-						? () => Promise<TOutput>
-						: (input: TInput) => Promise<TOutput>
+						? () => QueryResultType<TOutput>
+						: (input: TInput) => QueryResultType<TOutput>
 					: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
-						? (input: TInput) => Promise<TOutput>
+						? (input: TInput) => Promise<MutationResultType<TOutput>>
 						: never;
 		}
 	: never;

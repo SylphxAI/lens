@@ -243,10 +243,26 @@ class ClientImpl {
 
 	/**
 	 * Get operation metadata (may be null before first operation)
+	 * Handles nested operations structure (e.g., "user.get" → metadata.operations.user.get)
 	 */
 	private getOperationMeta(path: string): Metadata["operations"][string] | undefined {
 		if (!this.metadata) return undefined;
-		return this.metadata.operations[path];
+
+		// Navigate nested operations structure
+		const parts = path.split(".");
+		let current: Metadata["operations"] | Metadata["operations"][string] = this.metadata.operations;
+
+		for (const part of parts) {
+			if (!current || typeof current !== "object") return undefined;
+			current = (current as Record<string, unknown>)[part] as Metadata["operations"][string];
+		}
+
+		// Check if we found an operation meta (has "type" property)
+		if (current && typeof current === "object" && "type" in current) {
+			return current as Metadata["operations"][string];
+		}
+
+		return undefined;
 	}
 
 	/**
@@ -563,25 +579,38 @@ class ClientImpl {
 
 	createAccessor(path: string): (input?: unknown) => unknown {
 		const accessor = (input?: unknown) => {
-			// Note: We don't check metadata here because we want lazy connection.
-			// The actual operation type is determined by the server via metadata
-			// which is fetched on first execute().
-			//
-			// For now, we check if the path looks like a mutation (common patterns).
-			// This will be corrected once metadata is loaded.
-			const isMutationPath =
-				path.includes("create") ||
-				path.includes("update") ||
-				path.includes("delete") ||
-				path.includes("set") ||
-				path.includes("add") ||
-				path.includes("remove");
-
-			if (isMutationPath) {
-				return this.executeMutation(path, input);
+			// Check metadata first if available (after first connection)
+			const meta = this.getOperationMeta(path);
+			if (meta) {
+				if (meta.type === "mutation") {
+					return this.executeMutation(path, input);
+				}
+				return this.executeQuery(path, input);
 			}
 
-			return this.executeQuery(path, input);
+			// No metadata yet (lazy connection) - use pattern detection as fallback.
+			// Query patterns are more predictable than mutation patterns, so we
+			// detect queries and default to mutation for everything else.
+			// This ensures custom mutations like "publish", "archive", etc. work correctly.
+			const lastSegment = path.split(".").pop() ?? path;
+			const isQueryPath =
+				lastSegment === "get" ||
+				lastSegment === "list" ||
+				lastSegment === "find" ||
+				lastSegment === "search" ||
+				lastSegment === "count" ||
+				lastSegment === "exists" ||
+				lastSegment.startsWith("get") ||
+				lastSegment.startsWith("list") ||
+				lastSegment.startsWith("find") ||
+				lastSegment.startsWith("by") ||
+				lastSegment.startsWith("search");
+
+			if (isQueryPath) {
+				return this.executeQuery(path, input);
+			}
+
+			return this.executeMutation(path, input);
 		};
 
 		// Add subscribe method

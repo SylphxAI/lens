@@ -4,7 +4,7 @@
 	"private": true,
 	"description": "Type-safe, real-time API framework",
 	"type": "module",
-	"workspaces": ["packages/*"],
+	"workspaces": ["packages/*", "examples/*"],
 	"scripts": {
 		"build": "bun run --filter '@sylphx/lens-core' build && bun run --filter '@sylphx/lens-client' --filter '@sylphx/lens-server' build && bun run --filter '@sylphx/lens-react' --filter '@sylphx/lens-solid' --filter '@sylphx/lens-vue' --filter '@sylphx/lens-svelte' build && bun run --filter '@sylphx/lens' build",
 		"test": "bun run --filter '*' test",
