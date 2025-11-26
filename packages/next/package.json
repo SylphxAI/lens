@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-next",
-	"version": "1.2.4",
+	"version": "1.2.5",
 	"description": "Next.js integration for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -20,8 +20,17 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "next", "nextjs", "react", "ssr"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"next",
+		"nextjs",
+		"react",
+		"ssr"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

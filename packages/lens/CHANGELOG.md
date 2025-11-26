@@ -1,5 +1,20 @@
 # @sylphx/lens
 
+## 1.0.9
+
+### Patch Changes
+
+- Remove OptimisticFn, keep DSL-only optimistic updates
+
+  - Remove legacy `OptimisticFn` type (functions cannot be serialized for client)
+  - `optimistic()` now only accepts DSL (`'merge'`, `'create'`, `'delete'`, etc.)
+  - Fixes type variance issues with MutationsMap/QueriesMap
+
+- Updated dependencies
+  - @sylphx/lens-core@1.3.2
+  - @sylphx/lens-server@1.3.2
+  - @sylphx/lens-client@1.0.9
+
 ## 1.0.8
 
 ### Patch Changes

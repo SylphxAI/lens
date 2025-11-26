@@ -1,5 +1,14 @@
 # @sylphx/lens-nuxt
 
+## 1.2.5
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-server@1.3.2
+  - @sylphx/lens-client@1.0.9
+  - @sylphx/lens-vue@1.2.5
+
 ## 1.2.4
 
 ### Patch Changes

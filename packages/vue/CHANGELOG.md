@@ -1,5 +1,11 @@
 # @sylphx/lens-vue
 
+## 1.2.5
+
+### Patch Changes
+
+- @sylphx/lens-client@1.0.9
+
 ## 1.2.4
 
 ### Patch Changes

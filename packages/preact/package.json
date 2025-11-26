@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-preact",
-	"version": "1.2.4",
+	"version": "1.2.5",
 	"description": "Preact bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -20,8 +20,16 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "preact", "hooks", "reactive"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"preact",
+		"hooks",
+		"reactive"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

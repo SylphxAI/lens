@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-fresh",
-	"version": "1.2.4",
+	"version": "1.2.5",
 	"description": "Fresh (Deno/Preact) integration for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -20,8 +20,17 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "fresh", "deno", "preact", "islands"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"fresh",
+		"deno",
+		"preact",
+		"islands"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

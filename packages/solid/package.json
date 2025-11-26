@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-solid",
-	"version": "1.2.4",
+	"version": "1.2.5",
 	"description": "SolidJS bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -16,8 +16,17 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "solid", "solidjs", "reactive", "signals"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"solid",
+		"solidjs",
+		"reactive",
+		"signals"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
