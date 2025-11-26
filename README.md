@@ -785,6 +785,65 @@ const server = createServer({
 const getMe = query().resolve(({ ctx }) => ctx.user)
 ```
 
+### Typed Context with `initLens`
+
+For full type safety across your project, use the tRPC-style `initLens` pattern:
+
+```typescript
+// lib/lens.ts - Define once, use everywhere
+import { initLens } from '@sylphx/lens-core'
+import type { PrismaClient } from '@prisma/client'
+
+// Define your context type
+interface Context {
+  db: PrismaClient
+  user: { id: string; role: 'admin' | 'user' } | null
+}
+
+// Create typed lens instance
+export const lens = initLens.context<Context>().create()
+```
+
+```typescript
+// routes/user.ts - ctx is fully typed!
+import { lens } from '../lib/lens'
+import { z } from 'zod'
+
+export const getUser = lens.query()
+  .input(z.object({ id: z.string() }))
+  .resolve(({ input, ctx }) => {
+    // ctx.db is typed as PrismaClient
+    // ctx.user is typed as { id: string; role: 'admin' | 'user' } | null
+    return ctx.db.user.findUnique({ where: { id: input.id } })
+  })
+
+export const createUser = lens.mutation()
+  .input(z.object({ name: z.string(), email: z.string() }))
+  .resolve(({ input, ctx }) => {
+    if (ctx.user?.role !== 'admin') throw new Error('Unauthorized')
+    return ctx.db.user.create({ data: input })
+  })
+```
+
+```typescript
+// server.ts - Wire up the context
+import { createServer, router } from '@sylphx/lens-server'
+import * as userRoutes from './routes/user'
+
+export const server = createServer({
+  router: router({ user: userRoutes }),
+  context: async (req) => ({
+    db: prisma,
+    user: await getUserFromRequest(req),
+  }),
+})
+```
+
+This gives you:
+- **Full autocomplete** on `ctx` in all resolvers
+- **Type errors** when accessing non-existent properties
+- **Single source of truth** for context type across your codebase
+
 ---
 
 ## Comparison

@@ -220,6 +220,14 @@ export {
 // =============================================================================
 
 export {
+	// Initialization (tRPC-style)
+	initLens,
+	type LensInstance,
+	type LensBuilder,
+	type LensBuilderWithContext,
+} from "./operations/init";
+
+export {
 	// Builders
 	query,
 	mutation,
