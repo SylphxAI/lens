@@ -2,19 +2,9 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
-
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+    branches: [main]
 
 jobs:
   release:
-    name: Release
-    uses: SylphxAI/.github/.github/workflows/publish-npm.yml@main
-    with:
-      build-command: 'bun run build'
-      test-command: 'bun run test'
-      create-github-releases: true
-    secrets:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    uses: SylphxAI/.github/.github/workflows/release.yml@main
+    secrets: inherit
