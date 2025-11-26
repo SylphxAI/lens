@@ -6,47 +6,48 @@ End-to-end type safety from server to client. Like tRPC, but with **automatic li
 
 ## What Lens Does
 
-Lens lets you define type-safe API operations on the server that clients can call with full TypeScript inference. **Every query is automatically a live query** - clients can subscribe to any query and receive updates when the data changes.
+Lens lets you define type-safe API operations on the server that clients can call with full TypeScript inference. **Every query automatically supports subscriptions** - clients can subscribe to any query and receive updates when data changes. The server automatically computes and sends **only the changed fields** (minimal diff).
 
 ```typescript
-// Server: Define your API (just like tRPC)
+// Server: Define your API
 const appRouter = router({
   user: {
     get: query()
       .input(z.object({ id: z.string() }))
-      .resolve(({ input }) => db.user.find(input.id)),
+      .resolve(({ input, ctx }) => ctx.db.user.find(input.id)),
 
-    create: mutation()
-      .input(z.object({ name: z.string(), email: z.string() }))
-      .resolve(({ input }) => db.user.create(input)),
+    update: mutation()
+      .input(z.object({ id: z.string(), name: z.string() }))
+      .resolve(({ input, ctx }) => ctx.db.user.update(input)),
   },
 })
 
-// Client: One-time fetch (like REST/tRPC)
+// Client: One-time fetch
 const user = await client.user.get({ id: '123' })
 
-// Client: Live subscription - automatically receives updates!
+// Client: Subscribe to live updates
 client.user.get({ id: '123' }).subscribe((user) => {
-  console.log('User updated:', user)  // Called on every change
+  console.log('User updated:', user)  // Called whenever data changes
 })
 ```
 
 **Key features:**
 - 🔄 **Automatic Live Queries** - Any query can be subscribed to
-- 📡 **Minimal Data Transfer** - Server only sends changed fields (automatic diff)
+- 📡 **Minimal Diff Updates** - Server only sends changed fields
 - 🎯 **Field Selection** - Subscribe to specific fields only
 - ⚡ **Optimistic Updates** - Instant UI feedback with automatic rollback
-- 🌐 **Multi-Server** - Route to different backends with full type safety
+- 🌐 **Multi-Server Routing** - Route to different backends with full type safety
+- 🔌 **Plugin System** - Extensible request/response processing
 
 ---
 
 ## How Live Queries Work
 
-Every Lens query is automatically "live". When a client subscribes, Lens:
+When a client subscribes to a query, the server:
 
 1. Executes the resolver and sends initial data
 2. Tracks which entities/fields the client is watching
-3. When data changes, automatically sends **only the changed fields** (diff)
+3. When data changes, computes and sends **only the changed fields**
 
 ```
 ┌─────────┐                      ┌─────────┐
@@ -61,22 +62,13 @@ Every Lens query is automatically "live". When a client subscribes, Lens:
      │                                │
      │  Diff: {name:'New Name'}       │  ← Only changed field!
      │ <───────────────────────────── │
-     │                                │
-     │  Diff: {email:'new@mail.com'}  │  ← Only changed field!
-     │ <───────────────────────────── │
 ```
-
-**The server automatically:**
-- Tracks entity state across all subscriptions
-- Computes minimal diff between old and new values
-- Only sends fields that actually changed
-- Batches updates for efficiency
 
 ---
 
 ## Resolver Patterns
 
-Lens supports three ways to produce data in resolvers. **All patterns support live queries automatically.**
+Lens supports three ways to produce data in resolvers. **All patterns support live subscriptions.**
 
 ### 1. Single Return (Standard)
 
@@ -85,14 +77,12 @@ Most common pattern - returns a value once:
 ```typescript
 const getUser = query()
   .input(z.object({ id: z.string() }))
-  .resolve(({ input }) => db.user.find(input.id))
+  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
 ```
 
-When subscribed, the resolver re-executes when relevant data changes.
+### 2. Push Updates with `ctx.emit()`
 
-### 2. Push Updates with `ctx.emit`
-
-For fine-grained control, push updates manually:
+For fine-grained control over when updates are sent:
 
 ```typescript
 const watchUser = query()
@@ -100,11 +90,14 @@ const watchUser = query()
   .resolve(({ input, ctx }) => {
     // Subscribe to external data source
     const unsubscribe = db.user.onChange(input.id, (user) => {
-      ctx.emit(user)  // Push update to client
+      ctx.emit(user)  // Push update to subscribed clients
     })
-    ctx.onCleanup(unsubscribe)  // Cleanup on disconnect
 
-    return db.user.find(input.id)  // Initial data
+    // Cleanup when client disconnects
+    ctx.onCleanup(unsubscribe)
+
+    // Return initial data
+    return db.user.find(input.id)
   })
 ```
 
@@ -113,10 +106,10 @@ const watchUser = query()
 For streaming multiple values (pagination, feeds, AI responses):
 
 ```typescript
-const streamUsers = query()
-  .resolve(async function* () {
-    for await (const user of db.user.cursor()) {
-      yield user  // Stream each value
+const streamMessages = query()
+  .resolve(async function* ({ ctx }) {
+    for await (const message of ctx.ai.stream()) {
+      yield message  // Stream each value to client
     }
   })
 ```
@@ -134,6 +127,7 @@ npm install @sylphx/lens-react    # React
 npm install @sylphx/lens-vue      # Vue
 npm install @sylphx/lens-solid    # SolidJS
 npm install @sylphx/lens-svelte   # Svelte
+npm install @sylphx/lens-preact   # Preact
 
 # Meta-framework integrations (optional)
 npm install @sylphx/lens-next       # Next.js
@@ -156,24 +150,31 @@ import { z } from 'zod'
 export const appRouter = router({
   user: {
     list: query()
-      .resolve(() => db.user.findMany()),
+      .resolve(({ ctx }) => ctx.db.user.findMany()),
 
     get: query()
       .input(z.object({ id: z.string() }))
-      .resolve(({ input }) => db.user.findUnique({ where: { id: input.id } })),
+      .resolve(({ input, ctx }) => ctx.db.user.findUnique({ where: { id: input.id } })),
 
     create: mutation()
       .input(z.object({ name: z.string(), email: z.string() }))
-      .resolve(({ input }) => db.user.create({ data: input })),
+      .resolve(({ input, ctx }) => ctx.db.user.create({ data: input })),
 
     update: mutation()
       .input(z.object({ id: z.string(), name: z.string().optional() }))
-      .resolve(({ input }) => db.user.update({ where: { id: input.id }, data: input })),
+      .resolve(({ input, ctx }) => ctx.db.user.update({ where: { id: input.id }, data: input })),
   },
 })
 
 export type AppRouter = typeof appRouter
-export const server = createServer({ router: appRouter })
+
+export const server = createServer({
+  router: appRouter,
+  context: async (req) => ({
+    db: prisma,
+    user: await getUserFromRequest(req),
+  }),
+})
 ```
 
 ### 2. Create Your Client
@@ -183,51 +184,54 @@ export const server = createServer({ router: appRouter })
 import { createClient, http } from '@sylphx/lens-client'
 import type { AppRouter } from '../server/api'
 
+// Sync creation - connection is lazy (on first operation)
 export const client = createClient<AppRouter>({
   transport: http({ url: '/api' }),
 })
 
-// One-time query
+// One-time query (await)
 const user = await client.user.get({ id: '123' })
 
-// Live subscription - receives all updates automatically
-const subscription = client.user.get({ id: '123' }).subscribe((user) => {
+// Live subscription
+const unsubscribe = client.user.get({ id: '123' }).subscribe((user) => {
   console.log('Current user:', user)
 })
 
-// Update triggers automatic push to all subscribers
+// Mutations trigger updates to all subscribers
 await client.user.update({ id: '123', name: 'New Name' })
-// ^ All subscribers instantly receive: { name: 'New Name' }
+// ^ All subscribers receive the update
 
 // Cleanup
-subscription.unsubscribe()
+unsubscribe()
 ```
 
 ### 3. Use with React
 
 ```tsx
 import { useQuery, useMutation } from '@sylphx/lens-react'
-import { client } from '../client/api'
+import { client } from './api'
 
-function UserProfile({ userId }) {
-  // Automatically subscribes - receives live updates!
-  const { data, loading, error } = useQuery(client.user.get({ id: userId }))
+function UserProfile({ userId }: { userId: string }) {
+  // Automatically subscribes and receives live updates
+  const { data: user, loading, error } = useQuery(client.user.get({ id: userId }))
 
   if (loading) return <div>Loading...</div>
   if (error) return <div>Error: {error.message}</div>
 
-  return <h1>{data?.name}</h1>  // Auto-updates when name changes
+  return <h1>{user?.name}</h1>
 }
 
-function UpdateUser({ userId }) {
+function UpdateUser({ userId }: { userId: string }) {
   const { mutate, loading } = useMutation(client.user.update)
 
-  const handleClick = () => {
-    // This triggers update to ALL components watching this user
-    mutate({ id: userId, name: 'New Name' })
-  }
-
-  return <button disabled={loading} onClick={handleClick}>Update</button>
+  return (
+    <button
+      disabled={loading}
+      onClick={() => mutate({ id: userId, name: 'New Name' })}
+    >
+      Update
+    </button>
+  )
 }
 ```
 
@@ -235,14 +239,14 @@ function UpdateUser({ userId }) {
 
 ## Field Selection
 
-Subscribe to only the fields you need - server tracks and sends minimal updates:
+Subscribe to only the fields you need. The server tracks and sends minimal updates:
 
 ```typescript
-// Only subscribe to specific fields
+// Select specific fields
 client.user.get({ id: '123' })
   .select({ name: true, email: true })
   .subscribe((user) => {
-    // Only receives updates when 'name' or 'email' changes
+    // Only receives updates when name or email changes
   })
 
 // Nested selection for relations
@@ -258,18 +262,156 @@ client.user.get({ id: '123' })
 
 ---
 
-## Meta-Framework Integrations
+## Transport System
 
-For full-stack frameworks, Lens provides unified setup:
+### HTTP Transport
+
+Default transport - uses HTTP for queries/mutations, polling for subscriptions:
+
+```typescript
+import { createClient, http } from '@sylphx/lens-client'
+
+const client = createClient<AppRouter>({
+  transport: http({ url: '/api' }),
+})
+```
+
+### WebSocket Transport
+
+All operations over WebSocket - best for real-time apps:
+
+```typescript
+import { createClient, ws } from '@sylphx/lens-client'
+
+const client = createClient<AppRouter>({
+  transport: ws({
+    url: 'ws://localhost:3000/ws',
+    reconnect: { enabled: true, maxAttempts: 10 },
+  }),
+})
+```
+
+### Multi-Server Routing
+
+Route operations to different backends based on path patterns:
+
+```typescript
+import { createClient, http, route } from '@sylphx/lens-client'
+
+const client = createClient<AppRouter>({
+  transport: route({
+    'auth.*': http({ url: '/auth-api' }),
+    'analytics.*': http({ url: '/analytics-api' }),
+    '*': http({ url: '/api' }),  // fallback
+  }),
+})
+
+// Routes automatically:
+await client.auth.login({ ... })      // → /auth-api
+await client.analytics.track({ ... }) // → /analytics-api
+await client.user.get({ ... })        // → /api
+```
+
+### Route by Operation Type
+
+```typescript
+import { createClient, http, ws, routeByType } from '@sylphx/lens-client'
+
+const client = createClient<AppRouter>({
+  transport: routeByType({
+    default: http({ url: '/api' }),
+    subscription: ws({ url: 'ws://localhost:3000/ws' }),
+  }),
+})
+```
+
+---
+
+## Optimistic Updates
+
+Mutations can define optimistic behavior for instant UI feedback:
+
+```typescript
+// Server: Define optimistic strategy
+const updateUser = mutation()
+  .input(z.object({ id: z.string(), name: z.string() }))
+  .optimistic('merge')  // Instantly merge input into local state
+  .resolve(({ input, ctx }) => ctx.db.user.update({
+    where: { id: input.id },
+    data: input
+  }))
+
+// Client: UI updates instantly, rolls back on error
+await client.user.update({ id: '123', name: 'New Name' })
+```
+
+Optimistic strategies:
+- `'merge'` - Merge input into existing entity (auto-derived from `updateX` naming)
+- `'create'` - Create with temporary ID (auto-derived from `createX` naming)
+- `'delete'` - Mark entity as deleted (auto-derived from `deleteX` naming)
+- `{ merge: { field: value } }` - Merge with additional fields
+
+---
+
+## Plugin System
+
+Extend client behavior with plugins:
+
+```typescript
+import { createClient, http } from '@sylphx/lens-client'
+
+const client = createClient<AppRouter>({
+  transport: http({ url: '/api' }),
+  plugins: [
+    // Auth plugin
+    {
+      name: 'auth',
+      beforeRequest: async (op) => {
+        op.meta = {
+          ...op.meta,
+          headers: { Authorization: `Bearer ${getToken()}` }
+        }
+        return op
+      },
+    },
+    // Logger plugin
+    {
+      name: 'logger',
+      beforeRequest: (op) => {
+        console.log('→', op.path, op.input)
+        return op
+      },
+      afterResponse: (result, op) => {
+        console.log('←', op.path, result.data ?? result.error)
+        return result
+      },
+    },
+    // Retry plugin
+    {
+      name: 'retry',
+      onError: async (error, op, retry) => {
+        if (op.meta?.retryCount ?? 0 < 3) {
+          op.meta = { ...op.meta, retryCount: (op.meta?.retryCount ?? 0) + 1 }
+          return retry()
+        }
+        throw error
+      },
+    },
+  ],
+})
+```
+
+---
+
+## Meta-Framework Integrations
 
 ### Next.js
 
 ```typescript
 // lib/lens.ts
 import { createLensNext } from '@sylphx/lens-next'
-import { createServer } from '@sylphx/lens-server'
+import { server } from './server'
 
-const server = createServer({ router: appRouter })
 export const lens = createLensNext({ server })
 ```
 
@@ -291,9 +433,9 @@ export default async function UsersPage() {
 ```tsx
 // Client Component - live updates
 'use client'
-export function UserProfile({ userId }) {
+export function UserProfile({ userId }: { userId: string }) {
   const { data, loading } = lens.useQuery(c => c.user.get({ id: userId }))
-  return <h1>{data?.name}</h1>  // Auto-updates!
+  return <h1>{data?.name}</h1>
 }
 ```
 
@@ -302,7 +444,6 @@ export function UserProfile({ userId }) {
 ```typescript
 // server/lens.ts
 import { createLensNuxt } from '@sylphx/lens-nuxt'
-const server = createServer({ router: appRouter })
 export const lens = createLensNuxt({ server })
 ```
 
@@ -320,7 +461,6 @@ const { data } = await lens.useQuery('user', c => c.user.get({ id: '123' }))
 ```typescript
 // lib/lens.ts
 import { createLensSolidStart } from '@sylphx/lens-solidstart'
-const server = createServer({ router: appRouter })
 export const lens = createLensSolidStart({ server })
 ```
 
@@ -352,61 +492,19 @@ const getMe = query().resolve(({ ctx }) => ctx.user)
 
 ---
 
-## Transport System
-
-```typescript
-import { createClient, http, ws, route } from '@sylphx/lens-client'
-
-// HTTP (queries via GET, mutations via POST, subscriptions via SSE)
-const client = createClient<AppRouter>({
-  transport: http({ url: '/api' }),
-})
-
-// WebSocket (all operations, best for real-time)
-const client = createClient<AppRouter>({
-  transport: ws({ url: 'ws://localhost:3000/ws' }),
-})
-
-// Route to multiple servers
-const client = createClient<AppRouter>({
-  transport: route({
-    'auth.*': http({ url: '/auth-api' }),
-    'analytics.*': http({ url: '/analytics-api' }),
-    '*': http({ url: '/api' }),
-  }),
-})
-```
-
----
-
-## Optimistic Updates
-
-Mutations can define optimistic behavior for instant UI:
-
-```typescript
-const updateUser = mutation()
-  .input(z.object({ id: z.string(), name: z.string() }))
-  .optimistic('merge')  // Instantly merge input into local state
-  .resolve(({ input }) => db.user.update({ where: { id: input.id }, data: input }))
-
-// UI updates instantly, rolls back on error
-await client.user.update({ id: '123', name: 'New Name' })
-```
-
----
-
 ## Comparison
 
 | Feature | tRPC | GraphQL | REST | **Lens** |
 |---------|------|---------|------|----------|
 | Type Safety | ✅ | Codegen | ❌ | ✅ |
 | Code-first | ✅ | SDL | ✅ | ✅ |
-| Auto Live Queries | ❌ | ❌ | ❌ | ✅ |
+| Live Subscriptions | ❌ | Subscriptions | ❌ | ✅ Auto |
 | Minimal Diff Updates | ❌ | ❌ | ❌ | ✅ |
 | Field Selection | ❌ | ✅ | ❌ | ✅ |
-| Streaming | ❌ | ❌ | ❌ | ✅ |
+| Streaming | ✅ | ❌ | ❌ | ✅ |
 | Optimistic Updates | Manual | Manual | Manual | **Auto** |
 | Multi-Server | Manual | Federation | Manual | **Native** |
+| Plugin System | Links | ❌ | ❌ | ✅ Hooks |
 
 ---
 
@@ -415,11 +513,12 @@ await client.user.update({ id: '123', name: 'New Name' })
 | Package | Description |
 |---------|-------------|
 | `@sylphx/lens-server` | Server, router, operations |
-| `@sylphx/lens-client` | Client, transports |
+| `@sylphx/lens-client` | Client, transports, plugins |
 | `@sylphx/lens-react` | React hooks |
 | `@sylphx/lens-vue` | Vue composables |
 | `@sylphx/lens-solid` | SolidJS primitives |
 | `@sylphx/lens-svelte` | Svelte stores |
+| `@sylphx/lens-preact` | Preact hooks + signals |
 | `@sylphx/lens-next` | Next.js integration |
 | `@sylphx/lens-nuxt` | Nuxt 3 integration |
 | `@sylphx/lens-solidstart` | SolidStart integration |
