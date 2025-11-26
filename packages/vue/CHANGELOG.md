@@ -1,5 +1,20 @@
 # @sylphx/lens-vue
 
+## 1.0.4
+
+### Patch Changes
+
+- 01920b1: Fix framework bundling and build configuration
+
+  - Fix React bundling issue: properly externalize React instead of bundling (reduces size from 109KB to 4KB)
+  - Add workspace bunup configuration with explicit return types for isolated declarations
+  - Fix Solid package build: use tsc for type generation since bun build doesn't support --dts
+  - Add explicit return types to satisfy TypeScript isolated declarations requirement
+  - All packages now build without warnings
+
+- Updated dependencies [01920b1]
+  - @sylphx/lens-client@1.0.3
+
 ## 1.0.3
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Type-safe, real-time API framework - GraphQL concepts in TypeScript with zero codegen",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -24,7 +24,10 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
-	"files": ["dist", "src"],
+	"files": [
+		"dist",
+		"src"
+	],
 	"keywords": [
 		"lens",
 		"api",
