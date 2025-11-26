@@ -238,19 +238,21 @@ function UpdateUser({ userId }) {
 Subscribe to only the fields you need - server tracks and sends minimal updates:
 
 ```typescript
-// Only subscribe to 'name' field
+// Only subscribe to specific fields
 client.user.get({ id: '123' })
-  .select(['name'])
+  .select({ name: true, email: true })
   .subscribe((user) => {
-    // Only receives updates when 'name' changes
-    // Other field changes (email, etc) won't trigger this
+    // Only receives updates when 'name' or 'email' changes
   })
 
-// Subscribe to all fields
+// Nested selection for relations
 client.user.get({ id: '123' })
-  .select('*')
+  .select({
+    name: true,
+    posts: { select: { title: true, author: true } }
+  })
   .subscribe((user) => {
-    // Receives updates for any field change
+    // Receives updates for user.name or any post's title/author
   })
 ```
 
