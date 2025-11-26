@@ -1,5 +1,19 @@
 # @sylphx/lens-react
 
+## 1.0.5
+
+### Patch Changes
+
+- 53a6877: Republish all packages with verified build configuration
+
+  - All packages now use workspace bunup configuration
+  - Explicit return types for isolated declarations
+  - Framework packages properly externalize peer dependencies
+  - Solid package uses tsc for type generation
+
+- Updated dependencies [53a6877]
+  - @sylphx/lens-client@1.0.4
+
 ## 1.0.4
 
 ### Patch Changes
