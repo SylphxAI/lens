@@ -787,22 +787,21 @@ const getMe = query().resolve(({ ctx }) => ctx.user)
 
 ### Typed Context (Automatic Inference)
 
-Each query/mutation declares its own context requirements. The router automatically merges them, and `createServer` enforces the final type:
+Each query/mutation declares only what it actually uses. The router automatically merges them, and `createServer` enforces the final type:
 
 ```typescript
-// routes/user.ts - Declare what this query needs
+// routes/user.ts - Only declare what you USE
 import { query, mutation } from '@sylphx/lens-server'
 import { z } from 'zod'
 
-// This query needs db and user in context
-export const getUser = query<{ db: PrismaClient; user: User | null }>()
+// Only uses ctx.db
+export const getUser = query<{ db: PrismaClient }>()
   .input(z.object({ id: z.string() }))
   .resolve(({ input, ctx }) => {
-    // ctx.db and ctx.user are fully typed!
     return ctx.db.user.findUnique({ where: { id: input.id } })
   })
 
-// This mutation needs db and user
+// Uses ctx.db AND ctx.user
 export const createUser = mutation<{ db: PrismaClient; user: User | null }>()
   .input(z.object({ name: z.string(), email: z.string() }))
   .resolve(({ input, ctx }) => {
@@ -812,13 +811,11 @@ export const createUser = mutation<{ db: PrismaClient; user: User | null }>()
 ```
 
 ```typescript
-// routes/cache.ts - Different context requirements
-export const getCached = query<{ db: PrismaClient; cache: RedisClient }>()
+// routes/cache.ts - Different requirements
+// Only uses ctx.cache
+export const getCached = query<{ cache: RedisClient }>()
   .input(z.object({ key: z.string() }))
-  .resolve(({ input, ctx }) => {
-    // ctx.db and ctx.cache are typed!
-    return ctx.cache.get(input.key) ?? ctx.db.fallback(input.key)
-  })
+  .resolve(({ input, ctx }) => ctx.cache.get(input.key))
 ```
 
 ```typescript
@@ -832,13 +829,13 @@ const appRouter = router({
   cache: cacheRoutes,
 })
 
-// Context must satisfy ALL requirements: { db, user, cache }
+// Merged context: { db: PrismaClient; user: User | null; cache: RedisClient }
 const server = createServer({
   router: appRouter,
   context: async (req) => ({
-    db: prisma,           // Required by user + cache routes
-    user: await getUser(req),  // Required by user routes
-    cache: redis,         // Required by cache routes
+    db: prisma,                // Required by getUser, createUser
+    user: await getUser(req),  // Required by createUser
+    cache: redis,              // Required by getCached
   }),
 })
 ```
