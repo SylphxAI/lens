@@ -12,7 +12,7 @@
 		}
 	},
 	"scripts": {
-		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js --dts",
+		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
