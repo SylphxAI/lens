@@ -846,6 +846,44 @@ This gives you:
 - **Automatic merging** - router combines all context requirements
 - **Type enforcement** - `createServer` ensures context satisfies all needs
 
+#### Simple Approach: Shared Context Type
+
+If you prefer simplicity, just declare the same context type everywhere:
+
+```typescript
+// types.ts
+export interface Context {
+  db: PrismaClient
+  user: User | null
+  cache: RedisClient
+}
+
+// routes/user.ts
+export const getUser = query<Context>()
+  .resolve(({ ctx }) => ctx.db.user.find(...))
+
+export const createUser = mutation<Context>()
+  .resolve(({ ctx }) => ctx.db.user.create(...))
+```
+
+Or wrap it once and reuse:
+
+```typescript
+// lib/procedures.ts
+import { query, mutation } from '@sylphx/lens-server'
+import type { Context } from './types'
+
+export const typedQuery = () => query<Context>()
+export const typedMutation = () => mutation<Context>()
+
+// routes/user.ts
+import { typedQuery, typedMutation } from '../lib/procedures'
+
+export const getUser = typedQuery()
+  .input(z.object({ id: z.string() }))
+  .resolve(({ ctx }) => ctx.db.user.find(...))
+```
+
 ---
 
 ## Comparison
