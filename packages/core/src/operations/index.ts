@@ -233,28 +233,31 @@ export function normalizeOptimisticDSL(dsl: OptimisticDSL): {
 // =============================================================================
 
 /** Query definition */
-export interface QueryDef<TInput = void, TOutput = unknown> {
+export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown> {
 	_type: "query";
 	/** Query name (optional - derived from export key if not provided) */
 	_name?: string;
 	_input?: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
-	_resolve?: ResolverFn<TInput, TOutput>;
+	// biome-ignore lint/suspicious/noExplicitAny: Context type is erased at runtime
+	_resolve?: ResolverFn<TInput, TOutput, any>;
 }
 
 /** Query builder - fluent interface */
-export interface QueryBuilder<TInput = void, TOutput = unknown> {
+export interface QueryBuilder<TInput = void, TOutput = unknown, TContext = unknown> {
 	/** Define input validation schema (optional for queries) */
-	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput>;
+	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput, TContext>;
 
-	/** Define return type */
-	returns<R extends ReturnSpec>(spec: R): QueryBuilder<TInput, InferReturnType<R>>;
+	/** Define return type (optional - for entity outputs) */
+	returns<R extends ReturnSpec>(spec: R): QueryBuilder<TInput, InferReturnType<R>, TContext>;
 
 	/** Define resolver function */
-	resolve(fn: ResolverFn<TInput, TOutput>): QueryDef<TInput, TOutput>;
+	resolve<TOut = TOutput>(fn: ResolverFn<TInput, TOut, TContext>): QueryDef<TInput, TOut>;
 }
 
-class QueryBuilderImpl<TInput = void, TOutput = unknown> implements QueryBuilder<TInput, TOutput> {
+class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unknown>
+	implements QueryBuilder<TInput, TOutput, TContext>
+{
 	private _name?: string;
 	private _inputSchema?: ZodLikeSchema<TInput>;
 	private _outputSpec?: ReturnSpec;
@@ -263,21 +266,21 @@ class QueryBuilderImpl<TInput = void, TOutput = unknown> implements QueryBuilder
 		this._name = name;
 	}
 
-	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput> {
-		const builder = new QueryBuilderImpl<T, TOutput>(this._name);
+	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput, TContext> {
+		const builder = new QueryBuilderImpl<T, TOutput, TContext>(this._name);
 		builder._inputSchema = schema;
 		builder._outputSpec = this._outputSpec;
 		return builder;
 	}
 
-	returns<R extends ReturnSpec>(spec: R): QueryBuilder<TInput, InferReturnType<R>> {
-		const builder = new QueryBuilderImpl<TInput, InferReturnType<R>>(this._name);
+	returns<R extends ReturnSpec>(spec: R): QueryBuilder<TInput, InferReturnType<R>, TContext> {
+		const builder = new QueryBuilderImpl<TInput, InferReturnType<R>, TContext>(this._name);
 		builder._inputSchema = this._inputSchema as ZodLikeSchema<TInput> | undefined;
 		builder._outputSpec = spec;
 		return builder;
 	}
 
-	resolve(fn: ResolverFn<TInput, TOutput>): QueryDef<TInput, TOutput> {
+	resolve<TOut = TOutput>(fn: ResolverFn<TInput, TOut, TContext>): QueryDef<TInput, TOut> {
 		return {
 			_type: "query",
 			_name: this._name,
@@ -295,23 +298,28 @@ class QueryBuilderImpl<TInput = void, TOutput = unknown> implements QueryBuilder
  *
  * @example
  * ```typescript
- * // Name derived from export key (recommended)
+ * // Basic usage (no typed context)
  * export const getUser = query()
  *   .input(z.object({ id: z.string() }))
  *   .returns(User)
  *   .resolve(({ input }) => db.user.findUnique({ where: { id: input.id } }));
  *
- * // Explicit name (for edge cases)
- * export const getUser = query('getUser')
+ * // With typed context (recommended)
+ * export const getUser = query<MyContext>()
  *   .input(z.object({ id: z.string() }))
- *   .returns(User)
- *   .resolve(({ input }) => db.user.findUnique({ where: { id: input.id } }));
+ *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id));
+ *   // ctx is typed as MyContext!
+ *
+ * // Without .returns() - for simple return types
+ * export const getStatus = query()
+ *   .resolve(() => ({ online: true, version: "1.0" }));
+ *   // Returns inferred type without needing .returns()
  * ```
  */
-export function query(): QueryBuilder<void, unknown>;
-export function query(name: string): QueryBuilder<void, unknown>;
-export function query(name?: string): QueryBuilder<void, unknown> {
-	return new QueryBuilderImpl(name);
+export function query<TContext = unknown>(): QueryBuilder<void, unknown, TContext>;
+export function query<TContext = unknown>(name: string): QueryBuilder<void, unknown, TContext>;
+export function query<TContext = unknown>(name?: string): QueryBuilder<void, unknown, TContext> {
+	return new QueryBuilderImpl<void, unknown, TContext>(name);
 }
 
 // =============================================================================
@@ -319,7 +327,7 @@ export function query(name?: string): QueryBuilder<void, unknown> {
 // =============================================================================
 
 /** Mutation definition */
-export interface MutationDef<TInput = unknown, TOutput = unknown> {
+export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unknown> {
 	_type: "mutation";
 	/** Mutation name (optional - derived from export key if not provided) */
 	_name?: string;
@@ -331,23 +339,37 @@ export interface MutationDef<TInput = unknown, TOutput = unknown> {
 	 * - Function: Legacy, requires runtime import
 	 */
 	_optimistic?: OptimisticDSL | OptimisticFn<TInput, TOutput>;
-	_resolve: ResolverFn<TInput, TOutput>;
+	// biome-ignore lint/suspicious/noExplicitAny: Context type is erased at runtime
+	_resolve: ResolverFn<TInput, TOutput, any>;
 }
 
 /** Mutation builder - fluent interface */
-export interface MutationBuilder<TInput = unknown, TOutput = unknown> {
+export interface MutationBuilder<TInput = unknown, TOutput = unknown, TContext = unknown> {
 	/** Define input validation schema (required for mutations) */
-	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput>;
+	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput, TContext>;
 }
 
 /** Mutation builder after input is defined */
-export interface MutationBuilderWithInput<TInput, TOutput = unknown> {
-	/** Define return type */
-	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>>;
+export interface MutationBuilderWithInput<TInput, TOutput = unknown, TContext = unknown> {
+	/** Define return type (optional - for entity outputs) */
+	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>, TContext>;
+
+	/**
+	 * Define resolver function directly (without .returns())
+	 * Use this for mutations that return simple types (not entities)
+	 *
+	 * @example
+	 * ```typescript
+	 * mutation()
+	 *   .input(z.object({ id: z.string() }))
+	 *   .resolve(({ input, ctx }) => ({ success: true }))
+	 * ```
+	 */
+	resolve<TOut>(fn: ResolverFn<TInput, TOut, TContext>): MutationDef<TInput, TOut>;
 }
 
 /** Mutation builder after returns is defined */
-export interface MutationBuilderWithReturns<TInput, TOutput> {
+export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown> {
 	/**
 	 * Define optimistic update (optional)
 	 *
@@ -367,24 +389,24 @@ export interface MutationBuilderWithReturns<TInput, TOutput> {
 	 */
 	optimistic(
 		spec: OptimisticDSL | OptimisticFn<TInput, TOutput>,
-	): MutationBuilderWithOptimistic<TInput, TOutput>;
+	): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
 
 	/** Define resolver function */
-	resolve(fn: ResolverFn<TInput, TOutput>): MutationDef<TInput, TOutput>;
+	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
 }
 
 /** Mutation builder after optimistic is defined */
-export interface MutationBuilderWithOptimistic<TInput, TOutput> {
+export interface MutationBuilderWithOptimistic<TInput, TOutput, TContext = unknown> {
 	/** Define resolver function */
-	resolve(fn: ResolverFn<TInput, TOutput>): MutationDef<TInput, TOutput>;
+	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
 }
 
-class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
+class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknown>
 	implements
 		MutationBuilder<TInput, TOutput>,
-		MutationBuilderWithInput<TInput, TOutput>,
-		MutationBuilderWithReturns<TInput, TOutput>,
-		MutationBuilderWithOptimistic<TInput, TOutput>
+		MutationBuilderWithInput<TInput, TOutput, TContext>,
+		MutationBuilderWithReturns<TInput, TOutput, TContext>,
+		MutationBuilderWithOptimistic<TInput, TOutput, TContext>
 {
 	private _name?: string;
 	private _inputSchema?: ZodLikeSchema<TInput>;
@@ -395,14 +417,14 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 		this._name = name;
 	}
 
-	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput> {
-		const builder = new MutationBuilderImpl<T, TOutput>(this._name);
+	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput, TContext> {
+		const builder = new MutationBuilderImpl<T, TOutput, TContext>(this._name);
 		builder._inputSchema = schema;
 		return builder;
 	}
 
-	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>> {
-		const builder = new MutationBuilderImpl<TInput, InferReturnType<R>>(this._name);
+	returns<R extends ReturnSpec>(spec: R): MutationBuilderWithReturns<TInput, InferReturnType<R>, TContext> {
+		const builder = new MutationBuilderImpl<TInput, InferReturnType<R>, TContext>(this._name);
 		builder._inputSchema = this._inputSchema as ZodLikeSchema<TInput> | undefined;
 		builder._outputSpec = spec;
 		return builder;
@@ -410,15 +432,15 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 
 	optimistic(
 		spec: OptimisticDSL | OptimisticFn<TInput, TOutput>,
-	): MutationBuilderWithOptimistic<TInput, TOutput> {
-		const builder = new MutationBuilderImpl<TInput, TOutput>(this._name);
+	): MutationBuilderWithOptimistic<TInput, TOutput, TContext> {
+		const builder = new MutationBuilderImpl<TInput, TOutput, TContext>(this._name);
 		builder._inputSchema = this._inputSchema;
 		builder._outputSpec = this._outputSpec;
 		builder._optimisticSpec = spec;
 		return builder;
 	}
 
-	resolve(fn: ResolverFn<TInput, TOutput>): MutationDef<TInput, TOutput> {
+	resolve<TOut = TOutput>(fn: ResolverFn<TInput, TOut, TContext>): MutationDef<TInput, TOut> {
 		if (!this._inputSchema) {
 			throw new Error("Mutation requires input schema. Use .input(schema) first.");
 		}
@@ -427,7 +449,7 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
 			_name: this._name,
 			_input: this._inputSchema,
 			_output: this._outputSpec,
-			_optimistic: this._optimisticSpec,
+			_optimistic: this._optimisticSpec as OptimisticDSL | OptimisticFn<TInput, TOut> | undefined,
 			_resolve: fn,
 		};
 	}
@@ -440,23 +462,29 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown>
  *
  * @example
  * ```typescript
- * // Name derived from export key (recommended)
+ * // Basic usage (no typed context)
  * export const createPost = mutation()
  *   .input(z.object({ title: z.string(), content: z.string() }))
  *   .returns(Post)
  *   .resolve(({ input }) => db.post.create({ data: input }));
  *
- * // Explicit name (for edge cases)
- * export const createPost = mutation('createPost')
- *   .input(z.object({ title: z.string(), content: z.string() }))
- *   .returns(Post)
- *   .resolve(({ input }) => db.post.create({ data: input }));
+ * // With typed context (recommended)
+ * export const createPost = mutation<MyContext>()
+ *   .input(z.object({ title: z.string() }))
+ *   .resolve(({ input, ctx }) => ctx.db.post.create({ data: input }));
+ *   // ctx is typed as MyContext!
+ *
+ * // Without .returns() - for simple return types
+ * export const deletePost = mutation()
+ *   .input(z.object({ id: z.string() }))
+ *   .resolve(({ input }) => ({ success: true }));
+ *   // Returns { success: boolean } without needing .returns()
  * ```
  */
-export function mutation(): MutationBuilder<unknown, unknown>;
-export function mutation(name: string): MutationBuilder<unknown, unknown>;
-export function mutation(name?: string): MutationBuilder<unknown, unknown> {
-	return new MutationBuilderImpl(name);
+export function mutation<TContext = unknown>(): MutationBuilder<unknown, unknown, TContext>;
+export function mutation<TContext = unknown>(name: string): MutationBuilder<unknown, unknown, TContext>;
+export function mutation<TContext = unknown>(name?: string): MutationBuilder<unknown, unknown, TContext> {
+	return new MutationBuilderImpl<unknown, unknown, TContext>(name);
 }
 
 // =============================================================================
