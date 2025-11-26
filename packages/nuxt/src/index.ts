@@ -41,6 +41,23 @@ import { type ComputedRef, computed, ref } from "vue";
 // Types
 // =============================================================================
 
+/** Minimal H3 event type for Nuxt server routes */
+interface H3Event {
+	node: {
+		req: {
+			url: string;
+			on(event: "data", listener: (chunk: string) => void): void;
+			on(event: "end", listener: () => void): void;
+		};
+		res: unknown;
+	};
+	method: string;
+	path: string;
+}
+
+/** Handler response type */
+type HandlerResponse = { data: unknown } | { error: string };
+
 export interface CreateLensNuxtOptions<TServer extends LensServer> {
 	/** Lens server instance */
 	server: TServer;
@@ -57,11 +74,7 @@ export interface LensNuxtConfig {
 
 export interface LensNuxtInstance<TClient> {
 	/** Event handler for Nuxt server routes */
-	handler: (event: {
-		node: { req: Request; res: any };
-		method: string;
-		path: string;
-	}) => Promise<any>;
+	handler: (event: H3Event) => Promise<HandlerResponse>;
 
 	/** Typed client for client-side usage */
 	client: TClient;
@@ -196,7 +209,7 @@ function createServerClientProxy(server: LensServer): unknown {
 // =============================================================================
 
 function createHandler(server: LensServer, basePath: string) {
-	return async (event: { node: { req: any; res: any }; method: string; path: string }) => {
+	return async (event: H3Event): Promise<HandlerResponse> => {
 		const path = event.path.replace(basePath, "").replace(/^\//, "");
 
 		// Handle query (GET)
@@ -216,8 +229,8 @@ function createHandler(server: LensServer, basePath: string) {
 async function handleQuery(
 	server: LensServer,
 	path: string,
-	event: { node: { req: any } },
-): Promise<any> {
+	event: H3Event,
+): Promise<HandlerResponse> {
 	try {
 		const url = new URL(event.node.req.url, "http://localhost");
 		const inputParam = url.searchParams.get("input");
@@ -238,11 +251,11 @@ async function handleQuery(
 async function handleMutation(
 	server: LensServer,
 	path: string,
-	event: { node: { req: any } },
-): Promise<any> {
+	event: H3Event,
+): Promise<HandlerResponse> {
 	try {
 		// Read body - in Nuxt this would use readBody()
-		const body = await new Promise<any>((resolve) => {
+		const body = await new Promise<{ input?: unknown }>((resolve) => {
 			let data = "";
 			event.node.req.on("data", (chunk: string) => {
 				data += chunk;
