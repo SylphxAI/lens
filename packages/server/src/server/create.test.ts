@@ -7,7 +7,7 @@
 import { describe, expect, it } from "bun:test";
 import { entity, mutation, query, t } from "@sylphx/lens-core";
 import { z } from "zod";
-import { type WebSocketLike, createServer } from "./create";
+import { createServer, type WebSocketLike } from "./create";
 
 // =============================================================================
 // Test Fixtures
@@ -140,9 +140,7 @@ describe("executeQuery", () => {
 			queries: { getUser },
 		});
 
-		await expect(server.executeQuery("getUser", { id: 123 as unknown as string })).rejects.toThrow(
-			"Invalid input",
-		);
+		await expect(server.executeQuery("getUser", { id: 123 as unknown as string })).rejects.toThrow("Invalid input");
 	});
 
 	it("throws for unknown query", async () => {
@@ -151,9 +149,7 @@ describe("executeQuery", () => {
 			queries: {},
 		});
 
-		await expect(server.executeQuery("unknownQuery")).rejects.toThrow(
-			"Query not found: unknownQuery",
-		);
+		await expect(server.executeQuery("unknownQuery")).rejects.toThrow("Query not found: unknownQuery");
 	});
 });
 
@@ -200,9 +196,9 @@ describe("executeMutation", () => {
 			mutations: { createUser },
 		});
 
-		await expect(
-			server.executeMutation("createUser", { name: "Test", email: "invalid-email" }),
-		).rejects.toThrow("Invalid input");
+		await expect(server.executeMutation("createUser", { name: "Test", email: "invalid-email" })).rejects.toThrow(
+			"Invalid input",
+		);
 	});
 
 	it("throws for unknown mutation", async () => {
@@ -211,9 +207,7 @@ describe("executeMutation", () => {
 			mutations: {},
 		});
 
-		await expect(server.executeMutation("unknownMutation", {})).rejects.toThrow(
-			"Mutation not found: unknownMutation",
-		);
+		await expect(server.executeMutation("unknownMutation", {})).rejects.toThrow("Mutation not found: unknownMutation");
 	});
 });
 
@@ -355,9 +349,7 @@ describe("Subscribe Protocol", () => {
 		expect(ws.messages.length).toBeGreaterThan(0);
 
 		// Find the operation-level data message (has subscription id)
-		const dataMessage = ws.messages
-			.map((m) => JSON.parse(m))
-			.find((m) => m.type === "data" && m.id === "sub-1");
+		const dataMessage = ws.messages.map((m) => JSON.parse(m)).find((m) => m.type === "data" && m.id === "sub-1");
 
 		// Should have received operation-level data
 		expect(dataMessage).toBeDefined();

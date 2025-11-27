@@ -6,7 +6,7 @@
  * Provides context for passing server-fetched data to client components.
  */
 
-import { type ReactNode, createContext, useContext } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import type { DehydratedState } from "./index";
 
 // =============================================================================

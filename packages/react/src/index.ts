@@ -9,23 +9,23 @@
 // Context & Provider
 // =============================================================================
 
-export { LensProvider, useLensClient, type LensProviderProps } from "./context";
+export { LensProvider, type LensProviderProps, useLensClient } from "./context";
 
 // =============================================================================
 // Hooks (Operations-based API)
 // =============================================================================
 
 export {
-	// Query hooks
-	useQuery,
-	useLazyQuery,
-	// Mutation hook
-	useMutation,
+	type MutationFn,
 	// Types
 	type QueryInput,
-	type UseQueryResult,
 	type UseLazyQueryResult,
 	type UseMutationResult,
 	type UseQueryOptions,
-	type MutationFn,
+	type UseQueryResult,
+	useLazyQuery,
+	// Mutation hook
+	useMutation,
+	// Query hooks
+	useQuery,
 } from "./hooks";

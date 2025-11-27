@@ -9,23 +9,23 @@
 // Context & Provider
 // =============================================================================
 
-export { LensProvider, useLensClient, type LensProviderProps } from "./context";
+export { LensProvider, type LensProviderProps, useLensClient } from "./context";
 
 // =============================================================================
 // Reactive Primitives
 // =============================================================================
 
 export {
-	// Query primitives
-	createQuery,
+	type CreateLazyQueryResult,
+	type CreateMutationResult,
+	type CreateQueryOptions,
+	type CreateQueryResult,
 	createLazyQuery,
 	// Mutation primitive
 	createMutation,
+	// Query primitives
+	createQuery,
+	type MutationFn,
 	// Types
 	type QueryInput,
-	type CreateQueryResult,
-	type CreateMutationResult,
-	type CreateLazyQueryResult,
-	type CreateQueryOptions,
-	type MutationFn,
 } from "./primitives";

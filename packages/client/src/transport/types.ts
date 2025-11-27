@@ -77,8 +77,16 @@ export interface OperationMeta {
 	/** Operation type */
 	type: "query" | "mutation" | "subscription";
 	/** Optimistic update strategy (for mutations) */
-	optimistic?: OptimisticDSL;
+	optimistic?: OptimisticDSL | unknown;
 }
+
+/**
+ * Nested operations structure for handshake.
+ * Supports nested namespaces like { user: { get: {...}, create: {...} } }
+ */
+export type OperationsMap = {
+	[key: string]: OperationMeta | OperationsMap;
+};
 
 /**
  * Server metadata returned from handshake.
@@ -86,8 +94,8 @@ export interface OperationMeta {
 export interface Metadata {
 	/** Server version */
 	version: string;
-	/** Operation metadata map */
-	operations: Record<string, OperationMeta>;
+	/** Operation metadata map (can be nested for namespaced routers) */
+	operations: OperationsMap;
 }
 
 // =============================================================================

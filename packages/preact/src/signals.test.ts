@@ -7,15 +7,15 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+	createLazyQuerySignal,
+	createMutationSignal,
+	createQuerySignal,
 	type LazyQuerySignal,
 	type MutationFn,
 	type MutationSignal,
 	type QueryInput,
 	type QuerySignal,
 	type QuerySignalOptions,
-	createLazyQuerySignal,
-	createMutationSignal,
-	createQuerySignal,
 } from "./signals";
 
 // =============================================================================
@@ -87,9 +87,7 @@ describe("signal types", () => {
 			reset: () => void;
 		};
 
-		const _typeCheck: MutationSignal<{ name: string }, { id: string }> extends ExpectedShape
-			? true
-			: false = true;
+		const _typeCheck: MutationSignal<{ name: string }, { id: string }> extends ExpectedShape ? true : false = true;
 		expect(_typeCheck).toBe(true);
 	});
 
@@ -161,8 +159,8 @@ describe("signal primitives", () => {
 		mutation.reset();
 
 		expect(mutation.loading.value).toBe(false);
-		expect(mutation.error.value).toBe(null);
-		expect(mutation.data.value).toBe(null);
+		expect(mutation.error.value).toBeNull();
+		expect(mutation.data.value).toBeNull();
 	});
 
 	test("createLazyQuerySignal reset clears state", () => {
@@ -176,7 +174,7 @@ describe("signal primitives", () => {
 		query.reset();
 
 		expect(query.loading.value).toBe(false);
-		expect(query.error.value).toBe(null);
-		expect(query.data.value).toBe(null);
+		expect(query.error.value).toBeNull();
+		expect(query.data.value).toBeNull();
 	});
 });

@@ -10,20 +10,20 @@
 // =============================================================================
 
 export {
-	// Operations
-	query,
+	type InferRouterContext,
+	type MutationBuilder,
+	type MutationDef,
 	mutation,
-	router,
 	// Types
 	type QueryBuilder,
-	type MutationBuilder,
 	type QueryDef,
-	type MutationDef,
+	// Operations
+	query,
+	type ResolverContext,
+	type ResolverFn,
 	type RouterDef,
 	type RouterRoutes,
-	type ResolverFn,
-	type ResolverContext,
-	type InferRouterContext,
+	router,
 } from "@sylphx/lens-core";
 
 // =============================================================================
@@ -33,26 +33,26 @@ export {
 export {
 	// Factory
 	createServer,
-	// Types
-	type LensServer,
-	type LensServerConfig as ServerConfig,
 	type EntitiesMap,
-	type RelationsArray,
-	type QueriesMap,
-	type MutationsMap,
-	type WebSocketLike,
-	type SelectionObject,
-	// Metadata types (for transport handshake)
-	type ServerMetadata,
-	type OperationMeta,
-	type OperationsMap,
-	// In-process transport types
-	type LensOperation,
-	type LensResult,
 	// Type inference utilities (tRPC-style)
 	type InferApi,
 	type InferInput,
 	type InferOutput,
+	// In-process transport types
+	type LensOperation,
+	type LensResult,
+	// Types
+	type LensServer,
+	type LensServerConfig as ServerConfig,
+	type MutationsMap,
+	type OperationMeta,
+	type OperationsMap,
+	type QueriesMap,
+	type RelationsArray,
+	type SelectionObject,
+	// Metadata types (for transport handshake)
+	type ServerMetadata,
+	type WebSocketLike,
 } from "./server/create";
 
 // =============================================================================
@@ -60,17 +60,17 @@ export {
 // =============================================================================
 
 export {
-	// Class
-	GraphStateManager,
 	// Factory
 	createGraphStateManager,
 	// Types
 	type EntityKey,
-	type StateClient,
-	type StateUpdateMessage,
-	type StateFullMessage,
-	type Subscription,
+	// Class
+	GraphStateManager,
 	type GraphStateManagerConfig,
+	type StateClient,
+	type StateFullMessage,
+	type StateUpdateMessage,
+	type Subscription,
 } from "./state";
 
 // =============================================================================
@@ -78,11 +78,11 @@ export {
 // =============================================================================
 
 export {
-	// Class
-	SSEHandler,
 	// Factory
 	createSSEHandler,
+	type SSEClientInfo,
+	// Class
+	SSEHandler,
 	// Types
 	type SSEHandlerConfig,
-	type SSEClientInfo,
 } from "./sse/handler";

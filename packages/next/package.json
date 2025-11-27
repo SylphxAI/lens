@@ -18,10 +18,20 @@
 	"scripts": {
 		"build": "bun build ./src/index.ts ./src/server.ts ./src/hydration.tsx --outdir ./dist --target browser --external react --external next --external @sylphx/lens-react --external @sylphx/lens-client --external @sylphx/lens-server && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepack": "bun run build"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "next", "nextjs", "react", "ssr"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"next",
+		"nextjs",
+		"react",
+		"ssr"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

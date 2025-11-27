@@ -77,14 +77,10 @@ describe("runWithContext", () => {
 	it("runs synchronous function with context", () => {
 		const ctx = createContext<TestContext>();
 
-		const result = runWithContext(
-			ctx,
-			{ db: mockDb, currentUser: mockUser, requestId: "req-1" },
-			() => {
-				const context = useContext<TestContext>();
-				return context.currentUser?.name;
-			},
-		);
+		const result = runWithContext(ctx, { db: mockDb, currentUser: mockUser, requestId: "req-1" }, () => {
+			const context = useContext<TestContext>();
+			return context.currentUser?.name;
+		});
 
 		expect(result).toBe("John");
 	});
@@ -162,10 +158,11 @@ describe("createComposable", () => {
 describe("createComposables", () => {
 	it("creates multiple composables", () => {
 		const ctx = createContext<TestContext>();
-		const { useDb, useCurrentUser, useRequestId } = createComposables<
-			TestContext,
-			"db" | "currentUser" | "requestId"
-		>(["db", "currentUser", "requestId"]);
+		const { useDb, useCurrentUser, useRequestId } = createComposables<TestContext, "db" | "currentUser" | "requestId">([
+			"db",
+			"currentUser",
+			"requestId",
+		]);
 
 		runWithContext(ctx, { db: mockDb, currentUser: mockUser, requestId: "req-1" }, () => {
 			expect(useDb()).toBe(mockDb);
@@ -248,13 +245,9 @@ describe("Real-world usage pattern", () => {
 	it("works with resolver pattern", async () => {
 		const ctx = createContext<AppContext>();
 
-		const posts = await runWithContextAsync(
-			ctx,
-			{ db: mockDb, currentUser: mockUser },
-			async () => {
-				return getUserPosts();
-			},
-		);
+		const posts = await runWithContextAsync(ctx, { db: mockDb, currentUser: mockUser }, async () => {
+			return getUserPosts();
+		});
 
 		expect(posts).toEqual(["result for: SELECT * FROM posts WHERE authorId = 'user-1'"]);
 	});
@@ -279,27 +272,19 @@ describe("Concurrent requests", () => {
 		const ctx = createContext<TestContext>();
 		const results: string[] = [];
 
-		const task1 = runWithContextAsync(
-			ctx,
-			{ db: mockDb, currentUser: mockUser, requestId: "task-1" },
-			async () => {
-				await new Promise((r) => setTimeout(r, 10));
-				results.push(`1: ${useContext<TestContext>().requestId}`);
-				await new Promise((r) => setTimeout(r, 10));
-				results.push(`1: ${useContext<TestContext>().requestId}`);
-			},
-		);
+		const task1 = runWithContextAsync(ctx, { db: mockDb, currentUser: mockUser, requestId: "task-1" }, async () => {
+			await new Promise((r) => setTimeout(r, 10));
+			results.push(`1: ${useContext<TestContext>().requestId}`);
+			await new Promise((r) => setTimeout(r, 10));
+			results.push(`1: ${useContext<TestContext>().requestId}`);
+		});
 
-		const task2 = runWithContextAsync(
-			ctx,
-			{ db: mockDb, currentUser: null, requestId: "task-2" },
-			async () => {
-				await new Promise((r) => setTimeout(r, 5));
-				results.push(`2: ${useContext<TestContext>().requestId}`);
-				await new Promise((r) => setTimeout(r, 15));
-				results.push(`2: ${useContext<TestContext>().requestId}`);
-			},
-		);
+		const task2 = runWithContextAsync(ctx, { db: mockDb, currentUser: null, requestId: "task-2" }, async () => {
+			await new Promise((r) => setTimeout(r, 5));
+			results.push(`2: ${useContext<TestContext>().requestId}`);
+			await new Promise((r) => setTimeout(r, 15));
+			results.push(`2: ${useContext<TestContext>().requestId}`);
+		});
 
 		await Promise.all([task1, task2]);
 

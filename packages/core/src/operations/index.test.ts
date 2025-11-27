@@ -118,7 +118,12 @@ describe("query() builder", () => {
 			.returns(User)
 			.resolve(async ({ input }) => mockDb.user.findUnique({ where: { id: input.id } }));
 
-		const result = await getUser._resolve!({ input: { id: "123" } });
+		const result = await getUser._resolve!({
+			input: { id: "123" },
+			ctx: {},
+			emit: (() => {}) as never,
+			onCleanup: () => () => {},
+		});
 		expect(result).toEqual({ id: "123", name: "John", email: "john@example.com" });
 	});
 });
@@ -193,7 +198,12 @@ describe("mutation() builder", () => {
 			.returns(Post)
 			.resolve(async ({ input }) => mockDb.post.create({ data: input }));
 
-		const result = await createPost._resolve({ input: { title: "Hello", content: "World" } });
+		const result = await createPost._resolve({
+			input: { title: "Hello", content: "World" },
+			ctx: {},
+			emit: (() => {}) as never,
+			onCleanup: () => () => {},
+		});
 		expect(result).toEqual({
 			id: "created-1",
 			title: "Hello",
@@ -322,7 +332,12 @@ describe("Streaming support", () => {
 		expect(streamingQuery._resolve).toBeDefined();
 
 		// Execute and collect results
-		const generator = streamingQuery._resolve!({ input: undefined }) as AsyncGenerator<unknown[]>;
+		const generator = streamingQuery._resolve!({
+			input: undefined,
+			ctx: {},
+			emit: (() => {}) as never,
+			onCleanup: () => () => {},
+		}) as AsyncGenerator<unknown[]>;
 		const results: unknown[][] = [];
 
 		for await (const result of generator) {
@@ -528,8 +543,8 @@ describe("router() builder", () => {
 			});
 
 		const appRouter = router({
-			user: { get: getUserById },
-			cache: { get: getCachedData },
+			user: router({ get: getUserById }),
+			cache: router({ get: getCachedData }),
 		});
 
 		// Router should infer merged context

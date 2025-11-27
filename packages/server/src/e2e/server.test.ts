@@ -11,9 +11,9 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { type Update, applyUpdate, entity, mutation, query, t } from "@sylphx/lens-core";
+import { applyUpdate, entity, mutation, query, t, type Update } from "@sylphx/lens-core";
 import { z } from "zod";
-import { type WebSocketLike, createServer } from "../server/create";
+import { createServer, type WebSocketLike } from "../server/create";
 
 // =============================================================================
 // Test Fixtures
@@ -65,10 +65,7 @@ function createMockClient(server: ReturnType<typeof createServer>) {
 			lastData: unknown;
 		}
 	>();
-	const pending = new Map<
-		string,
-		{ resolve: (data: unknown) => void; reject: (error: Error) => void }
-	>();
+	const pending = new Map<string, { resolve: (data: unknown) => void; reject: (error: Error) => void }>();
 
 	let messageIdCounter = 0;
 	const nextId = () => `msg_${++messageIdCounter}`;
@@ -237,7 +234,11 @@ describe("E2E - Basic Operations", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+			.resolve(({ input }) => {
+				const user = mockUsers.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
+			});
 
 		const server = createServer({
 			entities: { User },
@@ -283,7 +284,11 @@ describe("E2E - Subscriptions", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+			.resolve(({ input }) => {
+				const user = mockUsers.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
+			});
 
 		const server = createServer({
 			entities: { User },
@@ -314,7 +319,9 @@ describe("E2E - Subscriptions", () => {
 			.returns(User)
 			.resolve(({ input, emit }) => {
 				emitFn = emit;
-				return mockUsers.find((u) => u.id === input.id) ?? null;
+				const user = mockUsers.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
 			});
 
 		const server = createServer({
@@ -357,7 +364,9 @@ describe("E2E - Subscriptions", () => {
 			.returns(User)
 			.resolve(({ input, emit }) => {
 				emitFn = emit;
-				return mockUsers.find((u) => u.id === input.id) ?? null;
+				const user = mockUsers.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
 			});
 
 		const server = createServer({
@@ -407,9 +416,7 @@ describe("E2E - Server API", () => {
 		const searchUsers = query()
 			.input(z.object({ query: z.string() }))
 			.returns([User])
-			.resolve(({ input }) =>
-				mockUsers.filter((u) => u.name.toLowerCase().includes(input.query.toLowerCase())),
-			);
+			.resolve(({ input }) => mockUsers.filter((u) => u.name.toLowerCase().includes(input.query.toLowerCase())));
 
 		const server = createServer({
 			entities: { User },
@@ -461,7 +468,9 @@ describe("E2E - Cleanup", () => {
 				onCleanup(() => {
 					cleanedUp = true;
 				});
-				return mockUsers.find((u) => u.id === input.id) ?? null;
+				const user = mockUsers.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
 			});
 
 		const server = createServer({
@@ -499,7 +508,9 @@ describe("E2E - GraphStateManager", () => {
 			.returns(User)
 			.resolve(({ input, emit }) => {
 				emitFn = emit;
-				return mockUsers.find((u) => u.id === input.id) ?? null;
+				const user = mockUsers.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
 			});
 
 		const updateUser = mutation()
@@ -566,7 +577,11 @@ describe("E2E - Entity Resolvers", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => users.find((u) => u.id === input.id) ?? null);
+			.resolve(({ input }) => {
+				const user = users.find((u) => u.id === input.id);
+				if (!user) throw new Error("Not found");
+				return user;
+			});
 
 		// Create entity resolvers for User.posts
 		const resolvers = {

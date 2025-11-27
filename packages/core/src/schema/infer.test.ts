@@ -7,15 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { belongsTo, createSchema, entity, hasMany, hasOne } from "./define";
-import type {
-	CreateInput,
-	InferEntity,
-	InferScalar,
-	RelationFields,
-	ScalarFields,
-	Select,
-	UpdateInput,
-} from "./infer";
+import type { CreateInput, InferEntity, InferScalar, RelationFields, ScalarFields, Select, UpdateInput } from "./infer";
 import { t } from "./types";
 
 // =============================================================================
@@ -166,16 +158,7 @@ describe("Type Inference", () => {
 			type UserScalars = ScalarFields<TestSchemaDefinition["User"]>;
 
 			// These should be scalar fields (not relations)
-			const scalars: UserScalars[] = [
-				"id",
-				"name",
-				"email",
-				"age",
-				"isActive",
-				"role",
-				"metadata",
-				"tags",
-			];
+			const scalars: UserScalars[] = ["id", "name", "email", "age", "isActive", "role", "metadata", "tags"];
 
 			// Verify schema has these as non-relations
 			const userMeta = testSchema.getEntity("User");
@@ -253,7 +236,6 @@ describe("Runtime Type Validation", () => {
 
 		expect(() => {
 			createSchema({
-				// @ts-expect-error - Testing runtime validation
 				A: A.with({ b: t.hasOne("NonExistent") }),
 			});
 		}).toThrow();

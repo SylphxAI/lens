@@ -69,7 +69,7 @@ export class SSEHandler {
 	 * Handle new SSE connection
 	 * Returns a Response with SSE stream
 	 */
-	handleConnection(req?: Request): Response {
+	handleConnection(_req?: Request): Response {
 		const clientId = `sse_${++this.clientCounter}_${Date.now()}`;
 		const encoder = new TextEncoder();
 

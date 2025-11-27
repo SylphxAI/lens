@@ -20,16 +20,16 @@ export {
 // =============================================================================
 
 export {
-	// Query composables
-	useQuery,
-	useLazyQuery,
-	// Mutation composable
-	useMutation,
+	type MutationFn,
 	// Types
 	type QueryInput,
-	type UseQueryResult,
 	type UseLazyQueryResult,
 	type UseMutationResult,
 	type UseQueryOptions,
-	type MutationFn,
+	type UseQueryResult,
+	useLazyQuery,
+	// Mutation composable
+	useMutation,
+	// Query composables
+	useQuery,
 } from "./composables";

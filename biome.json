@@ -1,9 +1,9 @@
 {
-	"$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
 	"extends": ["@sylphx/biome-config"],
 	"files": {
 		"ignoreUnknown": false,
-		"ignore": ["node_modules", "dist", ".changeset", "examples"]
+		"includes": ["**", "!**/node_modules", "!**/dist", "!**/.changeset", "!**/examples"]
 	},
 	"linter": {
 		"rules": {

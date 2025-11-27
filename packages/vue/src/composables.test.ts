@@ -61,7 +61,7 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 		// Test helpers
 		_setValue(value: T) {
 			currentValue = value;
-			subscribers.forEach((cb) => cb(value));
+			for (const cb of subscribers) cb(value);
 			if (!resolved && resolvePromise) {
 				resolved = true;
 				resolvePromise(value);
@@ -134,9 +134,7 @@ describe("useQuery", () => {
 
 describe("useMutation", () => {
 	test("executes mutation and returns result", async () => {
-		const mutationFn = async (input: { name: string }): Promise<
-			MutationResult<{ id: string; name: string }>
-		> => {
+		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 			return { data: { id: "new-id", name: input.name } };
 		};
 
@@ -153,9 +151,7 @@ describe("useMutation", () => {
 	});
 
 	test("handles mutation error", async () => {
-		const mutationFn = async (_input: { name: string }): Promise<
-			MutationResult<{ id: string }>
-		> => {
+		const mutationFn = async (_input: { name: string }): Promise<MutationResult<{ id: string }>> => {
 			throw new Error("Mutation failed");
 		};
 
@@ -172,9 +168,7 @@ describe("useMutation", () => {
 	});
 
 	test("reset clears mutation state", async () => {
-		const mutationFn = async (input: { name: string }): Promise<
-			MutationResult<{ id: string; name: string }>
-		> => {
+		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 			return { data: { id: "new-id", name: input.name } };
 		};
 

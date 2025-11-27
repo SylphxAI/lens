@@ -81,8 +81,7 @@ describe("useMutation composable factory", () => {
 		const lens = createLensNuxt({ server: server as any });
 
 		const mutation = lens.useMutation(
-			(client) => (input: { id: string }) =>
-				Promise.resolve({ data: { id: input.id, name: "Created" } }),
+			(_client) => (input: { id: string }) => Promise.resolve({ data: { id: input.id, name: "Created" } }),
 		);
 
 		expect(mutation.mutate).toBeDefined();
@@ -99,8 +98,7 @@ describe("useMutation composable factory", () => {
 		const lens = createLensNuxt({ server: server as any });
 
 		const mutation = lens.useMutation(
-			(client) => (input: { id: string }) =>
-				Promise.resolve({ data: { id: input.id, name: "Created" } }),
+			(_client) => (input: { id: string }) => Promise.resolve({ data: { id: input.id, name: "Created" } }),
 		);
 
 		expect(mutation.data.value).toBe(null);
@@ -113,8 +111,7 @@ describe("useMutation composable factory", () => {
 		const lens = createLensNuxt({ server: server as any });
 
 		const mutation = lens.useMutation(
-			(client) => (input: { id: string }) =>
-				Promise.resolve({ data: { id: input.id, name: "Created" } }),
+			(_client) => (input: { id: string }) => Promise.resolve({ data: { id: input.id, name: "Created" } }),
 		);
 
 		mutation.reset();

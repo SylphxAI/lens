@@ -61,7 +61,7 @@
  * ```
  */
 
-import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
+import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
 import type { ReactNode } from "react";
 
@@ -562,25 +562,25 @@ export type InferClient<TServer> = TServer extends LensServer
 // Legacy Exports (for backwards compatibility)
 // =============================================================================
 
+export type { LensClientConfig, MutationResult, QueryResult, Transport } from "@sylphx/lens-client";
+
+// Re-export client utilities
+export { createClient, http, route, ws } from "@sylphx/lens-client";
 // Re-export React hooks and context
 export {
 	LensProvider,
-	useLensClient,
-	useQuery,
-	useLazyQuery,
-	useMutation,
 	type LensProviderProps,
+	type MutationFn,
 	type QueryInput,
-	type UseQueryResult,
 	type UseLazyQueryResult,
 	type UseMutationResult,
 	type UseQueryOptions,
-	type MutationFn,
+	type UseQueryResult,
+	useLazyQuery,
+	useLensClient,
+	useMutation,
+	useQuery,
 } from "@sylphx/lens-react";
-
-// Re-export client utilities
-export { createClient, http, ws, route } from "@sylphx/lens-client";
-export type { LensClientConfig, QueryResult, MutationResult, Transport } from "@sylphx/lens-client";
 
 // Legacy utilities
 export async function fetchQuery<T>(query: QueryResult<T>): Promise<T> {

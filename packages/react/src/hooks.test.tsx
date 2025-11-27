@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { signal } from "@sylphx/lens-client";
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
+import { signal } from "@sylphx/lens-client";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useLazyQuery, useMutation, useQuery } from "./hooks";
 
@@ -66,7 +66,7 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 			result.signal.value = value;
 			result.loading.value = false;
 			result.error.value = null;
-			subscribers.forEach((cb) => cb(value));
+			for (const cb of subscribers) cb(value);
 			if (!resolved && resolvePromise) {
 				resolved = true;
 				resolvePromise(value);
@@ -180,9 +180,7 @@ describe("useQuery", () => {
 
 describe("useMutation", () => {
 	test("executes mutation and returns result", async () => {
-		const mutationFn = async (input: { name: string }): Promise<
-			MutationResult<{ id: string; name: string }>
-		> => {
+		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 			return {
 				data: { id: "new-id", name: input.name },
 			};
@@ -204,9 +202,7 @@ describe("useMutation", () => {
 	});
 
 	test("handles mutation error", async () => {
-		const mutationFn = async (_input: { name: string }): Promise<
-			MutationResult<{ id: string; name: string }>
-		> => {
+		const mutationFn = async (_input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 			throw new Error("Mutation failed");
 		};
 
@@ -226,9 +222,7 @@ describe("useMutation", () => {
 
 	test("shows loading state during mutation", async () => {
 		let resolveMutation: ((value: MutationResult<{ id: string }>) => void) | null = null;
-		const mutationFn = async (_input: { name: string }): Promise<
-			MutationResult<{ id: string }>
-		> => {
+		const mutationFn = async (_input: { name: string }): Promise<MutationResult<{ id: string }>> => {
 			return new Promise((resolve) => {
 				resolveMutation = resolve;
 			});
@@ -255,9 +249,7 @@ describe("useMutation", () => {
 	});
 
 	test("reset clears mutation state", async () => {
-		const mutationFn = async (input: { name: string }): Promise<
-			MutationResult<{ id: string; name: string }>
-		> => {
+		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 			return { data: { id: "new-id", name: input.name } };
 		};
 

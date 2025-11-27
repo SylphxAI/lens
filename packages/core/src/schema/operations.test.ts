@@ -140,8 +140,6 @@ describe("Aggregation types", () => {
 	it("AggregateInput only allows numeric fields for _sum/_avg", () => {
 		const aggregate: AggregateInput<PostDef> = {
 			_sum: { views: true, rating: true },
-			// @ts-expect-error - 'title' is string, not numeric
-			// _sum: { title: true },
 		};
 		expect(aggregate).toBeDefined();
 	});
@@ -171,6 +169,7 @@ describe("Batch operation types", () => {
 				{
 					name: "User 1",
 					email: "user1@example.com",
+					age: null,
 					score: 0,
 					isActive: true,
 					createdAt: new Date(),
@@ -179,6 +178,7 @@ describe("Batch operation types", () => {
 				{
 					name: "User 2",
 					email: "user2@example.com",
+					age: null,
 					score: 100,
 					isActive: false,
 					createdAt: new Date(),
@@ -226,6 +226,7 @@ describe("Relation mutation types", () => {
 		const create: ProfileRelation = {
 			create: {
 				bio: "Hello world",
+				avatar: null,
 			},
 		};
 		expect(create).toBeDefined();
@@ -237,7 +238,7 @@ describe("Relation mutation types", () => {
 		const connectOrCreate: ProfileRelation = {
 			connectOrCreate: {
 				where: { id: "profile-123" },
-				create: { bio: "New bio" },
+				create: { bio: "New bio", avatar: null },
 			},
 		};
 		expect(connectOrCreate).toBeDefined();
@@ -325,7 +326,7 @@ describe("Relation mutation types", () => {
 				create: [{ title: "First Post", content: "Hello", views: 0, rating: 0, published: true }],
 			},
 			profile: {
-				create: { bio: "My bio" },
+				create: { bio: "My bio", avatar: null },
 			},
 		};
 		expect(create.name).toBe("John");
@@ -341,7 +342,7 @@ describe("Relation mutation types", () => {
 				disconnect: [{ id: "old-post" }],
 			},
 			profile: {
-				update: { bio: "Updated bio" },
+				update: { bio: "Updated bio", avatar: null },
 			},
 		};
 		expect(update.id).toBe("user-123");
@@ -387,6 +388,7 @@ describe("Find types", () => {
 			create: {
 				name: "John",
 				email: "john@example.com",
+				age: null,
 				score: 0,
 				isActive: true,
 				createdAt: new Date(),

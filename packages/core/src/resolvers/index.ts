@@ -35,7 +35,7 @@ export function isBatchResolver<T, R>(
 
 /** Entity resolvers definition (map of entity name to resolvers) */
 export type EntityResolversDefinition = {
-	[entityName: string]: EntityResolverDef<unknown>;
+	[entityName: string]: EntityResolverDef<any>;
 };
 
 /** Entity resolvers instance */

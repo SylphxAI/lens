@@ -9,17 +9,18 @@
 // =============================================================================
 
 export type {
+	Metadata,
 	// Observable types
 	Observable,
 	Observer,
-	Unsubscribable,
+	Operation,
+	OperationMeta,
+	OperationsMap,
+	OptimisticDSL,
+	Result,
 	// Core types
 	Transport,
-	Operation,
-	Result,
-	Metadata,
-	OperationMeta,
-	OptimisticDSL,
+	Unsubscribable,
 } from "./types";
 
 // =============================================================================
@@ -27,19 +28,19 @@ export type {
 // =============================================================================
 
 export {
-	// Plugin interface
-	type Plugin,
+	type AuthPluginOptions,
+	auth,
+	type CachePluginOptions,
+	cache,
+	type LoggerPluginOptions,
 	// Built-in plugins
 	logger,
-	type LoggerPluginOptions,
-	auth,
-	type AuthPluginOptions,
-	retry,
+	// Plugin interface
+	type Plugin,
 	type RetryPluginOptions,
-	cache,
-	type CachePluginOptions,
-	timeout,
+	retry,
 	type TimeoutPluginOptions,
+	timeout,
 } from "./plugin";
 
 // =============================================================================
@@ -47,20 +48,17 @@ export {
 // =============================================================================
 
 // HTTP
-export { http, type HttpTransportOptions, type HttpServerTransportOptions } from "./http";
-
-// WebSocket
-export { ws, type WsTransportOptions, type WsServerTransportOptions } from "./ws";
-
+export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http";
 // In-Process
-export { inProcess, type InProcessTransportOptions, type LensServerInterface } from "./in-process";
-
+export { type InProcessTransportOptions, inProcess, type LensServerInterface } from "./in-process";
 // Route
 export {
-	route,
-	type RouteConfig,
-	routeByType,
 	type RouteByTypeConfig,
+	type RouteConfig,
+	route,
 	// Legacy
 	routeByPath,
+	routeByType,
 } from "./route";
+// WebSocket
+export { type WsServerTransportOptions, type WsTransportOptions, ws } from "./ws";

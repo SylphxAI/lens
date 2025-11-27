@@ -1,7 +1,10 @@
 /**
  * Tests for type-safe Emit API
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, mock } from "bun:test";
+
+const vi = { fn: () => mock(() => {}) };
+
 import { createEmit, createEmitArray, createEmitObject } from "./index";
 
 describe("createEmitObject", () => {

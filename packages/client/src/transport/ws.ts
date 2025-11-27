@@ -120,7 +120,7 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): Transpo
 				resolve(ws);
 			};
 
-			ws.onerror = (event) => {
+			ws.onerror = (_event) => {
 				clearTimeout(timeoutId);
 				reject(new Error("WebSocket connection error"));
 			};

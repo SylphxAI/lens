@@ -14,10 +14,20 @@
 	"scripts": {
 		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepack": "bun run build"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "solid", "solidjs", "reactive", "signals"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"solid",
+		"solidjs",
+		"reactive",
+		"signals"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

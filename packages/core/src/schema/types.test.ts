@@ -14,11 +14,11 @@ import {
 	HasOneType,
 	IdType,
 	IntType,
-	ObjectType,
-	StringType,
 	isHasManyType,
 	isRelationType,
 	isScalarType,
+	ObjectType,
+	StringType,
 	t,
 } from "./types";
 

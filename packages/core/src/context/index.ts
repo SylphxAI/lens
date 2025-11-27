@@ -39,7 +39,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export type ContextStore<T> = AsyncLocalStorage<T>;
 
 /** Context value - can be any object */
-export type ContextValue = Record<string, unknown>;
+export type ContextValue = object;
 
 // =============================================================================
 // Global Context Store

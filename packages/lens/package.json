@@ -22,9 +22,13 @@
 	"scripts": {
 		"build": "bunup",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepack": "bun run build"
 	},
-	"files": ["dist", "src"],
+	"files": [
+		"dist",
+		"src"
+	],
 	"keywords": [
 		"lens",
 		"api",

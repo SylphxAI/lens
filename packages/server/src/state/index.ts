@@ -5,12 +5,12 @@
  */
 
 export {
-	GraphStateManager,
 	createGraphStateManager,
 	type EntityKey,
-	type StateClient,
-	type StateUpdateMessage,
-	type StateFullMessage,
-	type Subscription,
+	GraphStateManager,
 	type GraphStateManagerConfig,
+	type StateClient,
+	type StateFullMessage,
+	type StateUpdateMessage,
+	type Subscription,
 } from "./graph-state-manager";

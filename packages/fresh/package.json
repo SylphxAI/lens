@@ -18,10 +18,20 @@
 	"scripts": {
 		"build": "bun build ./src/index.ts ./src/islands.ts --outdir ./dist --target browser --external preact --external @preact/signals && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepack": "bun run build"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "fresh", "deno", "preact", "islands"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"fresh",
+		"deno",
+		"preact",
+		"islands"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

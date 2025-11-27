@@ -3,12 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import {
-	createLensMutation,
-	createLensSolidStart,
-	createServerAction,
-	createServerQuery_legacy,
-} from "./index";
+import { createLensMutation, createLensSolidStart, createServerAction, createServerQuery_legacy } from "./index";
 
 // Mock server for testing
 const createMockServer = () => ({

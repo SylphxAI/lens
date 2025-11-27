@@ -21,9 +21,9 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 	abstract readonly _type: string;
 	abstract readonly _tsType: T;
 
-	protected _nullable = false;
-	protected _optional = false;
-	protected _default?: T;
+	readonly _nullable: boolean = false;
+	readonly _optional: boolean = false;
+	readonly _default?: T;
 
 	/** Make this field nullable (value can be null) */
 	nullable(): NullableType<this> {
@@ -88,12 +88,13 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 }
 
 /** Wrapper type for nullable fields */
-export type NullableType<T extends FieldType> = T & {
+export type NullableType<T extends FieldType> = Omit<T, "_nullable" | "_tsType"> & {
+	_nullable: true;
 	_tsType: T["_tsType"] | null;
 };
 
 /** Wrapper type for optional fields (undefined, not included in response) */
-export type OptionalType<T extends FieldType> = T & {
+export type OptionalType<T extends FieldType> = Omit<T, "_optional" | "_tsType"> & {
 	_tsType: T["_tsType"] | undefined;
 	_optional: true;
 };

@@ -33,7 +33,7 @@
  * ```
  */
 
-import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
+import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
 import { type ComputedRef, computed, ref } from "vue";
 
@@ -286,7 +286,7 @@ import type { MutationResult, QueryResult } from "@sylphx/lens-client";
 
 function createUseQuery<TClient>(getClient: () => TClient) {
 	return async function useQuery<T>(
-		key: string,
+		_key: string,
 		queryFn: (client: TClient) => QueryResult<T>,
 		options?: { lazy?: boolean },
 	) {
@@ -392,20 +392,20 @@ export type InferClient<TServer> = TServer extends LensServer
 // Legacy Exports (for backwards compatibility)
 // =============================================================================
 
+export type { LensClientConfig, MutationResult, QueryResult, Transport } from "@sylphx/lens-client";
+
+export { createClient, http, route, ws } from "@sylphx/lens-client";
 export {
 	LensClientKey,
+	type MutationFn,
 	provideLensClient,
-	useLensClient,
-	useQuery,
-	useLazyQuery,
-	useMutation,
 	type QueryInput,
-	type UseQueryResult,
 	type UseLazyQueryResult,
 	type UseMutationResult,
 	type UseQueryOptions,
-	type MutationFn,
+	type UseQueryResult,
+	useLazyQuery,
+	useLensClient,
+	useMutation,
+	useQuery,
 } from "@sylphx/lens-vue";
-
-export { createClient, http, ws, route } from "@sylphx/lens-client";
-export type { LensClientConfig, QueryResult, MutationResult, Transport } from "@sylphx/lens-client";

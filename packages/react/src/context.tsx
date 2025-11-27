@@ -5,7 +5,7 @@
  */
 
 import type { LensClient } from "@sylphx/lens-client";
-import { type ReactElement, type ReactNode, createContext, useContext } from "react";
+import { createContext, type ReactElement, type ReactNode, useContext } from "react";
 
 // =============================================================================
 // Context

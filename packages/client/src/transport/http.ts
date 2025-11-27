@@ -195,7 +195,7 @@ function createPollingObservable(
 		subscribe(observer) {
 			let active = true;
 			let retries = 0;
-			let lastValue: unknown = undefined;
+			let lastValue: unknown;
 
 			const poll = async () => {
 				if (!active) return;

@@ -51,7 +51,7 @@
  * ```
  */
 
-import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
+import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
 
 // =============================================================================
@@ -371,7 +371,6 @@ function createUseIslandQuery<TClient>(
 
 		const mountedRef = useRef(true);
 
-		// biome-ignore lint/correctness/useExhaustiveDependencies: client and queryFn are stable references from closure
 		useEffect(() => {
 			mountedRef.current = true;
 
@@ -415,7 +414,6 @@ function createUseIslandQuery<TClient>(
 			};
 		}, [options?.skip, initialData]);
 
-		// biome-ignore lint/correctness/useExhaustiveDependencies: client and queryFn are stable references from closure
 		const refetch = useCallback(() => {
 			if (options?.skip) return;
 
@@ -512,23 +510,23 @@ export type InferClient<TServer> = TServer extends LensServer
 // Legacy Exports (for backwards compatibility)
 // =============================================================================
 
+export type { LensClientConfig, MutationResult, QueryResult, Transport } from "@sylphx/lens-client";
+
+export { createClient, http, route, ws } from "@sylphx/lens-client";
 export {
 	LensProvider,
-	useLensClient,
-	useQuery,
-	useLazyQuery,
-	useMutation,
 	type LensProviderProps,
+	type MutationFn,
 	type QueryInput,
-	type UseQueryResult,
 	type UseLazyQueryResult,
 	type UseMutationResult,
 	type UseQueryOptions,
-	type MutationFn,
+	type UseQueryResult,
+	useLazyQuery,
+	useLensClient,
+	useMutation,
+	useQuery,
 } from "@sylphx/lens-preact";
-
-export { createClient, http, ws, route } from "@sylphx/lens-client";
-export type { LensClientConfig, QueryResult, MutationResult, Transport } from "@sylphx/lens-client";
 
 // Legacy utilities
 export async function fetchQuery<T>(query: QueryResult<T>): Promise<T> {

@@ -5,7 +5,7 @@
  */
 
 import type { LensClient } from "@sylphx/lens-client";
-import { type ComponentChildren, type VNode, createContext } from "preact";
+import { type ComponentChildren, createContext, type VNode } from "preact";
 import { useContext } from "preact/hooks";
 
 // =============================================================================

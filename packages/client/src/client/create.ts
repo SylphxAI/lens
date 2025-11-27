@@ -84,20 +84,18 @@ export type SelectedType<T, S extends SelectionObject> = {
 };
 
 /** Infer input type */
-export type InferInput<T> = T extends QueryDef<infer I, unknown>
-	? I extends void
-		? void
-		: I
-	: T extends MutationDef<infer I, unknown>
-		? I
-		: never;
+export type InferInput<T> =
+	T extends QueryDef<infer I, unknown>
+		? I extends void
+			? void
+			: I
+		: T extends MutationDef<infer I, unknown>
+			? I
+			: never;
 
 /** Infer output type */
-export type InferOutput<T> = T extends QueryDef<unknown, infer O>
-	? O
-	: T extends MutationDef<unknown, infer O>
-		? O
-		: never;
+export type InferOutput<T> =
+	T extends QueryDef<unknown, infer O> ? O : T extends MutationDef<unknown, infer O> ? O : never;
 
 // =============================================================================
 // Router Types
@@ -122,9 +120,8 @@ export type InferRouterClientType<TRoutes extends RouterRoutes> = {
 };
 
 /** Router-based client type */
-export type RouterLensClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
-	? InferRouterClientType<TRoutes>
-	: never;
+export type RouterLensClient<TRouter extends RouterDef> =
+	TRouter extends RouterDef<infer TRoutes> ? InferRouterClientType<TRoutes> : never;
 
 /** Generic client type (for framework adapters) */
 export type LensClient<_Q = unknown, _M = unknown> = {
@@ -740,6 +737,6 @@ export function createClient<TApi extends RouterApiShape>(
 	>;
 }
 
-// Re-export types
-export type { Transport, Operation, Result, Metadata } from "../transport/types";
 export type { Plugin } from "../transport/plugin";
+// Re-export types
+export type { Metadata, Operation, Result, Transport } from "../transport/types";

@@ -4,14 +4,14 @@
 
 import { describe, expect, test } from "bun:test";
 import {
-	type DeltaUpdate,
-	type PatchUpdate,
-	type ValueUpdate,
 	applyUpdate,
 	createUpdate,
+	type DeltaUpdate,
 	deltaStrategy,
+	type PatchUpdate,
 	patchStrategy,
 	selectStrategy,
+	type ValueUpdate,
 	valueStrategy,
 } from "./strategies";
 
@@ -75,8 +75,7 @@ describe("Delta Strategy", () => {
 
 	test("decodes delta operations correctly", () => {
 		// Use a long string where delta is efficient
-		const original =
-			"This is a long enough string to test delta decoding properly with real content";
+		const original = "This is a long enough string to test delta decoding properly with real content";
 		const expected = original.replace("test", "verify");
 
 		const update = deltaStrategy.encode(original, expected);
@@ -345,13 +344,13 @@ describe("createUpdate and applyUpdate", () => {
 	});
 
 	test("handles null to value transitions", () => {
-		const result = applyUpdate(null, { strategy: "value", data: { foo: "bar" } });
+		const result = applyUpdate(null, { strategy: "value", data: { foo: "bar" } }) as unknown as { foo: string };
 		expect(result).toEqual({ foo: "bar" });
 	});
 
 	test("handles undefined values", () => {
 		const update = createUpdate(undefined, "new value");
 		expect(update.strategy).toBe("value");
-		expect(applyUpdate(undefined, update)).toBe("new value");
+		expect(applyUpdate(undefined, update) as unknown as string).toBe("new value");
 	});
 });

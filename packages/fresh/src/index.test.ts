@@ -15,14 +15,9 @@ const serializeForIsland = <T>(data: T): { __lens_data__: true; data: T; timesta
 	timestamp: Date.now(),
 });
 
-const isSerializedData = <T>(
-	value: unknown,
-): value is { __lens_data__: true; data: T; timestamp: number } => {
+const isSerializedData = <T>(value: unknown): value is { __lens_data__: true; data: T; timestamp: number } => {
 	return (
-		value !== null &&
-		typeof value === "object" &&
-		"__lens_data__" in value &&
-		(value as any).__lens_data__ === true
+		value !== null && typeof value === "object" && "__lens_data__" in value && (value as any).__lens_data__ === true
 	);
 };
 

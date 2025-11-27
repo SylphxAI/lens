@@ -14,10 +14,19 @@
 	"scripts": {
 		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js --external @solidjs/start --external @solidjs/router && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepack": "bun run build"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "solid", "solidstart", "ssr"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"solid",
+		"solidstart",
+		"ssr"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

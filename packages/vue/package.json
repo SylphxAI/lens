@@ -14,10 +14,19 @@
 	"scripts": {
 		"build": "bunup",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepack": "bun run build"
 	},
-	"files": ["dist", "src"],
-	"keywords": ["lens", "vue", "composables", "composition-api"],
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"vue",
+		"composables",
+		"composition-api"
+	],
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {

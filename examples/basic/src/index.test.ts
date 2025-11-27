@@ -44,7 +44,7 @@ describe("Server Direct Execution", () => {
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toBeDefined();
-		expect(result.data.name).toBe("Alice");
+		expect((result.data as { name: string }).name).toBe("Alice");
 	});
 
 	it("executes mutations via server.execute()", async () => {
@@ -55,7 +55,7 @@ describe("Server Direct Execution", () => {
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toBeDefined();
-		expect(result.data.name).toBe("Charlie");
+		expect((result.data as { name: string }).name).toBe("Charlie");
 		expect(db.users.size).toBe(3);
 	});
 
@@ -81,7 +81,7 @@ describe("Client Type Inference", () => {
 
 	it("queries user by id", async () => {
 		const client = createTestClient();
-		const user = await client.user.get({ id: "user-1" });
+		const user = await client.user.get({ id: "user-1" }) as { id: string; name: string; email: string };
 
 		expect(user.id).toBe("user-1");
 		expect(user.name).toBe("Alice");
@@ -112,7 +112,7 @@ describe("Client Type Inference", () => {
 describe("Post Operations", () => {
 	it("queries posts by author", async () => {
 		const client = createTestClient();
-		const posts = await client.post.byAuthor({ authorId: "user-1" });
+		const posts = await client.post.byAuthor({ authorId: "user-1" }) as { title: string }[];
 
 		expect(posts.length).toBe(1);
 		expect(posts[0].title).toBe("Hello World");
@@ -125,13 +125,13 @@ describe("Post Operations", () => {
 			title: "New Post",
 			content: "Some content",
 			authorId: "user-1",
-		});
+		}) as { data: { id: string; published: boolean } };
 		const post = createResult.data;
 
 		expect(post.published).toBe(false);
 
 		// Publish it
-		const publishResult = await client.post.publish({ id: post.id });
+		const publishResult = await client.post.publish({ id: post.id }) as { data: { published: boolean } };
 		expect(publishResult.data.published).toBe(true);
 	});
 
@@ -141,7 +141,7 @@ describe("Post Operations", () => {
 		const result = await client.post.update({
 			id: "post-1",
 			title: "Updated Title",
-		});
+		}) as { data: { title: string; content: string } };
 		const updated = result.data;
 
 		expect(updated.title).toBe("Updated Title");
@@ -151,7 +151,7 @@ describe("Post Operations", () => {
 	it("deletes post", async () => {
 		const client = createTestClient();
 
-		const result = await client.post.delete({ id: "post-1" });
+		const result = await client.post.delete({ id: "post-1" }) as { data: { success: boolean } };
 		expect(result.data.success).toBe(true);
 		expect(db.posts.size).toBe(0);
 	});
@@ -177,10 +177,10 @@ describe("Server Metadata", () => {
 		const metadata = server.getMetadata();
 
 		// Check optimistic configs are present
-		const userCreate = metadata.operations.user as { create: { optimistic?: string } };
+		const userCreate = metadata.operations.user as unknown as { create: { optimistic?: string } };
 		expect(userCreate.create.optimistic).toBe("create");
 
-		const postPublish = metadata.operations.post as { publish: { optimistic?: unknown } };
+		const postPublish = metadata.operations.post as unknown as { publish: { optimistic?: unknown } };
 		expect(postPublish.publish.optimistic).toEqual({ merge: { published: true } });
 	});
 });

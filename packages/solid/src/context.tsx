@@ -5,7 +5,7 @@
  */
 
 import type { LensClient } from "@sylphx/lens-client";
-import { type ParentComponent, createContext, useContext } from "solid-js";
+import { createContext, type ParentComponent, useContext } from "solid-js";
 
 // =============================================================================
 // Context

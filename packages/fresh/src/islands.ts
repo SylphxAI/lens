@@ -31,7 +31,7 @@
 
 import type { QueryResult } from "@sylphx/lens-client";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { type SerializedData, isSerializedData } from "./index";
+import { isSerializedData, type SerializedData } from "./index";
 
 // =============================================================================
 // Island Data Hook
@@ -189,12 +189,12 @@ export function useIslandQuery<T>(
 // =============================================================================
 
 export {
-	createQuerySignal,
 	createLazyQuerySignal,
 	createMutationSignal,
-	type QuerySignal,
+	createQuerySignal,
 	type LazyQuerySignal,
-	type MutationSignal,
-	type QuerySignalOptions,
 	type MutationFn,
+	type MutationSignal,
+	type QuerySignal,
+	type QuerySignalOptions,
 } from "@sylphx/lens-preact/signals";

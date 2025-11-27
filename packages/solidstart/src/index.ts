@@ -36,7 +36,7 @@
  * ```
  */
 
-import { http, type LensClientConfig, createClient } from "@sylphx/lens-client";
+import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
 import type { LensServer } from "@sylphx/lens-server";
 import { type Accessor, createResource, createSignal } from "solid-js";
 
@@ -391,23 +391,23 @@ export type InferClient<TServer> = TServer extends LensServer
 // Legacy Exports (for backwards compatibility)
 // =============================================================================
 
+export type { LensClientConfig, MutationResult, QueryResult, Transport } from "@sylphx/lens-client";
+
+export { createClient, http, route, ws } from "@sylphx/lens-client";
 export {
-	LensProvider,
-	useLensClient,
-	createQuery,
-	createLazyQuery,
-	createMutation,
-	type LensProviderProps,
-	type QueryInput,
-	type CreateQueryResult,
 	type CreateLazyQueryResult,
 	type CreateMutationResult,
 	type CreateQueryOptions,
+	type CreateQueryResult,
+	createLazyQuery,
+	createMutation,
+	createQuery,
+	LensProvider,
+	type LensProviderProps,
 	type MutationFn,
+	type QueryInput,
+	useLensClient,
 } from "@sylphx/lens-solid";
-
-export { createClient, http, ws, route } from "@sylphx/lens-client";
-export type { LensClientConfig, QueryResult, MutationResult, Transport } from "@sylphx/lens-client";
 
 // Legacy helpers
 export function createLensQuery<T>(

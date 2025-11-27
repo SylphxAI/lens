@@ -10,19 +10,19 @@
 // =============================================================================
 
 export {
-	// Store factories
-	query,
-	mutation,
+	type LazyQueryStore,
 	lazyQuery,
+	type MutationFn,
+	type MutationStore,
+	type MutationStoreValue,
+	mutation,
 	// Types
 	type QueryInput,
 	type QueryStore,
-	type MutationStore,
-	type LazyQueryStore,
-	type QueryStoreValue,
-	type MutationStoreValue,
 	type QueryStoreOptions,
-	type MutationFn,
+	type QueryStoreValue,
+	// Store factories
+	query,
 } from "./stores";
 
 // =============================================================================
@@ -30,12 +30,12 @@ export {
 // =============================================================================
 
 export {
+	getLensClient,
 	// Context key
 	LENS_CLIENT_KEY,
 	// Context functions (recommended)
 	provideLensClient,
-	useLensClient,
 	// Legacy aliases (deprecated)
 	setLensClient,
-	getLensClient,
+	useLensClient,
 } from "./context";

@@ -3,11 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import {
-	GraphStateManager,
-	type StateClient,
-	type StateUpdateMessage,
-} from "./graph-state-manager";
+import { GraphStateManager, type StateClient, type StateUpdateMessage } from "./graph-state-manager";
 
 describe("GraphStateManager", () => {
 	let manager: GraphStateManager;

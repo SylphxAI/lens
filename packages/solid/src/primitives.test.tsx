@@ -61,7 +61,7 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 		// Test helpers
 		_setValue(value: T) {
 			currentValue = value;
-			subscribers.forEach((cb) => cb(value));
+			for (const cb of subscribers) cb(value);
 			if (!resolved && resolvePromise) {
 				resolved = true;
 				resolvePromise(value);
@@ -143,9 +143,7 @@ describe("createMutation", () => {
 	test("executes mutation and returns result", async () => {
 		await new Promise<void>((resolve) => {
 			createRoot(async (dispose) => {
-				const mutationFn = async (input: { name: string }): Promise<
-					MutationResult<{ id: string; name: string }>
-				> => {
+				const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 					return { data: { id: "new-id", name: input.name } };
 				};
 
@@ -169,9 +167,7 @@ describe("createMutation", () => {
 	test("handles mutation error", async () => {
 		await new Promise<void>((resolve) => {
 			createRoot(async (dispose) => {
-				const mutationFn = async (_input: { name: string }): Promise<
-					MutationResult<{ id: string }>
-				> => {
+				const mutationFn = async (_input: { name: string }): Promise<MutationResult<{ id: string }>> => {
 					throw new Error("Mutation failed");
 				};
 
@@ -195,9 +191,7 @@ describe("createMutation", () => {
 	test("reset clears mutation state", async () => {
 		await new Promise<void>((resolve) => {
 			createRoot(async (dispose) => {
-				const mutationFn = async (input: { name: string }): Promise<
-					MutationResult<{ id: string; name: string }>
-				> => {
+				const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
 					return { data: { id: "new-id", name: input.name } };
 				};
 

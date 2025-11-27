@@ -142,7 +142,6 @@ describe("createSchema", () => {
 		expect(() =>
 			createSchema({
 				User: User.with({
-					// @ts-expect-error - Testing runtime validation
 					invalid: t.hasMany("InvalidEntity"),
 				}),
 			}),
@@ -178,10 +177,7 @@ describe("Type inference with defineEntity", () => {
 		});
 
 		// Type-level test
-		type UserType = InferEntity<
-			(typeof schema)["definition"]["User"],
-			(typeof schema)["definition"]
-		>;
+		type UserType = InferEntity<(typeof schema)["definition"]["User"], (typeof schema)["definition"]>;
 
 		const user: UserType = {
 			id: "1",

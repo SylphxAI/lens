@@ -10,41 +10,41 @@
 // =============================================================================
 
 export {
-	// Type builders
-	t,
-	// Base classes
-	FieldType,
-	// Scalar types
-	IdType,
-	StringType,
-	IntType,
-	FloatType,
-	BooleanType,
-	DateTimeType,
-	DecimalType,
-	EnumType,
-	ObjectType,
 	ArrayType,
+	BelongsToType,
+	BooleanType,
 	// Custom types
 	CustomType,
-	defineType,
 	type CustomTypeDefinition,
+	DateTimeType,
+	DecimalType,
+	type DefaultType,
+	defineType,
+	type EntityDefinition,
+	EnumType,
+	// Definition types
+	type FieldDefinition,
+	// Base classes
+	FieldType,
+	FloatType,
+	HasManyType,
 	// Relation types
 	HasOneType,
-	HasManyType,
-	BelongsToType,
-	// Type helpers
-	type NullableType,
-	type DefaultType,
-	type RelationBrand,
+	// Scalar types
+	IdType,
+	IntType,
+	isHasManyType,
 	// Type guards
 	isRelationType,
 	isScalarType,
-	isHasManyType,
-	// Definition types
-	type FieldDefinition,
-	type EntityDefinition,
+	// Type helpers
+	type NullableType,
+	ObjectType,
+	type RelationBrand,
 	type SchemaDefinition,
+	StringType,
+	// Type builders
+	t,
 } from "./schema/types";
 
 // =============================================================================
@@ -52,20 +52,20 @@ export {
 // =============================================================================
 
 export {
-	// Schema class
-	Schema,
+	type EntityMeta,
 	// Metadata types
 	type RelationMeta,
-	type EntityMeta,
+	// Schema class
+	Schema,
+	type SchemaEntities,
 	// Type helpers
 	type SchemaEntity,
-	type SchemaEntities,
 	type SchemaSelect,
 	type SchemaSelected,
-	// Validation types
-	type ValidatedSchemaDefinition,
 	// Errors
 	SchemaValidationError,
+	// Validation types
+	type ValidatedSchemaDefinition,
 } from "./schema/create";
 
 // =============================================================================
@@ -73,21 +73,21 @@ export {
 // =============================================================================
 
 export {
-	// Entity definition
-	defineEntity,
-	entity,
-	isEntityDef,
-	type EntityDef,
+	belongsTo,
 	// Schema creation (primary)
 	createSchema,
+	// Entity definition
+	defineEntity,
+	type EntityDef,
+	entity,
 	// Relation helpers
 	hasMany,
 	hasOne,
-	belongsTo,
-	// Separate relation definition
-	relation,
+	isEntityDef,
 	type RelationDef,
 	type RelationTypeWithForeignKey,
+	// Separate relation definition
+	relation,
 } from "./schema/define";
 
 // =============================================================================
@@ -95,80 +95,80 @@ export {
 // =============================================================================
 
 export type {
-	// Scalar inference
-	InferScalar,
-	// Relation inference
-	InferRelationTarget,
-	IsRelation,
-	IsHasMany,
-	// Field categorization
-	ScalarFields,
-	RelationFields,
-	NumericFields,
-	// Entity inference
-	InferEntity,
-	InferFieldType,
-	InferScalarWithNullable,
-	InferRelationType,
-	// Selection inference
-	Select,
-	RelationSelectOptions,
-	InferSelected,
-	// Schema inference
-	InferSchemaEntities,
-	EntityNames,
-	EntityType,
-	// Input types (mutations)
-	CreateInput,
-	UpdateInput,
-	DeleteInput,
-	CreateInputWithRelations,
-	UpdateInputWithRelations,
-	// Batch operation types
-	CreateManyInput,
-	CreateManyResult,
-	UpdateManyInput,
-	UpdateManyResult,
-	DeleteManyInput,
-	DeleteManyResult,
+	AggregateInput,
+	AggregateResult,
+	// Aggregation types
+	AggregateSelect,
+	BooleanFilter,
 	// Relation mutation types
 	ConnectInput,
 	ConnectOrCreateInput,
-	SingleRelationInput,
-	ManyRelationInput,
-	// Find types
-	FindFirstInput,
-	FindUniqueInput,
-	FindManyInput,
-	WhereUniqueInput,
-	UpsertInput,
-	DistinctInput,
-	// Filter types (Where)
-	StringFilter,
-	NumberFilter,
-	BooleanFilter,
-	DateTimeFilter,
-	EnumFilter,
-	FieldFilter,
-	WhereInput,
-	// Sorting types (OrderBy)
-	SortOrder,
-	NullsOrder,
-	SortOrderInput,
-	OrderByInput,
+	CountInput,
+	// Input types (mutations)
+	CreateInput,
+	CreateInputWithRelations,
+	// Batch operation types
+	CreateManyInput,
+	CreateManyResult,
 	// Pagination types
 	CursorInput,
-	PaginationInput,
-	// Aggregation types
-	AggregateSelect,
-	AggregateInput,
-	AggregateResult,
-	CountInput,
+	DateTimeFilter,
+	DeepPartial,
+	DeleteInput,
+	DeleteManyInput,
+	DeleteManyResult,
+	DistinctInput,
+	EntityNames,
+	EntityType,
+	EnumFilter,
+	FieldFilter,
+	// Find types
+	FindFirstInput,
+	FindManyInput,
+	FindUniqueInput,
 	GroupByInput,
+	// Entity inference
+	InferEntity,
+	InferFieldType,
+	// Relation inference
+	InferRelationTarget,
+	InferRelationType,
+	// Scalar inference
+	InferScalar,
+	InferScalarWithNullable,
+	// Schema inference
+	InferSchemaEntities,
+	InferSelected,
+	IsHasMany,
+	IsRelation,
+	ManyRelationInput,
+	NullsOrder,
+	NumberFilter,
+	NumericFields,
+	OptionalKeys,
+	OrderByInput,
+	PaginationInput,
+	RelationFields,
+	RelationSelectOptions,
 	// Utility types
 	RequireKeys,
-	OptionalKeys,
-	DeepPartial,
+	// Field categorization
+	ScalarFields,
+	// Selection inference
+	Select,
+	SingleRelationInput,
+	// Sorting types (OrderBy)
+	SortOrder,
+	SortOrderInput,
+	// Filter types (Where)
+	StringFilter,
+	UpdateInput,
+	UpdateInputWithRelations,
+	UpdateManyInput,
+	UpdateManyResult,
+	UpsertInput,
+	WhereInput,
+	WhereUniqueInput,
 } from "./schema/infer";
 
 // =============================================================================
@@ -194,25 +194,25 @@ export function parseEntityKey(key: EntityKey): [string, string] {
 // =============================================================================
 
 export {
+	applyUpdate,
+	createUpdate,
+	type DeltaOperation,
+	type DeltaUpdate,
+	deltaStrategy,
+	type PatchOperation,
+	type PatchUpdate,
+	patchStrategy,
 	// Strategy names
 	type StrategyName,
-	// Update types
-	type Update,
-	type ValueUpdate,
-	type DeltaUpdate,
-	type DeltaOperation,
-	type PatchUpdate,
-	type PatchOperation,
-	// Strategy interface
-	type UpdateStrategy,
-	// Strategy implementations
-	valueStrategy,
-	deltaStrategy,
-	patchStrategy,
 	// Strategy selection
 	selectStrategy,
-	createUpdate,
-	applyUpdate,
+	// Update types
+	type Update,
+	// Strategy interface
+	type UpdateStrategy,
+	type ValueUpdate,
+	// Strategy implementations
+	valueStrategy,
 } from "./updates/strategies";
 
 // =============================================================================
@@ -220,41 +220,41 @@ export {
 // =============================================================================
 
 export {
-	// Builders
-	query,
-	mutation,
-	router,
-	// Helpers
-	tempId,
-	resetTempIdCounter,
-	isTempId,
-	flattenRouter,
-	// Type guards
-	isQueryDef,
-	isMutationDef,
-	isOperationDef,
-	isRouterDef,
-	isOptimisticDSL,
-	normalizeOptimisticDSL,
-	// Types
-	type QueryDef,
-	type MutationDef,
-	type RouterDef,
-	type RouterRoutes,
 	type AnyProcedure,
+	flattenRouter,
 	type InferRouterClient,
 	type InferRouterContext,
-	type QueryResultType,
-	type MutationResultType,
-	type QueryBuilder,
+	isMutationDef,
+	isOperationDef,
+	isOptimisticDSL,
+	// Type guards
+	isQueryDef,
+	isRouterDef,
+	isTempId,
 	type MutationBuilder,
-	type ResolverContext,
-	type ResolverFn,
-	type ReturnSpec,
-	type ZodLikeSchema,
+	type MutationDef,
+	type MutationResultType,
+	mutation,
+	normalizeOptimisticDSL,
 	// Optimistic DSL types
 	type OptimisticDSL,
 	type OptimisticUpdateManyConfig,
+	type QueryBuilder,
+	// Types
+	type QueryDef,
+	type QueryResultType,
+	// Builders
+	query,
+	type ResolverContext,
+	type ResolverFn,
+	type ReturnSpec,
+	type RouterDef,
+	type RouterRoutes,
+	resetTempIdCounter,
+	router,
+	// Helpers
+	tempId,
+	type ZodLikeSchema,
 } from "./operations/index";
 
 // =============================================================================
@@ -262,18 +262,18 @@ export {
 // =============================================================================
 
 export {
-	// Main function
-	entityResolvers,
-	// Type guards
-	isBatchResolver,
-	isEntityResolvers,
+	type BatchResolverFn,
+	type EntityResolverDef,
 	// Types
 	type EntityResolvers,
 	type EntityResolversDefinition,
-	type EntityResolverDef,
+	// Main function
+	entityResolvers,
 	type FieldResolver,
 	type FieldResolverFn,
-	type BatchResolverFn,
+	// Type guards
+	isBatchResolver,
+	isEntityResolvers,
 } from "./resolvers/index";
 
 // =============================================================================
@@ -281,18 +281,18 @@ export {
 // =============================================================================
 
 export {
+	type ArrayOperation,
 	// Factory
 	createEmit,
-	createEmitObject,
 	createEmitArray,
+	createEmitObject,
 	// Types
 	type Emit,
-	type EmitObject,
 	type EmitArray,
-	type FieldUpdate,
 	type EmitCommand,
+	type EmitObject,
+	type FieldUpdate,
 	type InternalFieldUpdate,
-	type ArrayOperation,
 } from "./emit/index";
 
 // =============================================================================
@@ -302,11 +302,11 @@ export {
 // Note: Context is now passed directly to resolvers via `ctx` parameter (tRPC style).
 // These exports are kept for advanced use cases and server internals.
 export {
+	// Types
+	type ContextStore,
+	type ContextValue,
 	// Core functions (internal use)
 	createContext,
 	runWithContext,
 	runWithContextAsync,
-	// Types
-	type ContextStore,
-	type ContextValue,
 } from "./context/index";

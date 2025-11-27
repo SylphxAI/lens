@@ -6,7 +6,7 @@
  */
 
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
-import { type Ref, type ShallowRef, onUnmounted, ref, shallowRef, watch } from "vue";
+import { onUnmounted, type Ref, ref, type ShallowRef, shallowRef, watch } from "vue";
 
 // =============================================================================
 // Query Input Types

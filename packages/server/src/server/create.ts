@@ -10,27 +10,27 @@
 
 import {
 	type ContextValue,
+	createContext,
+	createEmit,
+	createUpdate,
 	type EmitCommand,
 	type EntityDef,
 	type EntityDefinition,
 	type EntityResolvers,
 	type EntityResolversDefinition,
 	type FieldType,
+	flattenRouter,
 	type InferRouterContext,
+	isBatchResolver,
+	isMutationDef,
+	isQueryDef,
 	type MutationDef,
 	type QueryDef,
 	type RelationDef,
 	type RelationTypeWithForeignKey,
 	type RouterDef,
-	type Update,
-	createContext,
-	createEmit,
-	createUpdate,
-	flattenRouter,
-	isBatchResolver,
-	isMutationDef,
-	isQueryDef,
 	runWithContext,
+	type Update,
 } from "@sylphx/lens-core";
 
 /** Selection object type for nested field selection */
@@ -62,7 +62,7 @@ export type RelationsArray = RelationDef<
 
 /** Operation metadata for handshake */
 export interface OperationMeta {
-	type: "query" | "mutation";
+	type: "query" | "mutation" | "subscription";
 	optimistic?: unknown; // OptimisticDSL - sent as JSON
 }
 
@@ -285,11 +285,11 @@ class DataLoader<K, V> {
 			keys.forEach((key, index) => {
 				const callbacks = batch.get(key)!;
 				const result = results[index] ?? null;
-				callbacks.forEach(({ resolve }) => resolve(result));
+				for (const { resolve } of callbacks) resolve(result);
 			});
 		} catch (error) {
 			for (const callbacks of batch.values()) {
-				callbacks.forEach(({ reject }) => reject(error as Error));
+				for (const { reject } of callbacks) reject(error as Error);
 			}
 		}
 	}
@@ -1512,22 +1512,20 @@ function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
 /**
  * Infer input type from a query/mutation definition
  */
-export type InferInput<T> = T extends QueryDef<infer I, unknown>
-	? I extends void
-		? void
-		: I
-	: T extends MutationDef<infer I, unknown>
-		? I
-		: never;
+export type InferInput<T> =
+	T extends QueryDef<infer I, unknown>
+		? I extends void
+			? void
+			: I
+		: T extends MutationDef<infer I, unknown>
+			? I
+			: never;
 
 /**
  * Infer output type from a query/mutation definition
  */
-export type InferOutput<T> = T extends QueryDef<unknown, infer O>
-	? O
-	: T extends MutationDef<unknown, infer O>
-		? O
-		: never;
+export type InferOutput<T> =
+	T extends QueryDef<unknown, infer O> ? O : T extends MutationDef<unknown, infer O> ? O : never;
 
 /**
  * API type for client inference
@@ -1544,9 +1542,8 @@ export type InferOutput<T> = T extends QueryDef<unknown, infer O>
  * const client = createClient<Api>({ links: [...] });
  * ```
  */
-export type InferApi<T extends LensServer> = T extends LensServerImpl<infer Q, infer M>
-	? { queries: Q; mutations: M }
-	: never;
+export type InferApi<T extends LensServer> =
+	T extends LensServerImpl<infer Q, infer M> ? { queries: Q; mutations: M } : never;
 
 // =============================================================================
 // Factory

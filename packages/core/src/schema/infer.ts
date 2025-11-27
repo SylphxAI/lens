@@ -54,25 +54,21 @@ export type InferScalar<T extends FieldType> = T extends IdType
 // =============================================================================
 
 /** Infer the target entity name from a relation type */
-export type InferRelationTarget<T> = T extends HasOneType<infer Target>
-	? Target
-	: T extends HasManyType<infer Target>
-		? Target
-		: T extends BelongsToType<infer Target>
-			? Target
-			: never;
+export type InferRelationTarget<T> = T extends { target: infer Target } ? Target : never;
 
 /** Check if a field is a relation */
-export type IsRelation<T> = T extends HasOneType<string>
+export type IsRelation<T> = T extends { _relationKind: "hasOne" | "hasMany" | "belongsTo" }
 	? true
-	: T extends HasManyType<string>
-		? true
-		: T extends BelongsToType<string>
-			? true
-			: false;
+	: false;
 
 /** Check if a field is hasMany */
-export type IsHasMany<T> = T extends HasManyType<string> ? true : false;
+export type IsHasMany<T> = T extends { _relationKind: "hasMany" } ? true : false;
+
+/** Check if a field is hasOne */
+export type IsHasOne<T> = T extends { _relationKind: "hasOne" } ? true : false;
+
+/** Check if a field is belongsTo */
+export type IsBelongsTo<T> = T extends { _relationKind: "belongsTo" } ? true : false;
 
 // =============================================================================
 // Field Categorization
@@ -341,21 +337,29 @@ export type EnumFilter<T extends string> = {
 };
 
 /** Get filter type for a field type */
-export type FieldFilter<F extends FieldDefinition> = F extends IdType
-	? StringFilter
-	: F extends StringType
+/** Extract base type from potentially nullable/optional wrapper */
+type UnwrapFieldType<F> = F extends { _nullable: true }
+	? Omit<F, "_nullable" | "_tsType">
+	: F extends { _optional: true }
+		? Omit<F, "_optional" | "_tsType">
+		: F;
+
+export type FieldFilter<F extends FieldDefinition> =
+	UnwrapFieldType<F> extends IdType
 		? StringFilter
-		: F extends IntType
-			? NumberFilter
-			: F extends FloatType
+		: UnwrapFieldType<F> extends StringType
+			? StringFilter
+			: UnwrapFieldType<F> extends IntType
 				? NumberFilter
-				: F extends BooleanType
-					? BooleanFilter
-					: F extends DateTimeType
-						? DateTimeFilter
-						: F extends EnumType<infer V>
-							? EnumFilter<V[number]>
-							: never;
+				: UnwrapFieldType<F> extends FloatType
+					? NumberFilter
+					: UnwrapFieldType<F> extends BooleanType
+						? BooleanFilter
+						: UnwrapFieldType<F> extends DateTimeType
+							? DateTimeFilter
+							: UnwrapFieldType<F> extends EnumType<infer V>
+								? EnumFilter<V[number]>
+								: never;
 
 /** Where input for filtering entities */
 export type WhereInput<E extends EntityDefinition> = {
@@ -587,17 +591,17 @@ export type CreateInputWithRelations<
 	E extends EntityDefinition,
 	S extends SchemaDefinition,
 > = CreateInput<E, S> & {
-	[K in RelationFields<E>]?: E[K] extends HasManyType<infer Target>
-		? Target extends keyof S
-			? ManyRelationInput<S[Target], S>
+	[K in RelationFields<E>]?: IsHasMany<E[K]> extends true
+		? InferRelationTarget<E[K]> extends keyof S
+			? ManyRelationInput<S[InferRelationTarget<E[K]>], S>
 			: never
-		: E[K] extends HasOneType<infer Target>
-			? Target extends keyof S
-				? SingleRelationInput<S[Target], S>
+		: IsHasOne<E[K]> extends true
+			? InferRelationTarget<E[K]> extends keyof S
+				? SingleRelationInput<S[InferRelationTarget<E[K]>], S>
 				: never
-			: E[K] extends BelongsToType<infer Target>
-				? Target extends keyof S
-					? SingleRelationInput<S[Target], S> | string
+			: IsBelongsTo<E[K]> extends true
+				? InferRelationTarget<E[K]> extends keyof S
+					? SingleRelationInput<S[InferRelationTarget<E[K]>], S> | string
 					: never
 				: never;
 };
@@ -606,17 +610,17 @@ export type CreateInputWithRelations<
 export type UpdateInputWithRelations<E extends EntityDefinition, S extends SchemaDefinition> = {
 	id: string;
 } & Partial<Omit<CreateInput<E, S>, "id">> & {
-		[K in RelationFields<E>]?: E[K] extends HasManyType<infer Target>
-			? Target extends keyof S
-				? ManyRelationInput<S[Target], S>
+		[K in RelationFields<E>]?: IsHasMany<E[K]> extends true
+			? InferRelationTarget<E[K]> extends keyof S
+				? ManyRelationInput<S[InferRelationTarget<E[K]>], S>
 				: never
-			: E[K] extends HasOneType<infer Target>
-				? Target extends keyof S
-					? SingleRelationInput<S[Target], S>
+			: IsHasOne<E[K]> extends true
+				? InferRelationTarget<E[K]> extends keyof S
+					? SingleRelationInput<S[InferRelationTarget<E[K]>], S>
 					: never
-				: E[K] extends BelongsToType<infer Target>
-					? Target extends keyof S
-						? SingleRelationInput<S[Target], S> | string
+				: IsBelongsTo<E[K]> extends true
+					? InferRelationTarget<E[K]> extends keyof S
+						? SingleRelationInput<S[InferRelationTarget<E[K]>], S> | string
 						: never
 					: never;
 	};

@@ -58,19 +58,20 @@ export type ReturnSpec =
 	| Record<string, EntityDef<string, EntityDefinition> | [EntityDef<string, EntityDefinition>]>;
 
 /** Infer TypeScript type from return spec */
-export type InferReturnType<R extends ReturnSpec> = R extends ZodLikeSchema<infer T>
-	? T
-	: R extends EntityDef<string, infer F>
-		? { [K in keyof F]: unknown } // Simplified - actual inference would be more complex
-		: R extends [EntityDef<string, infer F>]
-			? { [K in keyof F]: unknown }[]
-			: R extends Record<string, unknown>
-				? {
-						[K in keyof R]: R[K] extends [EntityDef<string, EntityDefinition>]
-							? unknown[]
-							: unknown;
-					}
-				: never;
+export type InferReturnType<R extends ReturnSpec> =
+	R extends ZodLikeSchema<infer T>
+		? T
+		: R extends EntityDef<string, infer F>
+			? { [K in keyof F]: unknown } // Simplified - actual inference would be more complex
+			: R extends [EntityDef<string, infer F>]
+				? { [K in keyof F]: unknown }[]
+				: R extends Record<string, unknown>
+					? {
+							[K in keyof R]: R[K] extends [EntityDef<string, EntityDefinition>]
+								? unknown[]
+								: unknown;
+						}
+					: never;
 
 /**
  * Resolver context - passed directly to resolver function (tRPC style)
@@ -585,32 +586,35 @@ type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) exten
 /**
  * Extract context from a procedure (non-recursive, single level)
  */
-type ExtractProcedureContext<T> = T extends QueryDef<unknown, unknown, infer C>
-	? C
-	: T extends MutationDef<unknown, unknown, infer C>
+type ExtractProcedureContext<T> =
+	T extends QueryDef<unknown, unknown, infer C>
 		? C
-		: unknown;
+		: T extends MutationDef<unknown, unknown, infer C>
+			? C
+			: unknown;
 
 /**
  * Extract context from router's explicit context or from its routes
  */
-type ExtractRouterContext<T> = T extends RouterDef<infer R, infer C>
-	? unknown extends C
-		? R extends Record<string, infer V>
-			? ExtractProcedureContext<V>
-			: unknown
-		: C
-	: unknown;
+type ExtractRouterContext<T> =
+	T extends RouterDef<infer R, infer C>
+		? unknown extends C
+			? R extends Record<string, infer V>
+				? ExtractProcedureContext<V>
+				: unknown
+			: C
+		: unknown;
 
 /**
  * Extract contexts from a routes object (one level deep)
  * Handles both direct procedures and nested routers
  */
-type ExtractRoutesContext<T> = T extends Record<string, infer V>
-	? V extends RouterDef<RouterRoutes, infer _C>
-		? ExtractRouterContext<V>
-		: ExtractProcedureContext<V>
-	: unknown;
+type ExtractRoutesContext<T> =
+	T extends Record<string, infer V>
+		? V extends RouterDef<RouterRoutes, infer _C>
+			? ExtractRouterContext<V>
+			: ExtractProcedureContext<V>
+		: unknown;
 
 /**
  * Infer merged context type from router or routes
@@ -741,16 +745,17 @@ export interface MutationResultType<T> {
 }
 
 /** Infer the client type from a router definition */
-export type InferRouterClient<TRouter extends RouterDef> = TRouter extends RouterDef<infer TRoutes>
-	? {
-			[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
-				? InferRouterClient<RouterDef<TNestedRoutes>>
-				: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
-					? TInput extends void
-						? () => QueryResultType<TOutput>
-						: (input: TInput) => QueryResultType<TOutput>
-					: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
-						? (input: TInput) => Promise<MutationResultType<TOutput>>
-						: never;
-		}
-	: never;
+export type InferRouterClient<TRouter extends RouterDef> =
+	TRouter extends RouterDef<infer TRoutes>
+		? {
+				[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
+					? InferRouterClient<RouterDef<TNestedRoutes>>
+					: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
+						? TInput extends void
+							? () => QueryResultType<TOutput>
+							: (input: TInput) => QueryResultType<TOutput>
+						: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
+							? (input: TInput) => Promise<MutationResultType<TOutput>>
+							: never;
+			}
+		: never;

@@ -335,19 +335,11 @@ describe("Complex scenarios", () => {
 		expect(postAuthors?.[2].name).toBe("Jane");
 
 		// Post.comments
-		const postComments = await resolvers.resolve<Post, Comment[]>(
-			"Post",
-			"comments",
-			mockDb.posts[0],
-		);
+		const postComments = await resolvers.resolve<Post, Comment[]>("Post", "comments", mockDb.posts[0]);
 		expect(postComments).toHaveLength(2);
 
 		// Comment.author (batch)
-		const commentAuthors = await resolvers.resolveBatch<Comment, User>(
-			"Comment",
-			"author",
-			mockDb.comments,
-		);
+		const commentAuthors = await resolvers.resolveBatch<Comment, User>("Comment", "author", mockDb.comments);
 		expect(commentAuthors).toHaveLength(2);
 	});
 });

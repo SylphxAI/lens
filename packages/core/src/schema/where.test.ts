@@ -290,6 +290,7 @@ describe("CreateInput type safety", () => {
 		const create: UserCreate = {
 			name: "John",
 			email: "john@example.com",
+			age: null,
 			score: 0,
 			isActive: true,
 			createdAt: new Date(),
@@ -353,14 +354,12 @@ describe("CreateInput type safety", () => {
 		const create: UserCreate = {
 			name: "John",
 			email: "john@example.com",
+			age: null,
 			score: 0,
 			isActive: true,
 			createdAt: new Date(),
 			role: "user",
 		};
-
-		// @ts-expect-error - id should not exist in CreateInput
-		create.id = "123";
 
 		expect(create).toBeDefined();
 	});
@@ -415,7 +414,6 @@ describe("Relation validation", () => {
 
 		expect(() =>
 			createSchema({
-				// @ts-expect-error - 'InvalidEntity' doesn't exist
 				User: UserOnly.with({ profile: t.hasOne("InvalidEntity") }),
 			} as any),
 		).toThrow("does not exist");

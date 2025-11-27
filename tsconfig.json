@@ -5,6 +5,16 @@
 		"forceConsistentCasingInFileNames": true,
 		"sourceMap": true,
 		"composite": false,
-		"noUncheckedIndexedAccess": false
-	}
+		"noUncheckedIndexedAccess": false,
+		"jsx": "react-jsx"
+	},
+	"exclude": [
+		"examples",
+		"packages/core/src/schema/*.test.ts",
+		"packages/server/src/e2e/server.test.ts",
+		"packages/server/src/server/create.test.ts",
+		"packages/preact",
+		"packages/solid",
+		"packages/solidstart"
+	]
 }

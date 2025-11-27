@@ -12,20 +12,20 @@
 export {
 	// Factory
 	createClient,
-	// Types
-	type LensClientConfig,
-	type LensClient,
-	type QueryResult,
-	type MutationResult,
-	type SelectionObject,
-	type SelectedType,
-	type RouterApiShape,
-	type RouterLensClient,
-	type InferRouterClientType,
-	type QueriesMap,
-	type MutationsMap,
 	type InferInput,
 	type InferOutput,
+	type InferRouterClientType,
+	type LensClient,
+	// Types
+	type LensClientConfig,
+	type MutationResult,
+	type MutationsMap,
+	type QueriesMap,
+	type QueryResult,
+	type RouterApiShape,
+	type RouterLensClient,
+	type SelectedType,
+	type SelectionObject,
 } from "./client/create";
 
 // =============================================================================
@@ -33,32 +33,33 @@ export {
 // =============================================================================
 
 export {
-	// Types
-	type Transport,
-	type Operation,
-	type Result,
-	type Metadata,
-	type OperationMeta,
-	type OptimisticDSL,
-	type Observable,
-	type Observer,
-	type Unsubscribable,
+	type HttpServerTransportOptions,
+	type HttpTransportOptions,
 	// Transports
 	http,
-	type HttpTransportOptions,
-	type HttpServerTransportOptions,
-	ws,
-	type WsTransportOptions,
-	type WsServerTransportOptions,
-	inProcess,
 	type InProcessTransportOptions,
+	inProcess,
 	type LensServerInterface,
+	type Metadata,
+	type Observable,
+	type Observer,
+	type Operation,
+	type OperationMeta,
+	type OperationsMap,
+	type OptimisticDSL,
+	type Result,
+	type RouteByTypeConfig,
+	type RouteConfig,
 	// Route
 	route,
-	type RouteConfig,
-	routeByType,
-	type RouteByTypeConfig,
 	routeByPath,
+	routeByType,
+	// Types
+	type Transport,
+	type Unsubscribable,
+	type WsServerTransportOptions,
+	type WsTransportOptions,
+	ws,
 } from "./transport";
 
 // =============================================================================
@@ -66,19 +67,19 @@ export {
 // =============================================================================
 
 export {
-	// Types
-	type Plugin,
+	type AuthPluginOptions,
+	auth,
+	type CachePluginOptions,
+	cache,
+	type LoggerPluginOptions,
 	// Built-in plugins
 	logger,
-	type LoggerPluginOptions,
-	auth,
-	type AuthPluginOptions,
-	retry,
+	// Types
+	type Plugin,
 	type RetryPluginOptions,
-	cache,
-	type CachePluginOptions,
-	timeout,
+	retry,
 	type TimeoutPluginOptions,
+	timeout,
 } from "./transport";
 
 // =============================================================================
@@ -86,19 +87,19 @@ export {
 // =============================================================================
 
 export {
+	batch,
+	computed,
+	derive,
+	effect,
+	isSignal,
 	// Types
 	type Signal,
-	type WritableSignal,
 	type Subscriber,
-	type Unsubscribe,
 	// Functions
 	signal,
-	computed,
-	effect,
-	batch,
-	isSignal,
 	toPromise,
-	derive,
+	type Unsubscribe,
+	type WritableSignal,
 } from "./signals/signal";
 
 // =============================================================================
@@ -106,10 +107,10 @@ export {
 // =============================================================================
 
 export {
-	ReactiveStore,
 	createStore,
 	type EntityKey,
 	type EntityState,
 	type OptimisticEntry as StoreOptimisticEntry,
+	ReactiveStore,
 	type StoreConfig,
 } from "./store/reactive-store";

@@ -6,7 +6,7 @@
 
 import type { EntityKey, Update } from "@sylphx/lens-core";
 import { applyUpdate, makeEntityKey } from "@sylphx/lens-core";
-import { type Signal, type WritableSignal, batch, signal } from "../signals/signal";
+import { batch, type Signal, signal, type WritableSignal } from "../signals/signal";
 
 // Re-export for convenience
 export type { EntityKey };
