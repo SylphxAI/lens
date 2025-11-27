@@ -1,26 +1,12 @@
 {
 	"$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true
-	},
+	"extends": ["@sylphx/biome-config"],
 	"files": {
 		"ignoreUnknown": false,
 		"ignore": ["node_modules", "dist", ".changeset", "examples"]
 	},
-	"formatter": {
-		"enabled": true,
-		"indentStyle": "tab",
-		"lineWidth": 100
-	},
-	"organizeImports": {
-		"enabled": true
-	},
 	"linter": {
-		"enabled": true,
 		"rules": {
-			"recommended": true,
 			"suspicious": {
 				"noExplicitAny": "off",
 				"noThenProperty": "off",
@@ -40,13 +26,15 @@
 				"noAccumulatingSpread": "off"
 			},
 			"correctness": {
-				"noUnusedImports": "error"
+				"noUnusedVariables": "off"
 			}
 		}
 	},
 	"javascript": {
 		"formatter": {
-			"quoteStyle": "double"
+			"quoteStyle": "double",
+			"semicolons": "always",
+			"trailingCommas": "all"
 		}
 	}
 }

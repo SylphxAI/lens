@@ -22,6 +22,8 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@changesets/cli": "^2.29.7",
+		"@sylphx/biome-config": "^0.1.0",
+		"@sylphx/tsconfig": "^0.1.0",
 		"@types/bun": "latest",
 		"@typescript/native-preview": "^7.0.0-dev.20251126.1",
 		"bunup": "^0.16.10",
