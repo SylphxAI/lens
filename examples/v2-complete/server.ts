@@ -199,10 +199,10 @@ const server = createServer({
  * Usage in client:
  * ```typescript
  * import type { Api } from './server';
- * const client = createClient<Api>({ links: [...] });
+ * const client = createClient<Api>({ transport: ws({ url: '...' }) });
  * ```
  */
-export type Api = typeof server._types;
+export type Api = InferApi<typeof server>;
 
 // =============================================================================
 // Start Server
