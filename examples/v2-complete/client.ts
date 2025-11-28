@@ -15,13 +15,13 @@
 import {
 	createClient,
 	effect,
-	// Links (middleware chain)
-	loggerLink,
-	retryLink,
+	// Plugins (middleware chain)
+	logger,
+	retry,
 	// Reactive utilities
 	signal,
-	websocketLink,
-} from "@lens/client";
+	ws,
+} from "@sylphx/lens-client";
 
 // TYPE-only import from server!
 import type { Api } from "./server";
@@ -36,23 +36,18 @@ import { mutations } from "./operations";
 // =============================================================================
 
 const client = createClient<Api>({
-	// Mutations needed for optimistic updates (contains _optimistic functions)
-	mutations,
+	// Transport for server communication
+	transport: ws({
+		url: "ws://localhost:3000/ws",
+	}),
 
-	// Links = middleware chain (like tRPC)
-	links: [
+	// Plugins (middleware chain)
+	plugins: [
 		// Logging middleware
-		loggerLink({ enabled: process.env.NODE_ENV === "development" }),
+		logger({ enabled: process.env.NODE_ENV === "development" }),
 
 		// Retry on failure
-		retryLink({ retries: 3, delay: 1000 }),
-
-		// Terminal link (must be last)
-		websocketLink({
-			url: "ws://localhost:3000/ws",
-			reconnect: true,
-			reconnectDelay: 1000,
-		}),
+		retry({ retries: 3, delay: 1000 }),
 	],
 });
 

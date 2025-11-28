@@ -17,7 +17,7 @@
  *   - { updateMany: {...} }       → Cross-entity updates
  */
 
-import { mutation, query } from "@lens/core";
+import { mutation, query } from "@sylphx/lens-core";
 import { z } from "zod";
 import { Comment, Post, User } from "./schema";
 

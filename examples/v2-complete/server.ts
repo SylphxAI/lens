@@ -4,7 +4,7 @@
  * Demonstrates: Server setup with operations + type export for client
  */
 
-import { type InferApi, createUnifiedServer } from "@lens/server";
+import { type InferApi, createServer } from "@sylphx/lens-server";
 import { mutations, queries } from "./operations";
 import { Comment, Post, User, relations } from "./schema";
 
@@ -162,7 +162,7 @@ const entityResolvers = {
 // Server Setup
 // =============================================================================
 
-const server = createUnifiedServer({
+const server = createServer({
 	// Schema
 	entities: { User, Post, Comment },
 	relations,
@@ -172,12 +172,13 @@ const server = createUnifiedServer({
 	mutations,
 
 	// Entity resolvers for nested fields
-	entityResolvers,
+	resolvers: entityResolvers,
 
 	// Context factory - runs per request
 	context: async (req) => {
 		// In production: validate JWT, get user from session
-		const userId = req.headers?.["x-user-id"] ?? "1";
+		const userId =
+			(req as { headers?: Record<string, string> })?.headers?.["x-user-id"] ?? "1";
 		const currentUser = await db.user.findUnique({ where: { id: userId } });
 
 		return {
@@ -185,12 +186,6 @@ const server = createUnifiedServer({
 			currentUser,
 			requestId: crypto.randomUUID(),
 		};
-	},
-
-	// WebSocket options
-	ws: {
-		path: "/ws",
-		heartbeat: 30000,
 	},
 });
 
@@ -215,13 +210,9 @@ export type Api = typeof server._types;
 
 const PORT = 3000;
 
-Bun.serve({
-	port: PORT,
-	fetch: server.fetch,
-	websocket: server.websocket,
-});
-
-console.log(`
+// Use server.listen() which handles HTTP + WebSocket
+server.listen(PORT).then(() => {
+	console.log(`
 🔭 Lens Server running!
 
    HTTP:      http://localhost:${PORT}
@@ -230,3 +221,4 @@ console.log(`
    Queries:   whoami, getUser, searchUsers, getPost, trendingPosts
    Mutations: updateUser, createPost, updatePost, publishPost, bulkPromoteUsers, addComment
 `);
+});

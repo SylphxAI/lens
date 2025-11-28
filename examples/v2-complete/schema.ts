@@ -7,7 +7,7 @@
  * - const User = entity({...}) + export { User } → name = "User"
  */
 
-import { belongsTo, entity, hasMany, relation, t } from "@lens/core";
+import { belongsTo, entity, hasMany, relation, t } from "@sylphx/lens-core";
 
 // =============================================================================
 // Entities (name derived from variable/export key)
