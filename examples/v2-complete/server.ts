@@ -1,224 +1,279 @@
 /**
  * V2 Complete Example - Server
  *
- * Demonstrates: Server setup with operations + type export for client
+ * Demonstrates: Entity definitions with relations, router pattern
  */
 
-import { type InferApi, createServer } from "@sylphx/lens-server";
-import { mutations, queries } from "./operations";
-import { Comment, Post, User, relations } from "./schema";
+import { entity, t, query, mutation, router, hasMany, belongsTo, relation } from "@sylphx/lens-core";
+import { createServer } from "@sylphx/lens-server";
+import { z } from "zod";
 
 // =============================================================================
-// Mock Database (use Prisma/Drizzle in production)
+// Entities
+// =============================================================================
+
+export const User = entity("User", {
+	id: t.id(),
+	name: t.string(),
+	email: t.string(),
+	role: t.enum(["user", "admin", "vip"]),
+	avatar: t.string().optional(),
+	createdAt: t.date(),
+});
+
+export const Post = entity("Post", {
+	id: t.id(),
+	title: t.string(),
+	content: t.string(),
+	published: t.boolean(),
+	authorId: t.string(),
+	updatedAt: t.date().optional(),
+	createdAt: t.date(),
+});
+
+export const Comment = entity("Comment", {
+	id: t.id(),
+	content: t.string(),
+	postId: t.string(),
+	authorId: t.string(),
+	createdAt: t.date(),
+});
+
+// =============================================================================
+// Relations
+// =============================================================================
+
+export const relations = [
+	relation(User, {
+		posts: hasMany(Post, (e) => e.authorId),
+		comments: hasMany(Comment, (e) => e.authorId),
+	}),
+	relation(Post, {
+		author: belongsTo(User, (e) => e.authorId),
+		comments: hasMany(Comment, (e) => e.postId),
+	}),
+	relation(Comment, {
+		author: belongsTo(User, (e) => e.authorId),
+		post: belongsTo(Post, (e) => e.postId),
+	}),
+];
+
+// =============================================================================
+// Context
+// =============================================================================
+
+interface AppContext {
+	db: typeof db;
+	currentUser: (typeof db.users extends Map<string, infer V> ? V : never) | null;
+	requestId: string;
+}
+
+// =============================================================================
+// In-memory "database"
 // =============================================================================
 
 const db = {
-	user: {
-		data: new Map([
-			[
-				"1",
-				{
-					id: "1",
-					name: "Alice",
-					email: "alice@test.com",
-					role: "admin" as const,
-					createdAt: new Date(),
-				},
-			],
-			[
-				"2",
-				{
-					id: "2",
-					name: "Bob",
-					email: "bob@test.com",
-					role: "user" as const,
-					createdAt: new Date(),
-				},
-			],
-			[
-				"3",
-				{
-					id: "3",
-					name: "Charlie",
-					email: "charlie@test.com",
-					role: "vip" as const,
-					createdAt: new Date(),
-				},
-			],
-		]),
-		findUnique: async ({ where }: { where: { id: string } }) => db.user.data.get(where.id) ?? null,
-		findMany: async ({ where, take }: { where?: any; take?: number }) => {
-			let results = Array.from(db.user.data.values());
-			if (where?.name?.contains) {
-				results = results.filter((u) =>
-					u.name.toLowerCase().includes(where.name.contains.toLowerCase()),
-				);
-			}
-			if (where?.id?.in) {
-				results = results.filter((u) => where.id.in.includes(u.id));
-			}
-			return take ? results.slice(0, take) : results;
-		},
-		update: async ({ where, data }: { where: { id: string }; data: any }) => {
-			const user = db.user.data.get(where.id);
+	users: new Map([
+		["1", { id: "1", name: "Alice", email: "alice@test.com", role: "admin" as const, createdAt: new Date() }],
+		["2", { id: "2", name: "Bob", email: "bob@test.com", role: "user" as const, createdAt: new Date() }],
+		["3", { id: "3", name: "Charlie", email: "charlie@test.com", role: "vip" as const, createdAt: new Date() }],
+	]),
+	posts: new Map([
+		["1", { id: "1", title: "Hello World", content: "First post!", published: true, authorId: "1", createdAt: new Date() }],
+		["2", { id: "2", title: "Lens Guide", content: "How to use Lens...", published: true, authorId: "1", createdAt: new Date() }],
+	]),
+	comments: new Map<string, { id: string; content: string; postId: string; authorId: string; createdAt: Date }>(),
+};
+
+// =============================================================================
+// Operations
+// =============================================================================
+
+const userRouter = router({
+	whoami: query<AppContext>()
+		.returns(User)
+		.resolve(({ ctx }) => ctx.currentUser),
+
+	get: query<AppContext>()
+		.input(z.object({ id: z.string() }))
+		.returns(User)
+		.resolve(({ input, ctx }) => {
+			const user = ctx.db.users.get(input.id);
 			if (!user) throw new Error("User not found");
-			const updated = { ...user, ...data };
-			db.user.data.set(where.id, updated);
+			return user;
+		}),
+
+	search: query<AppContext>()
+		.input(z.object({ query: z.string(), limit: z.number().optional() }))
+		.returns([User])
+		.resolve(({ input, ctx }) => {
+			const results = Array.from(ctx.db.users.values()).filter((u) =>
+				u.name.toLowerCase().includes(input.query.toLowerCase()),
+			);
+			return input.limit ? results.slice(0, input.limit) : results;
+		}),
+
+	update: mutation<AppContext>()
+		.input(z.object({
+			id: z.string(),
+			name: z.string().optional(),
+			email: z.string().optional(),
+			avatar: z.string().optional(),
+		}))
+		.returns(User)
+		.optimistic("merge")
+		.resolve(({ input, ctx }) => {
+			const user = ctx.db.users.get(input.id);
+			if (!user) throw new Error("User not found");
+			const updated = { ...user, ...input };
+			ctx.db.users.set(input.id, updated);
 			return updated;
-		},
-		updateMany: async ({ where, data }: { where: { id: { in: string[] } }; data: any }) => {
+		}),
+
+	bulkPromote: mutation<AppContext>()
+		.input(z.object({
+			userIds: z.array(z.string()),
+			newRole: z.enum(["user", "admin", "vip"]),
+		}))
+		.resolve(({ input, ctx }) => {
 			let count = 0;
-			for (const id of where.id.in) {
-				const user = db.user.data.get(id);
+			for (const id of input.userIds) {
+				const user = ctx.db.users.get(id);
 				if (user) {
-					db.user.data.set(id, { ...user, ...data });
+					ctx.db.users.set(id, { ...user, role: input.newRole });
 					count++;
 				}
 			}
 			return { count };
-		},
-	},
-	post: {
-		data: new Map([
-			[
-				"1",
-				{
-					id: "1",
-					title: "Hello World",
-					content: "First post!",
-					published: true,
-					authorId: "1",
-					createdAt: new Date(),
-				},
-			],
-			[
-				"2",
-				{
-					id: "2",
-					title: "Lens Guide",
-					content: "How to use Lens...",
-					published: true,
-					authorId: "1",
-					createdAt: new Date(),
-				},
-			],
-		]),
-		findUnique: async ({ where }: { where: { id: string } }) => db.post.data.get(where.id) ?? null,
-		findMany: async ({ where, orderBy, take }: { where?: any; orderBy?: any; take?: number }) => {
-			let results = Array.from(db.post.data.values());
-			if (where?.published !== undefined) {
-				results = results.filter((p) => p.published === where.published);
-			}
-			if (orderBy?.createdAt === "desc") {
-				results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-			}
-			return take ? results.slice(0, take) : results;
-		},
-		create: async ({ data }: { data: any }) => {
-			const id = String(db.post.data.size + 1);
-			const post = { id, ...data, createdAt: new Date() };
-			db.post.data.set(id, post);
-			return post;
-		},
-		update: async ({ where, data }: { where: { id: string }; data: any }) => {
-			const post = db.post.data.get(where.id);
+		}),
+});
+
+const postRouter = router({
+	get: query<AppContext>()
+		.input(z.object({ id: z.string() }))
+		.returns(Post)
+		.resolve(({ input, ctx }) => {
+			const post = ctx.db.posts.get(input.id);
 			if (!post) throw new Error("Post not found");
-			const updated = { ...post, ...data };
-			db.post.data.set(where.id, updated);
+			return post;
+		}),
+
+	trending: query<AppContext>()
+		.input(z.object({ limit: z.number().default(10) }))
+		.returns([Post])
+		.resolve(({ input, ctx }) => {
+			const posts = Array.from(ctx.db.posts.values())
+				.filter((p) => p.published)
+				.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+			return posts.slice(0, input.limit);
+		}),
+
+	create: mutation<AppContext>()
+		.input(z.object({ title: z.string(), content: z.string() }))
+		.returns(Post)
+		.optimistic("create")
+		.resolve(({ input, ctx }) => {
+			const id = String(ctx.db.posts.size + 1);
+			const post = {
+				id,
+				...input,
+				published: false,
+				authorId: ctx.currentUser?.id ?? "unknown",
+				createdAt: new Date(),
+			};
+			ctx.db.posts.set(id, post);
+			return post;
+		}),
+
+	update: mutation<AppContext>()
+		.input(z.object({
+			id: z.string(),
+			title: z.string().optional(),
+			content: z.string().optional(),
+		}))
+		.returns(Post)
+		.optimistic("merge")
+		.resolve(({ input, ctx }) => {
+			const post = ctx.db.posts.get(input.id);
+			if (!post) throw new Error("Post not found");
+			const updated = { ...post, ...input, updatedAt: new Date() };
+			ctx.db.posts.set(input.id, updated);
 			return updated;
-		},
-	},
-	comment: {
-		data: new Map<string, any>(),
-		create: async ({ data }: { data: any }) => {
-			const id = String(db.comment.data.size + 1);
-			const comment = { id, ...data, createdAt: new Date() };
-			db.comment.data.set(id, comment);
+		}),
+
+	publish: mutation<AppContext>()
+		.input(z.object({ id: z.string() }))
+		.returns(Post)
+		.optimistic({ merge: { published: true } })
+		.resolve(({ input, ctx }) => {
+			const post = ctx.db.posts.get(input.id);
+			if (!post) throw new Error("Post not found");
+			const updated = { ...post, published: true, updatedAt: new Date() };
+			ctx.db.posts.set(input.id, updated);
+			return updated;
+		}),
+});
+
+const commentRouter = router({
+	add: mutation<AppContext>()
+		.input(z.object({ postId: z.string(), content: z.string() }))
+		.returns(Comment)
+		.optimistic("create")
+		.resolve(({ input, ctx }) => {
+			const id = String(ctx.db.comments.size + 1);
+			const comment = {
+				id,
+				...input,
+				authorId: ctx.currentUser?.id ?? "unknown",
+				createdAt: new Date(),
+			};
+			ctx.db.comments.set(id, comment);
 			return comment;
-		},
-	},
-};
-
-// =============================================================================
-// Entity Resolvers (for nested fields)
-// =============================================================================
-
-const entityResolvers = {
-	User: {
-		// Resolve User.posts relation
-		posts: async (user: { id: string }) => {
-			return Array.from(db.post.data.values()).filter((p) => p.authorId === user.id);
-		},
-	},
-	Post: {
-		// Resolve Post.author relation
-		author: async (post: { authorId: string }) => {
-			return db.user.data.get(post.authorId);
-		},
-	},
-};
-
-// =============================================================================
-// Server Setup
-// =============================================================================
-
-const server = createServer({
-	// Schema
-	entities: { User, Post, Comment },
-	relations,
-
-	// Operations
-	queries,
-	mutations,
-
-	// Entity resolvers for nested fields
-	resolvers: entityResolvers,
-
-	// Context factory - runs per request
-	context: async (req) => {
-		// In production: validate JWT, get user from session
-		const userId =
-			(req as { headers?: Record<string, string> })?.headers?.["x-user-id"] ?? "1";
-		const currentUser = await db.user.findUnique({ where: { id: userId } });
-
-		return {
-			db,
-			currentUser,
-			requestId: crypto.randomUUID(),
-		};
-	},
+		}),
 });
 
 // =============================================================================
-// Export API Type (for client type inference)
+// Main Router
 // =============================================================================
 
-/**
- * Client imports this TYPE (not runtime value) for type-safe API access
- *
- * Usage in client:
- * ```typescript
- * import type { Api } from './server';
- * const client = createClient<Api>({ transport: ws({ url: '...' }) });
- * ```
- */
-export type Api = InferApi<typeof server>;
+const appRouter = router({
+	user: userRouter,
+	post: postRouter,
+	comment: commentRouter,
+});
+
+export type AppRouter = typeof appRouter;
 
 // =============================================================================
-// Start Server
+// Server
+// =============================================================================
+
+export const server = createServer({
+	router: appRouter,
+	entities: { User, Post, Comment },
+	relations,
+	context: () => ({
+		db,
+		currentUser: db.users.get("1") ?? null,
+		requestId: crypto.randomUUID(),
+	}),
+});
+
+export { db };
+
+// =============================================================================
+// Start Server (when run directly)
 // =============================================================================
 
 const PORT = 3000;
 
-// Use server.listen() which handles HTTP + WebSocket
 server.listen(PORT).then(() => {
 	console.log(`
-🔭 Lens Server running!
+🔭 Lens Server running on http://localhost:${PORT}
 
-   HTTP:      http://localhost:${PORT}
-   WebSocket: ws://localhost:${PORT}/ws
-
-   Queries:   whoami, getUser, searchUsers, getPost, trendingPosts
-   Mutations: updateUser, createPost, updatePost, publishPost, bulkPromoteUsers, addComment
+Routes:
+  user.whoami, user.get, user.search, user.update, user.bulkPromote
+  post.get, post.trending, post.create, post.update, post.publish
+  comment.add
 `);
 });
