@@ -49,12 +49,14 @@ export const relations = [
 		comments: hasMany(Comment, (e) => e.authorId),
 	}),
 	relation(Post, {
-		author: belongsTo(User, (e) => e.authorId),
+		// belongsTo: foreign key is on source entity (Post), so use string
+		author: belongsTo(User),
 		comments: hasMany(Comment, (e) => e.postId),
 	}),
 	relation(Comment, {
-		author: belongsTo(User, (e) => e.authorId),
-		post: belongsTo(Post, (e) => e.postId),
+		// belongsTo: foreign key is on source entity (Comment), so use string
+		author: belongsTo(User),
+		post: belongsTo(Post),
 	}),
 ];
 
