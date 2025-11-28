@@ -251,9 +251,11 @@ export interface RelationTypeWithForeignKey {
  */
 export function hasMany<Target extends EntityDef<string, EntityDefinition>>(
 	target: Target,
-	fieldAccessor?: (entity: unknown) => unknown,
+	fieldAccessor?: (entity: { [K in keyof Target["fields"]]: K }) => keyof Target["fields"],
 ): HasManyType<Target["_name"] & string> & { foreignKey?: string } {
-	const foreignKey = fieldAccessor ? extractFieldName(fieldAccessor) : undefined;
+	const foreignKey = fieldAccessor
+		? extractFieldName(fieldAccessor as (entity: unknown) => unknown)
+		: undefined;
 	return new HasManyType(target._name ?? "", foreignKey);
 }
 
@@ -265,9 +267,11 @@ export function hasMany<Target extends EntityDef<string, EntityDefinition>>(
  */
 export function hasOne<Target extends EntityDef<string, EntityDefinition>>(
 	target: Target,
-	fieldAccessor?: (entity: unknown) => unknown,
+	fieldAccessor?: (entity: { [K in keyof Target["fields"]]: K }) => keyof Target["fields"],
 ): HasOneType<Target["_name"] & string> & { foreignKey?: string } {
-	const foreignKey = fieldAccessor ? extractFieldName(fieldAccessor) : undefined;
+	const foreignKey = fieldAccessor
+		? extractFieldName(fieldAccessor as (entity: unknown) => unknown)
+		: undefined;
 	return new HasOneType(target._name ?? "", foreignKey);
 }
 
@@ -279,9 +283,11 @@ export function hasOne<Target extends EntityDef<string, EntityDefinition>>(
  */
 export function belongsTo<Target extends EntityDef<string, EntityDefinition>>(
 	target: Target,
-	fieldAccessor?: (entity: unknown) => unknown,
+	fieldAccessor?: (entity: { [K in keyof Target["fields"]]: K }) => keyof Target["fields"],
 ): BelongsToType<Target["_name"] & string> & { foreignKey?: string } {
-	const foreignKey = fieldAccessor ? extractFieldName(fieldAccessor) : undefined;
+	const foreignKey = fieldAccessor
+		? extractFieldName(fieldAccessor as (entity: unknown) => unknown)
+		: undefined;
 	return new BelongsToType(target._name ?? "", foreignKey);
 }
 

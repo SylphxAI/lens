@@ -40,21 +40,21 @@ export const Comment = entity("Comment", {
 });
 
 // =============================================================================
-// Relations (optional - for documentation/future use)
+// Relations
 // =============================================================================
 
 export const relations = [
 	relation(User, {
-		posts: hasMany(Post),
-		comments: hasMany(Comment),
+		posts: hasMany(Post, (e) => e.authorId),
+		comments: hasMany(Comment, (e) => e.authorId),
 	}),
 	relation(Post, {
-		author: belongsTo(User),
-		comments: hasMany(Comment),
+		author: belongsTo(User, (e) => e.authorId),
+		comments: hasMany(Comment, (e) => e.postId),
 	}),
 	relation(Comment, {
-		author: belongsTo(User),
-		post: belongsTo(Post),
+		author: belongsTo(User, (e) => e.authorId),
+		post: belongsTo(Post, (e) => e.postId),
 	}),
 ];
 
