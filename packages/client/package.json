@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-client",
-	"version": "1.0.9",
+	"version": "1.1.0",
 	"description": "Reactive client for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

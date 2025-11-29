@@ -1,5 +1,21 @@
 # @sylphx/lens
 
+## 1.1.0 (2025-11-29)
+
+### ✨ Features
+
+- **core:** introduce new resolver() API with field builder pattern ([c4483ee](https://github.com/SylphxAI/Lens/commit/c4483eeea95a1949eb1f76ef3a2e332a1bddb1db))
+
+### 💅 Styles
+
+- format package.json files with biome ([8565fd9](https://github.com/SylphxAI/Lens/commit/8565fd9b1c71b8f35ce1f56514c822106142947a))
+
+### 🔧 Chores
+
+- update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
+- polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
+- fix all doctor warnings - 100% score ([c5e58ce](https://github.com/SylphxAI/Lens/commit/c5e58ce15133c00b4b579be7f5f8d772a81dbe23))
+
 ## 1.0.9
 
 ### Patch Changes
