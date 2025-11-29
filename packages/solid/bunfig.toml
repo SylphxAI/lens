@@ -1,0 +1,4 @@
+[test]
+# Configure JSX for SolidJS
+jsx = "preserve"
+jsxImportSource = "solid-js"

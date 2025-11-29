@@ -1,0 +1,4 @@
+[test]
+# Configure JSX for Preact
+jsx = "react-jsx"
+jsxImportSource = "preact"
