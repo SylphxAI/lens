@@ -7,7 +7,17 @@
 
 import { describe, expect, test } from "bun:test";
 import { createSchema, entity } from "./define";
-import type { CreateInput, InferEntity, InferScalar, RelationFields, ScalarFields, Select, UpdateInput } from "./infer";
+import type {
+	CreateInput,
+	FieldArgs,
+	InferEntity,
+	InferScalar,
+	RelationFields,
+	ScalarFields,
+	ScalarSelectOptions,
+	Select,
+	UpdateInput,
+} from "./infer";
 import { t } from "./types";
 
 // =============================================================================
@@ -154,6 +164,50 @@ describe("Type Inference", () => {
 			expect(selection.posts).toBeDefined();
 			expect((selection.posts as any).select.id).toBe(true);
 			expect((selection.posts as any).take).toBe(5);
+		});
+
+		test("select type allows field arguments on scalar fields", () => {
+			type UserSelect = Select<TestSchemaDefinition["User"], TestSchemaDefinition>;
+
+			// Scalar field with args (for computed fields like excerpt)
+			const selection: UserSelect = {
+				id: true,
+				name: { args: { length: 100 } }, // Field with args
+			};
+
+			expect(selection.id).toBe(true);
+			expect((selection.name as ScalarSelectOptions).args).toEqual({ length: 100 });
+		});
+
+		test("select type allows field arguments on relation fields", () => {
+			type UserSelect = Select<TestSchemaDefinition["User"], TestSchemaDefinition>;
+
+			// Relation field with args (GraphQL-style pagination)
+			const selection: UserSelect = {
+				id: true,
+				posts: {
+					args: { first: 10, published: true }, // Field args
+					select: {
+						id: true,
+						title: true,
+					},
+				},
+			};
+
+			expect(selection.id).toBe(true);
+			expect((selection.posts as any).args).toEqual({ first: 10, published: true });
+			expect((selection.posts as any).select.title).toBe(true);
+		});
+
+		test("FieldArgs type is a record of unknown values", () => {
+			const args: FieldArgs = {
+				first: 10,
+				published: true,
+				filter: { status: "active" },
+			};
+
+			expect(args.first).toBe(10);
+			expect(args.published).toBe(true);
 		});
 	});
 

@@ -113,6 +113,8 @@ export type {
 	EntityNames,
 	EntityType,
 	EnumFilter,
+	// Field arguments (GraphQL-style)
+	FieldArgs,
 	FieldFilter,
 	// Find types
 	FindFirstInput,
@@ -146,6 +148,8 @@ export type {
 	RequireKeys,
 	// Field categorization
 	ScalarFields,
+	// Scalar selection options (with args)
+	ScalarSelectOptions,
 	// Selection inference
 	Select,
 	SingleRelationInput,

@@ -156,12 +156,23 @@ export type InferRelationType<F extends FieldDefinition, S extends SchemaDefinit
 // Field Selection Type Inference
 // =============================================================================
 
+/** Field arguments type (for computed/relation fields with args) */
+export type FieldArgs = Record<string, unknown>;
+
+/** Scalar field selection options (for fields with arguments) */
+export type ScalarSelectOptions = {
+	/** Field arguments (GraphQL-style) */
+	args?: FieldArgs;
+};
+
 /** Nested relation selection options */
 export type RelationSelectOptions<
 	Target extends string,
 	S extends SchemaDefinition,
 > = Target extends keyof S
 	? {
+			/** Field arguments (GraphQL-style) */
+			args?: FieldArgs;
 			/** Nested field selection */
 			select?: Select<S[Target], S>;
 			/** Limit results */
@@ -180,8 +191,8 @@ export type Select<E extends EntityDefinition, S extends SchemaDefinition = neve
 	[K in keyof E]?: IsRelation<E[K]> extends true
 		? // For relations, allow nested selection or true
 			true | RelationSelectOptions<InferRelationTarget<E[K]> & string, S>
-		: // For scalars, just true
-			true;
+		: // For scalars, allow true or options with args
+			true | ScalarSelectOptions;
 };
 
 /** Infer selected type from selection */
@@ -191,9 +202,10 @@ export type InferSelected<
 	S extends SchemaDefinition = never,
 > = {
 	[K in keyof Sel & keyof E]: Sel[K] extends true
-		? InferFieldType<E[K], S>
+		? // Direct selection (true)
+			InferFieldType<E[K], S>
 		: Sel[K] extends { select: infer NestedSel }
-			? // Nested selection
+			? // Nested selection with select property
 				E[K] extends HasManyType<infer Target>
 				? Target extends keyof S
 					? NestedSel extends Select<S[Target], S>
@@ -213,8 +225,11 @@ export type InferSelected<
 								: never
 							: never
 						: never
-			: // Relation without nested select returns full entity
-				InferFieldType<E[K], S>;
+			: Sel[K] extends { args: FieldArgs }
+				? // Selection with args but no nested select - return field type
+					InferFieldType<E[K], S>
+				: // Relation without nested select returns full entity
+					InferFieldType<E[K], S>;
 };
 
 // =============================================================================
