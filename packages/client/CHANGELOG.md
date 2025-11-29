@@ -1,5 +1,52 @@
 # @sylphx/lens-client
 
+## 1.5.0 (2025-11-29)
+
+### ✨ Features
+
+- **client:** add automatic type inference from inProcess transport ([431e2a9](https://github.com/SylphxAI/Lens/commit/431e2a96ae87fe8893be8e61f29f5ac56092ef50))
+
+### 🐛 Bug Fixes
+
+- **client:** correct mutation detection and type inference ([6344651](https://github.com/SylphxAI/Lens/commit/6344651a4f95fbeee48dd30b91318b9ff77c7822))
+- **build:** add explicit return types for isolated declarations ([3af67c3](https://github.com/SylphxAI/Lens/commit/3af67c3ad875d87db9c97dc4c50989acdc31cacc))
+- **build:** add workspace bunup config with type inference ([94b0e02](https://github.com/SylphxAI/Lens/commit/94b0e02fe085337f6debcbbca2bddff39819f4a9))
+- **build:** add bunup config to enable type inference ([e89661f](https://github.com/SylphxAI/Lens/commit/e89661f80cabae59d3b3463ee2ae20d683293443))
+- use bunup for all packages, remove tsc build:types ([ba31790](https://github.com/SylphxAI/Lens/commit/ba31790239233c1573e3bb2fe1626c1fadc8fae9))
+- **core:** add explicit type annotations for bunup CI ([a2cc776](https://github.com/SylphxAI/Lens/commit/a2cc77681155cf807659daefedf54ab0f3116910))
+- externalize framework dependencies using bunup ([7e49f16](https://github.com/SylphxAI/Lens/commit/7e49f16535088d05ddfdfefa3b85d234af74c76e))
+- **release:** resolve workspace:* dependencies before publishing ([7272d22](https://github.com/SylphxAI/Lens/commit/7272d229bc2e06baecd2a73fcefa5a46585d2e59))
+
+### ♻️ Refactoring
+
+- enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
+- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
+- **client:** eager handshake with deferred execution ([4ee14a2](https://github.com/SylphxAI/Lens/commit/4ee14a2a997ae7078abfcf4bb08c6f43fdb57fc1))
+
+### 💅 Styles
+
+- format package.json files with biome ([8565fd9](https://github.com/SylphxAI/Lens/commit/8565fd9b1c71b8f35ce1f56514c822106142947a))
+
+### ✅ Tests
+
+- **core,client,server:** boost test coverage to 92%+ ([b5348b5](https://github.com/SylphxAI/Lens/commit/b5348b5eac9d6444f7d18f202948398bb6d09dc6))
+- **core,client:** add comprehensive type inference tests and examples ([3f4d49e](https://github.com/SylphxAI/Lens/commit/3f4d49ecd85ff30580a27a3c8ad8cfe2b83a1b1a))
+- **client:** add comprehensive WebSocket transport tests ([a92ab51](https://github.com/SylphxAI/Lens/commit/a92ab515c3939845c5298985508d07cecb0e121d))
+- **client:** add comprehensive transport layer test suite ([44d3563](https://github.com/SylphxAI/Lens/commit/44d3563b8af357a6858f45fcf13ba15ae72081e1))
+- **core:** improve test coverage for schema types, operations, and resolvers ([59d5c78](https://github.com/SylphxAI/Lens/commit/59d5c78d97431409c4b097afd0ff3e73b1f4bce3))
+
+### 🔧 Chores
+
+- **deps:** update @sylphx/bump to 1.3.9 ([73af518](https://github.com/SylphxAI/Lens/commit/73af5183ff6cfd75cf340a197a7fbd3e6235920e))
+- bump versions to bypass npm registry conflict ([afe45c4](https://github.com/SylphxAI/Lens/commit/afe45c42ffb8afa01bd080a1dc8b5b6c1edd3c3a))
+- update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
+- polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
+- fix all doctor warnings - 100% score ([c5e58ce](https://github.com/SylphxAI/Lens/commit/c5e58ce15133c00b4b579be7f5f8d772a81dbe23))
+- format package.json files ([625a947](https://github.com/SylphxAI/Lens/commit/625a947d98b2076c327606f718b0119c7cde4e3f))
+- format package.json files ([a0a0ed8](https://github.com/SylphxAI/Lens/commit/a0a0ed80252860b43d1220fbbe81bf0f506762f1))
+- fix lint errors - remove unused imports and add hook deps suppressions ([ba12a42](https://github.com/SylphxAI/Lens/commit/ba12a423462c773eed8c2d69c3648e80457b80b5))
+
 ## 1.4.0 (2025-11-29)
 
 ### ✨ Features
