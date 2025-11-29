@@ -525,10 +525,10 @@ describe("GraphStateManager", () => {
 			});
 
 			expect(mockClient.messages.length).toBe(2);
-			expect(mockClient.messages[1].updates._items.data).toEqual([
-				{ id: "1", name: "Alice" },
-				{ id: "2", name: "Bob" },
-			]);
+			// Second message should be incremental diff (push operation)
+			const update = mockClient.messages[1].updates._items;
+			expect(update.strategy).toBe("array");
+			expect(update.data).toEqual([{ op: "push", item: { id: "2", name: "Bob" } }]);
 		});
 
 		it("does not send update if array unchanged", () => {

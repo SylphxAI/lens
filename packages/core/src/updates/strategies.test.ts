@@ -4,7 +4,10 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+	applyArrayDiff,
 	applyUpdate,
+	computeArrayDiff,
+	createArrayUpdate,
 	createUpdate,
 	type DeltaUpdate,
 	deltaStrategy,
@@ -352,5 +355,260 @@ describe("createUpdate and applyUpdate", () => {
 		const update = createUpdate(undefined, "new value");
 		expect(update.strategy).toBe("value");
 		expect(applyUpdate(undefined, update) as unknown as string).toBe("new value");
+	});
+});
+
+// =============================================================================
+// Array Diff Strategy Tests
+// =============================================================================
+
+describe("Array Diff Strategy", () => {
+	describe("computeArrayDiff", () => {
+		test("returns empty array for identical arrays", () => {
+			const arr = [{ id: "1", name: "a" }];
+			const diff = computeArrayDiff(arr, arr);
+			expect(diff).toEqual([]);
+		});
+
+		test("returns replace for empty to non-empty transition", () => {
+			const prev: { id: string }[] = [];
+			const next = [{ id: "1" }, { id: "2" }];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toEqual([{ op: "replace", items: next }]);
+		});
+
+		test("returns replace for non-empty to empty transition", () => {
+			const prev = [{ id: "1" }, { id: "2" }];
+			const next: { id: string }[] = [];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toEqual([{ op: "replace", items: [] }]);
+		});
+
+		test("detects push operations for appended items", () => {
+			const prev = [{ id: "1", name: "a" }];
+			const next = [
+				{ id: "1", name: "a" },
+				{ id: "2", name: "b" },
+			];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toContainEqual({ op: "push", item: { id: "2", name: "b" } });
+		});
+
+		test("detects remove operations", () => {
+			const prev = [{ id: "1" }, { id: "2" }, { id: "3" }];
+			const next = [{ id: "1" }, { id: "3" }];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toContainEqual({ op: "remove", index: 1 });
+		});
+
+		test("detects update operations for changed items", () => {
+			const prev = [{ id: "1", name: "old" }];
+			const next = [{ id: "1", name: "new" }];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toContainEqual({ op: "update", index: 0, item: { id: "1", name: "new" } });
+		});
+
+		test("handles mixed add/remove/update", () => {
+			const prev = [
+				{ id: "1", name: "keep" },
+				{ id: "2", name: "remove" },
+				{ id: "3", name: "update-old" },
+			];
+			const next = [
+				{ id: "1", name: "keep" },
+				{ id: "3", name: "update-new" },
+				{ id: "4", name: "new" },
+			];
+			const diff = computeArrayDiff(prev, next);
+
+			// Should have remove for id:2, update for id:3, push for id:4
+			expect(diff).not.toBeNull();
+			expect(diff!.some((op) => op.op === "remove")).toBe(true);
+			expect(diff!.some((op) => op.op === "update")).toBe(true);
+			expect(diff!.some((op) => op.op === "push" || op.op === "insert")).toBe(true);
+		});
+
+		test("falls back to null for arrays without ids (complex changes)", () => {
+			const prev = [1, 2, 3, 4, 5];
+			const next = [5, 4, 3, 2, 1];
+			const diff = computeArrayDiff(prev, next);
+			// Should return null for complex positional changes
+			expect(diff).toBeNull();
+		});
+
+		test("handles append-only for primitive arrays", () => {
+			const prev = [1, 2, 3];
+			const next = [1, 2, 3, 4, 5];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toEqual([
+				{ op: "push", item: 4 },
+				{ op: "push", item: 5 },
+			]);
+		});
+
+		test("handles prepend-only for primitive arrays", () => {
+			const prev = [3, 4, 5];
+			const next = [1, 2, 3, 4, 5];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toEqual([
+				{ op: "unshift", item: 2 },
+				{ op: "unshift", item: 1 },
+			]);
+		});
+
+		test("handles remove from end for primitive arrays", () => {
+			const prev = [1, 2, 3, 4, 5];
+			const next = [1, 2, 3];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).toEqual([
+				{ op: "remove", index: 4 },
+				{ op: "remove", index: 3 },
+			]);
+		});
+	});
+
+	describe("applyArrayDiff", () => {
+		test("applies push operations", () => {
+			const current = [{ id: "1" }];
+			const ops = [{ op: "push" as const, item: { id: "2" } }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "1" }, { id: "2" }]);
+		});
+
+		test("applies unshift operations", () => {
+			const current = [{ id: "2" }];
+			const ops = [{ op: "unshift" as const, item: { id: "1" } }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "1" }, { id: "2" }]);
+		});
+
+		test("applies insert operations", () => {
+			const current = [{ id: "1" }, { id: "3" }];
+			const ops = [{ op: "insert" as const, index: 1, item: { id: "2" } }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "1" }, { id: "2" }, { id: "3" }]);
+		});
+
+		test("applies remove operations", () => {
+			const current = [{ id: "1" }, { id: "2" }, { id: "3" }];
+			const ops = [{ op: "remove" as const, index: 1 }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "1" }, { id: "3" }]);
+		});
+
+		test("applies update operations", () => {
+			const current = [{ id: "1", name: "old" }];
+			const ops = [{ op: "update" as const, index: 0, item: { id: "1", name: "new" } }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "1", name: "new" }]);
+		});
+
+		test("applies replace operations", () => {
+			const current = [{ id: "1" }];
+			const ops = [{ op: "replace" as const, items: [{ id: "2" }, { id: "3" }] }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "2" }, { id: "3" }]);
+		});
+
+		test("applies move operations", () => {
+			const current = [{ id: "1" }, { id: "2" }, { id: "3" }];
+			const ops = [{ op: "move" as const, from: 0, to: 2 }];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "2" }, { id: "3" }, { id: "1" }]);
+		});
+
+		test("applies multiple operations in sequence", () => {
+			const current = [{ id: "1" }, { id: "2" }];
+			const ops = [
+				{ op: "remove" as const, index: 1 },
+				{ op: "push" as const, item: { id: "3" } },
+				{ op: "push" as const, item: { id: "4" } },
+			];
+			const result = applyArrayDiff(current, ops);
+			expect(result).toEqual([{ id: "1" }, { id: "3" }, { id: "4" }]);
+		});
+	});
+
+	describe("createArrayUpdate", () => {
+		test("returns value update for no changes", () => {
+			const arr = [{ id: "1" }];
+			const update = createArrayUpdate(arr, arr);
+			expect(update.strategy).toBe("value");
+		});
+
+		test("returns value update when replace is more efficient", () => {
+			const prev: { id: string }[] = [];
+			const next = [{ id: "1" }];
+			const update = createArrayUpdate(prev, next);
+			expect(update.strategy).toBe("value");
+		});
+
+		test("returns array update for incremental changes", () => {
+			const prev = [{ id: "1", name: "a" }];
+			const next = [
+				{ id: "1", name: "a" },
+				{ id: "2", name: "b" },
+			];
+			const update = createArrayUpdate(prev, next);
+			expect(update.strategy).toBe("array");
+		});
+	});
+
+	describe("round-trip: computeArrayDiff + applyArrayDiff", () => {
+		test("round-trips push operations", () => {
+			const prev = [{ id: "1", name: "a" }];
+			const next = [
+				{ id: "1", name: "a" },
+				{ id: "2", name: "b" },
+			];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).not.toBeNull();
+			const result = applyArrayDiff(prev, diff!);
+			expect(result).toEqual(next);
+		});
+
+		test("round-trips remove operations", () => {
+			const prev = [{ id: "1" }, { id: "2" }, { id: "3" }];
+			const next = [{ id: "1" }, { id: "3" }];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).not.toBeNull();
+			const result = applyArrayDiff(prev, diff!);
+			expect(result).toEqual(next);
+		});
+
+		test("round-trips update operations", () => {
+			const prev = [{ id: "1", name: "old" }];
+			const next = [{ id: "1", name: "new" }];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).not.toBeNull();
+			const result = applyArrayDiff(prev, diff!);
+			expect(result).toEqual(next);
+		});
+
+		test("round-trips complex mixed operations", () => {
+			const prev = [
+				{ id: "1", name: "keep" },
+				{ id: "2", name: "remove" },
+				{ id: "3", name: "update-old" },
+			];
+			const next = [
+				{ id: "1", name: "keep" },
+				{ id: "3", name: "update-new" },
+				{ id: "4", name: "new" },
+			];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).not.toBeNull();
+			const result = applyArrayDiff(prev, diff!);
+			expect(result).toEqual(next);
+		});
+
+		test("round-trips append-only for primitives", () => {
+			const prev = [1, 2, 3];
+			const next = [1, 2, 3, 4, 5];
+			const diff = computeArrayDiff(prev, next);
+			expect(diff).not.toBeNull();
+			const result = applyArrayDiff(prev, diff!);
+			expect(result).toEqual(next);
+		});
 	});
 });

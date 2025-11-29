@@ -190,7 +190,13 @@ export function parseEntityKey(key: EntityKey): [string, string] {
 // =============================================================================
 
 export {
+	type ArrayDiffOperation,
+	type ArrayUpdate,
+	// Array diff
+	applyArrayDiff,
 	applyUpdate,
+	computeArrayDiff,
+	createArrayUpdate,
 	createUpdate,
 	type DeltaOperation,
 	type DeltaUpdate,

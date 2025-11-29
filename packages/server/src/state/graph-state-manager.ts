@@ -12,6 +12,7 @@
 import {
 	type ArrayOperation,
 	applyUpdate,
+	computeArrayDiff,
 	createUpdate,
 	type EmitCommand,
 	type EntityKey,
@@ -518,16 +519,40 @@ export class GraphStateManager {
 			return;
 		}
 
-		// For now, send full array replacement
-		// TODO: Compute array diff for optimal transfer
-		client.send({
-			type: "update",
-			entity,
-			id,
-			updates: {
-				_items: { strategy: "value", data: newArray },
-			},
-		});
+		// Compute optimal array diff
+		const diff = computeArrayDiff(lastState, newArray);
+
+		if (diff === null || diff.length === 0) {
+			// Full replace is more efficient
+			client.send({
+				type: "update",
+				entity,
+				id,
+				updates: {
+					_items: { strategy: "value", data: newArray },
+				},
+			});
+		} else if (diff.length === 1 && diff[0].op === "replace") {
+			// Single replace op - send as value
+			client.send({
+				type: "update",
+				entity,
+				id,
+				updates: {
+					_items: { strategy: "value", data: newArray },
+				},
+			});
+		} else {
+			// Send incremental diff operations
+			client.send({
+				type: "update",
+				entity,
+				id,
+				updates: {
+					_items: { strategy: "array", data: diff },
+				},
+			});
+		}
 
 		// Update client's last known state
 		clientArrayState.lastState = [...newArray];
