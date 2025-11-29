@@ -11,16 +11,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import {
-	applyUpdate,
-	createResolverRegistry,
-	entity,
-	mutation,
-	query,
-	resolver,
-	t,
-	type Update,
-} from "@sylphx/lens-core";
+import { applyUpdate, createResolverRegistry, entity, mutation, query, t, type Update } from "@sylphx/lens-core";
 import { z } from "zod";
 import { createServer, type WebSocketLike } from "../server/create";
 
@@ -592,16 +583,14 @@ describe("E2E - Entity Resolvers", () => {
 				return user;
 			});
 
-		// Create entity resolvers using new resolver() pattern
+		// Create entity resolvers using resolver registry
 		const resolvers = createResolverRegistry();
-		resolvers.register(
-			resolver(User, (f) => ({
-				id: f.expose("id"),
-				name: f.expose("name"),
-				email: f.expose("email"),
-				posts: f.many(Post).resolve((user) => posts.filter((p) => p.authorId === user.id)),
-			})),
-		);
+		resolvers.add(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			email: f.expose("email"),
+			posts: f.many(Post).resolve(({ parent }) => posts.filter((p) => p.authorId === parent.id)),
+		}));
 
 		const server = createServer({
 			entities: { User, Post },
@@ -650,21 +639,18 @@ describe("E2E - Entity Resolvers", () => {
 			.returns([User])
 			.resolve(() => users);
 
-		// Create entity resolvers using new resolver() pattern
-		// Note: The new pattern doesn't have built-in batching like DataLoader.
-		// Batching would need to be implemented at the resolve function level.
+		// Create entity resolvers using resolver registry
+		// Note: Batching would need to be implemented at the resolve function level.
 		const resolvers = createResolverRegistry();
-		resolvers.register(
-			resolver(User, (f) => ({
-				id: f.expose("id"),
-				name: f.expose("name"),
-				posts: f.many(Post).resolve((user) => {
-					// Simple resolve - batching is not part of the new pattern
-					batchCallCount++;
-					return posts.filter((p) => p.authorId === user.id);
-				}),
-			})),
-		);
+		resolvers.add(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f.many(Post).resolve(({ parent }) => {
+				// Simple resolve - batching is not part of the new pattern
+				batchCallCount++;
+				return posts.filter((p) => p.authorId === parent.id);
+			}),
+		}));
 
 		const server = createServer({
 			entities: { User, Post },

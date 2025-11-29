@@ -57,7 +57,6 @@ export {
 	// Types
 	type Transport,
 	type Unsubscribable,
-	type WsServerTransportOptions,
 	type WsTransportOptions,
 	ws,
 } from "./transport";

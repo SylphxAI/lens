@@ -598,8 +598,7 @@ describe("operations() factory", () => {
 	it("query and mutation work with named operations", () => {
 		const { query, mutation } = operations<{ db: unknown }>();
 
-		const namedQuery = query("getUsers")
-			.resolve(() => []);
+		const namedQuery = query("getUsers").resolve(() => []);
 
 		const namedMutation = mutation("createUser")
 			.input(z.object({ name: z.string() }))
@@ -617,11 +616,10 @@ describe("operations() factory", () => {
 
 		const { query } = operations<TestContext>();
 
-		const whoami = query()
-			.resolve(({ ctx }) => {
-				// Type check - ctx should have userId and permissions
-				return { userId: ctx.userId, perms: ctx.permissions.join(",") };
-			});
+		const whoami = query().resolve(({ ctx }) => {
+			// Type check - ctx should have userId and permissions
+			return { userId: ctx.userId, perms: ctx.permissions.join(",") };
+		});
 
 		const result = await whoami._resolve!({
 			input: undefined,

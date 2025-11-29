@@ -45,12 +45,9 @@ interface WsMessage {
 // =============================================================================
 
 /**
- * WebSocket transport function with server method
+ * WebSocket transport function
  */
-export interface WsTransport {
-	(options: WsTransportOptions): Transport;
-	server(options: WsServerTransportOptions): ServerTransport;
-}
+export type WsTransport = (options: WsTransportOptions) => Transport;
 
 /**
  * Create WebSocket transport.
@@ -337,113 +334,6 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): Transpo
 			}
 
 			return sendAndWait(op);
-		},
-	};
-};
-
-// =============================================================================
-// Server Transport
-// =============================================================================
-
-/**
- * WebSocket server transport options.
- */
-export interface WsServerTransportOptions {
-	/** Port to listen on */
-	port: number;
-	/** Path for WebSocket endpoint (default: '/') */
-	path?: string;
-}
-
-/**
- * Server transport interface.
- */
-export interface ServerTransport {
-	listen(server: LensServerInterface): void;
-}
-
-/**
- * Minimal server interface.
- */
-export interface LensServerInterface {
-	getMetadata(): Metadata;
-	execute(op: Operation): Promise<Result>;
-}
-
-/**
- * Create WebSocket server transport.
- *
- * @example
- * ```typescript
- * const server = createServer({
- *   transport: ws.server({ port: 3001 }),
- *   router: appRouter,
- * })
- * ```
- */
-ws.server = function wsServer(options: WsServerTransportOptions): ServerTransport {
-	const { port, path = "/" } = options;
-
-	return {
-		listen(server: LensServerInterface) {
-			Bun.serve({
-				port,
-				websocket: {
-					async message(ws, message) {
-						const data = JSON.parse(message as string) as WsMessage & {
-							path?: string;
-							opType?: string;
-							input?: unknown;
-						};
-
-						switch (data.type) {
-							case "handshake": {
-								ws.send(
-									JSON.stringify({
-										type: "handshake",
-										data: server.getMetadata(),
-									}),
-								);
-								break;
-							}
-
-							case "operation": {
-								const result = await server.execute({
-									id: data.id!,
-									path: data.path!,
-									type: data.opType as "query" | "mutation",
-									input: data.input,
-								});
-								ws.send(
-									JSON.stringify({
-										type: "response",
-										id: data.id,
-										...result,
-									}),
-								);
-								break;
-							}
-
-							case "subscription": {
-								// TODO: Implement subscription handling
-								// This would need the server to support streaming
-								break;
-							}
-
-							case "unsubscribe": {
-								// TODO: Implement unsubscribe handling
-								break;
-							}
-						}
-					},
-				},
-				fetch(req, server) {
-					if (server.upgrade(req)) {
-						return;
-					}
-					return new Response("WebSocket upgrade required", { status: 426 });
-				},
-			});
 		},
 	};
 };

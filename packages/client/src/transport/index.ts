@@ -61,4 +61,4 @@ export {
 	routeByType,
 } from "./route";
 // WebSocket
-export { type WsServerTransportOptions, type WsTransportOptions, ws } from "./ws";
+export { type WsTransportOptions, ws } from "./ws";

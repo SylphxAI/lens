@@ -230,26 +230,26 @@ export {
 	// Types
 	type MutationDef,
 	type MutationResultType,
+	// Builders
+	mutation,
+	// Helpers
+	normalizeOptimisticDSL,
+	type Operations,
 	type OptimisticDSL,
 	type OptimisticUpdateManyConfig,
+	operations,
 	type QueryDef,
 	type QueryResultType,
+	query,
 	type ResolverContext,
 	type ResolverFn,
 	type ReturnSpec,
 	type RouterDef,
 	type RouterRoutes,
-	type ZodLikeSchema,
-	// Builders
-	mutation,
-	operations,
-	type Operations,
-	query,
-	router,
-	// Helpers
-	normalizeOptimisticDSL,
 	resetTempIdCounter,
+	router,
 	tempId,
+	type ZodLikeSchema,
 } from "./operations/index";
 
 // =============================================================================
@@ -266,13 +266,13 @@ export {
 	type FieldResolverContext,
 	type InferResolverOutput,
 	type InferResolverSelected,
-	type ResolvedField,
-	type ResolverDef,
-	type ResolverRegistry,
 	// Type guards
 	isExposedField,
 	isResolvedField,
 	isResolverDef,
+	type ResolvedField,
+	type ResolverDef,
+	type ResolverRegistry,
 	// Main function
 	resolver,
 } from "./resolvers/index";

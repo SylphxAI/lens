@@ -569,8 +569,12 @@ export interface Operations<TContext> {
  */
 export function operations<TContext>(): Operations<TContext> {
 	return {
-		query: ((name?: string) => new QueryBuilderImpl<void, unknown, TContext>(name)) as Operations<TContext>["query"],
-		mutation: ((name?: string) => new MutationBuilderImpl<unknown, unknown, TContext>(name)) as Operations<TContext>["mutation"],
+		query: ((name?: string) =>
+			new QueryBuilderImpl<void, unknown, TContext>(name)) as Operations<TContext>["query"],
+		mutation: ((name?: string) =>
+			new MutationBuilderImpl<unknown, unknown, TContext>(
+				name,
+			)) as Operations<TContext>["mutation"],
 	};
 }
 
