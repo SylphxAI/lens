@@ -78,8 +78,8 @@ export function route(config: RouteConfig): Transport {
 				sorted.map(async ([pattern, transport]) => {
 					try {
 						return await transport.connect();
-					} catch (error) {
-						console.warn(`Failed to connect to ${pattern}: ${(error as Error).message}`);
+					} catch {
+						// Silently fall back to empty metadata for failed transports
 						return { version: "unknown", operations: {} } as Metadata;
 					}
 				}),
@@ -179,8 +179,8 @@ export function routeByType(config: RouteByTypeConfig): Transport {
 				Array.from(transports).map(async (t) => {
 					try {
 						return await t.connect();
-					} catch (error) {
-						console.warn(`Failed to connect: ${(error as Error).message}`);
+					} catch {
+						// Silently fall back to empty metadata for failed transports
 						return { version: "unknown", operations: {} } as Metadata;
 					}
 				}),

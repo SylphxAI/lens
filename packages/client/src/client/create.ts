@@ -623,7 +623,7 @@ class ClientImpl {
 					this.ensureConnected().then(() => {
 						const meta = this.getOperationMeta(path);
 						if (meta?.type === "mutation") {
-							console.warn(`subscribe() called on mutation: ${path}`);
+							// Silently ignore - subscribe on mutation is a no-op
 							return;
 						}
 						// Start query subscription

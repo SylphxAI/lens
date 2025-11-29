@@ -63,6 +63,13 @@ export type OperationsMap = {
 	[key: string]: OperationMeta | OperationsMap;
 };
 
+/** Logger interface for server */
+export interface LensLogger {
+	info?: (message: string, ...args: unknown[]) => void;
+	warn?: (message: string, ...args: unknown[]) => void;
+	error?: (message: string, ...args: unknown[]) => void;
+}
+
 /** Server configuration */
 export interface LensServerConfig<
 	TContext extends ContextValue = ContextValue,
@@ -78,6 +85,8 @@ export interface LensServerConfig<
 	mutations?: MutationsMap;
 	/** Field resolvers registry (new resolver() pattern) */
 	resolvers?: ResolverRegistry;
+	/** Logger for server messages (default: silent) */
+	logger?: LensLogger;
 	/** Context factory - must return the context type expected by the router */
 	context?: (req?: unknown) => TContext | Promise<TContext>;
 	/** Server version */
@@ -293,6 +302,9 @@ class DataLoader<K, V> {
 // Lens Server Implementation
 // =============================================================================
 
+/** No-op logger (default - silent) */
+const noopLogger: LensLogger = {};
+
 class LensServerImpl<
 	Q extends QueriesMap = QueriesMap,
 	M extends MutationsMap = MutationsMap,
@@ -305,6 +317,7 @@ class LensServerImpl<
 	private resolvers?: ResolverRegistry;
 	private contextFactory: (req?: unknown) => TContext | Promise<TContext>;
 	private version: string;
+	private logger: LensLogger;
 	private ctx = createContext<TContext>();
 
 	/** GraphStateManager for per-client state tracking */
@@ -343,6 +356,7 @@ class LensServerImpl<
 		this.resolvers = config.resolvers;
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
+		this.logger = config.logger ?? noopLogger;
 
 		// Inject entity names from keys (if not already set)
 		for (const [name, def] of Object.entries(this.entities)) {
@@ -777,7 +791,7 @@ class LensServerImpl<
 			try {
 				cleanup();
 			} catch (e) {
-				console.error("Cleanup error:", e);
+				this.logger.error?.("Cleanup error:", e);
 			}
 		}
 
@@ -859,7 +873,7 @@ class LensServerImpl<
 				try {
 					cleanup();
 				} catch (e) {
-					console.error("Cleanup error:", e);
+					this.logger.error?.("Cleanup error:", e);
 				}
 			}
 		}
@@ -1064,7 +1078,7 @@ class LensServerImpl<
 			},
 		});
 
-		console.log(`Lens server listening on port ${port}`);
+		this.logger.info?.(`Lens server listening on port ${port}`);
 	}
 
 	async close(): Promise<void> {
@@ -1366,7 +1380,7 @@ class LensServerImpl<
 						value,
 					);
 				} catch (error) {
-					console.warn(`Failed to serialize field ${entityName}.${fieldName}:`, error);
+					this.logger.warn?.(`Failed to serialize field ${entityName}.${fieldName}:`, error);
 					result[fieldName] = value;
 				}
 			} else {
