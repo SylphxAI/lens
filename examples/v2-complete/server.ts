@@ -93,8 +93,8 @@ resolvers.add(User, (f) => ({
 				published: z.boolean().optional(),
 			}),
 		)
-		.resolve((user, args, ctx) => {
-			let posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === user.id);
+		.resolve(({ parent, args, ctx }) => {
+			let posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === parent.id);
 			if (args.published !== undefined) {
 				posts = posts.filter((p) => p.published === args.published);
 			}
@@ -104,9 +104,9 @@ resolvers.add(User, (f) => ({
 	comments: f
 		.many(Comment)
 		.args(z.object({ first: z.number().default(10) }))
-		.resolve((user, args, ctx) =>
+		.resolve(({ parent, args, ctx }) =>
 			Array.from(ctx.db.comments.values())
-				.filter((c) => c.authorId === user.id)
+				.filter((c) => c.authorId === parent.id)
 				.slice(0, args.first)
 		),
 }));
@@ -123,24 +123,24 @@ resolvers.add(Post, (f) => ({
 	excerpt: f
 		.string()
 		.args(z.object({ length: z.number().default(100) }))
-		.resolve((post, args) => {
-			const text = post.content;
+		.resolve(({ parent, args }) => {
+			const text = parent.content;
 			if (text.length <= args.length) return text;
 			return text.slice(0, args.length) + "...";
 		}),
 	// Relation: Post.author (belongsTo - FK on Post)
-	author: f.one(User).resolve((post, _args, ctx) => {
-		const author = ctx.db.users.get(post.authorId);
-		if (!author) throw new Error(`Author not found: ${post.authorId}`);
+	author: f.one(User).resolve(({ parent, ctx }) => {
+		const author = ctx.db.users.get(parent.authorId);
+		if (!author) throw new Error(`Author not found: ${parent.authorId}`);
 		return author;
 	}),
 	// Relation with field arguments
 	comments: f
 		.many(Comment)
 		.args(z.object({ first: z.number().default(10) }))
-		.resolve((post, args, ctx) =>
+		.resolve(({ parent, args, ctx }) =>
 			Array.from(ctx.db.comments.values())
-				.filter((c) => c.postId === post.id)
+				.filter((c) => c.postId === parent.id)
 				.slice(0, args.first)
 		),
 }));
@@ -151,15 +151,15 @@ resolvers.add(Comment, (f) => ({
 	content: f.expose("content"),
 	createdAt: f.expose("createdAt"),
 	// Relation: Comment.author (belongsTo - FK on Comment)
-	author: f.one(User).resolve((comment, _args, ctx) => {
-		const author = ctx.db.users.get(comment.authorId);
-		if (!author) throw new Error(`Author not found: ${comment.authorId}`);
+	author: f.one(User).resolve(({ parent, ctx }) => {
+		const author = ctx.db.users.get(parent.authorId);
+		if (!author) throw new Error(`Author not found: ${parent.authorId}`);
 		return author;
 	}),
 	// Relation: Comment.post (belongsTo - FK on Comment)
-	post: f.one(Post).resolve((comment, _args, ctx) => {
-		const post = ctx.db.posts.get(comment.postId);
-		if (!post) throw new Error(`Post not found: ${comment.postId}`);
+	post: f.one(Post).resolve(({ parent, ctx }) => {
+		const post = ctx.db.posts.get(parent.postId);
+		if (!post) throw new Error(`Post not found: ${parent.postId}`);
 		return post;
 	}),
 }));

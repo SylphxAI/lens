@@ -125,9 +125,9 @@ describe("Field resolution", () => {
 	});
 
 	it("resolves computed scalar fields", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
-			avatar: f.string().resolve((user, ctx) => ctx.cdn.getAvatar(user.avatarKey)),
+			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
 		}));
 
 		const parent = mockDb.users[0];
@@ -137,9 +137,9 @@ describe("Field resolution", () => {
 	});
 
 	it("resolves relation fields with f.many()", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
-			posts: f.many(Post).resolve((user, ctx) => ctx.db.posts.filter((p) => p.authorId === user.id)),
+			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
 		}));
 
 		const parent = mockDb.users[0];
@@ -150,9 +150,9 @@ describe("Field resolution", () => {
 	});
 
 	it("resolves relation fields with f.one()", async () => {
-		const postResolver = resolver<typeof Post, any, MockContext>(Post, (f) => ({
+		const postResolver = resolver<MockContext>()(Post, (f) => ({
 			id: f.expose("id"),
-			author: f.one(User).resolve((post, ctx) => ctx.db.users.find((u) => u.id === post.authorId)!),
+			author: f.one(User).resolve(({ parent, ctx }) => ctx.db.users.find((u) => u.id === parent.authorId)!),
 		}));
 
 		const parent = mockDb.posts[0];
@@ -162,10 +162,10 @@ describe("Field resolution", () => {
 	});
 
 	it("resolveAll resolves all fields", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
-			avatar: f.string().resolve((user, ctx) => ctx.cdn.getAvatar(user.avatarKey)),
+			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
 		}));
 
 		const parent = mockDb.users[0];
@@ -177,7 +177,7 @@ describe("Field resolution", () => {
 	});
 
 	it("resolveAll respects select parameter", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
 			email: f.expose("email"),
@@ -198,11 +198,11 @@ describe("Field resolution", () => {
 
 describe("Async resolution", () => {
 	it("handles async resolvers", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
-			posts: f.many(Post).resolve(async (user, ctx) => {
+			posts: f.many(Post).resolve(async ({ parent, ctx }) => {
 				await new Promise((r) => setTimeout(r, 1));
-				return ctx.db.posts.filter((p) => p.authorId === user.id);
+				return ctx.db.posts.filter((p) => p.authorId === parent.id);
 			}),
 		}));
 
@@ -221,7 +221,7 @@ describe("createResolverRegistry()", () => {
 	it("registers and retrieves resolvers", () => {
 		const registry = createResolverRegistry<MockContext>();
 
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
 		}));
@@ -239,11 +239,11 @@ describe("createResolverRegistry()", () => {
 	it("registers multiple resolvers", () => {
 		const registry = createResolverRegistry<MockContext>();
 
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 		}));
 
-		const postResolver = resolver<typeof Post, any, MockContext>(Post, (f) => ({
+		const postResolver = resolver<MockContext>()(Post, (f) => ({
 			id: f.expose("id"),
 		}));
 
@@ -298,18 +298,18 @@ describe("Type guards", () => {
 
 describe("Complex scenarios", () => {
 	it("handles multiple entities with relations", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
-			posts: f.many(Post).resolve((user, ctx) => ctx.db.posts.filter((p) => p.authorId === user.id)),
-			comments: f.many(Comment).resolve((user, ctx) => ctx.db.comments.filter((c) => c.authorId === user.id)),
+			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
+			comments: f.many(Comment).resolve(({ parent, ctx }) => ctx.db.comments.filter((c) => c.authorId === parent.id)),
 		}));
 
-		const postResolver = resolver<typeof Post, any, MockContext>(Post, (f) => ({
+		const postResolver = resolver<MockContext>()(Post, (f) => ({
 			id: f.expose("id"),
 			title: f.expose("title"),
-			author: f.one(User).resolve((post, ctx) => ctx.db.users.find((u) => u.id === post.authorId)!),
-			comments: f.many(Comment).resolve((post, ctx) => ctx.db.comments.filter((c) => c.postId === post.id)),
+			author: f.one(User).resolve(({ parent, ctx }) => ctx.db.users.find((u) => u.id === parent.authorId)!),
+			comments: f.many(Comment).resolve(({ parent, ctx }) => ctx.db.comments.filter((c) => c.postId === parent.id)),
 		}));
 
 		// Test User.posts
@@ -327,12 +327,12 @@ describe("Complex scenarios", () => {
 	});
 
 	it("supports nullable relation fields", async () => {
-		const postResolver = resolver<typeof Post, any, MockContext>(Post, (f) => ({
+		const postResolver = resolver<MockContext>()(Post, (f) => ({
 			id: f.expose("id"),
 			author: f
 				.one(User)
 				.nullable()
-				.resolve((post, ctx) => ctx.db.users.find((u) => u.id === post.authorId) ?? null),
+				.resolve(({ parent, ctx }) => ctx.db.users.find((u) => u.id === parent.authorId) ?? null),
 		}));
 
 		const post = { ...mockDb.posts[0], authorId: "nonexistent" };
@@ -348,7 +348,7 @@ describe("Complex scenarios", () => {
 
 describe("Field arguments", () => {
 	it("resolves field with args using .args() builder", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			posts: f
 				.many(Post)
@@ -358,8 +358,8 @@ describe("Field arguments", () => {
 						published: z.boolean().optional(),
 					}),
 				)
-				.resolve((user, args, ctx) => {
-					let posts = ctx.db.posts.filter((p) => p.authorId === user.id);
+				.resolve(({ parent, args, ctx }) => {
+					let posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
 					if (args.published !== undefined) {
 						posts = posts.filter((p) => p.published === args.published);
 					}
@@ -384,12 +384,12 @@ describe("Field arguments", () => {
 	});
 
 	it("resolves scalar field with args", async () => {
-		const postResolver = resolver<typeof Post, any, MockContext>(Post, (f) => ({
+		const postResolver = resolver<MockContext>()(Post, (f) => ({
 			id: f.expose("id"),
 			excerpt: f
 				.string()
 				.args(z.object({ length: z.number().default(100) }))
-				.resolve((post, args) => post.content.slice(0, args.length) + "..."),
+				.resolve(({ parent, args }) => `${parent.content.slice(0, args.length)}...`),
 		}));
 
 		const parent = mockDb.posts[0]; // content = "World"
@@ -404,12 +404,12 @@ describe("Field arguments", () => {
 	});
 
 	it("getArgsSchema returns schema for field with args", () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			posts: f
 				.many(Post)
 				.args(z.object({ limit: z.number() }))
-				.resolve((user, args, ctx) => ctx.db.posts.slice(0, args.limit)),
+				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
 
 		expect(userResolver.getArgsSchema("id")).toBeNull();
@@ -417,12 +417,12 @@ describe("Field arguments", () => {
 	});
 
 	it("validates args against schema", async () => {
-		const userResolver = resolver<typeof User, any, MockContext>(User, (f) => ({
+		const userResolver = resolver<MockContext>()(User, (f) => ({
 			id: f.expose("id"),
 			posts: f
 				.many(Post)
 				.args(z.object({ limit: z.number().min(1).max(100) }))
-				.resolve((user, args, ctx) => ctx.db.posts.slice(0, args.limit)),
+				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
 
 		const parent = mockDb.users[0];

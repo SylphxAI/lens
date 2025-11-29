@@ -26,11 +26,11 @@
  *     id: f.expose('id'),
  *     name: f.expose('name'),
  *     // avatarKey not exposed = private field
- *     avatar: f.string().resolve((user, ctx) =>
- *       ctx.cdn.getAvatar(user.avatarKey)
+ *     avatar: f.string().resolve(({ parent, ctx }) =>
+ *       ctx.cdn.getAvatar(parent.avatarKey)
  *     ),
- *     posts: f.many(Post).resolve((user, ctx) =>
- *       ctx.loaders.post.loadByAuthorId(user.id)
+ *     posts: f.many(Post).resolve(({ parent, ctx }) =>
+ *       ctx.loaders.post.loadByAuthorId(parent.id)
  *     ),
  *   })),
  *
@@ -38,8 +38,8 @@
  *     id: f.expose('id'),
  *     title: f.expose('title'),
  *     // authorId not exposed = internal FK
- *     author: f.one(User).resolve((post, ctx) =>
- *       ctx.loaders.user.load(post.authorId)
+ *     author: f.one(User).resolve(({ parent, ctx }) =>
+ *       ctx.loaders.user.load(parent.authorId)
  *     ),
  *   })),
  * ];
@@ -62,18 +62,23 @@ export type FieldResolverContext = Record<string, unknown>;
 // Resolver Function Types
 // =============================================================================
 
-/** Resolver function signature (GraphQL-style: parent, args, ctx) */
+/** Resolver function params (object style) */
+export type FieldResolverParams<TParent, TArgs, TContext> = {
+	parent: TParent;
+	args: TArgs;
+	ctx: TContext;
+};
+
+/** Resolver function signature (object style: { parent, args, ctx }) */
 export type FieldResolverFn<TParent, TArgs, TContext, TResult> = (
-	parent: TParent,
-	args: TArgs,
-	ctx: TContext,
+	params: FieldResolverParams<TParent, TArgs, TContext>,
 ) => TResult | Promise<TResult>;
 
-/** Resolver function without args (for backward compatibility) */
-export type FieldResolverFnNoArgs<TParent, TContext, TResult> = (
-	parent: TParent,
-	ctx: TContext,
-) => TResult | Promise<TResult>;
+/** Resolver function without args */
+export type FieldResolverFnNoArgs<TParent, TContext, TResult> = (params: {
+	parent: TParent;
+	ctx: TContext;
+}) => TResult | Promise<TResult>;
 
 // =============================================================================
 // Field Definition Types
@@ -95,7 +100,7 @@ export interface ResolvedField<
 	readonly _kind: "resolved";
 	readonly _returnType: T;
 	readonly _argsSchema: z.ZodType<TArgs> | null;
-	readonly _resolver: FieldResolverFn<unknown, TArgs, TContext, T>;
+	readonly _resolver: (params: { parent: unknown; args: TArgs; ctx: TContext }) => T | Promise<T>;
 }
 
 /** Field definition (exposed or resolved) */
@@ -306,7 +311,11 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_kind: "resolved",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
-				_resolver: fn as FieldResolverFn<unknown, TArgs, TContext, T>,
+				_resolver: fn as (params: {
+					parent: unknown;
+					args: TArgs;
+					ctx: TContext;
+				}) => T | Promise<T>,
 			};
 		},
 		nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -332,17 +341,20 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 		resolve(
 			fn: FieldResolverFnNoArgs<TParent, TContext, T>,
 		): ResolvedField<T, Record<string, never>, TContext> {
-			// Wrap the no-args function to match the args signature
-			const wrappedFn: FieldResolverFn<TParent, Record<string, never>, TContext, T> = (
+			// Wrap the no-args function to include empty args
+			const wrappedFn = ({
 				parent,
-				_args,
 				ctx,
-			) => fn(parent, ctx);
+			}: {
+				parent: unknown;
+				args: Record<string, never>;
+				ctx: TContext;
+			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
 				_returnType: undefined as T,
 				_argsSchema: null,
-				_resolver: wrappedFn as FieldResolverFn<unknown, Record<string, never>, TContext, T>,
+				_resolver: wrappedFn,
 			};
 		},
 		nullable(): ScalarFieldBuilder<T | null, TParent, TContext> {
@@ -361,7 +373,11 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_kind: "resolved",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
-				_resolver: fn as FieldResolverFn<unknown, TArgs, TContext, T>,
+				_resolver: fn as (params: {
+					parent: unknown;
+					args: TArgs;
+					ctx: TContext;
+				}) => T | Promise<T>,
 			};
 		},
 		nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -387,17 +403,20 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 		resolve(
 			fn: FieldResolverFnNoArgs<TParent, TContext, T>,
 		): ResolvedField<T, Record<string, never>, TContext> {
-			// Wrap the no-args function to match the args signature
-			const wrappedFn: FieldResolverFn<TParent, Record<string, never>, TContext, T> = (
+			// Wrap the no-args function to include empty args
+			const wrappedFn = ({
 				parent,
-				_args,
 				ctx,
-			) => fn(parent, ctx);
+			}: {
+				parent: unknown;
+				args: Record<string, never>;
+				ctx: TContext;
+			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
 				_returnType: undefined as T,
 				_argsSchema: null,
-				_resolver: wrappedFn as FieldResolverFn<unknown, Record<string, never>, TContext, T>,
+				_resolver: wrappedFn,
 			};
 		},
 		nullable(): RelationFieldBuilder<T | null, TParent, TContext> {
@@ -520,7 +539,7 @@ class ResolverDefImpl<
 			parsedArgs = resolvedField._argsSchema.parse(args) as Record<string, unknown>;
 		}
 
-		return resolvedField._resolver(parent, parsedArgs, ctx);
+		return resolvedField._resolver({ parent, args: parsedArgs, ctx });
 	}
 
 	async resolveAll(
@@ -557,48 +576,64 @@ class ResolverDefImpl<
 /**
  * Define field resolvers for an entity.
  *
- * This defines how each field in the public API is resolved:
- * - `f.expose('fieldName')` - expose parent field directly
- * - `f.string().resolve(...)` - computed scalar field
- * - `f.one(Entity).resolve(...)` - single relation
- * - `f.many(Entity).resolve(...)` - array relation
- *
- * @param entity - The entity to define resolvers for
- * @param builder - Builder function that defines field resolution
- * @returns Resolver definition
+ * Two usage patterns:
+ * 1. Direct call (default context): `resolver(User, (f) => ({ ... }))`
+ * 2. With custom context: `resolver<{ db: DB }>()(User, (f) => ({ ... }))`
  *
  * @example
  * ```typescript
- * const User = entity('User', {
- *   id: t.id(),
- *   name: t.string(),
- *   avatarKey: t.string(),
- * });
- *
+ * // Default context
  * const userResolver = resolver(User, (f) => ({
  *   id: f.expose('id'),
  *   name: f.expose('name'),
- *   // avatarKey not exposed = private
- *   avatar: f.string().resolve((user, ctx) =>
- *     ctx.cdn.getAvatar(user.avatarKey)
- *   ),
- *   posts: f.many(Post).resolve((user, ctx) =>
- *     ctx.loaders.post.loadByAuthorId(user.id)
- *   ),
+ * }));
+ *
+ * // Custom context (like mutation<{db: DB}>())
+ * const userResolver = resolver<{ db: DB }>()(User, (f) => ({
+ *   id: f.expose('id'),
+ *   posts: f.many(Post).resolve(({ parent, args, ctx }) => ctx.db.posts...),
  * }));
  * ```
  */
-export function resolver<
+export function resolver<TContext = FieldResolverContext>(): <
 	TEntity extends EntityDef<string, EntityDefinition>,
-	TFields extends Record<string, FieldDef<any, any>>,
-	TContext = FieldResolverContext,
 >(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => TFields,
-): ResolverDef<TEntity, TFields, TContext> {
-	const fieldBuilder = createFieldBuilder<TEntity, TContext>();
-	const fields = builder(fieldBuilder);
-	return new ResolverDefImpl(entity, fields);
+	builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any, any>>,
+) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>;
+
+export function resolver<TEntity extends EntityDef<string, EntityDefinition>>(
+	entity: TEntity,
+	builder: (
+		f: FieldBuilder<TEntity, FieldResolverContext>,
+	) => Record<string, FieldDef<any, any, any>>,
+): ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, FieldResolverContext>;
+
+export function resolver<TContext = FieldResolverContext>(
+	entityOrNothing?: EntityDef<string, EntityDefinition>,
+	builder?: (f: FieldBuilder<any, TContext>) => Record<string, FieldDef<any, any, any>>,
+):
+	| ResolverDef<any, Record<string, FieldDef<any, any, any>>, TContext>
+	| (<TEntity extends EntityDef<string, EntityDefinition>>(
+			entity: TEntity,
+			builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any, any>>,
+	  ) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>) {
+	// Curried call: resolver<Context>()
+	if (entityOrNothing === undefined) {
+		return <TEntity extends EntityDef<string, EntityDefinition>>(
+			entity: TEntity,
+			builderFn: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
+		): ResolverDef<TEntity, Record<string, FieldDef<any, any>>, TContext> => {
+			const fieldBuilder = createFieldBuilder<TEntity, TContext>();
+			const fields = builderFn(fieldBuilder);
+			return new ResolverDefImpl(entity, fields);
+		};
+	}
+
+	// Direct call: resolver(Entity, builder)
+	const fieldBuilder = createFieldBuilder<any, TContext>();
+	const fields = builder!(fieldBuilder);
+	return new ResolverDefImpl(entityOrNothing, fields);
 }
 
 // =============================================================================
@@ -703,7 +738,9 @@ export function createResolverRegistry<
 			entity: TEntity,
 			builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
 		): void {
-			const resolverDef = resolver<TEntity, Record<string, FieldDef<any, any>>, TContext>(
+			// Use curried resolver with TContext from registry
+			const createResolver = resolver<TContext>();
+			const resolverDef = createResolver(
 				entity,
 				builder as (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
 			);
