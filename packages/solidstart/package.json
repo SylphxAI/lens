@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-solidstart",
-	"version": "1.2.10",
+	"version": "1.2.11",
 	"description": "SolidStart integration for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

@@ -1,5 +1,55 @@
 # @sylphx/lens-core
 
+## 1.5.0 (2025-11-29)
+
+### ✨ Features
+
+- **core:** add lens<TContext>() unified factory for functional API ([9bc178f](https://github.com/SylphxAI/Lens/commit/9bc178ff14c59c7cbdee6449bcdc5c7d682ed2d3))
+- **core:** implement array diff algorithm for optimal transfer ([58c7dbe](https://github.com/SylphxAI/Lens/commit/58c7dbe7c2ff706864a38cd42bb53f958d250d5f))
+- **core:** add operations() factory for typed query/mutation builders ([b3d01e7](https://github.com/SylphxAI/Lens/commit/b3d01e756b2b6159b47ef0ed9444dd1aef104dd8))
+- **core:** improve resolver API with curried pattern and object-style params ([564aff3](https://github.com/SylphxAI/Lens/commit/564aff3a788445abee2b2a85f5ecded27d724e94))
+- **core:** add resolvers.add() API for cleaner resolver registration ([e49d1f1](https://github.com/SylphxAI/Lens/commit/e49d1f12ffa699e628570dbd1ed8ca7d75aba947))
+- **core:** add field args support to client selection types ([c6eab92](https://github.com/SylphxAI/Lens/commit/c6eab92898de36b7b09ec86071cac715ce248186))
+- **core:** add field arguments support to resolver API ([6da4c97](https://github.com/SylphxAI/Lens/commit/6da4c976db76da24d069107e57be5353bd25fdb5))
+- **core:** introduce new resolver() API with field builder pattern ([c4483ee](https://github.com/SylphxAI/Lens/commit/c4483eeea95a1949eb1f76ef3a2e332a1bddb1db))
+- **core:** add RelationBuilder for type-safe foreign key accessors ([ca09420](https://github.com/SylphxAI/Lens/commit/ca09420f6fc043f27e2615af6439c4edc33f1335))
+
+### 🐛 Bug Fixes
+
+- **core:** fix QueryBuilder type inference for .returns() output type ([81be72c](https://github.com/SylphxAI/Lens/commit/81be72c0afa863ec9ace1a184888dfc374f3661c))
+- **core:** handle optional fields in InferParent type ([ca0b6f7](https://github.com/SylphxAI/Lens/commit/ca0b6f7cccb1cdc1dd34a4199fa789f617057b86))
+- **core:** simplify ResolverFn to avoid TypeScript union function issues ([f57257c](https://github.com/SylphxAI/Lens/commit/f57257c271a7cfffed4efdfe56ee3b3a0f75f2da))
+- **core:** improve InferReturnType to properly infer entity scalar fields ([274ce9b](https://github.com/SylphxAI/Lens/commit/274ce9ba5f8670f8fcc670f8851d24d1d6d25cd2))
+- **core:** rename RelationBuilder methods to avoid bundler name collisions ([a87dc5b](https://github.com/SylphxAI/Lens/commit/a87dc5bb037359ea00a8381771a57cce7e21aab0))
+- **core:** improve type inference for hasMany/belongsTo field accessors ([9ae8711](https://github.com/SylphxAI/Lens/commit/9ae8711d6d2c5d3e43b303263e90f45c0bd03c29))
+- **client:** correct mutation detection and type inference ([6344651](https://github.com/SylphxAI/Lens/commit/6344651a4f95fbeee48dd30b91318b9ff77c7822))
+
+### ♻️ Refactoring
+
+- **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
+- enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
+- cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
+- **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
+
+### 💅 Styles
+
+- format package.json files with biome ([8565fd9](https://github.com/SylphxAI/Lens/commit/8565fd9b1c71b8f35ce1f56514c822106142947a))
+
+### ✅ Tests
+
+- **core,client,server:** boost test coverage to 92%+ ([b5348b5](https://github.com/SylphxAI/Lens/commit/b5348b5eac9d6444f7d18f202948398bb6d09dc6))
+- **core,client:** add comprehensive type inference tests and examples ([3f4d49e](https://github.com/SylphxAI/Lens/commit/3f4d49ecd85ff30580a27a3c8ad8cfe2b83a1b1a))
+- **core:** improve test coverage for schema types, operations, and resolvers ([59d5c78](https://github.com/SylphxAI/Lens/commit/59d5c78d97431409c4b097afd0ff3e73b1f4bce3))
+
+### 🔧 Chores
+
+- **deps:** update @sylphx/bump to 1.3.9 ([73af518](https://github.com/SylphxAI/Lens/commit/73af5183ff6cfd75cf340a197a7fbd3e6235920e))
+- bump versions to bypass npm registry conflict ([afe45c4](https://github.com/SylphxAI/Lens/commit/afe45c42ffb8afa01bd080a1dc8b5b6c1edd3c3a))
+- remove legacy eslint-disable comments ([6be72a2](https://github.com/SylphxAI/Lens/commit/6be72a2bfd2640a37891fdcbb43689551f29e4ae))
+- update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
+- polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
+- fix all doctor warnings - 100% score ([c5e58ce](https://github.com/SylphxAI/Lens/commit/c5e58ce15133c00b4b579be7f5f8d772a81dbe23))
+
 ## 1.4.0 (2025-11-29)
 
 ### ✨ Features

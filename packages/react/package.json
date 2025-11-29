@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-react",
-	"version": "1.2.10",
+	"version": "1.2.6",
 	"description": "React bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

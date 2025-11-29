@@ -32,6 +32,45 @@
 
 ### 🔧 Chores
 
+- **deps:** update @sylphx/bump to 1.3.9 ([73af518](https://github.com/SylphxAI/Lens/commit/73af5183ff6cfd75cf340a197a7fbd3e6235920e))
+- bump versions to bypass npm registry conflict ([afe45c4](https://github.com/SylphxAI/Lens/commit/afe45c42ffb8afa01bd080a1dc8b5b6c1edd3c3a))
+- remove legacy eslint-disable comments ([6be72a2](https://github.com/SylphxAI/Lens/commit/6be72a2bfd2640a37891fdcbb43689551f29e4ae))
+- update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
+- polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
+- fix all doctor warnings - 100% score ([c5e58ce](https://github.com/SylphxAI/Lens/commit/c5e58ce15133c00b4b579be7f5f8d772a81dbe23))
+
+## 1.4.0 (2025-11-29)
+
+### ✨ Features
+
+- **client:** add automatic type inference from inProcess transport ([431e2a9](https://github.com/SylphxAI/Lens/commit/431e2a96ae87fe8893be8e61f29f5ac56092ef50))
+- **core:** add lens<TContext>() unified factory for functional API ([9bc178f](https://github.com/SylphxAI/Lens/commit/9bc178ff14c59c7cbdee6449bcdc5c7d682ed2d3))
+- **core:** implement array diff algorithm for optimal transfer ([58c7dbe](https://github.com/SylphxAI/Lens/commit/58c7dbe7c2ff706864a38cd42bb53f958d250d5f))
+- **core:** add field arguments support to resolver API ([6da4c97](https://github.com/SylphxAI/Lens/commit/6da4c976db76da24d069107e57be5353bd25fdb5))
+- **core:** introduce new resolver() API with field builder pattern ([c4483ee](https://github.com/SylphxAI/Lens/commit/c4483eeea95a1949eb1f76ef3a2e332a1bddb1db))
+
+### 🐛 Bug Fixes
+
+- **server:** fix InferApi type to work with createServer return type ([c443e40](https://github.com/SylphxAI/Lens/commit/c443e40d85bf4a1144d140ea1191398506684292))
+
+### ♻️ Refactoring
+
+- **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
+- enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
+- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
+- **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
+
+### 💅 Styles
+
+- format package.json files with biome ([8565fd9](https://github.com/SylphxAI/Lens/commit/8565fd9b1c71b8f35ce1f56514c822106142947a))
+
+### ✅ Tests
+
+- **core,client,server:** boost test coverage to 92%+ ([b5348b5](https://github.com/SylphxAI/Lens/commit/b5348b5eac9d6444f7d18f202948398bb6d09dc6))
+
+### 🔧 Chores
+
 - remove legacy eslint-disable comments ([6be72a2](https://github.com/SylphxAI/Lens/commit/6be72a2bfd2640a37891fdcbb43689551f29e4ae))
 - update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
 - polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))

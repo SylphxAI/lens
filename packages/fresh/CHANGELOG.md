@@ -1,5 +1,12 @@
 # @sylphx/lens-fresh
 
+## 1.2.11 (2025-11-29)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 1.2.0
+- Updated `@sylphx/lens-server` to 1.4.0
+
 ## 1.2.7 (2025-11-29)
 
 ### 📦 Dependencies
