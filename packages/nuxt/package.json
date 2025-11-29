@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-nuxt",
-	"version": "1.2.13",
+	"version": "1.2.14",
 	"description": "Nuxt 3 integration for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

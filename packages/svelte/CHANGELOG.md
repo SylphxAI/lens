@@ -69,6 +69,25 @@
 
 ### 🔧 Chores
 
+- **deps:** update @sylphx/bump to 1.3.9 ([73af518](https://github.com/SylphxAI/Lens/commit/73af5183ff6cfd75cf340a197a7fbd3e6235920e))
+- bump versions to bypass npm registry conflict ([afe45c4](https://github.com/SylphxAI/Lens/commit/afe45c42ffb8afa01bd080a1dc8b5b6c1edd3c3a))
+- remove legacy eslint-disable comments ([6be72a2](https://github.com/SylphxAI/Lens/commit/6be72a2bfd2640a37891fdcbb43689551f29e4ae))
+- update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
+- polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
+- fix all doctor warnings - 100% score ([c5e58ce](https://github.com/SylphxAI/Lens/commit/c5e58ce15133c00b4b579be7f5f8d772a81dbe23))
+
+## 1.2.6 (2025-11-29)
+
+### 🐛 Bug Fixes
+
+- update happy-dom to v20.0.10 in all packages ([2ca2842](https://github.com/SylphxAI/Lens/commit/2ca28425835033cdfb46b612fbff98f2f82b51bc))
+
+### 💅 Styles
+
+- format package.json files with biome ([8565fd9](https://github.com/SylphxAI/Lens/commit/8565fd9b1c71b8f35ce1f56514c822106142947a))
+
+### 🔧 Chores
+
 - remove legacy eslint-disable comments ([6be72a2](https://github.com/SylphxAI/Lens/commit/6be72a2bfd2640a37891fdcbb43689551f29e4ae))
 - update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
 - polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
