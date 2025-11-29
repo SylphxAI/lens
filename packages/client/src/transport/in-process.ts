@@ -25,7 +25,7 @@ export interface LensServerInterface {
  * Extract _types from a server (if present).
  * Handles both `{ _types: T }` and intersection types.
  */
-type ExtractServerTypes<T> = T extends { _types: infer Types } ? Types : unknown;
+export type ExtractServerTypes<T> = T extends { _types: infer Types } ? Types : unknown;
 
 /**
  * In-process transport options with typed server.

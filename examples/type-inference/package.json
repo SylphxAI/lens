@@ -1,0 +1,11 @@
+{
+	"name": "type-inference-example",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@sylphx/lens-core": "workspace:*",
+		"@sylphx/lens-server": "workspace:*",
+		"@sylphx/lens-client": "workspace:*",
+		"zod": "^3.24.2"
+	}
+}
