@@ -523,6 +523,58 @@ export function mutation<TContext = unknown>(
 }
 
 // =============================================================================
+// Operations Factory
+// =============================================================================
+
+/**
+ * Operations factory result - typed query and mutation builders
+ */
+export interface Operations<TContext> {
+	/** Create a query with pre-typed context */
+	query: {
+		(): QueryBuilder<void, unknown, TContext>;
+		(name: string): QueryBuilder<void, unknown, TContext>;
+	};
+	/** Create a mutation with pre-typed context */
+	mutation: {
+		(): MutationBuilder<unknown, unknown, TContext>;
+		(name: string): MutationBuilder<unknown, unknown, TContext>;
+	};
+}
+
+/**
+ * Create typed query and mutation builders with shared context.
+ *
+ * This eliminates the need to repeat context types on every operation.
+ *
+ * @example
+ * ```typescript
+ * // Define context type once
+ * type AppContext = { db: DB; user: User };
+ *
+ * // Create typed operations
+ * const { query, mutation } = operations<AppContext>();
+ *
+ * // Now all operations automatically have AppContext
+ * export const getUser = query()
+ *   .input(z.object({ id: z.string() }))
+ *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id));
+ *   // ctx is AppContext ✅
+ *
+ * export const createPost = mutation()
+ *   .input(z.object({ title: z.string() }))
+ *   .resolve(({ input, ctx }) => ctx.db.post.create(input));
+ *   // ctx is AppContext ✅
+ * ```
+ */
+export function operations<TContext>(): Operations<TContext> {
+	return {
+		query: ((name?: string) => new QueryBuilderImpl<void, unknown, TContext>(name)) as Operations<TContext>["query"],
+		mutation: ((name?: string) => new MutationBuilderImpl<unknown, unknown, TContext>(name)) as Operations<TContext>["mutation"],
+	};
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 

@@ -232,6 +232,9 @@ export {
 	type MutationResultType,
 	mutation,
 	normalizeOptimisticDSL,
+	// Operations factory
+	operations,
+	type Operations,
 	// Optimistic DSL types
 	type OptimisticDSL,
 	type OptimisticUpdateManyConfig,

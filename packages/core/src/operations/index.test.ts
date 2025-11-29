@@ -16,6 +16,7 @@ import {
 	isRouterDef,
 	isTempId,
 	mutation,
+	operations,
 	query,
 	resetTempIdCounter,
 	router,
@@ -557,5 +558,78 @@ describe("router() builder", () => {
 		// This is a compile-time check - if types don't match, this won't compile
 		const _typeCheck: RouterContext = {} as DbContext & UserContext & CacheContext;
 		expect(_typeCheck).toBeDefined();
+	});
+});
+
+// =============================================================================
+// Test: operations() Factory
+// =============================================================================
+
+describe("operations() factory", () => {
+	it("creates typed query and mutation builders", () => {
+		interface AppContext {
+			db: { users: Map<string, { id: string; name: string; email: string }> };
+		}
+
+		const { query, mutation } = operations<AppContext>();
+
+		// query() should return a typed builder
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input, ctx }) => {
+				// ctx is AppContext - this compiles only if types are correct
+				const user = ctx.db.users.get(input.id);
+				return user ?? { id: input.id, name: "Unknown", email: "" };
+			});
+
+		// mutation() should return a typed builder
+		const createUser = mutation()
+			.input(z.object({ name: z.string(), email: z.string() }))
+			.resolve(({ input, ctx }) => {
+				const user = { id: "new", ...input };
+				ctx.db.users.set(user.id, user);
+				return user;
+			});
+
+		expect(isQueryDef(getUser)).toBe(true);
+		expect(isMutationDef(createUser)).toBe(true);
+	});
+
+	it("query and mutation work with named operations", () => {
+		const { query, mutation } = operations<{ db: unknown }>();
+
+		const namedQuery = query("getUsers")
+			.resolve(() => []);
+
+		const namedMutation = mutation("createUser")
+			.input(z.object({ name: z.string() }))
+			.resolve(({ input }) => ({ id: "1", name: input.name }));
+
+		expect(namedQuery._name).toBe("getUsers");
+		expect(namedMutation._name).toBe("createUser");
+	});
+
+	it("resolvers receive correctly typed context", async () => {
+		interface TestContext {
+			userId: string;
+			permissions: string[];
+		}
+
+		const { query } = operations<TestContext>();
+
+		const whoami = query()
+			.resolve(({ ctx }) => {
+				// Type check - ctx should have userId and permissions
+				return { userId: ctx.userId, perms: ctx.permissions.join(",") };
+			});
+
+		const result = await whoami._resolve!({
+			input: undefined,
+			ctx: { userId: "user-1", permissions: ["read", "write"] },
+			emit: (() => {}) as never,
+			onCleanup: () => () => {},
+		});
+
+		expect(result).toEqual({ userId: "user-1", perms: "read,write" });
 	});
 });
