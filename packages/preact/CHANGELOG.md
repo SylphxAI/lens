@@ -1,5 +1,11 @@
 # @sylphx/lens-preact
 
+## 1.2.6 (2025-11-29)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 1.1.0
+
 ## 1.2.5
 
 ### Patch Changes
