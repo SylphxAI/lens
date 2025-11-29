@@ -75,7 +75,7 @@ export function route(config: RouteConfig): Transport {
 		async connect(): Promise<Metadata> {
 			// Connect all transports in parallel
 			const results = await Promise.all(
-				sorted.map(async ([pattern, transport]) => {
+				sorted.map(async ([_pattern, transport]) => {
 					try {
 						return await transport.connect();
 					} catch {

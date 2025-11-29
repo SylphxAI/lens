@@ -427,3 +427,193 @@ describe("Field arguments", () => {
 		await expect(userResolver.resolveField("posts", parent, { limit: 101 }, mockCtx)).rejects.toThrow();
 	});
 });
+
+// =============================================================================
+// Test: Edge Cases & Error Handling
+// =============================================================================
+
+describe("Edge cases and error handling", () => {
+	it("throws error for non-existent field", async () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+		}));
+
+		const parent = mockDb.users[0];
+
+		await expect(userResolver.resolveField("nonexistent" as any, parent, {}, mockCtx)).rejects.toThrow(
+			'Field "nonexistent" not found in resolver',
+		);
+	});
+
+	it("resolveAll with object-style select (name + args)", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f
+				.many(Post)
+				.args(z.object({ limit: z.number().default(10) }))
+				.resolve(({ parent, args, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id).slice(0, args.limit)),
+		}));
+
+		const parent = mockDb.users[0];
+		const result = await userResolver.resolveAll(parent, mockCtx, [
+			{ name: "id" },
+			{ name: "posts", args: { limit: 1 } },
+		]);
+
+		expect(result.id).toBe("1");
+		expect((result.posts as any[]).length).toBe(1);
+		expect(result.name).toBeUndefined();
+	});
+
+	it("resolveAll ignores non-existent fields in select", async () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+		}));
+
+		const parent = mockDb.users[0];
+		const result = await userResolver.resolveAll(parent, mockCtx, ["id", "nonexistent"]);
+
+		expect(result.id).toBe("1");
+		expect(result.nonexistent).toBeUndefined();
+	});
+
+	it("getArgsSchema returns null for non-existent field", () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+		}));
+
+		expect(userResolver.getArgsSchema("nonexistent")).toBeNull();
+	});
+});
+
+// =============================================================================
+// Test: Additional Field Builders
+// =============================================================================
+
+describe("Additional field builders", () => {
+	it("int field builder works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			postCount: f.int().resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id).length),
+		}));
+
+		const parent = mockDb.users[0];
+		const count = await userResolver.resolveField("postCount", parent, {}, mockCtx);
+		expect(count).toBe(2);
+	});
+
+	it("float field builder works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			avgPostLength: f.float().resolve(({ parent, ctx }) => {
+				const posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+				const totalLength = posts.reduce((sum, p) => sum + p.content.length, 0);
+				return totalLength / posts.length;
+			}),
+		}));
+
+		const parent = mockDb.users[0];
+		const avg = await userResolver.resolveField("avgPostLength", parent, {}, mockCtx);
+		expect(avg).toBe(4); // (5 + 3) / 2 = 4 (World + Bar)
+	});
+
+	it("boolean field builder works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			hasPublishedPosts: f
+				.boolean()
+				.resolve(({ parent, ctx }) => ctx.db.posts.some((p) => p.authorId === parent.id && p.published)),
+		}));
+
+		const parent = mockDb.users[0];
+		const hasPublished = await userResolver.resolveField("hasPublishedPosts", parent, {}, mockCtx);
+		expect(hasPublished).toBe(true);
+	});
+
+	it("datetime field builder works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			createdAt: f.datetime().resolve(() => new Date("2024-01-15")),
+		}));
+
+		const parent = mockDb.users[0];
+		const date = await userResolver.resolveField("createdAt", parent, {}, mockCtx);
+		expect(date).toBeInstanceOf(Date);
+	});
+
+	it("date field builder works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			birthDate: f.date().resolve(() => new Date("1990-05-20")),
+		}));
+
+		const parent = mockDb.users[0];
+		const date = await userResolver.resolveField("birthDate", parent, {}, mockCtx);
+		expect(date).toBeInstanceOf(Date);
+	});
+
+	it("nullable scalar field builder works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			nickname: f
+				.string()
+				.nullable()
+				.resolve(({ parent }) => (parent.name === "John" ? "Johnny" : null)),
+		}));
+
+		const parent1 = mockDb.users[0];
+		const parent2 = mockDb.users[1];
+
+		const nick1 = await userResolver.resolveField("nickname", parent1, {}, mockCtx);
+		const nick2 = await userResolver.resolveField("nickname", parent2, {}, mockCtx);
+
+		expect(nick1).toBe("Johnny");
+		expect(nick2).toBeNull();
+	});
+
+	it("nullable scalar field with args works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			nickname: f
+				.string()
+				.args(z.object({ uppercase: z.boolean().default(false) }))
+				.nullable()
+				.resolve(({ parent, args }) => {
+					if (parent.name !== "John") return null;
+					const nick = "Johnny";
+					return args.uppercase ? nick.toUpperCase() : nick;
+				}),
+		}));
+
+		const parent = mockDb.users[0];
+		const nick1 = await userResolver.resolveField("nickname", parent, {}, mockCtx);
+		const nick2 = await userResolver.resolveField("nickname", parent, { uppercase: true }, mockCtx);
+
+		expect(nick1).toBe("Johnny");
+		expect(nick2).toBe("JOHNNY");
+	});
+
+	it("nullable relation field with args works", async () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			latestPost: f
+				.one(Post)
+				.args(z.object({ published: z.boolean().default(false) }))
+				.nullable()
+				.resolve(({ parent, args, ctx }) => {
+					const posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+					if (args.published) {
+						return posts.find((p) => p.published) ?? null;
+					}
+					return posts[0] ?? null;
+				}),
+		}));
+
+		const parent = mockDb.users[0];
+		const post = (await userResolver.resolveField("latestPost", parent, { published: true }, mockCtx)) as any;
+
+		expect(post?.title).toBe("Hello");
+	});
+});

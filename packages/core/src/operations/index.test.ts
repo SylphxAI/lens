@@ -12,10 +12,12 @@ import {
 	flattenRouter,
 	isMutationDef,
 	isOperationDef,
+	isOptimisticDSL,
 	isQueryDef,
 	isRouterDef,
 	isTempId,
 	mutation,
+	normalizeOptimisticDSL,
 	operations,
 	query,
 	resetTempIdCounter,
@@ -629,5 +631,115 @@ describe("operations() factory", () => {
 		});
 
 		expect(result).toEqual({ userId: "user-1", perms: "read,write" });
+	});
+});
+
+// =============================================================================
+// Test: Optimistic DSL Helpers
+// =============================================================================
+
+describe("Optimistic DSL Helpers", () => {
+	describe("isOptimisticDSL", () => {
+		it("identifies string shorthand 'merge'", () => {
+			expect(isOptimisticDSL("merge")).toBe(true);
+		});
+
+		it("identifies string shorthand 'create'", () => {
+			expect(isOptimisticDSL("create")).toBe(true);
+		});
+
+		it("identifies string shorthand 'delete'", () => {
+			expect(isOptimisticDSL("delete")).toBe(true);
+		});
+
+		it("identifies object with merge", () => {
+			expect(isOptimisticDSL({ merge: { published: true } })).toBe(true);
+		});
+
+		it("identifies object with create", () => {
+			expect(isOptimisticDSL({ create: { status: "draft" } })).toBe(true);
+		});
+
+		it("identifies object with updateMany", () => {
+			expect(
+				isOptimisticDSL({
+					updateMany: { entity: "User", ids: "$userIds", set: { role: "admin" } },
+				}),
+			).toBe(true);
+		});
+
+		it("identifies object with custom", () => {
+			expect(isOptimisticDSL({ custom: {} })).toBe(true);
+		});
+
+		it("returns false for non-DSL strings", () => {
+			expect(isOptimisticDSL("update")).toBe(false);
+			expect(isOptimisticDSL("remove")).toBe(false);
+		});
+
+		it("returns false for empty object", () => {
+			expect(isOptimisticDSL({})).toBe(false);
+		});
+
+		it("returns false for null", () => {
+			expect(isOptimisticDSL(null)).toBe(false);
+		});
+
+		it("returns false for undefined", () => {
+			expect(isOptimisticDSL(undefined)).toBe(false);
+		});
+
+		it("returns false for number", () => {
+			expect(isOptimisticDSL(123)).toBe(false);
+		});
+	});
+
+	describe("normalizeOptimisticDSL", () => {
+		it("normalizes 'merge' string shorthand", () => {
+			expect(normalizeOptimisticDSL("merge")).toEqual({ type: "merge" });
+		});
+
+		it("normalizes 'create' string shorthand", () => {
+			expect(normalizeOptimisticDSL("create")).toEqual({ type: "create" });
+		});
+
+		it("normalizes 'delete' string shorthand", () => {
+			expect(normalizeOptimisticDSL("delete")).toEqual({ type: "delete" });
+		});
+
+		it("normalizes merge object with set fields", () => {
+			expect(normalizeOptimisticDSL({ merge: { published: true } })).toEqual({
+				type: "merge",
+				set: { published: true },
+			});
+		});
+
+		it("normalizes create object with set fields", () => {
+			expect(normalizeOptimisticDSL({ create: { status: "draft" } })).toEqual({
+				type: "create",
+				set: { status: "draft" },
+			});
+		});
+
+		it("normalizes updateMany object", () => {
+			const config = { entity: "User", ids: "$userIds", set: { role: "admin" } };
+			expect(normalizeOptimisticDSL({ updateMany: config })).toEqual({
+				type: "updateMany",
+				config,
+			});
+		});
+	});
+});
+
+// =============================================================================
+// Test: Mutation requires input
+// =============================================================================
+
+describe("Mutation input requirement", () => {
+	it("throws if resolve is called without input", () => {
+		expect(() => {
+			// @ts-expect-error - Testing runtime behavior
+			mutation().resolve(() => ({}));
+		}).toThrow("Mutation requires input schema");
 	});
 });
