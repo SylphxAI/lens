@@ -2,7 +2,7 @@
 
 > **Type-Safe Reactive API Framework for TypeScript**
 
-End-to-end type safety from server to client. Like tRPC, but with **automatic live queries**, **optimistic updates**, and **multi-server support** built-in.
+A **GraphQL-like** frontend-driven framework with **automatic live queries** and **incremental transfer**. Full type safety from server to client, no codegen required.
 
 ## What Lens Does
 
@@ -270,7 +270,7 @@ The server automatically selects optimal transfer strategies:
 
 ## Entity & Field Resolution
 
-Lens separates entity definition from field resolution to avoid circular reference issues and provide clean separation of concerns.
+Lens follows GraphQL's design: **entities define shape**, **field resolvers define resolution with arguments**.
 
 ### 1. Define Entities (Scalar Fields Only)
 
@@ -296,32 +296,59 @@ const Post = entity("Post", {
 })
 ```
 
-### 2. Define Field Resolvers
+### 2. Define Field Resolvers (with Field Arguments)
 
-Use `resolver()` to define which fields are exposed and how relations are resolved:
+Use `resolver()` to define fields with **GraphQL-style field arguments**:
 
 ```typescript
 import { resolver, createResolverRegistry } from '@sylphx/lens-core'
 
 const resolvers = createResolverRegistry<AppContext>()
 
-// User resolver
 resolvers.register(
   resolver(User, (f) => ({
-    // Expose scalar fields from parent data
+    // ===== Expose scalar fields from parent =====
     id: f.expose("id"),
     name: f.expose("name"),
     email: f.expose("email"),
     role: f.expose("role"),
 
-    // Define relations with resolve functions
-    posts: f.many(Post).resolve((user, ctx) =>
-      ctx.db.posts.filter(p => p.authorId === user.id)
+    // ===== Computed field (no args) =====
+    displayName: f.string().resolve((user) =>
+      `${user.name} (${user.role})`
     ),
+
+    // ===== Relation with field arguments =====
+    posts: f.many(Post)
+      .args(z.object({
+        first: z.number().default(10),
+        after: z.string().optional(),
+        published: z.boolean().optional(),
+        orderBy: z.enum(["createdAt", "title"]).default("createdAt"),
+      }))
+      .resolve((user, args, ctx) =>
+        ctx.db.posts.findMany({
+          where: {
+            authorId: user.id,
+            published: args.published,
+          },
+          take: args.first,
+          cursor: args.after,
+          orderBy: { [args.orderBy]: 'desc' },
+        })
+      ),
+
+    // ===== Computed field with arguments =====
+    postsCount: f.int()
+      .args(z.object({ published: z.boolean().optional() }))
+      .resolve((user, args, ctx) =>
+        ctx.db.posts.count({
+          where: { authorId: user.id, published: args.published },
+        })
+      ),
   }))
 )
 
-// Post resolver
 resolvers.register(
   resolver(Post, (f) => ({
     id: f.expose("id"),
@@ -330,9 +357,16 @@ resolvers.register(
     published: f.expose("published"),
 
     // belongsTo relation
-    author: f.one(User).resolve((post, ctx) =>
-      ctx.db.users.find(u => u.id === post.authorId)
+    author: f.one(User).resolve((post, args, ctx) =>
+      ctx.db.users.find(post.authorId)
     ),
+
+    // Computed with arguments
+    excerpt: f.string()
+      .args(z.object({ length: z.number().default(100) }))
+      .resolve((post, args) =>
+        post.content.slice(0, args.length) + "..."
+      ),
   }))
 )
 ```
@@ -343,47 +377,68 @@ resolvers.register(
 const server = createServer({
   router: appRouter,
   entities: { User, Post },
-  resolvers,  // Pass the resolver registry
+  resolvers,
   context: () => ({ db }),
 })
 ```
 
-### Field Builder API
+### Field Resolver Signature
 
-The `resolver()` function provides a field builder with these methods:
+```typescript
+// Full signature: (parent, args, ctx) => result
+(parent: TParent, args: TArgs, ctx: TContext) => TResult | Promise<TResult>
+```
+
+### Field Builder API
 
 | Method | Description | Example |
 |--------|-------------|---------|
-| `f.expose(field)` | Expose a scalar field from parent | `f.expose("name")` |
-| `f.one(Entity)` | Define a singular relation | `f.one(User).resolve(...)` |
-| `f.many(Entity)` | Define a collection relation | `f.many(Post).resolve(...)` |
-| `f.string()` | Define a computed string field | `f.string().resolve((p, ctx) => ...)` |
-| `f.int()` | Define a computed int field | `f.int().resolve(...)` |
+| `f.expose(field)` | Expose scalar from parent | `f.expose("name")` |
+| `f.string()` | Computed string field | `f.string().resolve((p, args, ctx) => ...)` |
+| `f.int()` | Computed int field | `f.int().resolve(...)` |
+| `f.boolean()` | Computed boolean field | `f.boolean().resolve(...)` |
+| `f.one(Entity)` | Singular relation | `f.one(User).resolve(...)` |
+| `f.many(Entity)` | Collection relation | `f.many(Post).resolve(...)` |
+| `.args(schema)` | Add field arguments | `.args(z.object({ limit: z.number() }))` |
+| `.resolve(fn)` | Field resolver function | `.resolve((parent, args, ctx) => ...)` |
 
-### Why This Design?
+### GraphQL Comparison
 
-**Avoids circular references:** Entity definitions are pure data shapes. Relations are defined separately in resolvers.
-
-**GraphQL-like resolution:** Each field can have its own resolver, just like GraphQL. The parent data flows down from operation resolvers.
-
-**Type-safe:** Full TypeScript inference for parent data, context, and return types.
-
-**Flexible:** Choose which fields to expose. Add computed fields. Transform data.
+```graphql
+# GraphQL
+query {
+  user(id: "1") {
+    name
+    posts(first: 5, published: true) {
+      title
+      excerpt(length: 50)
+    }
+    postsCount(published: true)
+  }
+}
+```
 
 ```typescript
-// Parent data comes from operation resolver
-const getUser = query()
-  .returns(User)
-  .resolve(({ input, ctx }) => ctx.db.users.find(input.id))
-  //       ↑ This becomes "parent" in field resolvers
-
-// Field resolver receives parent + context
-resolver(User, (f) => ({
-  fullName: f.string().resolve((user, ctx) =>
-    `${user.name} (${user.role})`  // Computed from parent
-  ),
-}))
+// Lens - equivalent
+client.user.get({ id: "1" }, {
+  select: {
+    name: true,
+    posts: {
+      args: { first: 5, published: true },
+      select: {
+        title: true,
+        excerpt: { args: { length: 50 } },
+      }
+    },
+    postsCount: { args: { published: true } },
+  }
+})
 ```
+
+**Lens adds:**
+- `.subscribe()` for live updates
+- Automatic incremental diff transfer
+- Full TypeScript inference (no codegen)
 
 ---
 
@@ -651,27 +706,92 @@ function UpdateUser({ userId }: { userId: string }) {
 
 ---
 
-## Field Selection
+## Field Selection & Arguments
 
-Subscribe to only the fields you need. The server tracks and sends minimal updates:
+GraphQL-like field selection with **field-level arguments**. The server tracks and sends minimal updates:
 
 ```typescript
-// Select specific fields
-client.user.get({ id: '123' })
-  .select({ name: true, email: true })
-  .subscribe((user) => {
-    // Only receives updates when name or email changes
-  })
+// Simple selection
+const user = await client.user.get({ id: '123' }, {
+  select: { name: true, email: true }
+})
 
-// Nested selection for relations
-client.user.get({ id: '123' })
-  .select({
+// Nested selection with field arguments
+const user = await client.user.get({ id: '123' }, {
+  select: {
     name: true,
-    posts: { select: { title: true, author: true } }
-  })
-  .subscribe((user) => {
-    // Receives updates for user.name or any post's title/author
-  })
+    displayName: true,
+
+    // Field with arguments
+    posts: {
+      args: { first: 5, published: true, orderBy: 'createdAt' },
+      select: {
+        title: true,
+        excerpt: { args: { length: 50 } },  // Scalar with args
+        author: { select: { name: true } },
+      }
+    },
+
+    // Computed field with arguments
+    postsCount: { args: { published: true } },
+  }
+})
+
+// Live subscription with field args
+client.user.get({ id: '123' }, {
+  select: {
+    name: true,
+    posts: {
+      args: { first: 5 },
+      select: { title: true }
+    }
+  }
+}).subscribe((user) => {
+  // Updates when user.name OR any post changes
+})
+```
+
+### Selection Syntax
+
+```typescript
+// Boolean - include field with default args
+{ name: true }
+
+// Object with select - nested entity
+{ posts: { select: { title: true } } }
+
+// Object with args - field arguments
+{ postsCount: { args: { published: true } } }
+
+// Object with args + select - both
+{ posts: { args: { first: 5 }, select: { title: true } } }
+```
+
+### Type Inference
+
+Selection is fully typed - TypeScript knows the exact shape:
+
+```typescript
+const user = await client.user.get({ id: '1' }, {
+  select: {
+    name: true,
+    posts: {
+      args: { first: 5 },
+      select: { title: true, author: { select: { name: true } } }
+    },
+    postsCount: { args: { published: true } },
+  }
+})
+
+// TypeScript infers:
+// {
+//   name: string
+//   posts: Array<{
+//     title: string
+//     author: { name: string }
+//   }>
+//   postsCount: number
+// }
 ```
 
 ---
@@ -1009,15 +1129,17 @@ export const getUser = typedQuery()
 
 | Feature | tRPC | GraphQL | REST | **Lens** |
 |---------|------|---------|------|----------|
-| Type Safety | ✅ | Codegen | ❌ | ✅ |
+| Type Safety | ✅ | Codegen | ❌ | ✅ Native |
 | Code-first | ✅ | SDL | ✅ | ✅ |
-| Live Subscriptions | ❌ | Subscriptions | ❌ | ✅ Auto |
-| Minimal Diff Updates | ❌ | ❌ | ❌ | ✅ |
 | Field Selection | ❌ | ✅ | ❌ | ✅ |
+| Field Arguments | ❌ | ✅ | ❌ | ✅ |
+| Live Subscriptions | ❌ | Separate | ❌ | ✅ Auto |
+| Incremental Updates | ❌ | ❌ | ❌ | ✅ Diff |
 | Streaming | ✅ | ❌ | ❌ | ✅ |
 | Optimistic Updates | Manual | Manual | Manual | **Auto** |
 | Multi-Server | Manual | Federation | Manual | **Native** |
-| Plugin System | Links | ❌ | ❌ | ✅ Hooks |
+
+**Lens = GraphQL's power + Live queries + No codegen**
 
 ---
 
