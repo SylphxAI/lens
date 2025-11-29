@@ -11,11 +11,9 @@
 
 export {
 	type InferRouterContext,
-	type MutationBuilder,
 	type MutationDef,
 	mutation,
 	// Types
-	type QueryBuilder,
 	type QueryDef,
 	// Operations
 	query,

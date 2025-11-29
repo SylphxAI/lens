@@ -221,12 +221,10 @@ describe("createResolverRegistry()", () => {
 	it("registers and retrieves resolvers", () => {
 		const registry = createResolverRegistry<MockContext>();
 
-		const userResolver = resolver<MockContext>()(User, (f) => ({
+		registry.add(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
 		}));
-
-		registry.register(userResolver);
 
 		expect(registry.has("User")).toBe(true);
 		expect(registry.has("Post")).toBe(false);
@@ -239,16 +237,13 @@ describe("createResolverRegistry()", () => {
 	it("registers multiple resolvers", () => {
 		const registry = createResolverRegistry<MockContext>();
 
-		const userResolver = resolver<MockContext>()(User, (f) => ({
+		registry.add(User, (f) => ({
 			id: f.expose("id"),
 		}));
 
-		const postResolver = resolver<MockContext>()(Post, (f) => ({
+		registry.add(Post, (f) => ({
 			id: f.expose("id"),
 		}));
-
-		registry.register(userResolver);
-		registry.register(postResolver);
 
 		expect(registry.has("User")).toBe(true);
 		expect(registry.has("Post")).toBe(true);

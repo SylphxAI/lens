@@ -220,40 +220,36 @@ export {
 	flattenRouter,
 	type InferRouterClient,
 	type InferRouterContext,
+	// Type guards
 	isMutationDef,
 	isOperationDef,
 	isOptimisticDSL,
-	// Type guards
 	isQueryDef,
 	isRouterDef,
 	isTempId,
-	type MutationBuilder,
+	// Types
 	type MutationDef,
 	type MutationResultType,
-	mutation,
-	normalizeOptimisticDSL,
-	// Operations factory
-	operations,
-	type Operations,
-	// Optimistic DSL types
 	type OptimisticDSL,
 	type OptimisticUpdateManyConfig,
-	type QueryBuilder,
-	// Types
 	type QueryDef,
 	type QueryResultType,
-	// Builders
-	query,
 	type ResolverContext,
 	type ResolverFn,
 	type ReturnSpec,
 	type RouterDef,
 	type RouterRoutes,
-	resetTempIdCounter,
+	type ZodLikeSchema,
+	// Builders
+	mutation,
+	operations,
+	type Operations,
+	query,
 	router,
 	// Helpers
+	normalizeOptimisticDSL,
+	resetTempIdCounter,
 	tempId,
-	type ZodLikeSchema,
 } from "./operations/index";
 
 // =============================================================================
@@ -268,21 +264,17 @@ export {
 	type FieldBuilder,
 	type FieldDef,
 	type FieldResolverContext,
-	type FieldResolverFn,
 	type InferResolverOutput,
 	type InferResolverSelected,
+	type ResolvedField,
+	type ResolverDef,
+	type ResolverRegistry,
 	// Type guards
 	isExposedField,
 	isResolvedField,
 	isResolverDef,
-	type RelationFieldBuilder,
-	type ResolvedField,
-	type ResolverDef,
-	type ResolverFields,
-	type ResolverRegistry,
 	// Main function
 	resolver,
-	type ScalarFieldBuilder,
 } from "./resolvers/index";
 
 // =============================================================================
