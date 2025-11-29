@@ -1,52 +1,52 @@
 {
-  "name": "@sylphx/lens",
-  "version": "1.1.10",
-  "description": "Type-safe, real-time API framework - GraphQL concepts in TypeScript with zero codegen",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./client": {
-      "import": "./dist/client.js",
-      "types": "./dist/client.d.ts"
-    },
-    "./server": {
-      "import": "./dist/server.js",
-      "types": "./dist/server.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "bun run build"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "api",
-    "graphql",
-    "trpc",
-    "typescript",
-    "type-safe",
-    "real-time",
-    "reactive"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "dependencies": {
-    "@sylphx/lens-core": "workspace:*",
-    "@sylphx/lens-client": "workspace:*",
-    "@sylphx/lens-server": "workspace:*"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3"
-  }
+	"name": "@sylphx/lens",
+	"version": "1.1.10",
+	"description": "Type-safe, real-time API framework - GraphQL concepts in TypeScript with zero codegen",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		},
+		"./client": {
+			"import": "./dist/client.js",
+			"types": "./dist/client.d.ts"
+		},
+		"./server": {
+			"import": "./dist/server.js",
+			"types": "./dist/server.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "bun run build"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"api",
+		"graphql",
+		"trpc",
+		"typescript",
+		"type-safe",
+		"real-time",
+		"reactive"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-core": "workspace:*",
+		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/lens-server": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	}
 }

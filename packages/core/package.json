@@ -1,36 +1,36 @@
 {
-  "name": "@sylphx/lens-core",
-  "version": "1.4.10",
-  "description": "Core schema types and utilities for Lens",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "bun run build"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "schema",
-    "types",
-    "typescript"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "devDependencies": {
-    "typescript": "^5.9.3",
-    "zod": "^4.1.13"
-  }
+	"name": "@sylphx/lens-core",
+	"version": "1.4.10",
+	"description": "Core schema types and utilities for Lens",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "bun run build"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"schema",
+		"types",
+		"typescript"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"devDependencies": {
+		"typescript": "^5.9.3",
+		"zod": "^4.1.13"
+	}
 }

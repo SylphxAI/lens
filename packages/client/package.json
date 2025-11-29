@@ -1,51 +1,51 @@
 {
-  "name": "@sylphx/lens-client",
-  "version": "1.1.10",
-  "description": "Reactive client for Lens API framework",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "bun run build"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "client",
-    "reactive",
-    "transport",
-    "plugins"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "dependencies": {
-    "@sylphx/lens-core": "workspace:*",
-    "@msgpack/msgpack": "^3.1.2"
-  },
-  "peerDependencies": {
-    "@preact/signals-core": ">=1.8.0"
-  },
-  "peerDependenciesMeta": {
-    "@preact/signals-core": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@preact/signals-core": "^1.8.0",
-    "@sylphx/lens-server": "workspace:*",
-    "typescript": "^5.9.3",
-    "zod": "^4.1.13"
-  }
+	"name": "@sylphx/lens-client",
+	"version": "1.1.10",
+	"description": "Reactive client for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "bun run build"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"client",
+		"reactive",
+		"transport",
+		"plugins"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-core": "workspace:*",
+		"@msgpack/msgpack": "^3.1.2"
+	},
+	"peerDependencies": {
+		"@preact/signals-core": ">=1.8.0"
+	},
+	"peerDependenciesMeta": {
+		"@preact/signals-core": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@preact/signals-core": "^1.8.0",
+		"@sylphx/lens-server": "workspace:*",
+		"typescript": "^5.9.3",
+		"zod": "^4.1.13"
+	}
 }

@@ -1,47 +1,47 @@
 {
-  "name": "@sylphx/lens-react",
-  "version": "1.2.10",
-  "description": "React bindings for Lens API framework",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "bun run build"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "react",
-    "hooks",
-    "reactive"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "dependencies": {
-    "@sylphx/lens-client": "workspace:*"
-  },
-  "peerDependencies": {
-    "react": ">=18.0.0"
-  },
-  "devDependencies": {
-    "@happy-dom/global-registrator": "^20.0.10",
-    "@testing-library/react": "^16.2.0",
-    "@types/react": "^19.1.6",
-    "happy-dom": "^20.0.10",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "typescript": "^5.9.3"
-  }
+	"name": "@sylphx/lens-react",
+	"version": "1.2.10",
+	"description": "React bindings for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "bun run build"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"react",
+		"hooks",
+		"reactive"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-client": "workspace:*"
+	},
+	"peerDependencies": {
+		"react": ">=18.0.0"
+	},
+	"devDependencies": {
+		"@happy-dom/global-registrator": "^20.0.10",
+		"@testing-library/react": "^16.2.0",
+		"@types/react": "^19.1.6",
+		"happy-dom": "^20.0.10",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"typescript": "^5.9.3"
+	}
 }

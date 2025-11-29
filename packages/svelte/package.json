@@ -1,45 +1,45 @@
 {
-  "name": "@sylphx/lens-svelte",
-  "version": "1.2.10",
-  "description": "Svelte bindings for Lens API framework",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "bun run build"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "svelte",
-    "stores",
-    "reactive"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "dependencies": {
-    "@sylphx/lens-client": "workspace:*"
-  },
-  "peerDependencies": {
-    "svelte": ">=4.0.0"
-  },
-  "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^4.0.2",
-    "@testing-library/svelte": "^5.2.7",
-    "happy-dom": "^20.0.10",
-    "svelte": "^4.2.19",
-    "typescript": "^5.9.3"
-  }
+	"name": "@sylphx/lens-svelte",
+	"version": "1.2.10",
+	"description": "Svelte bindings for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "bun run build"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"svelte",
+		"stores",
+		"reactive"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-client": "workspace:*"
+	},
+	"peerDependencies": {
+		"svelte": ">=4.0.0"
+	},
+	"devDependencies": {
+		"@sveltejs/vite-plugin-svelte": "^4.0.2",
+		"@testing-library/svelte": "^5.2.7",
+		"happy-dom": "^20.0.10",
+		"svelte": "^4.2.19",
+		"typescript": "^5.9.3"
+	}
 }

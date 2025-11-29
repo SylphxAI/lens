@@ -1,39 +1,39 @@
 {
-  "name": "@sylphx/lens-server",
-  "version": "1.4.10",
-  "description": "Server runtime for Lens API framework",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "bun run build"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "server",
-    "resolvers",
-    "graphql"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "dependencies": {
-    "@sylphx/lens-core": "workspace:*"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3",
-    "zod": "^4.1.13"
-  }
+	"name": "@sylphx/lens-server",
+	"version": "1.4.10",
+	"description": "Server runtime for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "bun run build"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"server",
+		"resolvers",
+		"graphql"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-core": "workspace:*"
+	},
+	"devDependencies": {
+		"typescript": "^5.9.3",
+		"zod": "^4.1.13"
+	}
 }
