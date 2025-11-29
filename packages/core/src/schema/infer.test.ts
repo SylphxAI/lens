@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { belongsTo, createSchema, entity, hasMany, hasOne } from "./define";
+import { createSchema, entity } from "./define";
 import type { CreateInput, InferEntity, InferScalar, RelationFields, ScalarFields, Select, UpdateInput } from "./infer";
 import { t } from "./types";
 
@@ -43,23 +43,27 @@ const Profile = entity("Profile", {
 	avatar: t.string(),
 });
 
-// Create schema with relations using direct entity references
+// Create schema with relations using t.hasMany/hasOne/belongsTo type builders
 const testSchema = createSchema({
-	User: User.with({
-		posts: hasMany(Post),
-		profile: hasOne(Profile),
-	}),
-	Post: Post.with({
-		author: belongsTo(User),
-		comments: hasMany(Comment),
-	}),
-	Comment: Comment.with({
-		author: belongsTo(User),
-		post: belongsTo(Post),
-	}),
-	Profile: Profile.with({
-		user: belongsTo(User),
-	}),
+	User: {
+		...User.fields,
+		posts: t.hasMany("Post"),
+		profile: t.hasOne("Profile"),
+	},
+	Post: {
+		...Post.fields,
+		author: t.belongsTo("User"),
+		comments: t.hasMany("Comment"),
+	},
+	Comment: {
+		...Comment.fields,
+		author: t.belongsTo("User"),
+		post: t.belongsTo("Post"),
+	},
+	Profile: {
+		...Profile.fields,
+		user: t.belongsTo("User"),
+	},
 });
 
 type TestSchemaDefinition = typeof testSchema.definition;
@@ -218,13 +222,13 @@ describe("Type Inference", () => {
 
 describe("Runtime Type Validation", () => {
 	test("schema validates relation targets", () => {
-		// Valid schema with direct entity references
+		// Valid schema using t.hasOne/belongsTo type builders
 		const A = entity("A", { id: t.id() });
 		const B = entity("B", { id: t.id() });
 
 		const validSchema = createSchema({
-			A: A.with({ b: hasOne(B) }),
-			B: B.with({ a: belongsTo(A) }),
+			A: { ...A.fields, b: t.hasOne("B") },
+			B: { ...B.fields, a: t.belongsTo("A") },
 		});
 
 		expect(validSchema.hasEntity("A")).toBe(true);
@@ -236,7 +240,7 @@ describe("Runtime Type Validation", () => {
 
 		expect(() => {
 			createSchema({
-				A: A.with({ b: t.hasOne("NonExistent") }),
+				A: { ...A.fields, b: t.hasOne("NonExistent") },
 			});
 		}).toThrow();
 	});

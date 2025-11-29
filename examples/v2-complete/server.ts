@@ -1,15 +1,15 @@
 /**
  * V2 Complete Example - Server
  *
- * Demonstrates: Entity definitions with relations, router pattern
+ * Demonstrates: Entity definitions with new resolver() pattern for field resolution
  */
 
-import { entity, t, query, mutation, router, relation } from "@sylphx/lens-core";
+import { entity, t, query, mutation, router, resolver, createResolverRegistry } from "@sylphx/lens-core";
 import { createServer } from "@sylphx/lens-server";
 import { z } from "zod";
 
 // =============================================================================
-// Entities
+// Entities (scalar fields only - no circular reference issues)
 // =============================================================================
 
 export const User = entity("User", {
@@ -26,7 +26,7 @@ export const Post = entity("Post", {
 	title: t.string(),
 	content: t.string(),
 	published: t.boolean(),
-	authorId: t.string(),
+	authorId: t.string(),  // FK to User
 	updatedAt: t.date().optional(),
 	createdAt: t.date(),
 });
@@ -34,34 +34,10 @@ export const Post = entity("Post", {
 export const Comment = entity("Comment", {
 	id: t.id(),
 	content: t.string(),
-	postId: t.string(),
-	authorId: t.string(),
+	postId: t.string(),    // FK to Post
+	authorId: t.string(),  // FK to User
 	createdAt: t.date(),
 });
-
-// =============================================================================
-// Relations (using builder pattern for type-safe FK accessors)
-// =============================================================================
-
-export const relations = [
-	// User: hasMany relations - FK is on target entities
-	relation(User, (r) => ({
-		posts: r.many(Post, (post) => post.authorId),
-		comments: r.many(Comment, (comment) => comment.authorId),
-	})),
-
-	// Post: belongsTo (FK on Post) + hasMany (FK on Comment)
-	relation(Post, (r) => ({
-		author: r.parent(User, (post) => post.authorId), // FK is on Post ✅
-		comments: r.many(Comment, (comment) => comment.postId),
-	})),
-
-	// Comment: belongsTo relations - FK is on Comment
-	relation(Comment, (r) => ({
-		author: r.parent(User, (comment) => comment.authorId), // FK is on Comment ✅
-		post: r.parent(Post, (comment) => comment.postId), // FK is on Comment ✅
-	})),
-];
 
 // =============================================================================
 // Context
@@ -89,6 +65,75 @@ const db = {
 	]),
 	comments: new Map<string, { id: string; content: string; postId: string; authorId: string; createdAt: Date }>(),
 };
+
+// =============================================================================
+// Field Resolvers (new resolver() pattern)
+// =============================================================================
+
+const resolvers = createResolverRegistry<AppContext>();
+
+// User resolver - defines which fields are exposed and how relations are resolved
+resolvers.register(
+	resolver<typeof User, any, AppContext>(User, (f) => ({
+		id: f.expose("id"),
+		name: f.expose("name"),
+		email: f.expose("email"),
+		role: f.expose("role"),
+		avatar: f.expose("avatar"),
+		createdAt: f.expose("createdAt"),
+		// Relation: User.posts (hasMany - FK on Post)
+		posts: f.many(Post).resolve((user, ctx) =>
+			Array.from(ctx.db.posts.values()).filter((p) => p.authorId === user.id)
+		),
+		// Relation: User.comments (hasMany - FK on Comment)
+		comments: f.many(Comment).resolve((user, ctx) =>
+			Array.from(ctx.db.comments.values()).filter((c) => c.authorId === user.id)
+		),
+	}))
+);
+
+// Post resolver
+resolvers.register(
+	resolver<typeof Post, any, AppContext>(Post, (f) => ({
+		id: f.expose("id"),
+		title: f.expose("title"),
+		content: f.expose("content"),
+		published: f.expose("published"),
+		updatedAt: f.expose("updatedAt"),
+		createdAt: f.expose("createdAt"),
+		// Relation: Post.author (belongsTo - FK on Post)
+		author: f.one(User).resolve((post, ctx) => {
+			const author = ctx.db.users.get(post.authorId);
+			if (!author) throw new Error(`Author not found: ${post.authorId}`);
+			return author;
+		}),
+		// Relation: Post.comments (hasMany - FK on Comment)
+		comments: f.many(Comment).resolve((post, ctx) =>
+			Array.from(ctx.db.comments.values()).filter((c) => c.postId === post.id)
+		),
+	}))
+);
+
+// Comment resolver
+resolvers.register(
+	resolver<typeof Comment, any, AppContext>(Comment, (f) => ({
+		id: f.expose("id"),
+		content: f.expose("content"),
+		createdAt: f.expose("createdAt"),
+		// Relation: Comment.author (belongsTo - FK on Comment)
+		author: f.one(User).resolve((comment, ctx) => {
+			const author = ctx.db.users.get(comment.authorId);
+			if (!author) throw new Error(`Author not found: ${comment.authorId}`);
+			return author;
+		}),
+		// Relation: Comment.post (belongsTo - FK on Comment)
+		post: f.one(Post).resolve((comment, ctx) => {
+			const post = ctx.db.posts.get(comment.postId);
+			if (!post) throw new Error(`Post not found: ${comment.postId}`);
+			return post;
+		}),
+	}))
+);
 
 // =============================================================================
 // Operations
@@ -256,7 +301,7 @@ export type AppRouter = typeof appRouter;
 export const server = createServer({
 	router: appRouter,
 	entities: { User, Post, Comment },
-	relations,
+	resolvers,
 	context: () => ({
 		db,
 		currentUser: db.users.get("1") ?? null,

@@ -48,7 +48,7 @@ export {
 	type OperationMeta,
 	type OperationsMap,
 	type QueriesMap,
-	type RelationsArray,
+	type ResolversRegistry,
 	type SelectionObject,
 	// Metadata types (for transport handshake)
 	type ServerMetadata,

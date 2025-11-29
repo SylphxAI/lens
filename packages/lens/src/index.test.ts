@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 
 // Re-exports from core
-import { belongsTo, defineType, entity, hasMany, mutation, query, relation, t } from "./index";
+import { defineType, entity, mutation, query, resolver, t } from "./index";
 
 describe("@sylphx/lens", () => {
 	describe("core re-exports", () => {
@@ -37,10 +37,9 @@ describe("@sylphx/lens", () => {
 			expect(mutation).toBeDefined();
 		});
 
-		test("relation helpers exist", () => {
-			expect(relation).toBeDefined();
-			expect(hasMany).toBeDefined();
-			expect(belongsTo).toBeDefined();
+		test("resolver function exists", () => {
+			expect(resolver).toBeDefined();
+			expect(typeof resolver).toBe("function");
 		});
 
 		test("defineType helper exists", () => {

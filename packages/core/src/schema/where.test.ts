@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { belongsTo, createSchema, entity, hasMany } from "./define";
+import { createSchema, entity } from "./define";
 import type { CreateInput, OrderByInput, Select, UpdateInput, WhereInput } from "./infer";
 import { t } from "./types";
 
@@ -33,10 +33,10 @@ const Post = entity("Post", {
 	published: t.boolean(),
 });
 
-// Create schema with relations using direct entity references
+// Create schema with relations using t.hasMany/belongsTo type builders
 const schema = createSchema({
-	User: User.with({ posts: hasMany(Post) }),
-	Post: Post.with({ author: belongsTo(User) }),
+	User: { ...User.fields, posts: t.hasMany("Post") },
+	Post: { ...Post.fields, author: t.belongsTo("User") },
 });
 
 type UserDef = (typeof schema)["definition"]["User"];
@@ -396,13 +396,13 @@ describe("UpdateInput type safety", () => {
 
 describe("Relation validation", () => {
 	it("valid schema compiles without error", () => {
-		// This schema has valid relations using direct entity references
+		// This schema has valid relations using t.hasMany/belongsTo type builders
 		const Author = entity("Author", { id: t.id() });
 		const Book = entity("Book", { id: t.id() });
 
 		const validSchema = createSchema({
-			Author: Author.with({ books: hasMany(Book) }),
-			Book: Book.with({ author: belongsTo(Author) }),
+			Author: { ...Author.fields, books: t.hasMany("Book") },
+			Book: { ...Book.fields, author: t.belongsTo("Author") },
 		});
 
 		expect(validSchema.entities.size).toBe(2);
@@ -414,7 +414,7 @@ describe("Relation validation", () => {
 
 		expect(() =>
 			createSchema({
-				User: UserOnly.with({ profile: t.hasOne("InvalidEntity") }),
+				User: { ...UserOnly.fields, profile: t.hasOne("InvalidEntity") },
 			} as any),
 		).toThrow("does not exist");
 	});

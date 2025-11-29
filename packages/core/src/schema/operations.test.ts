@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { belongsTo, createSchema, entity, hasMany, hasOne } from "./define";
+import { createSchema, entity } from "./define";
 import type {
 	// Aggregation
 	AggregateInput,
@@ -66,22 +66,26 @@ const Tag = entity("Tag", {
 	name: t.string(),
 });
 
-// Create schema with relations using direct entity references
+// Create schema with relations using t.hasMany/hasOne/belongsTo type builders
 const schema = createSchema({
-	User: User.with({
-		posts: hasMany(Post),
-		profile: hasOne(Profile),
-	}),
-	Post: Post.with({
-		author: belongsTo(User),
-		tags: hasMany(Tag),
-	}),
-	Profile: Profile.with({
-		user: belongsTo(User),
-	}),
-	Tag: Tag.with({
-		posts: hasMany(Post),
-	}),
+	User: {
+		...User.fields,
+		posts: t.hasMany("Post"),
+		profile: t.hasOne("Profile"),
+	},
+	Post: {
+		...Post.fields,
+		author: t.belongsTo("User"),
+		tags: t.hasMany("Tag"),
+	},
+	Profile: {
+		...Profile.fields,
+		user: t.belongsTo("User"),
+	},
+	Tag: {
+		...Tag.fields,
+		posts: t.hasMany("Post"),
+	},
 });
 
 type UserDef = (typeof schema)["definition"]["User"];

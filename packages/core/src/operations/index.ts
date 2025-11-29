@@ -58,13 +58,24 @@ export type ReturnSpec =
 	| ZodLikeSchema<unknown>
 	| Record<string, EntityDef<string, EntityDefinition> | [EntityDef<string, EntityDefinition>]>;
 
+/** Check if a field has the _optional flag */
+type IsOptional<F> = F extends { _optional: true } ? true : false;
+
+/** Flatten intersection types into a single object type */
+type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
 /**
  * Infer entity type from entity definition fields.
  * Only infers scalar fields (relations require schema context).
+ * Handles optional fields properly (makes them optional properties).
  */
-type InferEntityFromFields<F extends EntityDefinition> = {
-	[K in ScalarFields<F>]: InferScalar<F[K]>;
-};
+type InferEntityFromFields<F extends EntityDefinition> = Prettify<
+	{
+		[K in ScalarFields<F> as IsOptional<F[K]> extends true ? never : K]: InferScalar<F[K]>;
+	} & {
+		[K in ScalarFields<F> as IsOptional<F[K]> extends true ? K : never]?: InferScalar<F[K]>;
+	}
+>;
 
 /** Infer TypeScript type from return spec */
 export type InferReturnType<R extends ReturnSpec> =
@@ -256,6 +267,8 @@ export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown> 
 	_name?: string;
 	_input?: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
+	/** Branded phantom types for inference */
+	_brand: { input: TInput; output: TOutput };
 	/** Method syntax for bivariance - allows flexible context types */
 	_resolve?(
 		ctx: ResolverContext<TInput, TOutput, TContext>,
@@ -305,6 +318,7 @@ class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unknown>
 			_name: this._name,
 			_input: this._inputSchema,
 			_output: this._outputSpec,
+			_brand: {} as { input: TInput; output: TOut },
 			_resolve: fn,
 		};
 	}
@@ -352,6 +366,8 @@ export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unk
 	_name?: string;
 	_input: ZodLikeSchema<TInput>;
 	_output?: ReturnSpec;
+	/** Branded phantom types for inference */
+	_brand: { input: TInput; output: TOutput };
 	/** Optimistic update DSL (declarative, serializable for client) */
 	_optimistic?: OptimisticDSL;
 	/** Method syntax for bivariance - allows flexible context types */
@@ -463,6 +479,7 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 			_name: this._name,
 			_input: this._inputSchema,
 			_output: this._outputSpec,
+			_brand: {} as { input: TInput; output: TOut },
 			_optimistic: this._optimisticSpec,
 			_resolve: fn,
 		};
@@ -760,11 +777,17 @@ export type InferRouterClient<TRouter extends RouterDef> =
 		? {
 				[K in keyof TRoutes]: TRoutes[K] extends RouterDef<infer TNestedRoutes>
 					? InferRouterClient<RouterDef<TNestedRoutes>>
-					: TRoutes[K] extends QueryDef<infer TInput, infer TOutput>
+					: TRoutes[K] extends {
+								_type: "query";
+								_brand: { input: infer TInput; output: infer TOutput };
+							}
 						? TInput extends void
 							? () => QueryResultType<TOutput>
 							: (input: TInput) => QueryResultType<TOutput>
-						: TRoutes[K] extends MutationDef<infer TInput, infer TOutput>
+						: TRoutes[K] extends {
+									_type: "mutation";
+									_brand: { input: infer TInput; output: infer TOutput };
+								}
 							? (input: TInput) => Promise<MutationResultType<TOutput>>
 							: never;
 			}

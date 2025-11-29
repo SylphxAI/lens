@@ -28,26 +28,43 @@ import type {
 // Scalar Type Inference
 // =============================================================================
 
-/** Infer TypeScript type from a scalar field type */
-export type InferScalar<T extends FieldType> = T extends IdType
-	? string
-	: T extends StringType
-		? string
-		: T extends IntType
-			? number
-			: T extends FloatType
-				? number
-				: T extends BooleanType
-					? boolean
-					: T extends DateTimeType
-						? Date
-						: T extends EnumType<infer V>
-							? V[number]
-							: T extends ObjectType<infer O>
-								? O
-								: T extends ArrayType<infer I>
-									? I[]
-									: never;
+/** Type mapping from field _type to TypeScript type */
+type ScalarTypeMap = {
+	id: string;
+	string: string;
+	int: number;
+	float: number;
+	decimal: number;
+	boolean: boolean;
+	datetime: Date;
+	date: Date;
+	bigint: bigint;
+	bytes: Uint8Array;
+	json: unknown;
+};
+
+/** Infer base TypeScript type from field's _type property */
+type InferBaseType<T extends FieldType> = T extends {
+	_type: infer Type extends keyof ScalarTypeMap;
+}
+	? ScalarTypeMap[Type]
+	: T extends EnumType<infer V>
+		? V[number]
+		: T extends ObjectType<infer O>
+			? O
+			: T extends ArrayType<infer I>
+				? I[]
+				: never;
+
+/** Apply optional/nullable modifiers to base type */
+type ApplyModifiers<Base, T> = T extends { _optional: true }
+	? Base | undefined
+	: T extends { _nullable: true }
+		? Base | null
+		: Base;
+
+/** Infer TypeScript type from a scalar field type (handles optional/nullable) */
+export type InferScalar<T extends FieldType> = ApplyModifiers<InferBaseType<T>, T>;
 
 // =============================================================================
 // Relation Type Inference

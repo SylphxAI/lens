@@ -73,23 +73,13 @@ export {
 // =============================================================================
 
 export {
-	belongsTo,
-	// Schema creation (primary)
+	// Schema creation
 	createSchema,
 	// Entity definition
 	defineEntity,
 	type EntityDef,
 	entity,
-	// Relation helpers
-	hasMany,
-	hasOne,
 	isEntityDef,
-	// Relation builder (for type-safe FK accessors in relation())
-	type RelationBuilder,
-	type RelationDef,
-	type RelationTypeWithForeignKey,
-	// Separate relation definition
-	relation,
 } from "./schema/define";
 
 // =============================================================================
@@ -260,22 +250,32 @@ export {
 } from "./operations/index";
 
 // =============================================================================
-// Entity Resolvers
+// Field Resolvers
 // =============================================================================
 
 export {
-	type BatchResolverFn,
-	type EntityResolverDef,
+	// Registry
+	createResolverRegistry,
 	// Types
-	type EntityResolvers,
-	type EntityResolversDefinition,
-	// Main function
-	entityResolvers,
-	type FieldResolver,
+	type ExposedField,
+	type FieldBuilder,
+	type FieldDef,
+	type FieldResolverContext,
 	type FieldResolverFn,
+	type InferResolverOutput,
+	type InferResolverSelected,
 	// Type guards
-	isBatchResolver,
-	isEntityResolvers,
+	isExposedField,
+	isResolvedField,
+	isResolverDef,
+	type RelationFieldBuilder,
+	type ResolvedField,
+	type ResolverDef,
+	type ResolverFields,
+	type ResolverRegistry,
+	// Main function
+	resolver,
+	type ScalarFieldBuilder,
 } from "./resolvers/index";
 
 // =============================================================================

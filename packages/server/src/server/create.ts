@@ -15,19 +15,14 @@ import {
 	createUpdate,
 	type EmitCommand,
 	type EntityDef,
-	type EntityDefinition,
-	type EntityResolvers,
-	type EntityResolversDefinition,
 	type FieldType,
 	flattenRouter,
 	type InferRouterContext,
-	isBatchResolver,
 	isMutationDef,
 	isQueryDef,
 	type MutationDef,
 	type QueryDef,
-	type RelationDef,
-	type RelationTypeWithForeignKey,
+	type ResolverRegistry,
 	type RouterDef,
 	runWithContext,
 	type Update,
@@ -54,11 +49,8 @@ export type QueriesMap = Record<string, QueryDef<unknown, unknown>>;
 /** Mutations map type */
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
 
-/** Relations array type */
-export type RelationsArray = RelationDef<
-	EntityDef<string, EntityDefinition>,
-	Record<string, RelationTypeWithForeignKey>
->[];
+/** Resolver registry type (optional - uses new resolver() pattern) */
+export type ResolversRegistry = ResolverRegistry;
 
 /** Operation metadata for handshake */
 export interface OperationMeta {
@@ -78,16 +70,14 @@ export interface LensServerConfig<
 > {
 	/** Entity definitions */
 	entities?: EntitiesMap;
-	/** Relation definitions */
-	relations?: RelationsArray;
 	/** Router definition (namespaced operations) - context type is inferred */
 	router?: TRouter;
 	/** Query definitions (flat, legacy) */
 	queries?: QueriesMap;
 	/** Mutation definitions (flat, legacy) */
 	mutations?: MutationsMap;
-	/** Entity resolvers */
-	resolvers?: EntityResolvers<EntityResolversDefinition>;
+	/** Field resolvers registry (new resolver() pattern) */
+	resolvers?: ResolverRegistry;
 	/** Context factory - must return the context type expected by the router */
 	context?: (req?: unknown) => TContext | Promise<TContext>;
 	/** Server version */
@@ -312,7 +302,7 @@ class LensServerImpl<
 	private queries: Q;
 	private mutations: M;
 	private entities: EntitiesMap;
-	private resolvers?: EntityResolvers<EntityResolversDefinition>;
+	private resolvers?: ResolverRegistry;
 	private contextFactory: (req?: unknown) => TContext | Promise<TContext>;
 	private version: string;
 	private ctx = createContext<TContext>();
@@ -1227,7 +1217,7 @@ class LensServerImpl<
 
 	/**
 	 * Execute entity resolvers for nested data.
-	 * Processes the selection object and resolves relation fields.
+	 * Processes the selection object and resolves relation fields using new resolver() pattern.
 	 */
 	private async executeEntityResolvers<T>(
 		entityName: string,
@@ -1236,33 +1226,22 @@ class LensServerImpl<
 	): Promise<T> {
 		if (!data || !select || !this.resolvers) return data;
 
+		// Get resolver for this entity
+		const resolverDef = this.resolvers.get(entityName);
+		if (!resolverDef) return data;
+
 		const result = { ...(data as Record<string, unknown>) };
+		const context = await this.contextFactory();
 
 		for (const [fieldName, fieldSelect] of Object.entries(select)) {
 			if (fieldSelect === false || fieldSelect === true) continue;
 
-			// Check if this field has an entity resolver
-			const resolver = this.resolvers.getResolver(entityName, fieldName);
-			if (!resolver) continue;
+			// Check if this field has a resolver
+			if (!resolverDef.hasField(fieldName)) continue;
 
-			// Execute resolver (with batching if available)
-			if (isBatchResolver(resolver)) {
-				// Use DataLoader for batching
-				const loaderKey = `${entityName}.${fieldName}`;
-				if (!this.loaders.has(loaderKey)) {
-					this.loaders.set(
-						loaderKey,
-						new DataLoader(async (parents: unknown[]) => {
-							return resolver.batch(parents);
-						}),
-					);
-				}
-				const loader = this.loaders.get(loaderKey)!;
-				result[fieldName] = await loader.load(data);
-			} else {
-				// Simple resolver
-				result[fieldName] = await resolver(data);
-			}
+			// Execute field resolver
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			result[fieldName] = await resolverDef.resolveField(fieldName, data as any, context as any);
 
 			// Recursively resolve nested selections
 			const nestedSelect = (fieldSelect as { select?: SelectionObject }).select;
@@ -1557,11 +1536,10 @@ export type ServerConfigWithInferredContext<
 	M extends MutationsMap = MutationsMap,
 > = {
 	entities?: EntitiesMap;
-	relations?: RelationsArray;
 	router: TRouter;
 	queries?: Q;
 	mutations?: M;
-	resolvers?: EntityResolvers<EntityResolversDefinition>;
+	resolvers?: ResolverRegistry;
 	/** Context factory - type is inferred from router's procedures */
 	context?: (req?: unknown) => InferRouterContext<TRouter> | Promise<InferRouterContext<TRouter>>;
 	version?: string;
@@ -1576,11 +1554,10 @@ export type ServerConfigLegacy<
 	M extends MutationsMap = MutationsMap,
 > = {
 	entities?: EntitiesMap;
-	relations?: RelationsArray;
 	router?: undefined;
 	queries?: Q;
 	mutations?: M;
-	resolvers?: EntityResolvers<EntityResolversDefinition>;
+	resolvers?: ResolverRegistry;
 	context?: (req?: unknown) => TContext | Promise<TContext>;
 	version?: string;
 };
