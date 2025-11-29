@@ -298,77 +298,75 @@ const Post = entity("Post", {
 
 ### 2. Define Field Resolvers (with Field Arguments)
 
-Use `resolver()` to define fields with **GraphQL-style field arguments**:
+Use `lens()` to create typed resolver, query, and mutation builders:
 
 ```typescript
-import { resolver, createResolverRegistry } from '@sylphx/lens-core'
+import { lens } from '@sylphx/lens-core'
 
-const resolvers = createResolverRegistry<AppContext>()
+// Create typed builders with shared context
+const { resolver, query, mutation } = lens<AppContext>()
 
-resolvers.register(
-  resolver(User, (f) => ({
-    // ===== Expose scalar fields from parent =====
-    id: f.expose("id"),
-    name: f.expose("name"),
-    email: f.expose("email"),
-    role: f.expose("role"),
+// User resolver with field arguments (GraphQL-style)
+const userResolver = resolver(User, (f) => ({
+  // ===== Expose scalar fields from parent =====
+  id: f.expose("id"),
+  name: f.expose("name"),
+  email: f.expose("email"),
+  role: f.expose("role"),
 
-    // ===== Computed field (no args) =====
-    displayName: f.string().resolve((user) =>
-      `${user.name} (${user.role})`
+  // ===== Computed field (no args) =====
+  displayName: f.string().resolve(({ parent }) =>
+    `${parent.name} (${parent.role})`
+  ),
+
+  // ===== Relation with field arguments =====
+  posts: f.many(Post)
+    .args(z.object({
+      first: z.number().default(10),
+      after: z.string().optional(),
+      published: z.boolean().optional(),
+      orderBy: z.enum(["createdAt", "title"]).default("createdAt"),
+    }))
+    .resolve(({ parent, args, ctx }) =>
+      ctx.db.posts.findMany({
+        where: {
+          authorId: parent.id,
+          published: args.published,
+        },
+        take: args.first,
+        cursor: args.after,
+        orderBy: { [args.orderBy]: 'desc' },
+      })
     ),
 
-    // ===== Relation with field arguments =====
-    posts: f.many(Post)
-      .args(z.object({
-        first: z.number().default(10),
-        after: z.string().optional(),
-        published: z.boolean().optional(),
-        orderBy: z.enum(["createdAt", "title"]).default("createdAt"),
-      }))
-      .resolve((user, args, ctx) =>
-        ctx.db.posts.findMany({
-          where: {
-            authorId: user.id,
-            published: args.published,
-          },
-          take: args.first,
-          cursor: args.after,
-          orderBy: { [args.orderBy]: 'desc' },
-        })
-      ),
-
-    // ===== Computed field with arguments =====
-    postsCount: f.int()
-      .args(z.object({ published: z.boolean().optional() }))
-      .resolve((user, args, ctx) =>
-        ctx.db.posts.count({
-          where: { authorId: user.id, published: args.published },
-        })
-      ),
-  }))
-)
-
-resolvers.register(
-  resolver(Post, (f) => ({
-    id: f.expose("id"),
-    title: f.expose("title"),
-    content: f.expose("content"),
-    published: f.expose("published"),
-
-    // belongsTo relation
-    author: f.one(User).resolve((post, args, ctx) =>
-      ctx.db.users.find(post.authorId)
+  // ===== Computed field with arguments =====
+  postsCount: f.int()
+    .args(z.object({ published: z.boolean().optional() }))
+    .resolve(({ parent, args, ctx }) =>
+      ctx.db.posts.count({
+        where: { authorId: parent.id, published: args.published },
+      })
     ),
+}))
 
-    // Computed with arguments
-    excerpt: f.string()
-      .args(z.object({ length: z.number().default(100) }))
-      .resolve((post, args) =>
-        post.content.slice(0, args.length) + "..."
-      ),
-  }))
-)
+const postResolver = resolver(Post, (f) => ({
+  id: f.expose("id"),
+  title: f.expose("title"),
+  content: f.expose("content"),
+  published: f.expose("published"),
+
+  // belongsTo relation
+  author: f.one(User).resolve(({ parent, ctx }) =>
+    ctx.db.users.find(parent.authorId)
+  ),
+
+  // Computed with arguments
+  excerpt: f.string()
+    .args(z.object({ length: z.number().default(100) }))
+    .resolve(({ parent, args }) =>
+      parent.content.slice(0, args.length) + "..."
+    ),
+}))
 ```
 
 ### 3. Register with Server
@@ -377,7 +375,7 @@ resolvers.register(
 const server = createServer({
   router: appRouter,
   entities: { User, Post },
-  resolvers,
+  resolvers: [userResolver, postResolver],  // Array of resolver values
   context: () => ({ db }),
 })
 ```
@@ -385,8 +383,8 @@ const server = createServer({
 ### Field Resolver Signature
 
 ```typescript
-// Full signature: (parent, args, ctx) => result
-(parent: TParent, args: TArgs, ctx: TContext) => TResult | Promise<TResult>
+// Full signature: ({ parent, args, ctx }) => result
+({ parent, args, ctx }: { parent: TParent; args: TArgs; ctx: TContext }) => TResult | Promise<TResult>
 ```
 
 ### Field Builder API

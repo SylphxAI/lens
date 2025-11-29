@@ -8,16 +8,7 @@ import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { entity } from "../schema/define";
 import { t } from "../schema/types";
-import {
-	createResolverRegistry,
-	isExposedField,
-	isResolvedField,
-	isResolverDef,
-	isResolverRegistry,
-	normalizeResolvers,
-	resolver,
-	toResolverMap,
-} from "./index";
+import { isExposedField, isResolvedField, isResolverDef, resolver, toResolverMap } from "./index";
 
 // =============================================================================
 // Test Fixtures
@@ -219,44 +210,6 @@ describe("Async resolution", () => {
 		const posts = await userResolver.resolveField("posts", parent, {}, mockCtx);
 
 		expect(posts).toHaveLength(2);
-	});
-});
-
-// =============================================================================
-// Test: Resolver Registry
-// =============================================================================
-
-describe("createResolverRegistry()", () => {
-	it("registers and retrieves resolvers", () => {
-		const registry = createResolverRegistry<MockContext>();
-
-		registry.add(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-		}));
-
-		expect(registry.has("User")).toBe(true);
-		expect(registry.has("Post")).toBe(false);
-
-		const retrieved = registry.get("User");
-		expect(retrieved).toBeDefined();
-		expect(retrieved?.entity._name).toBe("User");
-	});
-
-	it("registers multiple resolvers", () => {
-		const registry = createResolverRegistry<MockContext>();
-
-		registry.add(User, (f) => ({
-			id: f.expose("id"),
-		}));
-
-		registry.add(Post, (f) => ({
-			id: f.expose("id"),
-		}));
-
-		expect(registry.has("User")).toBe(true);
-		expect(registry.has("Post")).toBe(true);
-		expect(registry.resolvers.size).toBe(2);
 	});
 });
 
@@ -660,46 +613,5 @@ describe("toResolverMap()", () => {
 		} as any;
 
 		expect(() => toResolverMap([badResolver])).toThrow("Resolver entity must have a name");
-	});
-});
-
-describe("isResolverRegistry()", () => {
-	it("returns true for registry", () => {
-		const registry = createResolverRegistry<MockContext>();
-		expect(isResolverRegistry(registry)).toBe(true);
-	});
-
-	it("returns false for array", () => {
-		const resolvers = [resolver(User, (f) => ({ id: f.expose("id") }))];
-		expect(isResolverRegistry(resolvers)).toBe(false);
-	});
-
-	it("returns false for plain object", () => {
-		expect(isResolverRegistry({} as any)).toBe(false);
-	});
-});
-
-describe("normalizeResolvers()", () => {
-	it("normalizes resolver array to map", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-		}));
-
-		const map = normalizeResolvers([userResolver]);
-
-		expect(map.size).toBe(1);
-		expect(map.get("User")).toBe(userResolver);
-	});
-
-	it("normalizes registry to map", () => {
-		const registry = createResolverRegistry<MockContext>();
-		registry.add(User, (f) => ({ id: f.expose("id") }));
-		registry.add(Post, (f) => ({ id: f.expose("id") }));
-
-		const map = normalizeResolvers(registry);
-
-		expect(map.size).toBe(2);
-		expect(map.has("User")).toBe(true);
-		expect(map.has("Post")).toBe(true);
 	});
 });

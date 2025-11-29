@@ -21,13 +21,12 @@ import {
 	isMutationDef,
 	isQueryDef,
 	type MutationDef,
-	normalizeResolvers,
 	type QueryDef,
 	type ResolverDef,
-	type ResolverRegistry,
-	type ResolversInput,
+	type Resolvers,
 	type RouterDef,
 	runWithContext,
+	toResolverMap,
 	type Update,
 } from "@sylphx/lens-core";
 
@@ -51,9 +50,6 @@ export type QueriesMap = Record<string, QueryDef<unknown, unknown>>;
 
 /** Mutations map type */
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
-
-/** Resolver registry type (optional - uses new resolver() pattern) */
-export type ResolversRegistry = ResolverRegistry;
 
 /** Resolver map type for internal use (uses any to avoid complex variance issues) */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,14 +86,8 @@ export interface LensServerConfig<
 	queries?: QueriesMap;
 	/** Mutation definitions (flat, legacy) */
 	mutations?: MutationsMap;
-	/**
-	 * Field resolvers (new resolver() pattern)
-	 *
-	 * Accepts either:
-	 * - ResolverDef[] array (functional, preferred)
-	 * - ResolverRegistry (legacy imperative pattern)
-	 */
-	resolvers?: ResolversInput;
+	/** Field resolvers array (use lens() factory to create) */
+	resolvers?: Resolvers;
 	/** Logger for server messages (default: silent) */
 	logger?: LensLogger;
 	/** Context factory - must return the context type expected by the router */
@@ -361,7 +351,7 @@ class LensServerImpl<
 		this.mutations = mutations as M;
 		this.entities = config.entities ?? {};
 		// Normalize resolvers input (array or registry) to internal map
-		this.resolverMap = config.resolvers ? normalizeResolvers(config.resolvers) : undefined;
+		this.resolverMap = config.resolvers ? toResolverMap(config.resolvers) : undefined;
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
 		this.logger = config.logger ?? noopLogger;
@@ -1572,8 +1562,8 @@ export type ServerConfigWithInferredContext<
 	router: TRouter;
 	queries?: Q;
 	mutations?: M;
-	/** Field resolvers - accepts array (functional) or registry (legacy) */
-	resolvers?: ResolversInput;
+	/** Field resolvers array */
+	resolvers?: Resolvers;
 	/** Context factory - type is inferred from router's procedures */
 	context?: (req?: unknown) => InferRouterContext<TRouter> | Promise<InferRouterContext<TRouter>>;
 	version?: string;
@@ -1591,8 +1581,8 @@ export type ServerConfigLegacy<
 	router?: undefined;
 	queries?: Q;
 	mutations?: M;
-	/** Field resolvers - accepts array (functional) or registry (legacy) */
-	resolvers?: ResolversInput;
+	/** Field resolvers array */
+	resolvers?: Resolvers;
 	context?: (req?: unknown) => TContext | Promise<TContext>;
 	version?: string;
 };

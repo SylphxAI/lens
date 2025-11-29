@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { applyUpdate, createResolverRegistry, entity, mutation, query, t, type Update } from "@sylphx/lens-core";
+import { applyUpdate, entity, lens, mutation, query, t, type Update } from "@sylphx/lens-core";
 import { z } from "zod";
 import { createServer, type WebSocketLike } from "../server/create";
 
@@ -583,9 +583,9 @@ describe("E2E - Entity Resolvers", () => {
 				return user;
 			});
 
-		// Create entity resolvers using resolver registry
-		const resolvers = createResolverRegistry();
-		resolvers.add(User, (f) => ({
+		// Create entity resolvers using lens() factory
+		const { resolver } = lens();
+		const userResolver = resolver(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
 			email: f.expose("email"),
@@ -595,7 +595,7 @@ describe("E2E - Entity Resolvers", () => {
 		const server = createServer({
 			entities: { User, Post },
 			queries: { getUser },
-			resolvers,
+			resolvers: [userResolver],
 		});
 
 		// Test with $select for nested posts
@@ -639,10 +639,9 @@ describe("E2E - Entity Resolvers", () => {
 			.returns([User])
 			.resolve(() => users);
 
-		// Create entity resolvers using resolver registry
-		// Note: Batching would need to be implemented at the resolve function level.
-		const resolvers = createResolverRegistry();
-		resolvers.add(User, (f) => ({
+		// Create entity resolvers using lens() factory
+		const { resolver } = lens();
+		const userResolver = resolver(User, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
 			posts: f.many(Post).resolve(({ parent }) => {
@@ -655,7 +654,7 @@ describe("E2E - Entity Resolvers", () => {
 		const server = createServer({
 			entities: { User, Post },
 			queries: { getUsers },
-			resolvers,
+			resolvers: [userResolver],
 		});
 
 		// Execute query with nested selection for all users

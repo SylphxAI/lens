@@ -658,111 +658,10 @@ export type InferResolverSelected<
 	: InferResolverOutput<R>;
 
 // =============================================================================
-// Resolver Registry
+// Resolvers Array (Primary API)
 // =============================================================================
 
-/** Registry of resolvers by entity name */
-export interface ResolverRegistry<TContext = FieldResolverContext> {
-	/** All registered resolvers */
-	readonly resolvers: Map<
-		string,
-		ResolverDef<EntityDef<string, EntityDefinition>, Record<string, FieldDef<any, any>>, TContext>
-	>;
-
-	/**
-	 * Add a resolver for an entity
-	 *
-	 * @example
-	 * ```typescript
-	 * const resolvers = createResolverRegistry<AppContext>();
-	 *
-	 * resolvers.add(User, (f) => ({
-	 *   id: f.expose("id"),
-	 *   name: f.expose("name"),
-	 *   posts: f.many(Post).resolve(({ parent, ctx }) => {
-	 *     // ctx is AppContext ✅
-	 *   }),
-	 * }));
-	 * ```
-	 */
-	add<TEntity extends EntityDef<string, EntityDefinition>>(
-		entity: TEntity,
-		builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
-	): void;
-
-	/** Get resolver for an entity */
-	get(
-		entityName: string,
-	):
-		| ResolverDef<EntityDef<string, EntityDefinition>, Record<string, FieldDef<any, any>>, TContext>
-		| undefined;
-
-	/** Check if resolver exists for entity */
-	has(entityName: string): boolean;
-}
-
-/**
- * Create a resolver registry for collecting entity resolvers.
- *
- * @example
- * ```typescript
- * const resolvers = createResolverRegistry<AppContext>();
- *
- * resolvers.add(User, (f) => ({
- *   id: f.expose("id"),
- *   posts: f.many(Post).resolve(({ parent, ctx }) => ...),
- * }));
- * ```
- */
-export function createResolverRegistry<
-	TContext = FieldResolverContext,
->(): ResolverRegistry<TContext> {
-	const resolversMap = new Map<
-		string,
-		ResolverDef<EntityDef<string, EntityDefinition>, Record<string, FieldDef<any, any>>, TContext>
-	>();
-
-	return {
-		resolvers: resolversMap,
-
-		add<TEntity extends EntityDef<string, EntityDefinition>>(
-			entity: TEntity,
-			builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
-		): void {
-			const createResolver = resolver<TContext>();
-			const resolverDef = createResolver(
-				entity,
-				builder as (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
-			);
-			const entityName = entity._name;
-			if (!entityName) {
-				throw new Error("Entity must have a name to register resolver");
-			}
-			resolversMap.set(
-				entityName,
-				resolverDef as ResolverDef<
-					EntityDef<string, EntityDefinition>,
-					Record<string, FieldDef<any, any>>,
-					TContext
-				>,
-			);
-		},
-
-		get(entityName: string) {
-			return resolversMap.get(entityName);
-		},
-
-		has(entityName: string): boolean {
-			return resolversMap.has(entityName);
-		},
-	};
-}
-
-// =============================================================================
-// Resolvers Array Support
-// =============================================================================
-
-/** Array of resolver definitions (functional pattern) */
+/** Array of resolver definitions */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Resolvers = ResolverDef<any, any, any>[];
 
@@ -787,45 +686,6 @@ export function toResolverMap(resolvers: Resolvers): Map<string, ResolverDef<any
 		map.set(entityName, resolver);
 	}
 	return map;
-}
-
-/** Input type for server - accepts array or registry (backward compatible) */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type ResolversInput = ResolverDef<any, any, any>[] | ResolverRegistry<any>;
-
-/**
- * Check if input is a resolver registry (vs array)
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function isResolverRegistry(input: ResolversInput): input is ResolverRegistry<any> {
-	return input !== null && typeof input === "object" && "resolvers" in input && "get" in input;
-}
-
-/**
- * Normalize resolver input to map.
- *
- * Accepts either:
- * - ResolverDef[] (new functional pattern)
- * - ResolverRegistry (legacy imperative pattern)
- *
- * @example
- * ```typescript
- * // Functional (preferred)
- * const map = normalizeResolvers([userResolver, postResolver]);
- *
- * // Legacy
- * const registry = createResolverRegistry();
- * registry.add(User, ...);
- * const map = normalizeResolvers(registry);
- * ```
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function normalizeResolvers(input: ResolversInput): Map<string, ResolverDef<any, any, any>> {
-	if (isResolverRegistry(input)) {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		return input.resolvers as Map<string, ResolverDef<any, any, any>>;
-	}
-	return toResolverMap(input);
 }
 
 // =============================================================================
