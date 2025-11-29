@@ -42,7 +42,6 @@ import { GraphStateManager } from "../state/graph-state-manager";
 // =============================================================================
 
 /** Entity map type */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type EntitiesMap = Record<string, EntityDef<string, any>>;
 
 /** Queries map type */
@@ -52,7 +51,6 @@ export type QueriesMap = Record<string, QueryDef<unknown, unknown>>;
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
 
 /** Resolver map type for internal use (uses any to avoid complex variance issues) */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ResolverMap = Map<string, ResolverDef<any, any, any>>;
 
 /** Operation metadata for handshake */
@@ -1258,7 +1256,6 @@ class LensServerImpl<
 					: {};
 
 			// Execute field resolver with args
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			result[fieldName] = await resolverDef.resolveField(
 				fieldName,
 				data as any,

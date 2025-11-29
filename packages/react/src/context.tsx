@@ -15,7 +15,6 @@ import { createContext, type ReactElement, type ReactNode, useContext } from "re
  * Context for Lens client
  * Using any for internal storage to avoid type constraint issues
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LensContext = createContext<LensClient<any, any> | null>(null);
 
 // =============================================================================
@@ -24,7 +23,6 @@ const LensContext = createContext<LensClient<any, any> | null>(null);
 
 export interface LensProviderProps {
 	/** Lens client instance */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	client: LensClient<any, any>;
 	/** Children */
 	children: ReactNode;
@@ -74,7 +72,6 @@ export function LensProvider({ client, children }: LensProviderProps): ReactElem
  * }
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 	const client = useContext(LensContext);
 
@@ -85,6 +82,5 @@ export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 		);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	return client as LensClient<any, any> & TRouter;
 }

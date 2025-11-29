@@ -43,12 +43,9 @@ import type { EntityDefinition } from "./schema/types";
 /**
  * Typed resolver factory function
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type LensResolver<TContext> = <TEntity extends EntityDef<string, EntityDefinition>>(
 	entity: TEntity,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any, TContext>>,
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => ResolverDef<TEntity, Record<string, FieldDef<any, any, TContext>>, TContext>;
 
 /**

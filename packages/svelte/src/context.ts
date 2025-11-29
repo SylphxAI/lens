@@ -33,7 +33,6 @@ export const LENS_CLIENT_KEY: unique symbol = Symbol("lens-client");
  * </script>
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function provideLensClient(client: LensClient<any, any>): void {
 	setContext(LENS_CLIENT_KEY, client);
 }
@@ -53,9 +52,7 @@ export function provideLensClient(client: LensClient<any, any>): void {
  * </script>
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const client = getContext<LensClient<any, any>>(LENS_CLIENT_KEY);
 
 	if (!client) {
@@ -65,7 +62,6 @@ export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 		);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	return client as LensClient<any, any> & TRouter;
 }
 

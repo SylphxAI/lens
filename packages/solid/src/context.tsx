@@ -11,7 +11,6 @@ import { createContext, type ParentComponent, useContext } from "solid-js";
 // Context
 // =============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LensClientContext = createContext<LensClient<any, any>>();
 
 // =============================================================================
@@ -20,7 +19,6 @@ const LensClientContext = createContext<LensClient<any, any>>();
 
 export interface LensProviderProps {
 	/** Lens client instance */
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	client: LensClient<any, any>;
 }
 
@@ -70,7 +68,6 @@ export const LensProvider: ParentComponent<LensProviderProps> = (props) => {
  * }
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 	const client = useContext(LensClientContext);
 
@@ -81,6 +78,5 @@ export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 		);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	return client as LensClient<any, any> & TRouter;
 }

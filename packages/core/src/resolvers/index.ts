@@ -677,7 +677,6 @@ export type InferResolverSelected<
 // =============================================================================
 
 /** Array of resolver definitions */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Resolvers = ResolverDef<any, any, any>[];
 
 /**
@@ -689,9 +688,7 @@ export type Resolvers = ResolverDef<any, any, any>[];
  * const userDef = resolverMap.get("User");
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function toResolverMap(resolvers: Resolvers): Map<string, ResolverDef<any, any, any>> {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const map = new Map<string, ResolverDef<any, any, any>>();
 	for (const resolver of resolvers) {
 		const entityName = resolver.entity._name;
