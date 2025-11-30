@@ -11,6 +11,7 @@
 
 import { entity, t, router, lens } from "@sylphx/lens-core";
 import { entity as e, temp, ref, now, branch } from "@sylphx/reify";
+// Note: `e` is the Reify entity helper, `entity` is the Lens entity definition builder
 import { createServer } from "@sylphx/lens-server";
 import { z } from "zod";
 
@@ -361,13 +362,13 @@ const chatRouter = router({
 			userId: z.string(),
 		}))
 		.returns(Message)
-		// 🔥 Callback with typed input - no need to define separately!
+		// 🔥 Callback with typed input AND typed entity operations!
 		.optimistic(({ input }) => [
 			// Step 1: Create or update session
 			// TypeScript knows: input.sessionId is string | undefined ✅
 			branch(input.sessionId)
-				.then(e.update("Session", { id: input.sessionId!, title: input.title ?? "Chat" }))
-				.else(e.create("Session", {
+				.then(e.update(Session, { id: input.sessionId!, title: input.title ?? "Chat" }))
+				.else(e.create(Session, {
 					id: temp(),
 					title: input.title ?? "New Chat",
 					userId: input.userId,  // TypeScript knows: string ✅
@@ -376,11 +377,12 @@ const chatRouter = router({
 				.as("session"),
 
 			// Step 2: Create message (references session from step 1)
-			e.create("Message", {
+			// e.create(Message, {...}) is fully type-checked! 🎉
+			e.create(Message, {
 				id: temp(),
 				sessionId: ref("session").id,
-				role: "user",
-				content: input.content,  // TypeScript knows: string ✅
+				role: "user",           // ✅ TypeScript knows: "user" | "assistant"
+				content: input.content, // ✅ TypeScript knows: string
 				createdAt: now(),
 			}).as("message"),
 		])

@@ -27,6 +27,7 @@
  */
 
 import { Schema } from "./create";
+import type { InferEntity } from "./infer";
 import type { EntityDefinition } from "./types";
 
 // =============================================================================
@@ -36,7 +37,11 @@ import type { EntityDefinition } from "./types";
 /** Symbol to identify entity definitions */
 const ENTITY_SYMBOL: unique symbol = Symbol("lens:entity");
 
-/** Entity definition with name and fields */
+/**
+ * Entity definition with name and fields.
+ *
+ * Implements StandardEntity protocol for type-safe Reify operations.
+ */
 export interface EntityDef<
 	Name extends string = string,
 	Fields extends EntityDefinition = EntityDefinition,
@@ -46,7 +51,35 @@ export interface EntityDef<
 	_name?: Name;
 	/** Entity fields (scalar only) */
 	readonly fields: Fields;
+	/**
+	 * Standard Entity Protocol marker.
+	 * Enables type-safe entity operations in Reify DSL.
+	 *
+	 * @example
+	 * ```typescript
+	 * import { entity } from '@sylphx/reify';
+	 * entity.create(Message, { content: "hello" })  // ✅ type-checked!
+	 * ```
+	 */
+	readonly "~entity": {
+		readonly name: Name;
+		/** Runtime marker - actual type inferred from fields via InferEntityType */
+		readonly type: unknown;
+	};
 }
+
+/**
+ * Extract the inferred entity type from an EntityDef.
+ * Use this when you need the actual TypeScript type of an entity.
+ *
+ * @example
+ * ```typescript
+ * type UserData = InferEntityType<typeof User>;
+ * // { id: string; name: string; email: string; ... }
+ * ```
+ */
+export type InferEntityType<E extends EntityDef> =
+	E extends EntityDef<string, infer F> ? InferEntity<F> : never;
 
 /**
  * Define an entity with its scalar fields.
@@ -94,6 +127,12 @@ function createEntityDef<Name extends string, Fields extends EntityDefinition>(
 		[ENTITY_SYMBOL]: true,
 		_name: name,
 		fields,
+		// StandardEntity protocol - runtime marker for type-safe Reify operations
+		// The `type` property is phantom (only exists at type level)
+		"~entity": {
+			name: name as Name,
+			type: undefined as unknown, // Phantom type - not used at runtime
+		},
 	} as EntityDef<Name, Fields>;
 }
 
