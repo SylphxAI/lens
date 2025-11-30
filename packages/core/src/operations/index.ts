@@ -30,7 +30,7 @@
  */
 
 import type { Emit } from "../emit/index";
-import type { Pipeline } from "../optimistic/reify";
+import type { Pipeline, PipelineStep } from "../optimistic/reify";
 import { isPipeline } from "../optimistic/reify";
 import type { EntityDef } from "../schema/define";
 import type { InferScalar, ScalarFields } from "../schema/infer";
@@ -369,6 +369,15 @@ export interface MutationBuilderWithInput<TInput, _TOutput = unknown, TContext =
 	resolve<TOut>(fn: ResolverFn<TInput, TOut, TContext>): MutationDef<TInput, TOut>;
 }
 
+/** Context passed to optimistic callback for type inference */
+export interface OptimisticContext<TInput> {
+	/** Typed input - inferred from .input() schema */
+	input: TInput;
+}
+
+/** Optimistic callback that receives typed input and returns steps */
+export type OptimisticCallback<TInput> = (ctx: OptimisticContext<TInput>) => PipelineStep[];
+
 /** Mutation builder after returns is defined */
 export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown> {
 	/**
@@ -378,13 +387,25 @@ export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown>
 	 *
 	 * @example
 	 * ```typescript
+	 * // Sugar syntax
 	 * .optimistic('merge')   // UPDATE: merge input into entity
 	 * .optimistic('create')  // CREATE: auto tempId
 	 * .optimistic('delete')  // DELETE: mark deleted
 	 * .optimistic({ merge: { published: true } })  // With additional fields
+	 *
+	 * // Callback with typed input (recommended for complex pipelines)
+	 * .optimistic(({ input }) => [
+	 *   branch(input.sessionId)
+	 *     .then(e.update("Session", { id: input.sessionId }))
+	 *     .else(e.create("Session", { id: temp(), userId: input.userId }))
+	 *     .as("session"),
+	 * ])
 	 * ```
 	 */
 	optimistic(spec: OptimisticDSL): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
+	optimistic(
+		callback: OptimisticCallback<TInput>,
+	): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
 
 	/** Define resolver function */
 	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
@@ -427,11 +448,31 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 		return builder;
 	}
 
-	optimistic(spec: OptimisticDSL): MutationBuilderWithOptimistic<TInput, TOutput, TContext> {
+	optimistic(
+		specOrCallback: OptimisticDSL | OptimisticCallback<TInput>,
+	): MutationBuilderWithOptimistic<TInput, TOutput, TContext> {
 		const builder = new MutationBuilderImpl<TInput, TOutput, TContext>(this._name);
 		builder._inputSchema = this._inputSchema;
 		builder._outputSpec = this._outputSpec;
-		builder._optimisticSpec = spec;
+
+		// Handle callback: execute with input proxy to build Pipeline
+		if (typeof specOrCallback === "function") {
+			// Create proxy that generates $input references
+			// The proxy intercepts property access and returns { $input: 'propName' }
+			const inputProxy = new Proxy(
+				{},
+				{
+					get(_, prop: string) {
+						return { $input: prop };
+					},
+				},
+			) as TInput;
+			const steps = specOrCallback({ input: inputProxy });
+			builder._optimisticSpec = { $pipe: steps } as Pipeline;
+		} else {
+			builder._optimisticSpec = specOrCallback;
+		}
+
 		return builder;
 	}
 

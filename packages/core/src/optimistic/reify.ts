@@ -19,6 +19,6 @@
  * ```
  */
 
-export type { Pipeline } from "@sylphx/reify";
+export type { Pipeline, PipelineStep } from "@sylphx/reify";
 // Only export what Lens needs internally
 export { isPipeline } from "@sylphx/reify";

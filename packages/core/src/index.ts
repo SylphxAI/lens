@@ -239,6 +239,8 @@ export {
 	// Builders
 	mutation,
 	type Operations,
+	type OptimisticCallback,
+	type OptimisticContext,
 	type OptimisticDSL,
 	type OptimisticSugar,
 	operations,

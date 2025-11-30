@@ -10,7 +10,7 @@
  */
 
 import { entity, t, router, lens } from "@sylphx/lens-core";
-import { entity as e, pipe, temp, ref, now, branch } from "@sylphx/reify";
+import { entity as e, temp, ref, now, branch } from "@sylphx/reify";
 import { createServer } from "@sylphx/lens-server";
 import { z } from "zod";
 
@@ -339,46 +339,19 @@ const commentRouter = router({
 });
 
 // =============================================================================
-// UDSL Demo: Chat Router
+// Reify Demo: Chat Router
 // =============================================================================
-
-/**
- * UDSL Pipeline for chat.send mutation
- *
- * Demonstrates "Mutations as Data" pattern:
- * - Conditional session create/update (upsert-like)
- * - Multi-entity operations (session + message)
- * - Value references between operations (ref('session').id)
- * - Temp IDs for optimistic updates
- *
- * This pipeline can be:
- * - Executed on server with createPrismaPlugin (real DB)
- * - Executed on client with createCachePlugin (optimistic updates)
- */
-const sendMessagePipeline = pipe(({ input }) => [
-	// Step 1: Create or update session
-	branch(input.sessionId)
-		.then(e.update("Session", { id: input.sessionId, title: input.title ?? "Chat" }))
-		.else(e.create("Session", { id: temp(), title: input.title ?? "New Chat", userId: input.userId, createdAt: now() }))
-		.as("session"),
-
-	// Step 2: Create message (references session from step 1)
-	e.create("Message", {
-		id: temp(),
-		sessionId: ref("session").id,
-		role: "user",
-		content: input.content,
-		createdAt: now(),
-	}).as("message"),
-]);
 
 const chatRouter = router({
 	/**
 	 * Send message to chat session
 	 *
-	 * Uses UDSL Pipeline for optimistic updates:
+	 * Uses Reify Pipeline for optimistic updates:
 	 * - Client executes pipeline against cache for instant feedback
 	 * - Server executes same pipeline against Prisma for persistence
+	 *
+	 * 🔥 NEW: Callback pattern with automatic type inference!
+	 * The `input` parameter is fully typed from .input() schema.
 	 */
 	send: mutation()
 		.input(z.object({
@@ -388,7 +361,29 @@ const chatRouter = router({
 			userId: z.string(),
 		}))
 		.returns(Message)
-		.optimistic(sendMessagePipeline)  // 🔥 UDSL Pipeline as optimistic DSL
+		// 🔥 Callback with typed input - no need to define separately!
+		.optimistic(({ input }) => [
+			// Step 1: Create or update session
+			// TypeScript knows: input.sessionId is string | undefined ✅
+			branch(input.sessionId)
+				.then(e.update("Session", { id: input.sessionId!, title: input.title ?? "Chat" }))
+				.else(e.create("Session", {
+					id: temp(),
+					title: input.title ?? "New Chat",
+					userId: input.userId,  // TypeScript knows: string ✅
+					createdAt: now(),
+				}))
+				.as("session"),
+
+			// Step 2: Create message (references session from step 1)
+			e.create("Message", {
+				id: temp(),
+				sessionId: ref("session").id,
+				role: "user",
+				content: input.content,  // TypeScript knows: string ✅
+				createdAt: now(),
+			}).as("message"),
+		])
 		.resolve(({ input, ctx }) => {
 			// Server-side execution (in real app, this would use Prisma)
 			let sessionId = input.sessionId;
@@ -462,6 +457,6 @@ Routes:
   user.whoami, user.get, user.search, user.update, user.bulkPromote
   post.get, post.trending, post.create, post.update, post.publish
   comment.add
-  chat.send (🔥 UDSL Pipeline demo)
+  chat.send (🔥 Reify Pipeline with typed callback)
 `);
 });
