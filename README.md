@@ -930,6 +930,8 @@ const createChatSession = mutation()
 | `$entity` | Target entity type name |
 | `$op` | Operation: `'create'` \| `'update'` \| `'delete'` |
 | `$id` | Target entity ID (required for update/delete) |
+| `$ids` | Array of entity IDs for bulk operations |
+| `$where` | Query filter for bulk operations |
 
 **Value References:**
 | Syntax | Description |
@@ -938,6 +940,17 @@ const createChatSession = mutation()
 | `{ $ref: 'sibling.field' }` | Value from sibling operation result |
 | `{ $temp: true }` | Generate temporary ID |
 | `{ $now: true }` | Current timestamp |
+
+**Field Operators:**
+| Syntax | Description |
+|--------|-------------|
+| `{ $increment: n }` | Increment numeric field by n |
+| `{ $decrement: n }` | Decrement numeric field by n |
+| `{ $push: item }` | Append item(s) to array |
+| `{ $pull: item }` | Remove item(s) from array |
+| `{ $addToSet: item }` | Add item(s) if not already in array |
+| `{ $default: value }` | Use value if field is undefined |
+| `{ $if: { condition, then, else } }` | Conditional value |
 
 **More Examples:**
 
@@ -975,6 +988,51 @@ const createChatSession = mutation()
     $op: 'create',
     type: 'new_post',
     postId: { $ref: 'newPost.id' },
+  },
+})
+
+// Field operators
+.optimistic({
+  user: {
+    $entity: 'User',
+    $op: 'update',
+    $id: { $input: 'userId' },
+    postCount: { $increment: 1 },           // Increment counter
+    tags: { $push: 'author' },              // Add to array
+    roles: { $addToSet: 'contributor' },    // Add if not exists
+    bio: { $default: 'No bio provided' },   // Default value
+  },
+})
+
+// Bulk operations
+.optimistic({
+  posts: {
+    $entity: 'Post',
+    $op: 'update',
+    $ids: { $input: 'postIds' },   // Update multiple by IDs
+    published: true,
+  },
+  drafts: {
+    $entity: 'Post',
+    $op: 'update',
+    $where: { authorId: { $input: 'userId' }, status: 'draft' },
+    archived: true,
+  },
+})
+
+// Conditional update
+.optimistic({
+  user: {
+    $entity: 'User',
+    $op: 'update',
+    $id: { $input: 'userId' },
+    role: {
+      $if: {
+        condition: { $input: 'isAdmin' },
+        then: 'admin',
+        else: 'user',
+      },
+    },
   },
 })
 ```
