@@ -1,5 +1,43 @@
 # @sylphx/lens
 
+## 1.2.0 (2025-11-30)
+
+Recovery release - bypass blocked version 1.1.0 on npm.
+
+### ✨ Features
+
+- **core:** introduce new resolver() API with field builder pattern ([c4483ee](https://github.com/SylphxAI/Lens/commit/c4483eeea95a1949eb1f76ef3a2e332a1bddb1db))
+- **client:** lazy connection - createClient is now sync ([b716da2](https://github.com/SylphxAI/Lens/commit/b716da24834d0b8047e7999abf18017ff31b57ae))
+
+### 🐛 Bug Fixes
+
+- **build:** add workspace bunup config with type inference ([94b0e02](https://github.com/SylphxAI/Lens/commit/94b0e02fe085337f6debcbbca2bddff39819f4a9))
+- **build:** add bunup config to enable type inference ([e89661f](https://github.com/SylphxAI/Lens/commit/e89661f80cabae59d3b3463ee2ae20d683293443))
+- use bunup for all packages, remove tsc build:types ([ba31790](https://github.com/SylphxAI/Lens/commit/ba31790239233c1573e3bb2fe1626c1fadc8fae9))
+- **core:** add explicit type annotations for bunup CI ([a2cc776](https://github.com/SylphxAI/Lens/commit/a2cc77681155cf807659daefedf54ab0f3116910))
+- externalize framework dependencies using bunup ([7e49f16](https://github.com/SylphxAI/Lens/commit/7e49f16535088d05ddfdfefa3b85d234af74c76e))
+- **release:** resolve workspace:* dependencies before publishing ([7272d22](https://github.com/SylphxAI/Lens/commit/7272d229bc2e06baecd2a73fcefa5a46585d2e59))
+
+### 💅 Styles
+
+- format package.json files with biome ([8565fd9](https://github.com/SylphxAI/Lens/commit/8565fd9b1c71b8f35ce1f56514c822106142947a))
+
+### 🔧 Chores
+
+- test filtered commits with bump@1.4.5 ([562812b](https://github.com/SylphxAI/Lens/commit/562812bbc3944e851478b60db1832a5021c87ca5))
+- update release PR with collapsed changelogs (bump@1.4.4) ([3d58dc7](https://github.com/SylphxAI/Lens/commit/3d58dc7bba3a99ce20317d2998b864ad8d586920))
+- re-trigger release with bump@1.4.3 ([c89ced0](https://github.com/SylphxAI/Lens/commit/c89ced01ff75cfa77dc490669c94b6e00f0f6636))
+- re-trigger release with bump@1.4.2 ([592d822](https://github.com/SylphxAI/Lens/commit/592d82210135afbff34ac8f5ec8aeb0f7af73213))
+- bump @sylphx/lens to 1.2.0 (blocked on npm) ([4554df1](https://github.com/SylphxAI/Lens/commit/4554df138251eed6f491f96c1b29ded806135133))
+- bump @sylphx/lens to 1.2.0 to bypass blocked version ([2d40f45](https://github.com/SylphxAI/Lens/commit/2d40f4575fb7e3b1b36a74786de611e78f1131a6))
+- **deps:** update @sylphx/bump to 1.3.9 ([73af518](https://github.com/SylphxAI/Lens/commit/73af5183ff6cfd75cf340a197a7fbd3e6235920e))
+- bump versions to bypass npm registry conflict ([afe45c4](https://github.com/SylphxAI/Lens/commit/afe45c42ffb8afa01bd080a1dc8b5b6c1edd3c3a))
+- update dependencies, fix types, add prepack scripts ([640f46c](https://github.com/SylphxAI/Lens/commit/640f46c447ae222287b808f5ae4d504335636e70))
+- polish project presentation - docs, README, packaging ([8bc2262](https://github.com/SylphxAI/Lens/commit/8bc2262c2e1a1b134e9b44bcabe0de8b2278179e))
+- fix all doctor warnings - 100% score ([c5e58ce](https://github.com/SylphxAI/Lens/commit/c5e58ce15133c00b4b579be7f5f8d772a81dbe23))
+- format package.json files ([625a947](https://github.com/SylphxAI/Lens/commit/625a947d98b2076c327606f718b0119c7cde4e3f))
+- format package.json files ([a0a0ed8](https://github.com/SylphxAI/Lens/commit/a0a0ed80252860b43d1220fbbe81bf0f506762f1))
+
 ## 1.1.0 (2025-11-29)
 
 ### ✨ Features
