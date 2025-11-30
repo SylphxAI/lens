@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 1.5.1 (2025-11-30)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 1.10.0
+
 ## 1.5.0 (2025-11-30)
 
 ### ✨ Features

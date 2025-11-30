@@ -1,5 +1,11 @@
 # @sylphx/lens-svelte
 
+## 1.2.8 (2025-11-30)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 1.7.0
+
 ## 1.2.7 (2025-11-30)
 
 ### 🐛 Bug Fixes

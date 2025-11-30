@@ -1,5 +1,12 @@
 # @sylphx/lens
 
+## 1.2.1 (2025-11-30)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 1.7.0
+- Updated `@sylphx/lens-core` to 1.10.0
+
 ## 1.2.0 (2025-11-30)
 
 Recovery release - bypass blocked version 1.1.0 on npm.

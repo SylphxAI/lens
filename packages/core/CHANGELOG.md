@@ -1,5 +1,12 @@
 # @sylphx/lens-core
 
+## 1.10.0 (2025-11-30)
+
+### ✨ Features
+
+- **core:** add v2 optimistic DSL operators ([da35ec6](https://github.com/SylphxAI/Lens/commit/da35ec642995c57f8f812498f3e8a75672872b1c))
+- **core:** add multi-entity optimistic DSL with evaluator ([26c1fe9](https://github.com/SylphxAI/Lens/commit/26c1fe947aee324bce0363016f2610dea0d436cd))
+
 ## 1.9.0 (2025-11-30)
 
 ### ✨ Features
