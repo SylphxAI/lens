@@ -26,6 +26,7 @@
  * ```
  */
 
+import type { EntityMarker } from "@sylphx/standard-entity";
 import { Schema } from "./create";
 import type { InferEntity } from "./infer";
 import type { EntityDefinition } from "./types";
@@ -41,31 +42,17 @@ const ENTITY_SYMBOL: unique symbol = Symbol("lens:entity");
  * Entity definition with name and fields.
  *
  * Implements StandardEntity protocol for type-safe Reify operations.
+ * Extends EntityMarker from @sylphx/standard-entity for protocol compliance.
  */
 export interface EntityDef<
 	Name extends string = string,
 	Fields extends EntityDefinition = EntityDefinition,
-> {
+> extends EntityMarker<Name> {
 	[ENTITY_SYMBOL]: true;
 	/** Entity name (injected from export key if not provided) */
 	_name?: Name;
 	/** Entity fields (scalar only) */
 	readonly fields: Fields;
-	/**
-	 * Standard Entity Protocol marker.
-	 * Enables type-safe entity operations in Reify DSL.
-	 *
-	 * @example
-	 * ```typescript
-	 * import { entity } from '@sylphx/reify';
-	 * entity.create(Message, { content: "hello" })  // ✅ type-checked!
-	 * ```
-	 */
-	readonly "~entity": {
-		readonly name: Name;
-		/** Runtime marker - actual type inferred from fields via InferEntityType */
-		readonly type: unknown;
-	};
 }
 
 /**

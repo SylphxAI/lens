@@ -5,6 +5,7 @@
     "": {
       "name": "lens",
       "dependencies": {
+        "@sylphx/standard-entity": "^0.1.0",
         "happy-dom": "^20.0.10",
       },
       "devDependencies": {
@@ -854,6 +855,8 @@
     "@sylphx/lens-svelte": ["@sylphx/lens-svelte@workspace:packages/svelte"],
 
     "@sylphx/lens-vue": ["@sylphx/lens-vue@workspace:packages/vue"],
+
+    "@sylphx/standard-entity": ["@sylphx/standard-entity@0.1.0", "", {}, "sha512-Qew99goKhGHIgS68VBbnyMbwpR3ZRzLEYWpZm7FBwRtWEYlohFmYhKzZDPLmE2LAV3ZbIHE/rvrLtV5ZAjRf/Q=="],
 
     "@sylphx/tsconfig": ["@sylphx/tsconfig@0.3.0", "", {}, "sha512-3O085PgS9CkWlW1xQND7XJkXYaq3SjoUvwOosK5sAA5eev1gVYEdYJhfAHgLcZefP541FQnHSCzs1re4gj6TjA=="],
 
