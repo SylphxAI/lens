@@ -438,9 +438,9 @@ export class ReactiveStore {
 	 *
 	 * Uses Reify's execute() with a cache adapter that wraps ReactiveStore.
 	 */
-	async applyPipelineOptimistic(
+	async applyPipelineOptimistic<TInput extends Record<string, unknown>>(
 		pipeline: Pipeline,
-		input: Record<string, unknown>,
+		input: TInput,
 	): Promise<string> {
 		if (!this.config.optimistic) {
 			return "";

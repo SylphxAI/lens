@@ -454,7 +454,7 @@ class ClientImpl {
 	// Mutation Execution
 	// ===========================================================================
 
-	async executeMutation<TInput, TOutput>(
+	async executeMutation<TInput extends Record<string, unknown>, TOutput>(
 		path: string,
 		input: TInput,
 	): Promise<MutationResult<TOutput>> {
@@ -505,18 +505,20 @@ class ClientImpl {
 	// Optimistic Updates
 	// ===========================================================================
 
-	private async applyOptimistic(path: string, input: unknown, dsl: OptimisticDSL): Promise<string> {
-		const inputObj = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-
+	private async applyOptimistic<TInput extends Record<string, unknown>>(
+		path: string,
+		input: TInput,
+		dsl: OptimisticDSL,
+	): Promise<string> {
 		// OptimisticDSL is now always a Reify Pipeline
 		if (isPipeline(dsl)) {
-			const txId = await this.store.applyPipelineOptimistic(dsl, inputObj);
+			const txId = await this.store.applyPipelineOptimistic(dsl, input);
 
 			// Store mutation info for rollback notification
-			this.optimisticMutationInfo.set(txId, { path, input: inputObj });
+			this.optimisticMutationInfo.set(txId, { path, input });
 
 			// Notify affected subscriptions
-			this.notifyAffectedSubscriptions(path, inputObj);
+			this.notifyAffectedSubscriptions(path, input);
 
 			return txId;
 		}
@@ -529,7 +531,10 @@ class ClientImpl {
 	 * Notify subscriptions that might be affected by an optimistic update.
 	 * Uses heuristics based on mutation path and input to find related query subscriptions.
 	 */
-	private notifyAffectedSubscriptions(mutationPath: string, input: Record<string, unknown>): void {
+	private notifyAffectedSubscriptions<TInput extends Record<string, unknown>>(
+		mutationPath: string,
+		input: TInput,
+	): void {
 		// Extract namespace (e.g., "user" from "user.update")
 		const parts = mutationPath.split(".");
 		if (parts.length < 2) return;
@@ -705,8 +710,9 @@ class ClientImpl {
 						const meta = this.getOperationMeta(path);
 
 						if (meta?.type === "mutation") {
-							// Execute as mutation
-							const mutationResult = await this.executeMutation(path, input);
+							// Execute as mutation (input is validated by typed proxy)
+							const inputObj = (input ?? {}) as Record<string, unknown>;
+							const mutationResult = await this.executeMutation(path, inputObj);
 							return onfulfilled
 								? onfulfilled(mutationResult)
 								: (mutationResult as unknown as TResult1);
