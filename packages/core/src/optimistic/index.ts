@@ -1,20 +1,11 @@
 /**
  * @sylphx/lens-core - Optimistic Updates
  *
- * Reify-powered DSL for optimistic updates.
- * "Describe once, execute anywhere"
+ * Internal module for optimistic update processing.
+ * Users should import Reify DSL directly from @sylphx/reify.
  */
 
-// =============================================================================
-// Reify DSL API
-// =============================================================================
-
-export * from "./reify";
-
-// =============================================================================
 // Evaluator (for legacy MultiEntityDSL format)
-// =============================================================================
-
 export {
 	applyDeferredOperation,
 	applyDeferredOperations,
@@ -25,3 +16,6 @@ export {
 	evaluateMultiEntityDSLMap,
 	OptimisticEvaluationError,
 } from "./evaluator";
+export type { Pipeline } from "./reify";
+// Internal - Reify type checking (used by Lens internals)
+export { isPipeline } from "./reify";

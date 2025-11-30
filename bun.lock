@@ -47,6 +47,7 @@
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
+        "@sylphx/reify": "file:../../../udsl/packages/reify",
         "zod": "^4.1.13",
       },
       "devDependencies": {
@@ -2233,6 +2234,8 @@
 
     "lazystream/readable-stream": ["readable-stream@2.3.8", "", { "dependencies": { "core-util-is": "~1.0.0", "inherits": "~2.0.3", "isarray": "~1.0.0", "process-nextick-args": "~2.0.0", "safe-buffer": "~5.1.1", "string_decoder": "~1.1.1", "util-deprecate": "~1.0.1" } }, "sha512-8p0AUk4XODgIewSi0l8Epjs+EVnWiK7NoDIEGU0HhE7+ZyY8D1IMY7odu5lRrFXGg71L15KG8QrPmum45RTtdA=="],
 
+    "lens-v2-example/@sylphx/reify": ["@sylphx/reify@file:../udsl/packages/reify", { "dependencies": { "@sylphx/reify-adapter-cache": "file:../adapter-cache", "@sylphx/reify-adapter-prisma": "file:../adapter-prisma", "@sylphx/reify-core": "file:../core", "@sylphx/reify-entity": "file:../entity" } }],
+
     "listhen/pathe": ["pathe@1.1.2", "", {}, "sha512-whLdWMYL2TwI08hn8/ZqAbrVemu0LNaNNJZX73O6qaIdCTfXutsLhMkjdENX0qhsQ9uIimo4/aQOmXkoon2nDQ=="],
 
     "micromatch/picomatch": ["picomatch@2.3.1", "", {}, "sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA=="],
@@ -2482,6 +2485,14 @@
     "lazystream/readable-stream/safe-buffer": ["safe-buffer@5.1.2", "", {}, "sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g=="],
 
     "lazystream/readable-stream/string_decoder": ["string_decoder@1.1.1", "", { "dependencies": { "safe-buffer": "~5.1.0" } }, "sha512-n/ShnvDi6FHbbVfviro+WojiFzv+s8MPMHBczVePfUpDJLwoLT0ht1l4YwBCbi8pJAveEEdnkHyPyTP/mzRfwg=="],
+
+    "lens-v2-example/@sylphx/reify/@sylphx/reify-adapter-cache": ["@sylphx/reify-adapter-cache@file:../udsl/packages/adapter-cache", {}],
+
+    "lens-v2-example/@sylphx/reify/@sylphx/reify-adapter-prisma": ["@sylphx/reify-adapter-prisma@file:../udsl/packages/adapter-prisma", {}],
+
+    "lens-v2-example/@sylphx/reify/@sylphx/reify-core": ["@sylphx/reify-core@file:../udsl/packages/core", {}],
+
+    "lens-v2-example/@sylphx/reify/@sylphx/reify-entity": ["@sylphx/reify-entity@file:../udsl/packages/entity", {}],
 
     "mlly/pkg-types/confbox": ["confbox@0.1.8", "", {}, "sha512-RMtmw0iFkeR4YV+fUOSucriAQNb9g8zFR52MWCtl+cCZOFRNL6zeB395vPzFhEjjn4fMxXudmELnl/KF/WrK6w=="],
 

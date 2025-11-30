@@ -346,55 +346,23 @@ export {
 } from "./context/index";
 
 // =============================================================================
-// Optimistic DSL Evaluator
+// Optimistic Updates (Internal)
 // =============================================================================
 
+// Note: For Reify DSL (pipe, entity, ref, temp, etc.), import directly from @sylphx/reify
 export {
-	addToSet,
+	// Evaluator
 	applyDeferredOperation,
 	applyDeferredOperations,
-	branch,
-	type Conditional,
-	clearPlugins,
-	createCachePlugin,
-	createPrismaPlugin,
 	type DeferredOperation,
-	dec,
-	defaultTo,
-	type EffectHandler,
-	type EvalContext,
 	type EvaluatedOperation,
 	type EvaluationContext,
-	EvaluationError,
-	entity as reify,
-	entityPlugin,
 	evaluateMultiEntityDSL,
 	evaluateMultiEntityDSLMap,
-	execute,
-	executeConditional,
-	executeOperation,
-	executePipeline,
-	getPluginNamespaces,
-	inc,
+	// Internal (for type checking)
 	isPipeline,
-	now,
-	type Operation,
 	OptimisticEvaluationError,
-	// Reify DSL
-	op,
 	type Pipeline,
-	type Plugin,
-	pipe,
-	pull,
-	push,
-	ref,
-	registerPlugin,
-	resolveValue,
-	type StepBuilder,
-	single,
-	temp,
-	unregisterPlugin,
-	when,
 } from "./optimistic/index";
 
 // =============================================================================

@@ -1,123 +1,24 @@
 /**
- * @sylphx/lens-core - Reify Integration
+ * @sylphx/lens-core - Reify Integration (Internal)
  *
- * Re-exports Reify for optimistic updates.
- * "Describe once, execute anywhere" - same pipeline works on cache (client) and DB (server).
+ * Re-exports only what Lens needs internally.
+ * Users should import directly from @sylphx/reify for DSL building.
  *
  * @example
  * ```typescript
- * import { pipe, reify, branch, ref, now, temp, inc } from '@sylphx/lens-core';
+ * // User code - import Reify directly
+ * import { entity, pipe, temp, ref, now, branch } from '@sylphx/reify';
  *
- * const createSession = pipe(({ input }) => [
- *   branch(input.sessionId)
- *     .then(reify.update('Session', { id: input.sessionId, title: input.title }))
- *     .else(reify.create('Session', { id: temp(), title: input.title }))
- *     .as('session'),
- *
- *   reify.create('Message', {
- *     id: temp(),
- *     sessionId: ref('session').id,
- *     content: input.content,
- *   }).as('message'),
+ * const pipeline = pipe(({ input }) => [
+ *   entity.create('Session', { id: temp() }).as('session'),
+ *   entity.create('Message', { sessionId: ref('session').id }).as('message'),
  * ]);
+ *
+ * // Use in Lens mutation
+ * mutation().optimistic(pipeline).resolve(...)
  * ```
  */
 
-// =============================================================================
-// Re-export Reify Builder API
-// =============================================================================
-
-export {
-	addToSet,
-	// Conditional builder
-	branch,
-	dec,
-	defaultTo,
-	// Entity helpers
-	entity,
-	// Operators
-	inc,
-	// Type guards
-	isPipeline,
-	now,
-	// Operation builder
-	op,
-	// Pipeline builders
-	pipe,
-	pull,
-	push,
-	// Value references
-	ref,
-	single,
-	temp,
-	when,
-} from "@sylphx/reify";
-
-// =============================================================================
-// Re-export Reify Types
-// =============================================================================
-
-export type {
-	Conditional,
-	ConditionalResult,
-	DSL,
-	EffectHandler,
-	EvalContext,
-	OpAddToSet,
-	OpDec,
-	OpDefault,
-	// Core types
-	Operation,
-	// Result types
-	OperationResult,
-	OpIf,
-	// Operator types
-	OpInc,
-	OpPull,
-	OpPush,
-	Pipeline,
-	PipelineResult,
-	PipelineStep,
-	// Plugin types
-	Plugin,
-	// Reference types
-	RefInput,
-	RefNow,
-	RefResult,
-	RefTemp,
-	// Builder types
-	StepBuilder,
-	StepResult,
-} from "@sylphx/reify";
-
-// =============================================================================
-// Re-export Reify Execution
-// =============================================================================
-
-export {
-	clearPlugins,
-	// Adapters
-	createCachePlugin,
-	createPrismaPlugin,
-	// Errors
-	EvaluationError,
-	// Built-in plugins
-	entityPlugin,
-	// Execution
-	execute,
-	executeConditional,
-	executeOperation,
-	executePipeline,
-	getPluginNamespaces,
-	// Plugin registry
-	registerPlugin,
-	// Value resolution
-	resolveValue,
-	unregisterPlugin,
-} from "@sylphx/reify";
-
-// =============================================================================
-// Re-export adapter types
-// =============================================================================
-
-export type { CacheLike, CachePluginOptions, PrismaLike, PrismaPluginOptions } from "@sylphx/reify";
+export type { Pipeline } from "@sylphx/reify";
+// Only export what Lens needs internally
+export { isPipeline } from "@sylphx/reify";

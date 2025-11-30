@@ -887,19 +887,20 @@ Simple strategies:
 
 ### Multi-Entity Optimistic (Reify Pipeline)
 
-For mutations that affect multiple entities, use Reify pipelines - **"Describe once, execute anywhere"**:
+For mutations that affect multiple entities, use [Reify](https://github.com/SylphxAI/reify) pipelines - **"Describe once, execute anywhere"**:
 
 ```typescript
-import { pipe, reify, temp, ref, now, branch, inc, push } from '@sylphx/lens-core';
+// Import Reify DSL directly from @sylphx/reify
+import { entity, pipe, temp, ref, now, branch, inc, push } from '@sylphx/reify';
 
 const sendMessagePipeline = pipe(({ input }) => [
   // Step 1: Conditional upsert - create or update session
   branch(input.sessionId)
-    .then(reify.update('Session', {
+    .then(entity.update('Session', {
       id: input.sessionId,
       updatedAt: now()
     }))
-    .else(reify.create('Session', {
+    .else(entity.create('Session', {
       id: temp(),
       title: input.title,
       createdAt: now()
@@ -907,7 +908,7 @@ const sendMessagePipeline = pipe(({ input }) => [
     .as('session'),
 
   // Step 2: Create message (references session from step 1)
-  reify.create('Message', {
+  entity.create('Message', {
     id: temp(),
     sessionId: ref('session').id,  // Reference sibling operation result
     role: 'user',
@@ -916,7 +917,7 @@ const sendMessagePipeline = pipe(({ input }) => [
   }).as('message'),
 
   // Step 3: Update user stats with operators
-  reify.update('User', {
+  entity.update('User', {
     id: input.userId,
     messageCount: inc(1),          // Increment by 1
     tags: push('active'),          // Append to array
@@ -924,7 +925,7 @@ const sendMessagePipeline = pipe(({ input }) => [
   }).as('userStats'),
 ]);
 
-// Use in mutation
+// Use in Lens mutation
 const createChatSession = mutation()
   .input(z.object({
     sessionId: z.string().optional(),
@@ -933,7 +934,7 @@ const createChatSession = mutation()
     userId: z.string(),
   }))
   .returns(Message)
-  .optimistic(sendMessagePipeline)  // 🔥 Same pipeline executes on client (cache) and server (DB)
+  .optimistic(sendMessagePipeline)  // 🔥 Lens accepts Reify pipelines
   .resolve(...)
 ```
 
@@ -942,39 +943,7 @@ const createChatSession = mutation()
 - Pipelines are **serializable** - can be sent over the wire
 - Operations are **composable** - build complex flows from simple steps
 
-### DSL Reference
-
-**Pipeline Builder:**
-| Function | Description |
-|----------|-------------|
-| `pipe(({ input }) => [...])` | Create pipeline from steps |
-| `reify.create(entity, data).as('name')` | Create entity |
-| `reify.update(entity, data).as('name')` | Update entity (data includes `id`) |
-| `reify.delete(entity, id).as('name')` | Delete entity |
-
-**Value References:**
-| Function | Description |
-|----------|-------------|
-| `input.field` | Value from mutation input |
-| `ref('sibling').field` | Value from sibling operation result |
-| `temp()` | Generate temporary ID |
-| `now()` | Current timestamp |
-
-**Field Operators:**
-| Function | Description |
-|----------|-------------|
-| `inc(n)` | Increment numeric field by n |
-| `dec(n)` | Decrement numeric field by n |
-| `push(...items)` | Append item(s) to array |
-| `pull(...items)` | Remove item(s) from array |
-| `addToSet(...items)` | Add unique item(s) to array |
-| `defaultTo(value)` | Use value if field is undefined |
-
-**Conditional Flows:**
-| Function | Description |
-|----------|-------------|
-| `branch(condition).then(op).else(op).as('name')` | Conditional operation |
-| `when(condition, value)` | Conditional value |
+See [@sylphx/reify documentation](https://github.com/SylphxAI/reify) for full DSL reference
 
 ---
 

@@ -13,6 +13,7 @@
 		"@sylphx/lens-core": "workspace:*",
 		"@sylphx/lens-server": "workspace:*",
 		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/reify": "file:../../../udsl/packages/reify",
 		"zod": "^4.1.13"
 	},
 	"devDependencies": {
