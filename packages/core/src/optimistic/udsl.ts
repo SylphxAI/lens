@@ -1,8 +1,8 @@
 /**
- * @sylphx/lens-core - UDSL Integration
+ * @sylphx/lens-core - Reify Integration
  *
- * Re-exports UDSL for optimistic updates with Lens-specific adapters.
- * UDSL provides the "Mutations as Data" pattern - describe operations once,
+ * Re-exports Reify for optimistic updates with Lens-specific adapters.
+ * Reify provides reified mutations - describe operations once,
  * execute anywhere with plugins.
  *
  * @example
@@ -25,7 +25,7 @@
  */
 
 // =============================================================================
-// Re-export UDSL Builder API
+// Re-export Reify Builder API
 // =============================================================================
 
 export {
@@ -52,10 +52,10 @@ export {
 	single,
 	temp,
 	when,
-} from "@sylphx/udsl";
+} from "@sylphx/reify";
 
 // =============================================================================
-// Re-export UDSL Types
+// Re-export Reify Types
 // =============================================================================
 
 export type {
@@ -89,10 +89,10 @@ export type {
 	// Builder types
 	StepBuilder,
 	StepResult,
-} from "@sylphx/udsl";
+} from "@sylphx/reify";
 
 // =============================================================================
-// Re-export UDSL Execution
+// Re-export Reify Execution
 // =============================================================================
 
 export {
@@ -115,10 +115,10 @@ export {
 	// Value resolution
 	resolveValue,
 	unregisterPlugin,
-} from "@sylphx/udsl";
+} from "@sylphx/reify";
 
 // =============================================================================
 // Re-export adapter types
 // =============================================================================
 
-export type { CacheLike, CachePluginOptions, PrismaLike, PrismaPluginOptions } from "@sylphx/udsl";
+export type { CacheLike, CachePluginOptions, PrismaLike, PrismaPluginOptions } from "@sylphx/reify";

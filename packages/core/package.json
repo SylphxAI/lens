@@ -30,11 +30,11 @@
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@sylphx/udsl": "file:../../../udsl/packages/udsl",
-		"@sylphx/udsl-core": "file:../../../udsl/packages/core",
-		"@sylphx/udsl-entity": "file:../../../udsl/packages/entity",
-		"@sylphx/udsl-adapter-cache": "file:../../../udsl/packages/adapter-cache",
-		"@sylphx/udsl-adapter-prisma": "file:../../../udsl/packages/adapter-prisma"
+		"@sylphx/reify": "file:../../../udsl/packages/reify",
+		"@sylphx/reify-core": "file:../../../udsl/packages/core",
+		"@sylphx/reify-entity": "file:../../../udsl/packages/entity",
+		"@sylphx/reify-adapter-cache": "file:../../../udsl/packages/adapter-cache",
+		"@sylphx/reify-adapter-prisma": "file:../../../udsl/packages/adapter-prisma"
 	},
 	"devDependencies": {
 		"typescript": "^5.9.3",

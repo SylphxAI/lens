@@ -77,11 +77,11 @@
       "name": "@sylphx/lens-core",
       "version": "1.11.0",
       "dependencies": {
-        "@sylphx/udsl": "file:../../../udsl/packages/udsl",
-        "@sylphx/udsl-adapter-cache": "file:../../../udsl/packages/adapter-cache",
-        "@sylphx/udsl-adapter-prisma": "file:../../../udsl/packages/adapter-prisma",
-        "@sylphx/udsl-core": "file:../../../udsl/packages/core",
-        "@sylphx/udsl-entity": "file:../../../udsl/packages/entity",
+        "@sylphx/reify": "file:../../../udsl/packages/reify",
+        "@sylphx/reify-adapter-cache": "file:../../../udsl/packages/adapter-cache",
+        "@sylphx/reify-adapter-prisma": "file:../../../udsl/packages/adapter-prisma",
+        "@sylphx/reify-core": "file:../../../udsl/packages/core",
+        "@sylphx/reify-entity": "file:../../../udsl/packages/entity",
       },
       "devDependencies": {
         "typescript": "^5.9.3",
@@ -2147,15 +2147,15 @@
 
     "@rollup/pluginutils/estree-walker": ["estree-walker@2.0.2", "", {}, "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="],
 
-    "@sylphx/lens-core/@sylphx/udsl": ["@sylphx/udsl@file:../udsl/packages/udsl", { "dependencies": { "@sylphx/udsl-adapter-cache": "file:../adapter-cache", "@sylphx/udsl-adapter-prisma": "file:../adapter-prisma", "@sylphx/udsl-core": "file:../core", "@sylphx/udsl-entity": "file:../entity" } }],
+    "@sylphx/lens-core/@sylphx/reify": ["@sylphx/reify@file:../udsl/packages/reify", { "dependencies": { "@sylphx/reify-adapter-cache": "file:../adapter-cache", "@sylphx/reify-adapter-prisma": "file:../adapter-prisma", "@sylphx/reify-core": "file:../core", "@sylphx/reify-entity": "file:../entity" } }],
 
-    "@sylphx/lens-core/@sylphx/udsl-adapter-cache": ["@sylphx/udsl-adapter-cache@file:../udsl/packages/adapter-cache", { "dependencies": { "@sylphx/udsl-core": "file:../core" } }],
+    "@sylphx/lens-core/@sylphx/reify-adapter-cache": ["@sylphx/reify-adapter-cache@file:../udsl/packages/adapter-cache", { "dependencies": { "@sylphx/reify-core": "file:../core" } }],
 
-    "@sylphx/lens-core/@sylphx/udsl-adapter-prisma": ["@sylphx/udsl-adapter-prisma@file:../udsl/packages/adapter-prisma", { "dependencies": { "@sylphx/udsl-core": "file:../core" } }],
+    "@sylphx/lens-core/@sylphx/reify-adapter-prisma": ["@sylphx/reify-adapter-prisma@file:../udsl/packages/adapter-prisma", { "dependencies": { "@sylphx/reify-core": "file:../core" } }],
 
-    "@sylphx/lens-core/@sylphx/udsl-core": ["@sylphx/udsl-core@file:../udsl/packages/core", {}],
+    "@sylphx/lens-core/@sylphx/reify-core": ["@sylphx/reify-core@file:../udsl/packages/core", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl-entity": ["@sylphx/udsl-entity@file:../udsl/packages/entity", { "dependencies": { "@sylphx/udsl-core": "file:../core" } }],
+    "@sylphx/lens-core/@sylphx/reify-entity": ["@sylphx/reify-entity@file:../udsl/packages/entity", { "dependencies": { "@sylphx/reify-core": "file:../core" } }],
 
     "@tanstack/directive-functions-plugin/@babel/code-frame": ["@babel/code-frame@7.26.2", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.25.9", "js-tokens": "^4.0.0", "picocolors": "^1.0.0" } }, "sha512-RJlIHRueQgwWitWgF8OdFYGZX328Ax5BCemNGlqHfplnRT9ESi8JkFlvaVYbS+UubVY6dpv87Fs2u5M29iNFVQ=="],
 
@@ -2443,19 +2443,19 @@
 
     "@nuxt/devtools/vite/postcss": ["postcss@8.5.6", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg=="],
 
-    "@sylphx/lens-core/@sylphx/udsl/@sylphx/udsl-adapter-cache": ["@sylphx/udsl-adapter-cache@file:../udsl/packages/adapter-cache", {}],
+    "@sylphx/lens-core/@sylphx/reify/@sylphx/reify-adapter-cache": ["@sylphx/reify-adapter-cache@file:../udsl/packages/adapter-cache", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl/@sylphx/udsl-adapter-prisma": ["@sylphx/udsl-adapter-prisma@file:../udsl/packages/adapter-prisma", {}],
+    "@sylphx/lens-core/@sylphx/reify/@sylphx/reify-adapter-prisma": ["@sylphx/reify-adapter-prisma@file:../udsl/packages/adapter-prisma", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl/@sylphx/udsl-core": ["@sylphx/udsl-core@file:../udsl/packages/core", {}],
+    "@sylphx/lens-core/@sylphx/reify/@sylphx/reify-core": ["@sylphx/reify-core@file:../udsl/packages/core", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl/@sylphx/udsl-entity": ["@sylphx/udsl-entity@file:../udsl/packages/entity", {}],
+    "@sylphx/lens-core/@sylphx/reify/@sylphx/reify-entity": ["@sylphx/reify-entity@file:../udsl/packages/entity", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl-adapter-cache/@sylphx/udsl-core": ["@sylphx/udsl-core@file:../udsl/packages/core", {}],
+    "@sylphx/lens-core/@sylphx/reify-adapter-cache/@sylphx/reify-core": ["@sylphx/reify-core@file:../udsl/packages/core", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl-adapter-prisma/@sylphx/udsl-core": ["@sylphx/udsl-core@file:../udsl/packages/core", {}],
+    "@sylphx/lens-core/@sylphx/reify-adapter-prisma/@sylphx/reify-core": ["@sylphx/reify-core@file:../udsl/packages/core", {}],
 
-    "@sylphx/lens-core/@sylphx/udsl-entity/@sylphx/udsl-core": ["@sylphx/udsl-core@file:../udsl/packages/core", {}],
+    "@sylphx/lens-core/@sylphx/reify-entity/@sylphx/reify-core": ["@sylphx/reify-core@file:../udsl/packages/core", {}],
 
     "@tanstack/directive-functions-plugin/@babel/code-frame/js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 
