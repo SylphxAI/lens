@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-svelte",
-	"version": "1.2.9",
+	"version": "1.2.10",
 	"description": "Svelte bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

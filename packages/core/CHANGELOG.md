@@ -1,5 +1,33 @@
 # @sylphx/lens-core
 
+## 1.12.0 (2025-12-01)
+
+### ✨ Features
+
+- **core:** use @sylphx/standard-entity for protocol compliance ([2f4b90a](https://github.com/SylphxAI/Lens/commit/2f4b90aa2227ff3364d5f71c188b1b41ac14702c))
+- **core:** implement StandardEntity protocol for type-safe Reify operations ([2db4ab3](https://github.com/SylphxAI/Lens/commit/2db4ab3edf4db02ef7f4043f5c4d44a1b7fb3992))
+- **core:** add typed callback pattern for .optimistic() ([abb39f4](https://github.com/SylphxAI/Lens/commit/abb39f4a5174678fd87b5f4f7b63771afc215dcb))
+- **core:** add UDSL Pipeline support to mutation().optimistic() ([99c3de0](https://github.com/SylphxAI/Lens/commit/99c3de0ddb839935f3b681693d5c45c865a5f377))
+- **core:** integrate UDSL for optimistic updates ([935ab8d](https://github.com/SylphxAI/Lens/commit/935ab8d1de4dc96aca39bf310144db0d48e65206))
+
+### 🐛 Bug Fixes
+
+- update codebase for strict TypeScript settings ([17ef860](https://github.com/SylphxAI/Lens/commit/17ef860ee4a850e5304414f836d14f02b14f0aa2))
+- **core:** use StepBuilder[] for OptimisticCallback return type ([d47af03](https://github.com/SylphxAI/Lens/commit/d47af03d3ad6ce965f82d15c31d0b0593b97074b))
+
+### ♻️ Refactoring
+
+- remove legacy DSL evaluator, use Reify for optimistic updates ([e0d83cf](https://github.com/SylphxAI/Lens/commit/e0d83cf7661474030a2d185ccac5f1af6d39a0ec))
+- **core:** stop re-exporting Reify, users import directly ([3c3d9b2](https://github.com/SylphxAI/Lens/commit/3c3d9b2163e6730b97ec950bc3ca9d2f8293b5db))
+- **core:** rename udsl to reify for consistency ([c6d4d58](https://github.com/SylphxAI/Lens/commit/c6d4d58fc4c3694588a45b548c3400d378d5145a))
+- **core:** remove legacy DSL builder, use Reify only ([2ac52bd](https://github.com/SylphxAI/Lens/commit/2ac52bd6931a0604513a8f148e8ea1da09e608ca))
+- update to use @sylphx/reify ([ae58f78](https://github.com/SylphxAI/Lens/commit/ae58f7892ec65f9693e288d4bd706013e90f6ff2))
+
+### 🔧 Chores
+
+- fix doctor warnings - consistent zod version and credits ([b34bdb9](https://github.com/SylphxAI/Lens/commit/b34bdb98b0a77172065ae8c3f98529d11d0ea8bf))
+- use @sylphx/reify from npm instead of file links ([c7a4fda](https://github.com/SylphxAI/Lens/commit/c7a4fda267139f701e3acf4c8624e955d0ca8dce))
+
 ## 1.11.0 (2025-11-30)
 
 ### ✨ Features

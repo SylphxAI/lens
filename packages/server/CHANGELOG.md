@@ -1,5 +1,15 @@
 # @sylphx/lens-server
 
+## 1.5.3 (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- update codebase for strict TypeScript settings ([17ef860](https://github.com/SylphxAI/Lens/commit/17ef860ee4a850e5304414f836d14f02b14f0aa2))
+
+### ♻️ Refactoring
+
+- remove legacy DSL evaluator, use Reify for optimistic updates ([e0d83cf](https://github.com/SylphxAI/Lens/commit/e0d83cf7661474030a2d185ccac5f1af6d39a0ec))
+
 ## 1.5.2 (2025-11-30)
 
 ### 📦 Dependencies
