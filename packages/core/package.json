@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-core",
-	"version": "1.16.0",
+	"version": "1.15.1",
 	"description": "Core schema types and utilities for Lens",
 	"type": "module",
 	"main": "./dist/index.js",
