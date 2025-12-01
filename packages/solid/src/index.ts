@@ -9,7 +9,7 @@
 // Context & Provider
 // =============================================================================
 
-export { LensProvider, type LensProviderProps, useLensClient } from "./context";
+export { LensProvider, type LensProviderProps, useLensClient } from "./context.js";
 
 // =============================================================================
 // Reactive Primitives
@@ -28,4 +28,4 @@ export {
 	type MutationFn,
 	// Types
 	type QueryInput,
-} from "./primitives";
+} from "./primitives.js";

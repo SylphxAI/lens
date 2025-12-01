@@ -599,4 +599,4 @@ export function dehydrate(data: Record<string, unknown>): DehydratedState {
 	};
 }
 
-export { HydrationBoundary, useHydration } from "./hydration";
+export { HydrationBoundary, useHydration } from "./hydration.js";

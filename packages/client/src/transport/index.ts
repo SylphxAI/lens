@@ -21,10 +21,10 @@ export type {
 	// Core types
 	Transport,
 	Unsubscribable,
-} from "./types";
+} from "./types.js";
 
 // Type guard functions (re-exported from core)
-export { isOptimisticDSL } from "./types";
+export { isOptimisticDSL } from "./types.js";
 
 // =============================================================================
 // Plugins
@@ -44,16 +44,20 @@ export {
 	retry,
 	type TimeoutPluginOptions,
 	timeout,
-} from "./plugin";
+} from "./plugin.js";
 
 // =============================================================================
 // Transports
 // =============================================================================
 
 // HTTP
-export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http";
+export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http.js";
 // In-Process
-export { type InProcessTransportOptions, inProcess, type LensServerInterface } from "./in-process";
+export {
+	type InProcessTransportOptions,
+	inProcess,
+	type LensServerInterface,
+} from "./in-process.js";
 // Route
 export {
 	type RouteByTypeConfig,
@@ -62,6 +66,6 @@ export {
 	// Legacy
 	routeByPath,
 	routeByType,
-} from "./route";
+} from "./route.js";
 // WebSocket
-export { type WsTransportOptions, ws } from "./ws";
+export { type WsTransportOptions, ws } from "./ws.js";

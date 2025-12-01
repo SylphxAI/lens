@@ -8,10 +8,10 @@
 
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { lens } from "../lens";
-import { entity } from "../schema/define";
-import { t } from "../schema/types";
-import { type InferReturnType, mutation, query, router } from "./index";
+import { lens } from "../lens.js";
+import { entity } from "../schema/define.js";
+import { t } from "../schema/types.js";
+import { type InferReturnType, mutation, query, router } from "./index.js";
 
 // =============================================================================
 // Test Entities
@@ -87,7 +87,7 @@ describe("QueryBuilder type inference", () => {
 				name: string;
 				email: string;
 				role: "user" | "admin" | "vip";
-				avatar?: string;
+				avatar?: string | undefined;
 				createdAt: Date;
 			};
 
@@ -117,7 +117,7 @@ describe("QueryBuilder type inference", () => {
 				name: string;
 				email: string;
 				role: "user" | "admin" | "vip";
-				avatar?: string;
+				avatar?: string | undefined;
 				createdAt: Date;
 			}[];
 
@@ -608,7 +608,7 @@ describe("InferReturnType utility", () => {
 			name: string;
 			email: string;
 			role: "user" | "admin" | "vip";
-			avatar?: string;
+			avatar?: string | undefined;
 			createdAt: Date;
 		};
 
@@ -624,7 +624,7 @@ describe("InferReturnType utility", () => {
 			name: string;
 			email: string;
 			role: "user" | "admin" | "vip";
-			avatar?: string;
+			avatar?: string | undefined;
 			createdAt: Date;
 		}[];
 
@@ -682,7 +682,7 @@ describe("_brand phantom type", () => {
 			name: string;
 			email: string;
 			role: "user" | "admin" | "vip";
-			avatar?: string;
+			avatar?: string | undefined;
 			createdAt: Date;
 		};
 
@@ -700,7 +700,7 @@ describe("_brand phantom type", () => {
 			.resolve(() => []);
 
 		type BrandInput = (typeof search)["_brand"]["input"];
-		type Expected = { id: string; limit?: number };
+		type Expected = { id: string; limit?: number | undefined };
 
 		type _assert = Assert<Equals<BrandInput, Expected>>;
 		const _typeCheck: _assert = true;
@@ -732,7 +732,7 @@ describe("_brand phantom type", () => {
 					name: string;
 					email: string;
 					role: "user" | "admin" | "vip";
-					avatar?: string;
+					avatar?: string | undefined;
 					createdAt: Date;
 				}
 			>

@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 
 // Re-exports from core
-import { defineType, entity, mutation, query, resolver, t } from "./index";
+import { defineType, entity, mutation, query, resolver, t } from "./index.js";
 
 describe("@sylphx/lens", () => {
 	describe("core re-exports", () => {

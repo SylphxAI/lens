@@ -6,8 +6,8 @@
 
 import { beforeEach, describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { entity } from "../schema/define";
-import { t } from "../schema/types";
+import { entity } from "../schema/define.js";
+import { t } from "../schema/types.js";
 import {
 	flattenRouter,
 	isMutationDef,
@@ -22,7 +22,7 @@ import {
 	resetTempIdCounter,
 	router,
 	tempId,
-} from "./index";
+} from "./index.js";
 
 // =============================================================================
 // Test Fixtures

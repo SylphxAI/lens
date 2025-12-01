@@ -39,7 +39,7 @@ export interface SelectionObject {
 	[key: string]: boolean | SelectionObject | { select: SelectionObject };
 }
 
-import { GraphStateManager } from "../state/graph-state-manager";
+import { GraphStateManager } from "../state/graph-state-manager.js";
 
 // =============================================================================
 // Types
@@ -81,21 +81,21 @@ export interface LensServerConfig<
 	TRouter extends RouterDef = RouterDef,
 > {
 	/** Entity definitions */
-	entities?: EntitiesMap;
+	entities?: EntitiesMap | undefined;
 	/** Router definition (namespaced operations) - context type is inferred */
-	router?: TRouter;
+	router?: TRouter | undefined;
 	/** Query definitions (flat, legacy) */
-	queries?: QueriesMap;
+	queries?: QueriesMap | undefined;
 	/** Mutation definitions (flat, legacy) */
-	mutations?: MutationsMap;
+	mutations?: MutationsMap | undefined;
 	/** Field resolvers array (use lens() factory to create) */
-	resolvers?: Resolvers;
+	resolvers?: Resolvers | undefined;
 	/** Logger for server messages (default: silent) */
-	logger?: LensLogger;
+	logger?: LensLogger | undefined;
 	/** Context factory - must return the context type expected by the router */
-	context?: (req?: unknown) => TContext | Promise<TContext>;
+	context?: ((req?: unknown) => TContext | Promise<TContext>) | undefined;
 	/** Server version */
-	version?: string;
+	version?: string | undefined;
 }
 
 /** Server metadata for transport handshake */
@@ -248,9 +248,9 @@ function sugarToPipeline(
 		typeof optimistic === "object" &&
 		optimistic !== null &&
 		"merge" in optimistic &&
-		typeof (optimistic as Record<string, unknown>).merge === "object"
+		typeof (optimistic as Record<string, unknown>)["merge"] === "object"
 	) {
-		const extra = (optimistic as { merge: Record<string, unknown> }).merge;
+		const extra = (optimistic as { merge: Record<string, unknown> })["merge"];
 		const args: Record<string, unknown> = { type: entityType };
 		for (const field of inputFields) {
 			args[field] = { $input: field };
@@ -428,7 +428,7 @@ class LensServerImpl<
 	private queries: Q;
 	private mutations: M;
 	private entities: EntitiesMap;
-	private resolverMap?: ResolverMap;
+	private resolverMap?: ResolverMap | undefined;
 	private contextFactory: (req?: unknown) => TContext | Promise<TContext>;
 	private version: string;
 	private logger: LensLogger;
@@ -1300,7 +1300,7 @@ class LensServerImpl<
 
 		// Always include id
 		if ("id" in obj) {
-			result.id = obj.id;
+			result["id"] = obj["id"];
 		}
 
 		// Handle string array (simple field list)

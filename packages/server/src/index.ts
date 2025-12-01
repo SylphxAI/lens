@@ -50,7 +50,7 @@ export {
 	// Metadata types (for transport handshake)
 	type ServerMetadata,
 	type WebSocketLike,
-} from "./server/create";
+} from "./server/create.js";
 
 // =============================================================================
 // State Management
@@ -68,7 +68,7 @@ export {
 	type StateFullMessage,
 	type StateUpdateMessage,
 	type Subscription,
-} from "./state";
+} from "./state/index.js";
 
 // =============================================================================
 // SSE Transport Adapter
@@ -82,4 +82,4 @@ export {
 	SSEHandler,
 	// Types
 	type SSEHandlerConfig,
-} from "./sse/handler";
+} from "./sse/handler.js";

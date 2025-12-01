@@ -15,7 +15,7 @@ const test = hasDom ? bunTest : bunTest.skip;
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
 import { signal } from "@sylphx/lens-client";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { useLazyQuery, useMutation, useQuery } from "./hooks";
+import { useLazyQuery, useMutation, useQuery } from "./hooks.js";
 
 // =============================================================================
 // Mock QueryResult

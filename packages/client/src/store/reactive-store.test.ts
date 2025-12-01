@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { createStore } from "./reactive-store";
+import { createStore } from "./reactive-store.js";
 
 describe("ReactiveStore", () => {
 	describe("Entity Management", () => {

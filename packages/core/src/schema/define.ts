@@ -27,9 +27,9 @@
  */
 
 import type { EntityMarker } from "@sylphx/standard-entity";
-import { Schema } from "./create";
-import type { InferEntity } from "./infer";
-import type { EntityDefinition } from "./types";
+import { Schema } from "./create.js";
+import type { InferEntity } from "./infer.js";
+import type { EntityDefinition } from "./types.js";
 
 // =============================================================================
 // Entity Definition Builder

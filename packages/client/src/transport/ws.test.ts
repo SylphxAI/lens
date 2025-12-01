@@ -3,8 +3,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import type { Observable, Result } from "./types";
-import { ws } from "./ws";
+import type { Observable, Result } from "./types.js";
+import { ws } from "./ws.js";
 
 // =============================================================================
 // Mock WebSocket

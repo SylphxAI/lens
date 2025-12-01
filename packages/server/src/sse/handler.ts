@@ -5,7 +5,7 @@
  * Connects SSE streams to GraphStateManager.
  */
 
-import type { GraphStateManager, StateClient } from "../state/graph-state-manager";
+import type { GraphStateManager, StateClient } from "../state/graph-state-manager.js";
 
 // =============================================================================
 // Types

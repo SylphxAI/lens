@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, mock, test } from "bun:test";
-import { batch, computed, derive, effect, isSignal, signal } from "./signal";
+import { batch, computed, derive, effect, isSignal, signal } from "./signal.js";
 
 describe("signal()", () => {
 	test("creates signal with initial value", () => {

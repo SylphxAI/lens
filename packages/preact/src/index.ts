@@ -9,7 +9,7 @@
 // Context & Provider
 // =============================================================================
 
-export { LensProvider, type LensProviderProps, useLensClient } from "./context";
+export { LensProvider, type LensProviderProps, useLensClient } from "./context.js";
 
 // =============================================================================
 // Hooks (Operations-based API)
@@ -28,4 +28,4 @@ export {
 	useMutation,
 	// Query hooks
 	useQuery,
-} from "./hooks";
+} from "./hooks.js";

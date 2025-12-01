@@ -5,7 +5,7 @@
  * Supports multi-server architectures with automatic metadata merging.
  */
 
-import type { Metadata, Observable, Operation, Result, Transport } from "./types";
+import type { Metadata, Observable, Operation, Result, Transport } from "./types.js";
 
 // =============================================================================
 // Route Transport (Glob Pattern)

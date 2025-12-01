@@ -31,7 +31,7 @@
 
 import type { QueryResult } from "@sylphx/lens-client";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { isSerializedData, type SerializedData } from "./index";
+import { isSerializedData, type SerializedData } from "./index.js";
 
 // =============================================================================
 // Island Data Hook

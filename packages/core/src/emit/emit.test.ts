@@ -5,7 +5,7 @@ import { describe, expect, it, mock } from "bun:test";
 
 const vi = { fn: () => mock(() => {}) };
 
-import { createEmit, createEmitArray, createEmitObject } from "./index";
+import { createEmit, createEmitArray, createEmitObject } from "./index.js";
 
 describe("createEmitObject", () => {
 	it("should emit full data", () => {

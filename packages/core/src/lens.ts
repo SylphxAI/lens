@@ -29,12 +29,17 @@
  * ```
  */
 
-import type { MutationBuilder, QueryBuilder } from "./operations/index";
-import { mutation as createMutation, query as createQuery } from "./operations/index";
-import type { FieldBuilder, FieldDef, FieldResolverContext, ResolverDef } from "./resolvers/index";
-import { resolver as createResolver } from "./resolvers/index";
-import type { EntityDef } from "./schema/define";
-import type { EntityDefinition } from "./schema/types";
+import type { MutationBuilder, QueryBuilder } from "./operations/index.js";
+import { mutation as createMutation, query as createQuery } from "./operations/index.js";
+import type {
+	FieldBuilder,
+	FieldDef,
+	FieldResolverContext,
+	ResolverDef,
+} from "./resolvers/index.js";
+import { resolver as createResolver } from "./resolvers/index.js";
+import type { EntityDef } from "./schema/define.js";
+import type { EntityDefinition } from "./schema/types.js";
 
 // =============================================================================
 // Lens Factory Types

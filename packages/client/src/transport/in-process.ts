@@ -5,7 +5,7 @@
  * Useful for testing and SSR.
  */
 
-import type { Metadata, Observable, Operation, Result, Transport } from "./types";
+import type { Metadata, Observable, Operation, Result, Transport } from "./types.js";
 
 // =============================================================================
 // Types

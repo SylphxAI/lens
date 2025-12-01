@@ -5,7 +5,7 @@
  * Handles all operations over WebSocket with native streaming for subscriptions.
  */
 
-import type { Metadata, Observable, Operation, Result, Transport } from "./types";
+import type { Metadata, Observable, Operation, Result, Transport } from "./types.js";
 
 // =============================================================================
 // Types

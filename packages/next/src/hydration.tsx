@@ -7,7 +7,7 @@
  */
 
 import { createContext, type ReactNode, useContext } from "react";
-import type { DehydratedState } from "./index";
+import type { DehydratedState } from "./index.js";
 
 // =============================================================================
 // Context

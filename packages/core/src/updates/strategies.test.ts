@@ -16,7 +16,7 @@ import {
 	selectStrategy,
 	type ValueUpdate,
 	valueStrategy,
-} from "./strategies";
+} from "./strategies.js";
 
 describe("Value Strategy", () => {
 	test("encodes value as-is", () => {

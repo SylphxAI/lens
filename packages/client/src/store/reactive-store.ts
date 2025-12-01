@@ -13,7 +13,7 @@ import {
 	registerPlugin,
 	unregisterPlugin,
 } from "@sylphx/reify";
-import { batch, type Signal, signal, type WritableSignal } from "../signals/signal";
+import { batch, type Signal, signal, type WritableSignal } from "../signals/signal.js";
 
 // Re-export for convenience
 export type { EntityKey };
@@ -31,9 +31,9 @@ export interface EntityState<T = unknown> {
 	/** Subscription reference count */
 	refCount: number;
 	/** Cache timestamp */
-	cachedAt?: number;
+	cachedAt?: number | undefined;
 	/** Cache tags for invalidation */
-	tags?: string[];
+	tags?: string[] | undefined;
 }
 
 /** Optimistic update entry */

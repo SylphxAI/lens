@@ -6,8 +6,8 @@ import { describe, expect, it, mock } from "bun:test";
 import { entity, lens, router, t } from "@sylphx/lens-core";
 import { createServer } from "@sylphx/lens-server";
 import { z } from "zod";
-import { type ExtractServerTypes, inProcess, type LensServerInterface, type TypedTransport } from "./in-process";
-import type { Observable, Result } from "./types";
+import { type ExtractServerTypes, inProcess, type LensServerInterface, type TypedTransport } from "./in-process.js";
+import type { Observable, Result } from "./types.js";
 
 // =============================================================================
 // Mock Server
@@ -40,7 +40,7 @@ describe("inProcess transport", () => {
 			const metadata = await transport.connect();
 
 			expect(metadata.version).toBe("1.0.0");
-			expect(metadata.operations.user).toBeDefined();
+			expect(metadata.operations["user"]).toBeDefined();
 		});
 
 		it("returns server metadata directly without network call", async () => {

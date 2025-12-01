@@ -25,7 +25,7 @@
  * ```
  */
 
-import type { DeltaOperation, PatchOperation, Update } from "../updates/strategies";
+import type { DeltaOperation, PatchOperation, Update } from "../updates/strategies.js";
 
 // =============================================================================
 // Type Utilities

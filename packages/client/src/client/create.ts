@@ -15,10 +15,10 @@ import type {
 	RouterRoutes,
 } from "@sylphx/lens-core";
 import { isPipeline } from "@sylphx/lens-core";
-import { createStore, type ReactiveStore } from "../store/reactive-store";
-import type { TypedTransport } from "../transport/in-process";
-import type { Plugin } from "../transport/plugin";
-import type { Metadata, Observable, Operation, Result, Transport } from "../transport/types";
+import { createStore, type ReactiveStore } from "../store/reactive-store.js";
+import type { TypedTransport } from "../transport/in-process.js";
+import type { Plugin } from "../transport/plugin.js";
+import type { Metadata, Observable, Operation, Result, Transport } from "../transport/types.js";
 
 // =============================================================================
 // Types
@@ -63,7 +63,7 @@ export interface QueryResult<T> {
 /** Mutation result */
 export interface MutationResult<T> {
 	data: T;
-	rollback?: () => void;
+	rollback?: (() => void) | undefined;
 }
 
 /** Infer selected type from selection object */
@@ -155,7 +155,7 @@ class ClientImpl {
 		{
 			data: unknown;
 			callbacks: Set<(data: unknown) => void>;
-			unsubscribe?: () => void;
+			unsubscribe?: (() => void) | undefined;
 		}
 	>();
 
@@ -540,7 +540,7 @@ class ClientImpl {
 		if (parts.length < 2) return;
 
 		const namespace = parts.slice(0, -1).join(".");
-		const entityId = input.id as string | undefined;
+		const entityId = input["id"] as string | undefined;
 
 		if (!entityId) return;
 
@@ -550,7 +550,7 @@ class ClientImpl {
 			if (key.startsWith(`${namespace}.get:`) || key.startsWith(`${namespace}.`)) {
 				// Try to parse the input from the key
 				const keyInput = this.parseQueryKeyInput(key);
-				if (keyInput?.id === entityId && sub.callbacks.size > 0) {
+				if (keyInput?.["id"] === entityId && sub.callbacks.size > 0) {
 					// Get updated data from store
 					const entitySignal = this.store.getEntity(
 						this.getEntityTypeFromPath(namespace),
@@ -600,7 +600,7 @@ class ClientImpl {
 		if (!data || typeof data !== "object") return;
 
 		const entityData = data as Record<string, unknown>;
-		const entityId = entityData.id as string | undefined;
+		const entityId = entityData["id"] as string | undefined;
 		if (!entityId) return;
 
 		// Extract namespace from path (e.g., "user.get" -> "user")
@@ -816,6 +816,6 @@ export function createClient(config: LensClientConfig | TypedClientConfig<unknow
 	return createNestedProxy("");
 }
 
-export type { Plugin } from "../transport/plugin";
+export type { Plugin } from "../transport/plugin.js";
 // Re-export types
-export type { Metadata, Operation, Result, Transport } from "../transport/types";
+export type { Metadata, Operation, Result, Transport } from "../transport/types.js";

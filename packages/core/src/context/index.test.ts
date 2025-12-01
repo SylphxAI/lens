@@ -15,7 +15,7 @@ import {
 	runWithContextAsync,
 	tryUseContext,
 	useContext,
-} from "./index";
+} from "./index.js";
 
 // =============================================================================
 // Test Fixtures

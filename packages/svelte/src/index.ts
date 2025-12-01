@@ -23,7 +23,7 @@ export {
 	type QueryStoreValue,
 	// Store factories
 	query,
-} from "./stores";
+} from "./stores.js";
 
 // =============================================================================
 // Context
@@ -38,4 +38,4 @@ export {
 	// Legacy aliases (deprecated)
 	setLensClient,
 	useLensClient,
-} from "./context";
+} from "./context.js";

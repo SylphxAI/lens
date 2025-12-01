@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
 import { ref } from "vue";
-import { useLazyQuery, useMutation, useQuery } from "./composables";
+import { useLazyQuery, useMutation, useQuery } from "./composables.js";
 
 // =============================================================================
 // Mock QueryResult

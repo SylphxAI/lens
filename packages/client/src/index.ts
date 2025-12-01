@@ -26,7 +26,7 @@ export {
 	type RouterLensClient,
 	type SelectedType,
 	type SelectionObject,
-} from "./client/create";
+} from "./client/create.js";
 
 // =============================================================================
 // Transport
@@ -59,7 +59,7 @@ export {
 	type Unsubscribable,
 	type WsTransportOptions,
 	ws,
-} from "./transport";
+} from "./transport/index.js";
 
 // =============================================================================
 // Plugins
@@ -79,7 +79,7 @@ export {
 	retry,
 	type TimeoutPluginOptions,
 	timeout,
-} from "./transport";
+} from "./transport/index.js";
 
 // =============================================================================
 // Signals
@@ -99,7 +99,7 @@ export {
 	toPromise,
 	type Unsubscribe,
 	type WritableSignal,
-} from "./signals/signal";
+} from "./signals/signal.js";
 
 // =============================================================================
 // Store
@@ -113,4 +113,4 @@ export {
 	type OptimisticTransaction,
 	ReactiveStore,
 	type StoreConfig,
-} from "./store/reactive-store";
+} from "./store/reactive-store.js";

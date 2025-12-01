@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
-import { lazyQuery, mutation, query } from "./stores";
+import { lazyQuery, mutation, query } from "./stores.js";
 
 // =============================================================================
 // Mock QueryResult

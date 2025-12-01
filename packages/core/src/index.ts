@@ -45,7 +45,7 @@ export {
 	StringType,
 	// Type builders
 	t,
-} from "./schema/types";
+} from "./schema/types.js";
 
 // =============================================================================
 // Schema Creation
@@ -66,7 +66,7 @@ export {
 	SchemaValidationError,
 	// Validation types
 	type ValidatedSchemaDefinition,
-} from "./schema/create";
+} from "./schema/create.js";
 
 // =============================================================================
 // Entity & Schema Definition (Primary API)
@@ -80,7 +80,7 @@ export {
 	type EntityDef,
 	entity,
 	isEntityDef,
-} from "./schema/define";
+} from "./schema/define.js";
 
 // =============================================================================
 // Type Inference
@@ -165,7 +165,7 @@ export type {
 	UpsertInput,
 	WhereInput,
 	WhereUniqueInput,
-} from "./schema/infer";
+} from "./schema/infer.js";
 
 // =============================================================================
 // Shared Types
@@ -215,7 +215,7 @@ export {
 	type ValueUpdate,
 	// Strategy implementations
 	valueStrategy,
-} from "./updates/strategies";
+} from "./updates/strategies.js";
 
 // =============================================================================
 // Operations API (query, mutation)
@@ -256,7 +256,7 @@ export {
 	router,
 	tempId,
 	type ZodLikeSchema,
-} from "./operations/index";
+} from "./operations/index.js";
 
 // =============================================================================
 // Field Resolvers
@@ -281,7 +281,7 @@ export {
 	// Main function (prefer lens() factory instead)
 	resolver,
 	toResolverMap,
-} from "./resolvers/index";
+} from "./resolvers/index.js";
 
 // =============================================================================
 // Emit API
@@ -300,7 +300,7 @@ export {
 	type EmitObject,
 	type FieldUpdate,
 	type InternalFieldUpdate,
-} from "./emit/index";
+} from "./emit/index.js";
 
 // =============================================================================
 // Context System (Internal - used by server)
@@ -316,7 +316,7 @@ export {
 	createContext,
 	runWithContext,
 	runWithContextAsync,
-} from "./context/index";
+} from "./context/index.js";
 
 // =============================================================================
 // Optimistic Updates (Internal)
@@ -327,7 +327,7 @@ export {
 	// Internal (for type checking)
 	isPipeline,
 	type Pipeline,
-} from "./optimistic/index";
+} from "./optimistic/index.js";
 
 // =============================================================================
 // Lens Factory (Primary API)
@@ -341,4 +341,4 @@ export {
 	type LensResolver,
 	// Main factory
 	lens,
-} from "./lens";
+} from "./lens.js";

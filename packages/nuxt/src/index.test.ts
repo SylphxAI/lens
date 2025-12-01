@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { createLensNuxt } from "./index";
+import { createLensNuxt } from "./index.js";
 
 // Mock server for testing
 const createMockServer = () => ({

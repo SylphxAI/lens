@@ -5,7 +5,7 @@
  * Unlike middleware chains, plugin order doesn't matter (mostly).
  */
 
-import type { Operation, Result } from "./types";
+import type { Operation, Result } from "./types.js";
 
 // =============================================================================
 // Plugin Interface
@@ -156,7 +156,7 @@ export function auth(options: AuthPluginOptions): Plugin {
 		async beforeRequest(op) {
 			const token = await getToken();
 			if (token) {
-				const headers = (op.meta?.headers as Record<string, string>) ?? {};
+				const headers = (op.meta?.["headers"] as Record<string, string>) ?? {};
 				headers[headerName] = prefix ? `${prefix} ${token}` : token;
 				op.meta = { ...op.meta, headers };
 			}
@@ -197,7 +197,7 @@ export function retry(options: RetryPluginOptions = {}): Plugin {
 		name: "retry",
 
 		async onError(error, op, retryFn) {
-			const attempt = ((op.meta?.retryCount as number) ?? 0) + 1;
+			const attempt = ((op.meta?.["retryCount"] as number) ?? 0) + 1;
 
 			if (attempt > attempts || !shouldRetry(error, attempt)) {
 				throw error;

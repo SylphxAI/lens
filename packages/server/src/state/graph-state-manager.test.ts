@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { GraphStateManager, type StateClient, type StateUpdateMessage } from "./graph-state-manager";
+import { GraphStateManager, type StateClient, type StateUpdateMessage } from "./graph-state-manager.js";
 
 describe("GraphStateManager", () => {
 	let manager: GraphStateManager;
@@ -62,7 +62,7 @@ describe("GraphStateManager", () => {
 				entity: "Post",
 				id: "123",
 			});
-			expect(mockClient.messages[0].updates.title).toMatchObject({
+			expect(mockClient.messages[0].updates["title"]).toMatchObject({
 				strategy: "value",
 				data: "Hello",
 			});
@@ -179,7 +179,7 @@ describe("GraphStateManager", () => {
 
 			manager.emit("Post", "123", { title: "World" });
 
-			expect(mockClient.messages[0].updates.title.strategy).toBe("value");
+			expect(mockClient.messages[0].updates["title"].strategy).toBe("value");
 		});
 
 		it("uses delta strategy for long strings with small changes", () => {
@@ -191,7 +191,7 @@ describe("GraphStateManager", () => {
 			manager.emit("Post", "123", { content: `${longText} appended` });
 
 			// Should use delta for efficient transfer
-			const update = mockClient.messages[0].updates.content;
+			const update = mockClient.messages[0].updates["content"];
 			expect(["delta", "value"]).toContain(update.strategy);
 		});
 
@@ -206,7 +206,7 @@ describe("GraphStateManager", () => {
 				metadata: { views: 101, likes: 10, tags: ["a", "b"] },
 			});
 
-			const update = mockClient.messages[0].updates.metadata;
+			const update = mockClient.messages[0].updates["metadata"];
 			expect(["patch", "value"]).toContain(update.strategy);
 		});
 	});
@@ -258,12 +258,12 @@ describe("GraphStateManager", () => {
 
 			// client-1 got incremental update
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.title.data).toBe("Updated");
+			expect(mockClient.messages[0].updates["title"].data).toBe("Updated");
 
 			// client-2 got full current state
 			expect(client2.messages.length).toBe(1);
-			expect(client2.messages[0].updates.title.data).toBe("Updated");
-			expect(client2.messages[0].updates.content.data).toBe("World");
+			expect(client2.messages[0].updates["title"].data).toBe("Updated");
+			expect(client2.messages[0].updates["content"].data).toBe("World");
 		});
 	});
 
@@ -390,7 +390,7 @@ describe("GraphStateManager", () => {
 			manager.emitField("Post", "123", "title", { strategy: "value", data: "Hello World" });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.title).toEqual({
+			expect(mockClient.messages[0].updates["title"]).toEqual({
 				strategy: "value",
 				data: "Hello World",
 			});
@@ -424,7 +424,7 @@ describe("GraphStateManager", () => {
 			});
 
 			const state = manager.getState("Post", "123");
-			expect(state?.metadata).toEqual({ views: 101, likes: 10 });
+			expect(state?.["metadata"]).toEqual({ views: 101, likes: 10 });
 		});
 
 		it("sends field update to subscribed clients only for subscribed fields", () => {
@@ -480,9 +480,9 @@ describe("GraphStateManager", () => {
 			]);
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.title.data).toBe("Hello");
-			expect(mockClient.messages[0].updates.content.data).toBe("World");
-			expect(mockClient.messages[0].updates.author.data).toBe("Alice");
+			expect(mockClient.messages[0].updates["title"].data).toBe("Hello");
+			expect(mockClient.messages[0].updates["content"].data).toBe("World");
+			expect(mockClient.messages[0].updates["author"].data).toBe("Alice");
 		});
 
 		it("applies batch updates to canonical state", () => {
@@ -712,7 +712,7 @@ describe("GraphStateManager", () => {
 			});
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.author.data).toEqual({
+			expect(mockClient.messages[0].updates["author"].data).toEqual({
 				id: "1",
 				name: "Alice",
 				profile: {
@@ -792,7 +792,7 @@ describe("GraphStateManager", () => {
 
 			// Should have 10 updates
 			expect(mockClient.messages.length).toBe(10);
-			expect(mockClient.messages[9].updates.counter.data).toBe(9);
+			expect(mockClient.messages[9].updates["counter"].data).toBe(9);
 		});
 
 		it("handles large number of subscribers to same entity", () => {
@@ -815,7 +815,7 @@ describe("GraphStateManager", () => {
 			// All clients should receive the update
 			for (const client of clients) {
 				expect(client.messages.length).toBe(1);
-				expect(client.messages[0].updates.title.data).toBe("Broadcast");
+				expect(client.messages[0].updates["title"].data).toBe("Broadcast");
 			}
 		});
 
@@ -842,14 +842,14 @@ describe("GraphStateManager", () => {
 			manager.emit("Post", "123", { tags: ["javascript", "typescript"] });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.tags.data).toEqual(["javascript", "typescript"]);
+			expect(mockClient.messages[0].updates["tags"].data).toEqual(["javascript", "typescript"]);
 
 			// Update array
 			mockClient.messages = [];
 			manager.emit("Post", "123", { tags: ["javascript", "typescript", "react"] });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.tags.data).toEqual(["javascript", "typescript", "react"]);
+			expect(mockClient.messages[0].updates["tags"].data).toEqual(["javascript", "typescript", "react"]);
 		});
 
 		it("handles boolean field values", () => {
@@ -859,14 +859,14 @@ describe("GraphStateManager", () => {
 			manager.emit("Post", "123", { published: true });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.published.data).toBe(true);
+			expect(mockClient.messages[0].updates["published"].data).toBe(true);
 
 			// Toggle boolean
 			mockClient.messages = [];
 			manager.emit("Post", "123", { published: false });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.published.data).toBe(false);
+			expect(mockClient.messages[0].updates["published"].data).toBe(false);
 		});
 
 		it("handles number field values including 0", () => {
@@ -876,14 +876,14 @@ describe("GraphStateManager", () => {
 			manager.emit("Post", "123", { likes: 0 });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.likes.data).toBe(0);
+			expect(mockClient.messages[0].updates["likes"].data).toBe(0);
 
 			// Update to positive number
 			mockClient.messages = [];
 			manager.emit("Post", "123", { likes: 5 });
 
 			expect(mockClient.messages.length).toBe(1);
-			expect(mockClient.messages[0].updates.likes.data).toBe(5);
+			expect(mockClient.messages[0].updates["likes"].data).toBe(5);
 		});
 	});
 
@@ -909,7 +909,7 @@ describe("GraphStateManager", () => {
 				entity: "Users",
 				id: "list",
 			});
-			expect(mockClient.messages[0].updates._items.data).toEqual([
+			expect(mockClient.messages[0].updates["_items"].data).toEqual([
 				{ id: "1", name: "Alice" },
 				{ id: "2", name: "Bob" },
 			]);
@@ -1086,7 +1086,7 @@ describe("GraphStateManager", () => {
 
 			expect(mockClient.messages.length).toBe(2);
 			// Second message should be incremental diff (push operation)
-			const update = mockClient.messages[1].updates._items;
+			const update = mockClient.messages[1].updates["_items"];
 			expect(update.strategy).toBe("array");
 			expect(update.data).toEqual([{ op: "push", item: { id: "2", name: "Bob" } }]);
 		});

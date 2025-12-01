@@ -10,8 +10,8 @@ import { describe, expect, it } from "bun:test";
 import { entity, lens, router, t } from "@sylphx/lens-core";
 import { createServer } from "@sylphx/lens-server";
 import { z } from "zod";
-import { inProcess, type TypedTransport } from "../transport/in-process";
-import { createClient } from "./create";
+import { inProcess, type TypedTransport } from "../transport/in-process.js";
+import { createClient } from "./create.js";
 
 // =============================================================================
 // Test Entities

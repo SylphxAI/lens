@@ -3,8 +3,8 @@
  */
 
 import { describe, expect, it, mock } from "bun:test";
-import { auth, cache, logger, type Plugin, retry, timeout } from "./plugin";
-import type { Operation, Result } from "./types";
+import { auth, cache, logger, type Plugin, retry, timeout } from "./plugin.js";
+import type { Operation, Result } from "./types.js";
 
 // =============================================================================
 // Test Helpers
@@ -119,7 +119,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toEqual({
+		expect(result.meta?.["headers"]).toEqual({
 			Authorization: "Bearer my-token",
 		});
 	});
@@ -130,7 +130,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toEqual({
+		expect(result.meta?.["headers"]).toEqual({
 			Authorization: "Bearer async-token",
 		});
 	});
@@ -144,7 +144,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toEqual({
+		expect(result.meta?.["headers"]).toEqual({
 			"X-API-Key": "Bearer token",
 		});
 	});
@@ -158,7 +158,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toEqual({
+		expect(result.meta?.["headers"]).toEqual({
 			Authorization: "Token token",
 		});
 	});
@@ -172,7 +172,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toEqual({
+		expect(result.meta?.["headers"]).toEqual({
 			Authorization: "api-key-123",
 		});
 	});
@@ -183,7 +183,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toBeUndefined();
+		expect(result.meta?.["headers"]).toBeUndefined();
 	});
 
 	it("preserves existing headers", async () => {
@@ -194,7 +194,7 @@ describe("auth plugin", () => {
 
 		const result = await plugin.beforeRequest!(op);
 
-		expect(result.meta?.headers).toEqual({
+		expect(result.meta?.["headers"]).toEqual({
 			"X-Custom": "value",
 			Authorization: "Bearer token",
 		});
@@ -229,7 +229,7 @@ describe("retry plugin", () => {
 
 		await plugin.onError!(new Error("Fail"), op, retryFn);
 
-		expect(op.meta?.retryCount).toBe(1);
+		expect(op.meta?.["retryCount"]).toBe(1);
 	});
 
 	it("throws after max attempts", async () => {
@@ -305,14 +305,14 @@ describe("cache plugin", () => {
 
 		// First request - no cache
 		const before1 = plugin.beforeRequest!(op) as Operation;
-		expect(before1.meta?.cachedResult).toBeUndefined();
+		expect(before1.meta?.["cachedResult"]).toBeUndefined();
 
 		// Store in cache
 		plugin.afterResponse!(result, op);
 
 		// Second request - should have cached result
 		const before2 = plugin.beforeRequest!(op) as Operation;
-		expect(before2.meta?.cachedResult).toEqual(result);
+		expect(before2.meta?.["cachedResult"]).toEqual(result);
 	});
 
 	it("respects TTL", async () => {
@@ -324,7 +324,7 @@ describe("cache plugin", () => {
 
 		// Immediate - should be cached
 		const before1 = plugin.beforeRequest!(op) as Operation;
-		expect(before1.meta?.cachedResult).toBeDefined();
+		expect(before1.meta?.["cachedResult"]).toBeDefined();
 
 		// Wait for TTL to expire
 		await new Promise((r) => setTimeout(r, 50));
@@ -332,7 +332,7 @@ describe("cache plugin", () => {
 		// Create a fresh operation (same key but no cached meta)
 		const freshOp = createOperation();
 		const before2 = plugin.beforeRequest!(freshOp) as Operation;
-		expect(before2.meta?.cachedResult).toBeUndefined();
+		expect(before2.meta?.["cachedResult"]).toBeUndefined();
 	});
 
 	it("does not cache mutations by default", () => {
@@ -343,7 +343,7 @@ describe("cache plugin", () => {
 		plugin.afterResponse!(result, op);
 
 		const before = plugin.beforeRequest!(op) as Operation;
-		expect(before.meta?.cachedResult).toBeUndefined();
+		expect(before.meta?.["cachedResult"]).toBeUndefined();
 	});
 
 	it("can cache mutations when queriesOnly is false", () => {
@@ -354,7 +354,7 @@ describe("cache plugin", () => {
 		plugin.afterResponse!(result, op);
 
 		const before = plugin.beforeRequest!(op) as Operation;
-		expect(before.meta?.cachedResult).toEqual(result);
+		expect(before.meta?.["cachedResult"]).toEqual(result);
 	});
 
 	it("does not cache errors", () => {
@@ -365,7 +365,7 @@ describe("cache plugin", () => {
 		plugin.afterResponse!(result, op);
 
 		const before = plugin.beforeRequest!(op) as Operation;
-		expect(before.meta?.cachedResult).toBeUndefined();
+		expect(before.meta?.["cachedResult"]).toBeUndefined();
 	});
 
 	it("uses custom key function", () => {
@@ -380,7 +380,7 @@ describe("cache plugin", () => {
 
 		// op2 should hit cache because key only uses path
 		const before = plugin.beforeRequest!(op2) as Operation;
-		expect(before.meta?.cachedResult).toEqual(result);
+		expect(before.meta?.["cachedResult"]).toEqual(result);
 	});
 
 	it("different inputs have different cache keys by default", () => {
@@ -393,7 +393,7 @@ describe("cache plugin", () => {
 
 		// op2 should not hit cache
 		const before = plugin.beforeRequest!(op2) as Operation;
-		expect(before.meta?.cachedResult).toBeUndefined();
+		expect(before.meta?.["cachedResult"]).toBeUndefined();
 	});
 });
 
@@ -413,7 +413,7 @@ describe("timeout plugin", () => {
 
 		const result = plugin.beforeRequest!(op) as Operation;
 
-		expect(result.meta?.timeout).toBe(3000);
+		expect(result.meta?.["timeout"]).toBe(3000);
 	});
 
 	it("preserves existing meta", () => {
@@ -447,8 +447,8 @@ describe("Plugin composition", () => {
 			}
 		}
 
-		expect(op.meta?.headers).toEqual({ Authorization: "Bearer token" });
-		expect(op.meta?.timeout).toBe(5000);
+		expect(op.meta?.["headers"]).toEqual({ Authorization: "Bearer token" });
+		expect(op.meta?.["timeout"]).toBe(5000);
 	});
 
 	it("plugins modify operation in order", async () => {

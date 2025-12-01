@@ -13,7 +13,7 @@ export {
 	LensClientKey,
 	provideLensClient,
 	useLensClient,
-} from "./context";
+} from "./context.js";
 
 // =============================================================================
 // Composables
@@ -32,4 +32,4 @@ export {
 	useMutation,
 	// Query composables
 	useQuery,
-} from "./composables";
+} from "./composables.js";

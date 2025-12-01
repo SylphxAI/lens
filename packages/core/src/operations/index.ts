@@ -29,12 +29,12 @@
  * ```
  */
 
-import type { Emit } from "../emit/index";
-import type { Pipeline, StepBuilder } from "../optimistic/reify";
-import { isPipeline } from "../optimistic/reify";
-import type { EntityDef } from "../schema/define";
-import type { InferScalar, ScalarFields } from "../schema/infer";
-import type { EntityDefinition } from "../schema/types";
+import type { Emit } from "../emit/index.js";
+import type { Pipeline, StepBuilder } from "../optimistic/reify.js";
+import { isPipeline } from "../optimistic/reify.js";
+import type { EntityDef } from "../schema/define.js";
+import type { InferScalar, ScalarFields } from "../schema/infer.js";
+import type { EntityDefinition } from "../schema/types.js";
 
 // =============================================================================
 // Type Definitions
@@ -230,9 +230,9 @@ export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
 export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown> {
 	_type: "query";
 	/** Query name (optional - derived from export key if not provided) */
-	_name?: string;
-	_input?: ZodLikeSchema<TInput>;
-	_output?: ReturnSpec;
+	_name?: string | undefined;
+	_input?: ZodLikeSchema<TInput> | undefined;
+	_output?: ReturnSpec | undefined;
 	/** Branded phantom types for inference */
 	_brand: { input: TInput; output: TOutput };
 	/** Method syntax for bivariance - allows flexible context types */
@@ -256,9 +256,9 @@ export interface QueryBuilder<TInput = void, TOutput = unknown, TContext = unkno
 class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unknown>
 	implements QueryBuilder<TInput, TOutput, TContext>
 {
-	private _name?: string;
-	private _inputSchema?: ZodLikeSchema<TInput>;
-	private _outputSpec?: ReturnSpec;
+	private _name?: string | undefined;
+	private _inputSchema?: ZodLikeSchema<TInput> | undefined;
+	private _outputSpec?: ReturnSpec | undefined;
 
 	constructor(name?: string) {
 		this._name = name;
@@ -329,13 +329,13 @@ export function query<TContext = unknown>(name?: string): QueryBuilder<void, unk
 export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unknown> {
 	_type: "mutation";
 	/** Mutation name (optional - derived from export key if not provided) */
-	_name?: string;
+	_name?: string | undefined;
 	_input: ZodLikeSchema<TInput>;
-	_output?: ReturnSpec;
+	_output?: ReturnSpec | undefined;
 	/** Branded phantom types for inference */
 	_brand: { input: TInput; output: TOutput };
 	/** Optimistic update DSL (declarative, serializable for client) */
-	_optimistic?: OptimisticDSL;
+	_optimistic?: OptimisticDSL | undefined;
 	/** Method syntax for bivariance - allows flexible context types */
 	_resolve(
 		ctx: ResolverContext<TInput, TOutput, TContext>,
@@ -424,10 +424,10 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 		MutationBuilderWithReturns<TInput, TOutput, TContext>,
 		MutationBuilderWithOptimistic<TInput, TOutput, TContext>
 {
-	private _name?: string;
-	private _inputSchema?: ZodLikeSchema<TInput>;
-	private _outputSpec?: ReturnSpec;
-	private _optimisticSpec?: OptimisticDSL;
+	private _name?: string | undefined;
+	private _inputSchema?: ZodLikeSchema<TInput> | undefined;
+	private _outputSpec?: ReturnSpec | undefined;
+	private _optimisticSpec?: OptimisticDSL | undefined;
 
 	constructor(name?: string) {
 		this._name = name;
@@ -467,9 +467,9 @@ class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknow
 					},
 				},
 			) as TInput;
-			const stepBuilders = specOrCallback({ input: inputProxy });
+			const stepBuilders: StepBuilder[] = specOrCallback({ input: inputProxy });
 			// Convert StepBuilder[] to PipelineStep[]
-			const steps = stepBuilders.map((s) => s.build());
+			const steps = stepBuilders.map((s: StepBuilder) => s.build());
 			builder._optimisticSpec = { $pipe: steps } as Pipeline;
 		} else {
 			builder._optimisticSpec = specOrCallback;

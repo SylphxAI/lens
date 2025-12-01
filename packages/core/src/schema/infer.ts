@@ -22,7 +22,7 @@ import type {
 	ObjectType,
 	SchemaDefinition,
 	StringType,
-} from "./types";
+} from "./types.js";
 
 // =============================================================================
 // Scalar Type Inference

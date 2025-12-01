@@ -5,7 +5,7 @@
  * Handles query/mutation via POST, subscriptions via polling.
  */
 
-import type { Metadata, Observable, Operation, Result, Transport } from "./types";
+import type { Metadata, Observable, Operation, Result, Transport } from "./types.js";
 
 // =============================================================================
 // Types
@@ -103,10 +103,10 @@ export const http: HttpTransport = function http(options: HttpTransportOptions):
 			return executeRequest(baseUrl, op, {
 				headers: {
 					...defaultHeaders,
-					...((op.meta?.headers as Record<string, string>) ?? {}),
+					...((op.meta?.["headers"] as Record<string, string>) ?? {}),
 				},
 				fetch: fetchImpl,
-				timeout: op.meta?.timeout as number | undefined,
+				timeout: op.meta?.["timeout"] as number | undefined,
 			});
 		},
 	};
@@ -119,7 +119,7 @@ export const http: HttpTransport = function http(options: HttpTransportOptions):
 interface RequestOptions {
 	headers: HeadersInit;
 	fetch: typeof fetch;
-	timeout?: number;
+	timeout?: number | undefined;
 }
 
 /**

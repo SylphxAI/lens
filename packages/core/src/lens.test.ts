@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { lens } from "./lens";
-import { entity } from "./schema/define";
-import { t } from "./schema/types";
+import { lens } from "./lens.js";
+import { entity } from "./schema/define.js";
+import { t } from "./schema/types.js";
 
 // =============================================================================
 // Test Fixtures

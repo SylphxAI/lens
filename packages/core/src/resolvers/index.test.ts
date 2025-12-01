@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { entity } from "../schema/define";
-import { t } from "../schema/types";
-import { isExposedField, isResolvedField, isResolverDef, resolver, toResolverMap } from "./index";
+import { entity } from "../schema/define.js";
+import { t } from "../schema/types.js";
+import { isExposedField, isResolvedField, isResolverDef, resolver, toResolverMap } from "./index.js";
 
 // =============================================================================
 // Test Fixtures
@@ -171,9 +171,9 @@ describe("Field resolution", () => {
 		const parent = mockDb.users[0];
 		const result = await userResolver.resolveAll(parent, mockCtx);
 
-		expect(result.id).toBe("1");
-		expect(result.name).toBe("John");
-		expect(result.avatar).toBe("https://cdn.example.com/john-avatar");
+		expect(result["id"]).toBe("1");
+		expect(result["name"]).toBe("John");
+		expect(result["avatar"]).toBe("https://cdn.example.com/john-avatar");
 	});
 
 	it("resolveAll respects select parameter", async () => {
@@ -186,9 +186,9 @@ describe("Field resolution", () => {
 		const parent = mockDb.users[0];
 		const result = await userResolver.resolveAll(parent, mockCtx, ["id", "name"]);
 
-		expect(result.id).toBe("1");
-		expect(result.name).toBe("John");
-		expect(result.email).toBeUndefined();
+		expect(result["id"]).toBe("1");
+		expect(result["name"]).toBe("John");
+		expect(result["email"]).toBeUndefined();
 	});
 });
 
@@ -224,8 +224,8 @@ describe("Type guards", () => {
 			avatar: f.string().resolve(() => ""),
 		}));
 
-		expect(isExposedField(userResolver.fields.id)).toBe(true);
-		expect(isExposedField(userResolver.fields.avatar)).toBe(false);
+		expect(isExposedField(userResolver.fields["id"])).toBe(true);
+		expect(isExposedField(userResolver.fields["avatar"])).toBe(false);
 	});
 
 	it("isResolvedField identifies resolved fields", () => {
@@ -234,8 +234,8 @@ describe("Type guards", () => {
 			avatar: f.string().resolve(() => ""),
 		}));
 
-		expect(isResolvedField(userResolver.fields.id)).toBe(false);
-		expect(isResolvedField(userResolver.fields.avatar)).toBe(true);
+		expect(isResolvedField(userResolver.fields["id"])).toBe(false);
+		expect(isResolvedField(userResolver.fields["avatar"])).toBe(true);
 	});
 
 	it("isResolverDef identifies resolver definitions", () => {
@@ -272,15 +272,15 @@ describe("Complex scenarios", () => {
 		// Test User.posts
 		const user = mockDb.users[0];
 		const userResult = await userResolver.resolveAll(user, mockCtx);
-		expect(userResult.name).toBe("John");
-		expect((userResult.posts as any[]).length).toBe(2);
+		expect(userResult["name"]).toBe("John");
+		expect((userResult["posts"] as any[]).length).toBe(2);
 
 		// Test Post.author
 		const post = mockDb.posts[0];
 		const postResult = await postResolver.resolveAll(post, mockCtx);
-		expect(postResult.title).toBe("Hello");
-		expect((postResult.author as any).name).toBe("John");
-		expect((postResult.comments as any[]).length).toBe(2);
+		expect(postResult["title"]).toBe("Hello");
+		expect((postResult["author"] as any).name).toBe("John");
+		expect((postResult["comments"] as any[]).length).toBe(2);
 	});
 
 	it("supports nullable relation fields", async () => {
@@ -423,9 +423,9 @@ describe("Edge cases and error handling", () => {
 			{ name: "posts", args: { limit: 1 } },
 		]);
 
-		expect(result.id).toBe("1");
-		expect((result.posts as any[]).length).toBe(1);
-		expect(result.name).toBeUndefined();
+		expect(result["id"]).toBe("1");
+		expect((result["posts"] as any[]).length).toBe(1);
+		expect(result["name"]).toBeUndefined();
 	});
 
 	it("resolveAll ignores non-existent fields in select", async () => {
@@ -437,8 +437,8 @@ describe("Edge cases and error handling", () => {
 		const parent = mockDb.users[0];
 		const result = await userResolver.resolveAll(parent, mockCtx, ["id", "nonexistent"]);
 
-		expect(result.id).toBe("1");
-		expect(result.nonexistent).toBeUndefined();
+		expect(result["id"]).toBe("1");
+		expect(result["nonexistent"]).toBeUndefined();
 	});
 
 	it("getArgsSchema returns null for non-existent field", () => {

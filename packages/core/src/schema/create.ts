@@ -4,7 +4,7 @@
  * Creates and validates schemas from definitions.
  */
 
-import type { InferEntity, InferSchemaEntities, InferSelected, Select } from "./infer";
+import type { InferEntity, InferSchemaEntities, InferSelected, Select } from "./infer.js";
 import type {
 	BelongsToType,
 	EntityDefinition,
@@ -12,8 +12,8 @@ import type {
 	HasManyType,
 	HasOneType,
 	SchemaDefinition,
-} from "./types";
-import { isRelationType } from "./types";
+} from "./types.js";
+import { isRelationType } from "./types.js";
 
 // =============================================================================
 // Type-Level Relation Validation

@@ -47,9 +47,9 @@
  */
 
 import type { z } from "zod";
-import type { EntityDef } from "../schema/define";
-import type { InferScalar } from "../schema/infer";
-import type { EntityDefinition, FieldType } from "../schema/types";
+import type { EntityDef } from "../schema/define.js";
+import type { InferScalar } from "../schema/infer.js";
+import type { EntityDefinition, FieldType } from "../schema/types.js";
 
 // =============================================================================
 // Context Type (passed to resolvers)

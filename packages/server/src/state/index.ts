@@ -13,4 +13,4 @@ export {
 	type StateFullMessage,
 	type StateUpdateMessage,
 	type Subscription,
-} from "./graph-state-manager";
+} from "./graph-state-manager.js";
