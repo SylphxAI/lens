@@ -163,9 +163,7 @@ describe("useQuery", () => {
 		const { error, loading } = useQuery(() => customMockQuery);
 
 		// Trigger error with a string
-		if (rejectPromise) {
-			rejectPromise("String error message");
-		}
+		rejectPromise!("String error message");
 
 		// Wait for promise to reject
 		await new Promise((r) => setTimeout(r, 10));

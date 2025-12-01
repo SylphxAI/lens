@@ -6,13 +6,13 @@
 		"sourceMap": true,
 		"composite": false,
 		"noUncheckedIndexedAccess": false,
+		"noPropertyAccessFromIndexSignature": false,
 		"jsx": "react-jsx"
 	},
 	"exclude": [
 		"examples",
-		"packages/core/src/schema/*.test.ts",
-		"packages/server/src/e2e/server.test.ts",
-		"packages/server/src/server/create.test.ts",
+		"**/*.test.ts",
+		"**/*.test.tsx",
 		"packages/preact",
 		"packages/solid",
 		"packages/solidstart"
