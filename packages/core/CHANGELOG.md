@@ -2,6 +2,27 @@
 
 ## 2.0.0 (2025-12-01)
 
+### 🐛 Bug Fixes
+
+- revert lens-core version to 1.15.1 for proper workflow release ([22c45b2](https://github.com/SylphxAI/Lens/commit/22c45b27fbd96981a7db92914f849d9d99153257))
+- **core:** correct version to 1.16.0 after deprecating 2.0.0 ([35abd1e](https://github.com/SylphxAI/Lens/commit/35abd1e4d6641bc7fba0e0caf0151a77b3bfd086))
+
+### ♻️ Refactoring
+
+- 💥 **core:** move emit and onCleanup into ctx ([9f9ed3f](https://github.com/SylphxAI/Lens/commit/9f9ed3faf8a3c4750b426982ad59a0cd4d6c7a8f))
+- **core:** remove unused Prisma-style types ([aa5fc6f](https://github.com/SylphxAI/Lens/commit/aa5fc6f18fc36b2813d62dd2633740dd4933a309))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
+### 💥 Breaking Changes
+
+- **core:** move emit and onCleanup into ctx ([9f9ed3f](https://github.com/SylphxAI/Lens/commit/9f9ed3faf8a3c4750b426982ad59a0cd4d6c7a8f))
+  emit and onCleanup are now accessed via ctx instead of being top-level resolver parameters.
+
+## 2.0.0 (2025-12-01)
+
 ### ♻️ Refactoring
 
 - 💥 **core:** move emit and onCleanup into ctx ([9f9ed3f](https://github.com/SylphxAI/Lens/commit/9f9ed3faf8a3c4750b426982ad59a0cd4d6c7a8f))
