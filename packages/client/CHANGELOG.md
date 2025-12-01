@@ -1,5 +1,15 @@
 # @sylphx/lens-client
 
+## 1.8.0 (2025-12-01)
+
+### ✨ Features
+
+- **client:** expose .select() method on accessor API ([97c3640](https://github.com/SylphxAI/Lens/commit/97c364084230bb594400594e6e3db4191fdbe08a))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
 ## 1.7.5 (2025-12-01)
 
 ### 🐛 Bug Fixes

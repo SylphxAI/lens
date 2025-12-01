@@ -1,5 +1,20 @@
 # @sylphx/lens-server
 
+## 2.0.0 (2025-12-01)
+
+### ♻️ Refactoring
+
+- 💥 **core:** move emit and onCleanup into ctx ([9f9ed3f](https://github.com/SylphxAI/Lens/commit/9f9ed3faf8a3c4750b426982ad59a0cd4d6c7a8f))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
+### 💥 Breaking Changes
+
+- **core:** move emit and onCleanup into ctx ([9f9ed3f](https://github.com/SylphxAI/Lens/commit/9f9ed3faf8a3c4750b426982ad59a0cd4d6c7a8f))
+  emit and onCleanup are now accessed via ctx instead of being top-level resolver parameters.
+
 ## 1.5.6 (2025-12-01)
 
 ### 🐛 Bug Fixes
