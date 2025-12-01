@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-fresh",
-	"version": "1.2.22",
+	"version": "1.2.23",
 	"description": "Fresh (Deno/Preact) integration for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
