@@ -1,5 +1,11 @@
 # @sylphx/lens-vue
 
+## 1.2.12 (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- update codebase for strict TypeScript settings ([17ef860](https://github.com/SylphxAI/Lens/commit/17ef860ee4a850e5304414f836d14f02b14f0aa2))
+
 ## 1.2.11 (2025-12-01)
 
 ### 🐛 Bug Fixes
