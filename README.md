@@ -7,6 +7,7 @@
 [![npm](https://img.shields.io/npm/v/@sylphx/lens-server)](https://www.npmjs.com/package/@sylphx/lens-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/SylphxAI/Lens/actions/workflows/ci.yml/badge.svg)](https://github.com/SylphxAI/Lens/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/SylphxAI/Lens)](https://github.com/SylphxAI/Lens)
 
 </div>
 
@@ -1215,19 +1216,21 @@ export const getUser = typedQuery()
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `@sylphx/lens-server` | Server, router, operations |
-| `@sylphx/lens-client` | Client, transports, plugins |
-| `@sylphx/lens-react` | React hooks |
-| `@sylphx/lens-vue` | Vue composables |
-| `@sylphx/lens-solid` | SolidJS primitives |
-| `@sylphx/lens-svelte` | Svelte stores |
-| `@sylphx/lens-preact` | Preact hooks + signals |
-| `@sylphx/lens-next` | Next.js integration |
-| `@sylphx/lens-nuxt` | Nuxt 3 integration |
-| `@sylphx/lens-solidstart` | SolidStart integration |
-| `@sylphx/lens-fresh` | Fresh (Deno) integration |
+| Package | Version | Description |
+|---------|---------|-------------|
+| [@sylphx/lens](./packages/lens) | [![version](https://img.shields.io/npm/v/@sylphx/lens)](https://www.npmjs.com/package/@sylphx/lens) | All-in-one package |
+| [@sylphx/lens-server](./packages/server) | [![version](https://img.shields.io/npm/v/@sylphx/lens-server)](https://www.npmjs.com/package/@sylphx/lens-server) | Server, router, operations |
+| [@sylphx/lens-client](./packages/client) | [![version](https://img.shields.io/npm/v/@sylphx/lens-client)](https://www.npmjs.com/package/@sylphx/lens-client) | Client, transports, plugins |
+| [@sylphx/lens-core](./packages/core) | [![version](https://img.shields.io/npm/v/@sylphx/lens-core)](https://www.npmjs.com/package/@sylphx/lens-core) | Core types and utilities |
+| [@sylphx/lens-react](./packages/react) | [![version](https://img.shields.io/npm/v/@sylphx/lens-react)](https://www.npmjs.com/package/@sylphx/lens-react) | React hooks |
+| [@sylphx/lens-vue](./packages/vue) | [![version](https://img.shields.io/npm/v/@sylphx/lens-vue)](https://www.npmjs.com/package/@sylphx/lens-vue) | Vue composables |
+| [@sylphx/lens-solid](./packages/solid) | [![version](https://img.shields.io/npm/v/@sylphx/lens-solid)](https://www.npmjs.com/package/@sylphx/lens-solid) | SolidJS primitives |
+| [@sylphx/lens-svelte](./packages/svelte) | [![version](https://img.shields.io/npm/v/@sylphx/lens-svelte)](https://www.npmjs.com/package/@sylphx/lens-svelte) | Svelte stores |
+| [@sylphx/lens-preact](./packages/preact) | [![version](https://img.shields.io/npm/v/@sylphx/lens-preact)](https://www.npmjs.com/package/@sylphx/lens-preact) | Preact hooks + signals |
+| [@sylphx/lens-next](./packages/next) | [![version](https://img.shields.io/npm/v/@sylphx/lens-next)](https://www.npmjs.com/package/@sylphx/lens-next) | Next.js integration |
+| [@sylphx/lens-nuxt](./packages/nuxt) | [![version](https://img.shields.io/npm/v/@sylphx/lens-nuxt)](https://www.npmjs.com/package/@sylphx/lens-nuxt) | Nuxt 3 integration |
+| [@sylphx/lens-solidstart](./packages/solidstart) | [![version](https://img.shields.io/npm/v/@sylphx/lens-solidstart)](https://www.npmjs.com/package/@sylphx/lens-solidstart) | SolidStart integration |
+| [@sylphx/lens-fresh](./packages/fresh) | [![version](https://img.shields.io/npm/v/@sylphx/lens-fresh)](https://www.npmjs.com/package/@sylphx/lens-fresh) | Fresh (Deno) integration |
 
 ---
 
