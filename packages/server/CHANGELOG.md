@@ -1,5 +1,15 @@
 # @sylphx/lens-server
 
+## 2.1.0 (2025-12-01)
+
+### ✨ Features
+
+- **core:** move emit and onCleanup into ctx ([40097cd](https://github.com/SylphxAI/Lens/commit/40097cd7f2730df86dc4acb398309b0714853790))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
 ## 2.0.0 (2025-12-01)
 
 ### ♻️ Refactoring

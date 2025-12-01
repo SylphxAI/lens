@@ -1,5 +1,15 @@
 # @sylphx/lens-vue
 
+## 1.2.15 (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- resolve TypeScript strict mode errors ([3dd0231](https://github.com/SylphxAI/Lens/commit/3dd0231d74c0e061d96ff6f4df428ec9722c9101))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
 ## 1.2.14 (2025-12-01)
 
 ### 📦 Dependencies
