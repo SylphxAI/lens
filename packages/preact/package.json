@@ -19,7 +19,7 @@
 		"build": "bun build ./src/index.ts ./src/signals.ts --outdir ./dist --target browser --external preact --external @preact/signals && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepack": "bun run build"
+		"prepack": "[ -d dist ] || bun run build"
 	},
 	"files": [
 		"dist",

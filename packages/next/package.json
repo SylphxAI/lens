@@ -19,7 +19,7 @@
 		"build": "bun build ./src/index.ts ./src/server.ts ./src/hydration.tsx --outdir ./dist --target browser --external react --external next --external @sylphx/lens-react --external @sylphx/lens-client --external @sylphx/lens-server && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepack": "bun run build"
+		"prepack": "[ -d dist ] || bun run build"
 	},
 	"files": [
 		"dist",

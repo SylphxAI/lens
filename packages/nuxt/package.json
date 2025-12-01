@@ -15,7 +15,7 @@
 		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external vue --external nuxt --external @sylphx/lens-vue --external @sylphx/lens-client && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepack": "bun run build"
+		"prepack": "[ -d dist ] || bun run build"
 	},
 	"files": [
 		"dist",

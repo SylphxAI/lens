@@ -15,7 +15,7 @@
 		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js --external @solidjs/start --external @solidjs/router --external @sylphx/reify && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepack": "bun run build"
+		"prepack": "[ -d dist ] || bun run build"
 	},
 	"files": [
 		"dist",

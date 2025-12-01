@@ -23,7 +23,7 @@
 		"build": "bunup",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepack": "bun run build"
+		"prepack": "[ -d dist ] || bun run build"
 	},
 	"files": [
 		"dist",

@@ -19,7 +19,7 @@
 		"build": "bun build ./src/index.ts ./src/islands.ts --outdir ./dist --target browser --external preact --external @preact/signals --external @sylphx/reify --external @sylphx/lens-preact --external @sylphx/lens-client --external @sylphx/lens-server && tsc --emitDeclarationOnly --declaration --skipLibCheck --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepack": "bun run build"
+		"prepack": "[ -d dist ] || bun run build"
 	},
 	"files": [
 		"dist",
