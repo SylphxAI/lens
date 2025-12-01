@@ -87,40 +87,14 @@ export {
 // =============================================================================
 
 export type {
-	AggregateInput,
-	AggregateResult,
-	// Aggregation types
-	AggregateSelect,
-	BooleanFilter,
-	// Relation mutation types
-	ConnectInput,
-	ConnectOrCreateInput,
-	CountInput,
 	// Input types (mutations)
 	CreateInput,
-	CreateInputWithRelations,
-	// Batch operation types
-	CreateManyInput,
-	CreateManyResult,
-	// Pagination types
-	CursorInput,
-	DateTimeFilter,
 	DeepPartial,
 	DeleteInput,
-	DeleteManyInput,
-	DeleteManyResult,
-	DistinctInput,
 	EntityNames,
 	EntityType,
-	EnumFilter,
 	// Field arguments (GraphQL-style)
 	FieldArgs,
-	FieldFilter,
-	// Find types
-	FindFirstInput,
-	FindManyInput,
-	FindUniqueInput,
-	GroupByInput,
 	// Entity inference
 	InferEntity,
 	InferFieldType,
@@ -133,15 +107,11 @@ export type {
 	// Schema inference
 	InferSchemaEntities,
 	InferSelected,
+	IsBelongsTo,
 	IsHasMany,
+	IsHasOne,
 	IsRelation,
-	ManyRelationInput,
-	NullsOrder,
-	NumberFilter,
-	NumericFields,
 	OptionalKeys,
-	OrderByInput,
-	PaginationInput,
 	RelationFields,
 	RelationSelectOptions,
 	// Utility types
@@ -152,19 +122,7 @@ export type {
 	ScalarSelectOptions,
 	// Selection inference
 	Select,
-	SingleRelationInput,
-	// Sorting types (OrderBy)
-	SortOrder,
-	SortOrderInput,
-	// Filter types (Where)
-	StringFilter,
 	UpdateInput,
-	UpdateInputWithRelations,
-	UpdateManyInput,
-	UpdateManyResult,
-	UpsertInput,
-	WhereInput,
-	WhereUniqueInput,
 } from "./schema/infer.js";
 
 // =============================================================================
