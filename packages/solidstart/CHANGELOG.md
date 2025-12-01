@@ -1,5 +1,15 @@
 # @sylphx/lens-solidstart
 
+## 1.2.22 (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- **release:** build all packages before npm publish ([1bd467e](https://github.com/SylphxAI/Lens/commit/1bd467e4d5fdad65ff384386af787dc789ed7a4f))
+
+### 🔧 Chores
+
+- use @sylphx/reify from npm instead of file links ([c7a4fda](https://github.com/SylphxAI/Lens/commit/c7a4fda267139f701e3acf4c8624e955d0ca8dce))
+
 ## 1.2.21 (2025-12-01)
 
 ### 📦 Dependencies

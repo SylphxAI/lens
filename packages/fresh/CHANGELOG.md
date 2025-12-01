@@ -1,5 +1,18 @@
 # @sylphx/lens-fresh
 
+## 1.2.22 (2025-12-01)
+
+### 🐛 Bug Fixes
+
+- **release:** build all packages before npm publish ([1bd467e](https://github.com/SylphxAI/Lens/commit/1bd467e4d5fdad65ff384386af787dc789ed7a4f))
+- **fresh:** add skipLibCheck to build for CI compatibility ([50dd8f2](https://github.com/SylphxAI/Lens/commit/50dd8f23d603757812d2353e12650f5bdb209c1d))
+- **fresh:** add workspace deps as externals in build ([3e45776](https://github.com/SylphxAI/Lens/commit/3e45776342ea8009fff4fb3e0b362562b95f3f4b))
+- update codebase for strict TypeScript settings ([17ef860](https://github.com/SylphxAI/Lens/commit/17ef860ee4a850e5304414f836d14f02b14f0aa2))
+
+### 🔧 Chores
+
+- use @sylphx/reify from npm instead of file links ([c7a4fda](https://github.com/SylphxAI/Lens/commit/c7a4fda267139f701e3acf4c8624e955d0ca8dce))
+
 ## 1.2.21 (2025-12-01)
 
 ### 🐛 Bug Fixes

@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-solid",
-	"version": "1.2.21",
+	"version": "1.2.22",
 	"description": "SolidJS bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
