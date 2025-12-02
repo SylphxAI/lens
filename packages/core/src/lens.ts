@@ -49,14 +49,7 @@ import type {
 	QueryBuilder,
 } from "./operations/index.js";
 import { mutation as createMutation, query as createQuery } from "./operations/index.js";
-import type {
-	ExtractExtension,
-	ExtractPluginExtensions,
-	HasPlugin,
-	NoExtension,
-	PluginExtension,
-	RuntimePlugin,
-} from "./plugin/types.js";
+import type { PluginExtension, RuntimePlugin } from "./plugin/types.js";
 import type {
 	FieldBuilder,
 	FieldDef,
@@ -100,34 +93,62 @@ export interface LensMutation<TContext> {
 // =============================================================================
 
 /**
- * Mutation builder with plugin extensions applied.
- * Adds methods from plugins to the builder at each stage.
+ * Mutation builder WITHOUT optimistic plugin.
+ * .returns() gives MutationBuilderWithReturnsBase (no .optimistic()).
  */
-export type MutationBuilderWithExtensions<
-	TContext,
-	TPlugins extends readonly PluginExtension[],
-> = MutationBuilder<unknown, unknown, TContext> & {
+export type MutationBuilderNoPlugins<TContext> = Omit<
+	MutationBuilder<unknown, unknown, TContext>,
+	"input"
+> & {
 	input<T>(
 		schema: import("./operations/index.js").ZodLikeSchema<T>,
-	): MutationBuilderWithInputExtended<T, unknown, TContext, TPlugins>;
+	): MutationBuilderWithInputNoPlugins<T, unknown, TContext>;
 };
 
 /**
- * Mutation builder after .input() with plugin extensions.
+ * Mutation builder WITH optimistic plugin.
+ * .returns() gives full MutationBuilderWithReturns (with .optimistic()).
  */
-export type MutationBuilderWithInputExtended<
-	TInput,
-	TOutput,
-	TContext,
-	TPlugins extends readonly PluginExtension[],
-> = Omit<MutationBuilderWithInput<TInput, TOutput, TContext>, "returns"> & {
+export type MutationBuilderWithPlugins<TContext> = Omit<
+	MutationBuilder<unknown, unknown, TContext>,
+	"input"
+> & {
+	input<T>(
+		schema: import("./operations/index.js").ZodLikeSchema<T>,
+	): MutationBuilderWithInputWithPlugins<T, unknown, TContext>;
+};
+
+/**
+ * Mutation builder after .input() WITHOUT optimistic plugin.
+ * Returns() gives MutationBuilderWithReturnsBase (no .optimistic()).
+ */
+export type MutationBuilderWithInputNoPlugins<TInput, TOutput, TContext> = Omit<
+	MutationBuilderWithInput<TInput, TOutput, TContext>,
+	"returns"
+> & {
 	returns<R extends import("./operations/index.js").ReturnSpec>(
 		spec: R,
-	): MutationBuilderWithReturnsExtended<
+	): MutationBuilderWithReturnsBase<
 		TInput,
 		import("./operations/index.js").InferReturnType<R>,
-		TContext,
-		TPlugins
+		TContext
+	>;
+};
+
+/**
+ * Mutation builder after .input() WITH optimistic plugin.
+ * Returns() gives the full MutationBuilderWithReturns (with .optimistic()).
+ */
+export type MutationBuilderWithInputWithPlugins<TInput, TOutput, TContext> = Omit<
+	MutationBuilderWithInput<TInput, TOutput, TContext>,
+	"returns"
+> & {
+	returns<R extends import("./operations/index.js").ReturnSpec>(
+		spec: R,
+	): import("./operations/index.js").MutationBuilderWithReturns<
+		TInput,
+		import("./operations/index.js").InferReturnType<R>,
+		TContext
 	>;
 };
 
@@ -143,8 +164,22 @@ export interface MutationBuilderWithReturnsBase<TInput, TOutput, TContext> {
 }
 
 /**
+ * Helper type to check if plugin array includes optimistic plugin.
+ * Uses direct array element check instead of HasPlugin which can fail with inference.
+ */
+type IncludesOptimistic<TPlugins> = TPlugins extends readonly (infer E)[]
+	? E extends { readonly name: "optimistic" }
+		? true
+		: false
+	: false;
+
+/**
  * Mutation builder after .returns() with plugin extensions.
- * Conditionally includes .optimistic() based on HasPlugin<'optimistic'>.
+ * Conditionally includes .optimistic() based on plugin presence.
+ *
+ * NOTE: We explicitly add the .optimistic() method with bound type parameters
+ * rather than using ExtractExtension, because the generic methods in the
+ * plugin extension interface don't automatically bind to the outer types.
  */
 export type MutationBuilderWithReturnsExtended<
 	TInput,
@@ -152,24 +187,39 @@ export type MutationBuilderWithReturnsExtended<
 	TContext,
 	TPlugins extends readonly PluginExtension[],
 > = MutationBuilderWithReturnsBase<TInput, TOutput, TContext> &
-	(HasPlugin<TPlugins, "optimistic"> extends true
-		? ExtractExtension<TPlugins, "MutationBuilderWithReturns">
+	(IncludesOptimistic<TPlugins> extends true
+		? {
+				optimistic(
+					spec: import("./operations/index.js").OptimisticDSL,
+				): import("./operations/index.js").MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
+				optimistic(
+					callback: import("./operations/index.js").OptimisticCallback<TInput>,
+				): import("./operations/index.js").MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
+			}
 		: unknown);
 
 /**
- * Plugin-aware mutation factory function.
- * Returns builders with methods added by plugins.
+ * Mutation factory WITHOUT plugins - returns builders without .optimistic()
  */
-export interface LensMutationWithPlugins<
-	TContext,
-	TPlugins extends readonly PluginExtension[] = readonly NoExtension[],
-> {
-	(): MutationBuilderWithExtensions<TContext, TPlugins>;
-	(name: string): MutationBuilderWithExtensions<TContext, TPlugins>;
+export interface LensMutationNoPlugins<TContext> {
+	(): MutationBuilderNoPlugins<TContext>;
+	(name: string): MutationBuilderNoPlugins<TContext>;
+}
+
+/**
+ * Mutation factory WITH plugins - returns builders with .optimistic()
+ */
+export interface LensMutationWithPlugins<TContext> {
+	(): MutationBuilderWithPlugins<TContext>;
+	(name: string): MutationBuilderWithPlugins<TContext>;
 }
 
 /**
  * Result of lens<TContext>() - all typed builders
+ *
+ * NOTE: This uses the plugin-extended builder types with an empty plugin array,
+ * which means .optimistic() is NOT available. Use lens({ plugins: [optimisticPlugin()] })
+ * to enable .optimistic().
  */
 export interface Lens<TContext> {
 	/**
@@ -206,6 +256,8 @@ export interface Lens<TContext> {
 
 	/**
 	 * Create a mutation with pre-typed context.
+	 * NOTE: .optimistic() is NOT available without plugins.
+	 * Use lens({ plugins: [optimisticPlugin()] }) to enable it.
 	 *
 	 * @example
 	 * ```typescript
@@ -218,7 +270,7 @@ export interface Lens<TContext> {
 	 *   });
 	 * ```
 	 */
-	mutation: LensMutation<TContext>;
+	mutation: LensMutationNoPlugins<TContext>;
 }
 
 // =============================================================================
@@ -250,11 +302,12 @@ export interface LensConfig<
 
 /**
  * Result of lens<TContext>({ plugins }) - typed builders with plugin extensions
+ *
+ * NOTE: This simplified version always includes .optimistic() on mutations
+ * when ANY plugins are configured. For finer control, separate plugin-specific
+ * interfaces could be created.
  */
-export interface LensWithPlugins<
-	TContext,
-	TPlugins extends readonly PluginExtension[] = readonly NoExtension[],
-> {
+export interface LensWithPlugins<TContext> {
 	/**
 	 * Create a resolver with pre-typed context.
 	 */
@@ -268,8 +321,7 @@ export interface LensWithPlugins<
 
 	/**
 	 * Create a mutation with pre-typed context.
-	 * Extended with plugin methods when plugins are configured.
-	 * When optimisticPlugin is included, .optimistic() becomes available.
+	 * .optimistic() is available when optimisticPlugin is included.
 	 *
 	 * @example With optimisticPlugin
 	 * ```typescript
@@ -281,7 +333,7 @@ export interface LensWithPlugins<
 	 *   .resolve(({ input, ctx }) => ctx.db.user.update(input));
 	 * ```
 	 */
-	mutation: LensMutationWithPlugins<TContext, TPlugins>;
+	mutation: LensMutationWithPlugins<TContext>;
 
 	/**
 	 * Runtime plugins for use with createServer().
@@ -362,32 +414,32 @@ export function lens<
 	TContext = FieldResolverContext,
 	TPlugins extends
 		readonly RuntimePlugin<PluginExtension>[] = readonly RuntimePlugin<PluginExtension>[],
->(config: LensConfig<TPlugins>): LensWithPlugins<TContext, ExtractPluginExtensions<TPlugins>>;
+>(config: LensConfig<TPlugins>): LensWithPlugins<TContext>;
 export function lens<
 	TContext = FieldResolverContext,
 	TPlugins extends
 		readonly RuntimePlugin<PluginExtension>[] = readonly RuntimePlugin<PluginExtension>[],
->(
-	config?: LensConfig<TPlugins>,
-): Lens<TContext> | LensWithPlugins<TContext, ExtractPluginExtensions<TPlugins>> {
+>(config?: LensConfig<TPlugins>): Lens<TContext> | LensWithPlugins<TContext> {
 	// Create typed resolver factory using curried form
 	const typedResolver = createResolver<TContext>();
 
-	const base: Lens<TContext> = {
+	// If no config or no plugins, return base Lens (no .optimistic())
+	if (!config?.plugins) {
+		return {
+			resolver: typedResolver as LensResolver<TContext>,
+			query: ((name?: string) => createQuery<TContext>(name as string)) as LensQuery<TContext>,
+			mutation: ((name?: string) =>
+				createMutation<TContext>(name as string)) as LensMutationNoPlugins<TContext>,
+		};
+	}
+
+	// Return LensWithPlugins with runtime plugins (has .optimistic())
+	// doesn't propagate the plugin types correctly through the function signature.
+	return {
 		resolver: typedResolver as LensResolver<TContext>,
 		query: ((name?: string) => createQuery<TContext>(name as string)) as LensQuery<TContext>,
 		mutation: ((name?: string) =>
-			createMutation<TContext>(name as string)) as LensMutation<TContext>,
-	};
-
-	// If no config or no plugins, return base Lens
-	if (!config?.plugins) {
-		return base;
-	}
-
-	// Return LensWithPlugins with runtime plugins
-	return {
-		...base,
+			createMutation<TContext>(name as string)) as unknown as LensMutationWithPlugins<TContext>,
 		plugins: config.plugins as unknown as RuntimePlugin[],
-	} as LensWithPlugins<TContext, TPlugins>;
+	};
 }

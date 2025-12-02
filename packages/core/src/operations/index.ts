@@ -395,8 +395,23 @@ export interface OptimisticContext<TInput> {
 /** Optimistic callback that receives typed input and returns step builders */
 export type OptimisticCallback<TInput> = (ctx: OptimisticContext<TInput>) => StepBuilder[];
 
-/** Mutation builder after returns is defined */
-export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown> {
+/**
+ * Mutation builder after returns is defined (strict version).
+ * Only has .resolve() - no .optimistic().
+ * Used by lens() without plugins for type safety.
+ */
+export interface MutationBuilderWithReturns2<TInput, TOutput, TContext = unknown> {
+	/** Define resolver function */
+	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
+}
+
+/**
+ * Mutation builder after returns is defined (with optimistic).
+ * Has .optimistic() and .resolve().
+ * Used by direct mutation() calls for backward compatibility.
+ */
+export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown>
+	extends MutationBuilderWithReturns2<TInput, TOutput, TContext> {
 	/**
 	 * Define optimistic update (optional)
 	 *
@@ -423,9 +438,6 @@ export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown>
 	optimistic(
 		callback: OptimisticCallback<TInput>,
 	): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
-
-	/** Define resolver function */
-	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
 }
 
 /** Mutation builder after optimistic is defined */

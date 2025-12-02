@@ -178,6 +178,12 @@ export interface RuntimePlugin<TExt extends PluginExtension = PluginExtension> {
 	readonly name: TExt["name"];
 
 	/**
+	 * Phantom type to store the extension type for extraction.
+	 * Never set at runtime - only used for type inference.
+	 */
+	readonly _extension?: TExt;
+
+	/**
 	 * Extension methods to add to builders.
 	 * Called during lens() initialization to wire up methods.
 	 */
@@ -213,10 +219,23 @@ export function isRuntimePlugin(value: unknown): value is RuntimePlugin {
 }
 
 /**
+ * Helper type to extract extension from a single RuntimePlugin.
+ * Uses the _extension phantom property for reliable extraction.
+ */
+type ExtractSingleExtension<P> = P extends { readonly _extension?: infer E }
+	? E extends PluginExtension
+		? E
+		: NoExtension
+	: NoExtension;
+
+/**
  * Extract PluginExtension types from a RuntimePlugin array.
  *
  * This allows lens({ plugins: [optimisticPlugin()] }) to work where
  * optimisticPlugin() returns RuntimePlugin<OptimisticPluginExtension>.
+ *
+ * Uses the _extension phantom property for reliable extraction,
+ * avoiding issues with `infer` on branded/extended types.
  *
  * @example
  * ```typescript
@@ -226,5 +245,5 @@ export function isRuntimePlugin(value: unknown): value is RuntimePlugin {
  * ```
  */
 export type ExtractPluginExtensions<T extends readonly RuntimePlugin[]> = {
-	[K in keyof T]: T[K] extends RuntimePlugin<infer E> ? E : NoExtension;
+	[K in keyof T]: ExtractSingleExtension<T[K]>;
 };
