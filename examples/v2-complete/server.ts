@@ -10,6 +10,8 @@
  */
 
 import { entity, t, router, lens } from "@sylphx/lens-core";
+// Import OptimisticPluginExtension to trigger module augmentation
+import type { OptimisticPluginExtension as _ } from "@sylphx/lens-core";
 import { entity as e, temp, ref, now, branch } from "@sylphx/reify";
 // Note: `e` is the Reify entity helper, `entity` is the Lens entity definition builder
 import { createServer, optimisticPlugin } from "@sylphx/lens-server";
@@ -95,9 +97,11 @@ const db = {
 // Typed Builders (functional pattern - define context once)
 // =============================================================================
 
-const { query, mutation, resolver, plugins } = lens<AppContext>({
-	plugins: [optimisticPlugin()],
-});
+// Use .withPlugins() pattern for correct TypeScript inference
+// (explicit type param + inline plugins doesn't infer correctly)
+const { query, mutation, resolver, plugins } = lens<AppContext>().withPlugins([
+	optimisticPlugin(),
+]);
 
 // =============================================================================
 // Field Resolvers (pure values - no mutable registry)
