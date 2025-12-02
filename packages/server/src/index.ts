@@ -31,6 +31,8 @@ export {
 export {
 	// Factory
 	createServer,
+	// Subscription transports
+	directTransport,
 	type EntitiesMap,
 	// Type inference utilities (tRPC-style)
 	type InferApi,
@@ -49,6 +51,7 @@ export {
 	type SelectionObject,
 	// Metadata types (for transport handshake)
 	type ServerMetadata,
+	type SubscriptionTransport,
 	type WebSocketLike,
 } from "./server/create.js";
 
@@ -108,3 +111,15 @@ export {
 	// Types
 	type SSEHandlerConfig,
 } from "./sse/handler.js";
+
+// =============================================================================
+// Subscription Transports
+// =============================================================================
+
+export {
+	// Pusher transport
+	createPusherSubscription,
+	pusher,
+	type PusherLike,
+	type PusherTransportOptions,
+} from "./transport/index.js";

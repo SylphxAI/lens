@@ -33,7 +33,16 @@
 		"@sylphx/lens-core": "workspace:*"
 	},
 	"devDependencies": {
+		"pusher": "^5.2.0",
 		"typescript": "^5.9.3",
 		"zod": "^4.1.13"
+	},
+	"peerDependencies": {
+		"pusher": ">=5.0.0"
+	},
+	"peerDependenciesMeta": {
+		"pusher": {
+			"optional": true
+		}
 	}
 }

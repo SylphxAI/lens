@@ -77,6 +77,94 @@ export interface LensLogger {
 	error?: (message: string, ...args: unknown[]) => void;
 }
 
+// =============================================================================
+// Subscription Transport
+// =============================================================================
+
+/**
+ * Subscription transport interface.
+ * Defines how the server delivers updates to subscribers.
+ */
+export interface SubscriptionTransport {
+	/** Transport name (for debugging) */
+	name: string;
+
+	/**
+	 * Initialize the transport.
+	 * Called once when the server starts.
+	 */
+	init?(): Promise<void>;
+
+	/**
+	 * Publish a message to a channel.
+	 * @param channel - Channel name (e.g., "entity:User:123")
+	 * @param message - Message payload
+	 */
+	publish(channel: string, message: unknown): Promise<void>;
+
+	/**
+	 * Subscribe a client to a channel.
+	 * @param clientId - Client identifier
+	 * @param channel - Channel name
+	 * @param onMessage - Callback when message is received
+	 * @returns Unsubscribe function
+	 */
+	subscribe(clientId: string, channel: string, onMessage: (message: unknown) => void): () => void;
+
+	/**
+	 * Cleanup when transport is closed.
+	 */
+	close?(): Promise<void>;
+}
+
+/**
+ * Direct WebSocket transport (default).
+ * Messages are sent directly to connected clients.
+ */
+export function directTransport(): SubscriptionTransport {
+	// In-memory pub/sub for direct connections
+	const channels = new Map<string, Set<{ clientId: string; callback: (msg: unknown) => void }>>();
+
+	return {
+		name: "direct",
+
+		async publish(channel: string, message: unknown): Promise<void> {
+			const subscribers = channels.get(channel);
+			if (subscribers) {
+				for (const { callback } of subscribers) {
+					callback(message);
+				}
+			}
+		},
+
+		subscribe(
+			clientId: string,
+			channel: string,
+			onMessage: (message: unknown) => void,
+		): () => void {
+			let subscribers = channels.get(channel);
+			if (!subscribers) {
+				subscribers = new Set();
+				channels.set(channel, subscribers);
+			}
+
+			const sub = { clientId, callback: onMessage };
+			subscribers.add(sub);
+
+			return () => {
+				subscribers?.delete(sub);
+				if (subscribers?.size === 0) {
+					channels.delete(channel);
+				}
+			};
+		},
+
+		async close(): Promise<void> {
+			channels.clear();
+		},
+	};
+}
+
 /** Server configuration */
 export interface LensServerConfig<
 	TContext extends ContextValue = ContextValue,
@@ -94,6 +182,24 @@ export interface LensServerConfig<
 	resolvers?: Resolvers | undefined;
 	/** Server plugins for extending behavior */
 	plugins?: ServerPlugin[] | undefined;
+	/**
+	 * Transport for delivering subscription updates.
+	 * Defaults to directTransport() (in-memory pub/sub).
+	 *
+	 * For serverless or distributed deployments, use external transports:
+	 * - pusher() - Pusher Channels
+	 * - redis() - Redis pub/sub
+	 *
+	 * @example
+	 * ```typescript
+	 * // Direct (default - WebSocket)
+	 * subscriptionTransport: directTransport()
+	 *
+	 * // Pusher (serverless-friendly)
+	 * subscriptionTransport: pusher({ appId: '...', key: '...' })
+	 * ```
+	 */
+	subscriptionTransport?: SubscriptionTransport | undefined;
 	/** Logger for server messages (default: silent) */
 	logger?: LensLogger | undefined;
 	/** Context factory - must return the context type expected by the router */
