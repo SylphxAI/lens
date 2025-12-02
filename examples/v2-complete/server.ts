@@ -236,7 +236,12 @@ const userRouter = router({
 		.resolve(({ input, ctx }) => {
 			const user = ctx.db.users.get(input.id);
 			if (!user) throw new Error("User not found");
-			const updated = { ...user, ...input };
+			const updated = {
+				...user,
+				...(input.name && { name: input.name }),
+				...(input.email && { email: input.email }),
+				...(input.avatar && { avatar: input.avatar }),
+			};
 			ctx.db.users.set(input.id, updated);
 			return updated;
 		}),
@@ -307,7 +312,12 @@ const postRouter = router({
 		.resolve(({ input, ctx }) => {
 			const post = ctx.db.posts.get(input.id);
 			if (!post) throw new Error("Post not found");
-			const updated = { ...post, ...input, updatedAt: new Date() };
+			const updated = {
+				...post,
+				...(input.title && { title: input.title }),
+				...(input.content && { content: input.content }),
+				updatedAt: new Date(),
+			};
 			ctx.db.posts.set(input.id, updated);
 			return updated;
 		}),
