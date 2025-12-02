@@ -35,6 +35,7 @@ import { isPipeline } from "../optimistic/reify.js";
 import type { EntityDef } from "../schema/define.js";
 import type { InferScalar, ScalarFields } from "../schema/infer.js";
 import type { EntityDefinition } from "../schema/types.js";
+import type { Prettify, UnionToIntersection } from "../utils/types.js";
 
 // =============================================================================
 // Type Definitions
@@ -62,9 +63,6 @@ export type ReturnSpec =
 
 /** Check if a field has the _optional flag */
 type IsOptional<F> = F extends { _optional: true } ? true : false;
-
-/** Flatten intersection types into a single object type */
-type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 /**
  * Infer entity type from entity definition fields.
@@ -716,16 +714,6 @@ export interface RouterDef<TRoutes extends RouterRoutes = RouterRoutes, TContext
 	/** Phantom type for context inference */
 	_context?: TContext;
 }
-
-/**
- * Convert union type to intersection type
- * { a: 1 } | { b: 2 } => { a: 1 } & { b: 2 } => { a: 1; b: 2 }
- */
-type UnionToIntersection<U> = (U extends unknown ? (x: U) => void : never) extends (
-	x: infer I,
-) => void
-	? I
-	: never;
 
 /**
  * Extract context from a procedure (non-recursive, single level)

@@ -90,25 +90,8 @@ export interface NoPlugins extends PluginExtension {
 // Type Utilities
 // =============================================================================
 
-/**
- * Convert union type to intersection type.
- *
- * @example
- * ```typescript
- * type A = { a: 1 } | { b: 2 };
- * type B = UnionToIntersection<A>; // { a: 1 } & { b: 2 }
- * ```
- */
-export type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
-	k: infer I,
-) => void
-	? I
-	: never;
-
-/**
- * Flatten intersection types for better IDE display.
- */
-export type Prettify<T> = { [K in keyof T]: T[K] } & {};
+// Re-export shared type utilities
+export type { Prettify, UnionToIntersection } from "../utils/types.js";
 
 // =============================================================================
 // Plugin Method Type Imports
