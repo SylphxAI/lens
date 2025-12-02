@@ -6,7 +6,8 @@
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
 		"lib": ["ES2022", "DOM"],
-		"noEmit": false
+		"noEmit": false,
+		"skipLibCheck": true
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.tsx"]
