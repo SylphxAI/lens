@@ -2,12 +2,12 @@
  * Type Inference Demo
  *
  * This example demonstrates the complete type inference chain in Lens:
- *   server._types.router → inProcess({ server }) → TypedTransport → createClient() → typed client
+ *   app._types.router → inProcess({ app }) → TypedTransport → createClient() → typed client
  *
  * Run: bun run examples/type-inference/demo.ts
  */
 
-import { createServer, optimisticPlugin } from "@sylphx/lens-server";
+import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { createClient, inProcess } from "@sylphx/lens-client";
 import { entity, lens, router, t } from "@sylphx/lens-core";
 import { z } from "zod";
@@ -257,7 +257,7 @@ const appRouter = router({
 
 console.log("🚀 Creating server...\n");
 
-const server = createServer({
+const app = createApp({
 	router: appRouter,
 	plugins,
 	context: () => ({
@@ -291,7 +291,7 @@ console.log("📱 Creating client with inProcess transport...\n");
 // The magic: client is FULLY TYPED from server!
 // No manual type annotations needed.
 const client = createClient({
-	transport: inProcess({ server }),
+	transport: inProcess({ app }),
 });
 
 // =============================================================================

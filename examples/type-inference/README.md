@@ -3,7 +3,7 @@
 This example demonstrates the complete type inference chain in Lens:
 
 ```
-server._types.router → inProcess({ server }) → TypedTransport → createClient() → typed client
+app._types.router → inProcess({ app }) → TypedTransport → createClient() → typed client
 ```
 
 ## What This Example Shows
@@ -61,11 +61,11 @@ const getUser = query()
 ### 4. Create Client with `inProcess()` for Full Type Inference
 
 ```typescript
-const server = createServer({ router: appRouter, context: () => ({...}) });
+const app = createApp({ router: appRouter, context: () => ({...}) });
 
 // Full type inference - no manual types needed!
 const client = createClient({
-  transport: inProcess({ server }),
+  transport: inProcess({ app }),
 });
 
 // client.user.get is fully typed

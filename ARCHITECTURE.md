@@ -109,7 +109,7 @@ interface LensServer {
 ### Server Creation
 
 ```typescript
-import { createServer, router, query, mutation } from '@sylphx/lens-server'
+import { createApp, router, query, mutation } from '@sylphx/lens-server'
 
 const appRouter = router({
   user: {
@@ -126,7 +126,7 @@ const appRouter = router({
 })
 
 // Pure executor - no transport, no connection handling
-const server = createServer({
+const server = createApp({
   router: appRouter,
   context: () => ({ db: prisma }),
 })
@@ -145,10 +145,10 @@ Adapters bridge the server to specific protocols/frameworks. Each adapter is a *
 ### HTTP Adapter
 
 ```typescript
-import { createHTTPAdapter } from '@sylphx/lens-server/adapters/http'
+import { createHTTPHandler } from '@sylphx/lens-server/adapters/http'
 
 // Creates a fetch handler
-const handler = createHTTPAdapter(server)
+const handler = createHTTPHandler(server)
 
 // Use with any framework:
 
@@ -156,8 +156,8 @@ const handler = createHTTPAdapter(server)
 Bun.serve({ port: 3000, fetch: handler })
 
 // Node (with adapter)
-import { createServer } from 'http'
-createServer(toNodeHandler(handler)).listen(3000)
+import { createApp } from 'http'
+createApp(toNodeHandler(handler)).listen(3000)
 
 // Vercel
 export default handler
@@ -169,10 +169,10 @@ export default { fetch: handler }
 ### WebSocket Adapter
 
 ```typescript
-import { createWSAdapter } from '@sylphx/lens-server/adapters/ws'
+import { createWSHandler } from '@sylphx/lens-server/adapters/ws'
 
 // Creates WS handler with connection management
-const wsHandler = createWSAdapter(server, {
+const wsHandler = createWSHandler(server, {
   stateManager: createGraphStateManager(), // Optional - for subscriptions
 })
 
@@ -187,10 +187,10 @@ Bun.serve({
 ### SSE Adapter
 
 ```typescript
-import { createSSEAdapter } from '@sylphx/lens-server/adapters/sse'
+import { createSSEHandler } from '@sylphx/lens-server/adapters/sse'
 
 // Creates SSE handler
-const sseHandler = createSSEAdapter(server, {
+const sseHandler = createSSEHandler(server, {
   stateManager: createGraphStateManager(),
 })
 
@@ -383,8 +383,8 @@ import { createGraphStateManager, GraphStateManager } from '@sylphx/lens-server'
 const stateManager = createGraphStateManager()
 
 // Used by WS/SSE adapters
-const wsHandler = createWSAdapter(server, { stateManager })
-const sseHandler = createSSEAdapter(server, { stateManager })
+const wsHandler = createWSHandler(server, { stateManager })
+const sseHandler = createSSEHandler(server, { stateManager })
 ```
 
 ### Why State Lives in Adapters?
@@ -431,7 +431,7 @@ interface ServerPlugin {
 }
 
 // Usage - passed to adapters, not server
-const wsHandler = createWSAdapter(server, {
+const wsHandler = createWSHandler(server, {
   stateManager,
   plugins: [
     diffOptimizer(),  // Compute minimal diffs
@@ -468,7 +468,7 @@ const compression: PairedPlugin = {
 import { compression } from '@sylphx/lens-plugin-compression'
 
 // Server adapter gets compression.server
-createWSAdapter(server, { plugins: [compression] })
+createWSHandler(server, { plugins: [compression] })
 
 // Client gets compression.client
 createClient({ plugins: [compression] })
@@ -481,11 +481,11 @@ createClient({ plugins: [compression] })
 ### Scenario A: Traditional Server (WebSocket)
 
 ```typescript
-import { createServer, createHTTPAdapter, createWSAdapter } from '@sylphx/lens-server'
+import { createApp, createHTTPHandler, createWSHandler } from '@sylphx/lens-server'
 
-const server = createServer({ router })
-const httpHandler = createHTTPAdapter(server)
-const wsHandler = createWSAdapter(server, { stateManager: createGraphStateManager() })
+const server = createApp({ router })
+const httpHandler = createHTTPHandler(server)
+const wsHandler = createWSHandler(server, { stateManager: createGraphStateManager() })
 
 Bun.serve({
   port: 3000,
@@ -503,10 +503,10 @@ Bun.serve({
 ### Scenario B: Serverless (HTTP only)
 
 ```typescript
-import { createServer, createHTTPAdapter } from '@sylphx/lens-server'
+import { createApp, createHTTPHandler } from '@sylphx/lens-server'
 
-const server = createServer({ router })
-const handler = createHTTPAdapter(server)
+const server = createApp({ router })
+const handler = createHTTPHandler(server)
 
 // Vercel
 export default handler
@@ -524,11 +524,11 @@ export default { fetch: handler }
 ### Scenario C: Serverless + SSE
 
 ```typescript
-import { createServer, createHTTPAdapter, createSSEAdapter } from '@sylphx/lens-server'
+import { createApp, createHTTPHandler, createSSEHandler } from '@sylphx/lens-server'
 
-const server = createServer({ router })
-const httpHandler = createHTTPAdapter(server)
-const sseHandler = createSSEAdapter(server, { stateManager: createGraphStateManager() })
+const server = createApp({ router })
+const httpHandler = createHTTPHandler(server)
+const sseHandler = createSSEHandler(server, { stateManager: createGraphStateManager() })
 
 // Route based on path
 export default (req: Request) => {
@@ -549,10 +549,10 @@ export default (req: Request) => {
 
 ```typescript
 // Server (Lambda)
-import { createServer, createHTTPAdapter, createPusherPublisher } from '@sylphx/lens-server'
+import { createApp, createHTTPHandler, createPusherPublisher } from '@sylphx/lens-server'
 
-const server = createServer({ router })
-const httpHandler = createHTTPAdapter(server)
+const server = createApp({ router })
+const httpHandler = createHTTPHandler(server)
 const pusherPublisher = createPusherPublisher({ appId, key, secret })
 
 // After mutations, publish to Pusher
@@ -607,11 +607,11 @@ packages/
 │   └── store/               ReactiveStore, optimistic
 │
 ├── server/                  @sylphx/lens-server
-│   ├── server/              createServer (pure executor)
+│   ├── server/              createApp (pure executor)
 │   ├── adapters/
-│   │   ├── http.ts          createHTTPAdapter
-│   │   ├── ws.ts            createWSAdapter
-│   │   └── sse.ts           createSSEAdapter
+│   │   ├── http.ts          createHTTPHandler
+│   │   ├── ws.ts            createWSHandler
+│   │   └── sse.ts           createSSEHandler
 │   ├── state/               GraphStateManager
 │   ├── plugins/             diffOptimizer, logger
 │   └── publishers/

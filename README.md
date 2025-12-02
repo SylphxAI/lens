@@ -383,7 +383,7 @@ const postResolver = resolver(Post, (f) => ({
 ### 3. Register with Server
 
 ```typescript
-const server = createServer({
+const app = createApp({
   router: appRouter,
   entities: { User, Post },
   resolvers: [userResolver, postResolver],  // Array of resolver values
@@ -622,7 +622,7 @@ npm install @sylphx/lens-fresh      # Fresh (Deno)
 
 ```typescript
 // server/api.ts
-import { createServer, router, query, mutation } from '@sylphx/lens-server'
+import { createApp, router, query, mutation } from '@sylphx/lens-server'
 import { z } from 'zod'
 
 export const appRouter = router({
@@ -646,7 +646,7 @@ export const appRouter = router({
 
 export type AppRouter = typeof appRouter
 
-export const server = createServer({
+export const app = createApp({
   router: appRouter,
   context: async (req) => ({
     db: prisma,
@@ -1083,7 +1083,7 @@ export default function UserProfile() {
 Pass request-specific data to resolvers:
 
 ```typescript
-const server = createServer({
+const app = createApp({
   router: appRouter,
   context: async (req) => ({
     db: prisma,
@@ -1140,7 +1140,7 @@ const appRouter = router({
 })
 
 // Merged context: { db: PrismaClient; user: User | null; cache: RedisClient }
-const server = createServer({
+const app = createApp({
   router: appRouter,
   context: async (req) => ({
     db: prisma,                // Required by getUser, createUser

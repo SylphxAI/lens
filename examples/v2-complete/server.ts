@@ -12,7 +12,7 @@
 import { entity, t, router, lens } from "@sylphx/lens-core";
 import { entity as e, temp, ref, now, branch } from "@sylphx/reify";
 // Note: `e` is the Reify entity helper, `entity` is the Lens entity definition builder
-import { createServer, optimisticPlugin } from "@sylphx/lens-server";
+import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 
 // =============================================================================
@@ -436,7 +436,7 @@ export type AppRouter = typeof appRouter;
 // Server (accepts resolver array - functional pattern)
 // =============================================================================
 
-export const server = createServer({
+export const app = createApp({
 	router: appRouter,
 	entities: { User, Post, Comment, Session, Message },
 	resolvers: [userResolver, postResolver, commentResolver],  // Array of pure values
@@ -456,7 +456,7 @@ export { db };
 
 const PORT = 3000;
 
-server.listen(PORT).then(() => {
+app.listen(PORT).then(() => {
 	console.log(`
 🔭 Lens Server running on http://localhost:${PORT}
 

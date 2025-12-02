@@ -2,7 +2,7 @@
  * Example Lens Server
  */
 import { entity, t, lens, router } from "@sylphx/lens-core";
-import { createServer, optimisticPlugin } from "@sylphx/lens-server";
+import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 
 // =============================================================================
@@ -163,7 +163,7 @@ export type AppRouter = typeof appRouter;
 // Server
 // =============================================================================
 
-export const server = createServer({
+export const app = createApp({
 	router: appRouter,
 	entities: { User, Post },
 	plugins,
