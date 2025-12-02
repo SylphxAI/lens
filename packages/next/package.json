@@ -16,7 +16,7 @@
 		}
 	},
 	"scripts": {
-		"build": "bunup",
+		"build": "bun build ./src/index.ts ./src/server.ts --outdir ./dist --target browser --external react --external next --external @sylphx/lens-react --external @sylphx/lens-client --external @sylphx/lens-server && tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"prepack": "[ -d dist ] || bun run build"
