@@ -317,8 +317,10 @@ export {
 	type ConnectionState,
 	coalescePatches,
 	compressIfNeeded,
+	createMetricsTracker,
 	createSubscriptionRegistry,
 	DEFAULT_COMPRESSION_CONFIG,
+	DEFAULT_METRICS_CONFIG,
 	DEFAULT_OPERATION_LOG_CONFIG,
 	DEFAULT_RECONNECT_CONFIG,
 	decompressIfNeeded,
@@ -336,6 +338,9 @@ export {
 	// Utilities
 	isCompressedPayload,
 	isCompressionSupported,
+	type MetricsCollector,
+	type MetricsConfig,
+	type MetricsEvent,
 	// Hashing
 	murmurhash3,
 	// Operation Log
@@ -349,6 +354,9 @@ export {
 	type ReconnectConfig,
 	type ReconnectionHealth,
 	type ReconnectionMetrics,
+	// Metrics
+	ReconnectionMetricsTracker,
+	type ReconnectionRecord,
 	type ReconnectMessage,
 	type ReconnectResult,
 	type ReconnectStatus,

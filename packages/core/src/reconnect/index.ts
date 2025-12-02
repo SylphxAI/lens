@@ -111,3 +111,17 @@ export {
 	getSpaceSaved,
 	isCompressionSupported,
 } from "./compression.js";
+
+// =============================================================================
+// Metrics
+// =============================================================================
+
+export {
+	createMetricsTracker,
+	DEFAULT_METRICS_CONFIG,
+	type MetricsCollector,
+	type MetricsConfig,
+	type MetricsEvent,
+	ReconnectionMetricsTracker,
+	type ReconnectionRecord,
+} from "./metrics.js";
