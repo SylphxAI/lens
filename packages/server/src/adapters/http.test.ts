@@ -1,0 +1,215 @@
+/**
+ * @sylphx/lens-server - HTTP Adapter Tests
+ */
+
+import { describe, expect, it } from "bun:test";
+import { mutation, query } from "@sylphx/lens-core";
+import { z } from "zod";
+import { createServer } from "../server/create.js";
+import { createHTTPAdapter } from "./http.js";
+
+// =============================================================================
+// Test Queries and Mutations
+// =============================================================================
+
+const getUser = query()
+	.input(z.object({ id: z.string() }))
+	.resolve(({ input }) => ({
+		id: input.id,
+		name: "Test User",
+	}));
+
+const createUser = mutation()
+	.input(z.object({ name: z.string() }))
+	.resolve(({ input }) => ({
+		id: "new-id",
+		name: input.name,
+	}));
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+describe("createHTTPAdapter", () => {
+	it("creates an HTTP adapter from server", () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		expect(typeof handler).toBe("function");
+		expect(typeof handler.handle).toBe("function");
+	});
+
+	it("returns metadata on GET /__lens/metadata", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/__lens/metadata", {
+			method: "GET",
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(200);
+
+		const data = await response.json();
+		expect(data.version).toBeDefined();
+		expect(data.operations).toBeDefined();
+		expect(data.operations.getUser.type).toBe("query");
+		expect(data.operations.createUser.type).toBe("mutation");
+	});
+
+	it("executes query via POST", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				operation: "getUser",
+				input: { id: "123" },
+			}),
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(200);
+
+		const data = await response.json();
+		expect(data.data).toEqual({ id: "123", name: "Test User" });
+	});
+
+	it("executes mutation via POST", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				operation: "createUser",
+				input: { name: "New User" },
+			}),
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(200);
+
+		const data = await response.json();
+		expect(data.data).toEqual({ id: "new-id", name: "New User" });
+	});
+
+	it("supports path prefix", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server, { pathPrefix: "/api" });
+
+		// Metadata at /api/__lens/metadata
+		const metadataRequest = new Request("http://localhost/api/__lens/metadata", {
+			method: "GET",
+		});
+		const metadataResponse = await handler(metadataRequest);
+		expect(metadataResponse.status).toBe(200);
+
+		// Operation at /api
+		const operationRequest = new Request("http://localhost/api", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				operation: "getUser",
+				input: { id: "456" },
+			}),
+		});
+		const operationResponse = await handler(operationRequest);
+		expect(operationResponse.status).toBe(200);
+
+		const data = await operationResponse.json();
+		expect(data.data.id).toBe("456");
+	});
+
+	it("handles CORS preflight", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/", {
+			method: "OPTIONS",
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(204);
+		expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+	});
+
+	it("returns 404 for unknown paths", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/unknown", {
+			method: "GET",
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(404);
+	});
+
+	it("returns error for missing operation", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({}),
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(400);
+
+		const data = await response.json();
+		expect(data.error).toContain("Missing operation");
+	});
+
+	it("returns error for unknown operation", async () => {
+		const server = createServer({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPAdapter(server);
+
+		const request = new Request("http://localhost/", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				operation: "unknownOperation",
+				input: {},
+			}),
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(500);
+
+		const data = await response.json();
+		expect(data.error).toContain("not found");
+	});
+});

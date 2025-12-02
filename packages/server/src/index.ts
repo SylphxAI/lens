@@ -2,7 +2,12 @@
  * @sylphx/lens-server
  *
  * Server runtime for Lens API framework.
- * Operations-based server with GraphStateManager for reactive updates.
+ *
+ * Architecture:
+ * - Server = Pure executor (getMetadata, execute)
+ * - Adapters = Protocol handlers (HTTP, WebSocket, SSE)
+ * - State = Per-connection tracking (GraphStateManager)
+ * - Plugins = Lifecycle hooks (diffOptimizer, logger)
  */
 
 // =============================================================================
@@ -25,13 +30,13 @@ export {
 } from "@sylphx/lens-core";
 
 // =============================================================================
-// Server
+// Server (Pure Executor)
 // =============================================================================
 
 export {
 	// Factory
 	createServer,
-	// Subscription transports
+	// Subscription transports (legacy - use adapters instead)
 	directTransport,
 	type EntitiesMap,
 	// Type inference utilities (tRPC-style)
@@ -54,6 +59,24 @@ export {
 	type SubscriptionTransport,
 	type WebSocketLike,
 } from "./server/create.js";
+
+// =============================================================================
+// Protocol Adapters
+// =============================================================================
+
+export {
+	// HTTP Adapter
+	createHTTPAdapter,
+	type HTTPAdapter,
+	type HTTPAdapterOptions,
+	// WebSocket Adapter
+	createWSAdapter,
+	type WSAdapter,
+	type WSAdapterOptions,
+	// SSE Adapter (alias)
+	createSSEAdapter,
+	type SSEAdapterOptions,
+} from "./adapters/index.js";
 
 // =============================================================================
 // State Management
@@ -99,7 +122,7 @@ export {
 } from "./plugin/index.js";
 
 // =============================================================================
-// SSE Transport Adapter
+// SSE Handler (Legacy - prefer createSSEAdapter)
 // =============================================================================
 
 export {
@@ -113,7 +136,7 @@ export {
 } from "./sse/handler.js";
 
 // =============================================================================
-// Subscription Transports
+// Subscription Transports (for third-party services)
 // =============================================================================
 
 export {
