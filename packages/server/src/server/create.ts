@@ -25,6 +25,7 @@ import {
 	type MutationDef,
 	type Pipeline,
 	type QueryDef,
+	type ReconnectMessage,
 	type ResolverDef,
 	type Resolvers,
 	type ReturnSpec,
@@ -331,7 +332,8 @@ type ClientMessage =
 	| UnsubscribeMessage
 	| QueryMessage
 	| MutationMessage
-	| HandshakeMessage;
+	| HandshakeMessage
+	| ReconnectMessage;
 
 // =============================================================================
 // Client Connection
@@ -668,6 +670,9 @@ class LensServerImpl<
 				case "mutation":
 					this.handleMutation(conn, message);
 					break;
+				case "reconnect":
+					this.handleReconnect(conn, message);
+					break;
 			}
 		} catch (error) {
 			conn.ws.send(
@@ -688,6 +693,68 @@ class LensServerImpl<
 				operations: this.buildOperationsMap(),
 			}),
 		);
+	}
+
+	private handleReconnect(conn: ClientConnection, message: ReconnectMessage): void {
+		const startTime = Date.now();
+
+		try {
+			// Re-register client with GraphStateManager (may have been cleaned up)
+			if (!this.stateManager.hasClient(conn.id)) {
+				this.stateManager.addClient({
+					id: conn.id,
+					send: (msg) => {
+						conn.ws.send(JSON.stringify(msg));
+					},
+				});
+			}
+
+			// Process reconnection through GraphStateManager
+			const results = this.stateManager.handleReconnect(message.subscriptions);
+
+			// Re-establish subscriptions in local connection state
+			for (const sub of message.subscriptions) {
+				// Find or create subscription entry
+				let clientSub = conn.subscriptions.get(sub.id);
+				if (!clientSub) {
+					clientSub = {
+						id: sub.id,
+						operation: "", // Will be set by subsequent subscribe if needed
+						input: sub.input,
+						fields: sub.fields,
+						entityKeys: new Set([`${sub.entity}:${sub.entityId}`]),
+						cleanups: [],
+						lastData: null,
+					};
+					conn.subscriptions.set(sub.id, clientSub);
+				}
+
+				// Re-subscribe to entity in GraphStateManager
+				this.stateManager.subscribe(conn.id, sub.entity, sub.entityId, sub.fields);
+			}
+
+			// Send reconnect acknowledgment
+			conn.ws.send(
+				JSON.stringify({
+					type: "reconnect_ack",
+					results,
+					serverTime: Date.now(),
+					reconnectId: message.reconnectId,
+					processingTime: Date.now() - startTime,
+				}),
+			);
+		} catch (error) {
+			conn.ws.send(
+				JSON.stringify({
+					type: "error",
+					error: {
+						code: "RECONNECT_ERROR",
+						message: String(error),
+						reconnectId: message.reconnectId,
+					},
+				}),
+			);
+		}
 	}
 
 	private async handleSubscribe(conn: ClientConnection, message: SubscribeMessage): Promise<void> {

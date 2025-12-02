@@ -2359,3 +2359,274 @@ describe("Entity Resolvers", () => {
 		expect((result as any).bio).toBeUndefined();
 	});
 });
+
+// =============================================================================
+// Test: Reconnection Protocol
+// =============================================================================
+
+describe("WebSocket Reconnection", () => {
+	it("handles reconnect message and returns reconnect_ack", async () => {
+		const getUser = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id) ?? null);
+
+		const server = createServer({
+			entities: { User },
+			queries: { getUser },
+		});
+
+		const ws = createMockWs();
+		server.handleWebSocket(ws);
+
+		// First emit some data to establish state
+		const stateManager = server.getStateManager();
+		stateManager.emit("User", "user-1", { id: "user-1", name: "Alice", email: "alice@test.com" });
+
+		// Simulate reconnect message
+		const reconnectMessage = {
+			type: "reconnect",
+			protocolVersion: 1,
+			reconnectId: "reconnect-123",
+			clientTime: Date.now(),
+			subscriptions: [
+				{
+					id: "sub-1",
+					entity: "User",
+					entityId: "user-1",
+					fields: "*" as const,
+					version: 0, // Client is behind
+				},
+			],
+		};
+
+		// Trigger message handler
+		ws.onmessage?.({ data: JSON.stringify(reconnectMessage) });
+
+		// Wait for async processing
+		await new Promise((r) => setTimeout(r, 10));
+
+		// Check reconnect_ack was sent
+		const ackMessage = ws.messages.find((m) => {
+			const parsed = JSON.parse(m);
+			return parsed.type === "reconnect_ack";
+		});
+
+		expect(ackMessage).toBeDefined();
+		const ack = JSON.parse(ackMessage!);
+		expect(ack.type).toBe("reconnect_ack");
+		expect(ack.reconnectId).toBe("reconnect-123");
+		expect(ack.results).toBeInstanceOf(Array);
+		expect(ack.results.length).toBe(1);
+		expect(ack.processingTime).toBeGreaterThanOrEqual(0);
+	});
+
+	it("returns current status when client is up-to-date", async () => {
+		const server = createServer({
+			entities: { User },
+		});
+
+		const ws = createMockWs();
+		server.handleWebSocket(ws);
+
+		// Emit data and get current version
+		const stateManager = server.getStateManager();
+		stateManager.emit("User", "user-1", { id: "user-1", name: "Alice" });
+		const currentVersion = stateManager.getVersion("User", "user-1");
+
+		// Reconnect with current version
+		const reconnectMessage = {
+			type: "reconnect",
+			protocolVersion: 1,
+			reconnectId: "reconnect-456",
+			clientTime: Date.now(),
+			subscriptions: [
+				{
+					id: "sub-1",
+					entity: "User",
+					entityId: "user-1",
+					fields: "*" as const,
+					version: currentVersion, // Client is current
+				},
+			],
+		};
+
+		ws.onmessage?.({ data: JSON.stringify(reconnectMessage) });
+		await new Promise((r) => setTimeout(r, 10));
+
+		const ackMessage = ws.messages.find((m) => JSON.parse(m).type === "reconnect_ack");
+		const ack = JSON.parse(ackMessage!);
+
+		expect(ack.results[0].status).toBe("current");
+		expect(ack.results[0].version).toBe(currentVersion);
+	});
+
+	it("returns snapshot status when patches not available", async () => {
+		const server = createServer({
+			entities: { User },
+		});
+
+		const ws = createMockWs();
+		server.handleWebSocket(ws);
+
+		// Emit data
+		const stateManager = server.getStateManager();
+		stateManager.emit("User", "user-1", { id: "user-1", name: "Alice" });
+
+		// Reconnect with very old version (version 0, patches won't be available)
+		const reconnectMessage = {
+			type: "reconnect",
+			protocolVersion: 1,
+			reconnectId: "reconnect-789",
+			clientTime: Date.now(),
+			subscriptions: [
+				{
+					id: "sub-1",
+					entity: "User",
+					entityId: "user-1",
+					fields: "*" as const,
+					version: 0, // Very old version
+				},
+			],
+		};
+
+		ws.onmessage?.({ data: JSON.stringify(reconnectMessage) });
+		await new Promise((r) => setTimeout(r, 10));
+
+		const ackMessage = ws.messages.find((m) => JSON.parse(m).type === "reconnect_ack");
+		const ack = JSON.parse(ackMessage!);
+
+		// Should return either patched (if patches available) or snapshot
+		expect(["patched", "snapshot"]).toContain(ack.results[0].status);
+		if (ack.results[0].status === "snapshot") {
+			expect(ack.results[0].data).toBeDefined();
+			expect(ack.results[0].data.name).toBe("Alice");
+		}
+	});
+
+	it("returns deleted status for non-existent entity", async () => {
+		const server = createServer({
+			entities: { User },
+		});
+
+		const ws = createMockWs();
+		server.handleWebSocket(ws);
+
+		// Reconnect asking for non-existent entity
+		const reconnectMessage = {
+			type: "reconnect",
+			protocolVersion: 1,
+			reconnectId: "reconnect-deleted",
+			clientTime: Date.now(),
+			subscriptions: [
+				{
+					id: "sub-1",
+					entity: "User",
+					entityId: "non-existent-user",
+					fields: "*" as const,
+					version: 5,
+				},
+			],
+		};
+
+		ws.onmessage?.({ data: JSON.stringify(reconnectMessage) });
+		await new Promise((r) => setTimeout(r, 10));
+
+		const ackMessage = ws.messages.find((m) => JSON.parse(m).type === "reconnect_ack");
+		const ack = JSON.parse(ackMessage!);
+
+		expect(ack.results[0].status).toBe("deleted");
+	});
+
+	it("handles multiple subscriptions in single reconnect", async () => {
+		const server = createServer({
+			entities: { User, Post },
+		});
+
+		const ws = createMockWs();
+		server.handleWebSocket(ws);
+
+		// Emit data for multiple entities
+		const stateManager = server.getStateManager();
+		stateManager.emit("User", "user-1", { id: "user-1", name: "Alice" });
+		stateManager.emit("Post", "post-1", { id: "post-1", title: "Hello" });
+
+		// Reconnect with multiple subscriptions
+		const reconnectMessage = {
+			type: "reconnect",
+			protocolVersion: 1,
+			reconnectId: "reconnect-multi",
+			clientTime: Date.now(),
+			subscriptions: [
+				{
+					id: "sub-user",
+					entity: "User",
+					entityId: "user-1",
+					fields: "*" as const,
+					version: 0,
+				},
+				{
+					id: "sub-post",
+					entity: "Post",
+					entityId: "post-1",
+					fields: "*" as const,
+					version: 0,
+				},
+			],
+		};
+
+		ws.onmessage?.({ data: JSON.stringify(reconnectMessage) });
+		await new Promise((r) => setTimeout(r, 10));
+
+		const ackMessage = ws.messages.find((m) => JSON.parse(m).type === "reconnect_ack");
+		const ack = JSON.parse(ackMessage!);
+
+		expect(ack.results.length).toBe(2);
+		expect(ack.results.find((r: any) => r.entity === "User")).toBeDefined();
+		expect(ack.results.find((r: any) => r.entity === "Post")).toBeDefined();
+	});
+
+	it("re-establishes subscriptions after reconnect", async () => {
+		const server = createServer({
+			entities: { User },
+		});
+
+		const ws = createMockWs();
+		server.handleWebSocket(ws);
+
+		// Emit initial data
+		const stateManager = server.getStateManager();
+		stateManager.emit("User", "user-1", { id: "user-1", name: "Alice" });
+
+		// Reconnect
+		const reconnectMessage = {
+			type: "reconnect",
+			protocolVersion: 1,
+			reconnectId: "reconnect-resub",
+			clientTime: Date.now(),
+			subscriptions: [
+				{
+					id: "sub-1",
+					entity: "User",
+					entityId: "user-1",
+					fields: "*" as const,
+					version: 0,
+				},
+			],
+		};
+
+		ws.onmessage?.({ data: JSON.stringify(reconnectMessage) });
+		await new Promise((r) => setTimeout(r, 10));
+
+		// Clear messages to check for new updates
+		ws.messages.length = 0;
+
+		// Emit new data - should be received by reconnected client
+		stateManager.emit("User", "user-1", { name: "Alice Updated" });
+		await new Promise((r) => setTimeout(r, 10));
+
+		// Client should receive the update
+		const updateMessage = ws.messages.find((m) => JSON.parse(m).type === "update");
+		expect(updateMessage).toBeDefined();
+	});
+});

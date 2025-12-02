@@ -201,6 +201,13 @@ export class GraphStateManager {
 		this.clientArrayStates.delete(clientId);
 	}
 
+	/**
+	 * Check if a client is registered
+	 */
+	hasClient(clientId: string): boolean {
+		return this.clients.has(clientId);
+	}
+
 	// ===========================================================================
 	// Subscription Management
 	// ===========================================================================

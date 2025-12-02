@@ -437,45 +437,63 @@ export interface ConnectionQuality {
  */
 export interface ReconnectionMetrics {
 	/** Total reconnect attempts */
-	attempts: number;
+	totalAttempts: number;
 
 	/** Successful reconnects */
-	successes: number;
+	successfulReconnects: number;
 
 	/** Failed reconnects */
-	failures: number;
+	failedReconnects: number;
 
-	/** Total patches sent */
-	patchesSent: number;
+	/** Success rate (0-1) */
+	successRate: number;
 
-	/** Total snapshots sent */
-	snapshotsSent: number;
+	/** Average latency in ms */
+	averageLatency: number;
 
-	/** Total bytes sent for reconnect */
-	bytesSent: number;
+	/** 50th percentile latency in ms */
+	p50Latency: number;
 
-	/** Average reconnect duration in ms */
-	avgDuration: number;
+	/** 95th percentile latency in ms */
+	p95Latency: number;
 
-	/** Last reconnect timestamp */
-	lastReconnectAt: number | null;
+	/** 99th percentile latency in ms */
+	p99Latency: number;
+
+	/** Total subscriptions processed */
+	totalSubscriptionsProcessed: number;
+
+	/** Breakdown by status */
+	statusBreakdown: Record<string, number>;
+
+	/** Total bytes transferred */
+	bytesTransferred: number;
+
+	/** Total bytes saved by compression */
+	bytesSaved: number;
+
+	/** Compression ratio (0-1) */
+	compressionRatio: number;
 }
 
 /**
  * Health check result.
  */
 export interface ReconnectionHealth {
-	/** Operation log within memory limits */
-	operationLogHealthy: boolean;
+	/** Health status */
+	status: "healthy" | "degraded" | "unhealthy";
 
-	/** Reconnect success rate (last 5 minutes) */
-	reconnectSuccessRate: number;
+	/** Current metrics */
+	metrics: ReconnectionMetrics;
 
-	/** Average reconnect latency in ms */
-	avgReconnectLatency: number;
+	/** Issues detected */
+	issues: string[];
 
-	/** Number of clients currently reconnecting */
-	reconnectingClients: number;
+	/** Last reconnect timestamp */
+	lastReconnect: number | null;
+
+	/** Number of pending reconnections */
+	pendingReconnects: number;
 }
 
 // =============================================================================
