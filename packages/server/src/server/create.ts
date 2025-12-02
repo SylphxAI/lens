@@ -41,6 +41,7 @@ export interface SelectionObject {
 }
 
 import { GraphStateManager } from "../state/graph-state-manager.js";
+import { createPluginManager, type PluginManager, type ServerPlugin } from "../plugin/types.js";
 
 // =============================================================================
 // Types
@@ -91,6 +92,8 @@ export interface LensServerConfig<
 	mutations?: MutationsMap | undefined;
 	/** Field resolvers array (use lens() factory to create) */
 	resolvers?: Resolvers | undefined;
+	/** Server plugins for extending behavior */
+	plugins?: ServerPlugin[] | undefined;
 	/** Logger for server messages (default: silent) */
 	logger?: LensLogger | undefined;
 	/** Context factory - must return the context type expected by the router */
@@ -439,6 +442,9 @@ class LensServerImpl<
 	/** GraphStateManager for per-client state tracking */
 	private stateManager: GraphStateManager;
 
+	/** Plugin manager for lifecycle hooks */
+	private pluginManager: PluginManager;
+
 	/** DataLoaders for N+1 batching (per-request) */
 	private loaders = new Map<string, DataLoader<unknown, unknown>>();
 
@@ -516,6 +522,12 @@ class LensServerImpl<
 				// Optional: cleanup when entity has no subscribers
 			},
 		});
+
+		// Initialize plugin manager
+		this.pluginManager = createPluginManager();
+		for (const plugin of config.plugins ?? []) {
+			this.pluginManager.register(plugin);
+		}
 
 		// Validate queries and mutations
 		for (const [name, def] of Object.entries(this.queries)) {
@@ -636,6 +648,14 @@ class LensServerImpl<
 			send: (msg) => {
 				ws.send(JSON.stringify(msg));
 			},
+		});
+
+		// Run onConnect hooks (async but we don't await - fire and forget for WS)
+		this.pluginManager.runOnConnect({ clientId }).then((allowed) => {
+			if (!allowed) {
+				ws.close();
+				this.handleDisconnect(conn);
+			}
 		});
 
 		ws.onmessage = (event) => {
@@ -759,6 +779,26 @@ class LensServerImpl<
 
 	private async handleSubscribe(conn: ClientConnection, message: SubscribeMessage): Promise<void> {
 		const { id, operation, input, fields } = message;
+
+		// Run onSubscribe hooks
+		const allowed = await this.pluginManager.runOnSubscribe({
+			clientId: conn.id,
+			subscriptionId: id,
+			operation,
+			input,
+			fields,
+		});
+
+		if (!allowed) {
+			conn.ws.send(
+				JSON.stringify({
+					type: "error",
+					id,
+					error: { code: "SUBSCRIPTION_REJECTED", message: "Subscription rejected by plugin" },
+				}),
+			);
+			return;
+		}
 
 		// Create subscription
 		const sub: ClientSubscription = {
@@ -992,6 +1032,14 @@ class LensServerImpl<
 		}
 
 		conn.subscriptions.delete(message.id);
+
+		// Run onUnsubscribe hooks
+		this.pluginManager.runOnUnsubscribe({
+			clientId: conn.id,
+			subscriptionId: message.id,
+			operation: sub.operation,
+			entityKeys: Array.from(sub.entityKeys),
+		});
 	}
 
 	private async handleQuery(conn: ClientConnection, message: QueryMessage): Promise<void> {
@@ -1057,6 +1105,8 @@ class LensServerImpl<
 	}
 
 	private handleDisconnect(conn: ClientConnection): void {
+		const subscriptionCount = conn.subscriptions.size;
+
 		// Cleanup all subscriptions
 		for (const sub of conn.subscriptions.values()) {
 			for (const cleanup of sub.cleanups) {
@@ -1073,6 +1123,12 @@ class LensServerImpl<
 
 		// Remove connection
 		this.connections.delete(conn.id);
+
+		// Run onDisconnect hooks
+		this.pluginManager.runOnDisconnect({
+			clientId: conn.id,
+			subscriptionCount,
+		});
 	}
 
 	// ===========================================================================
@@ -1160,10 +1216,17 @@ class LensServerImpl<
 			}
 		}
 
+		// Run beforeMutation hooks
+		const startTime = Date.now();
+		const allowed = await this.pluginManager.runBeforeMutation({ name, input });
+		if (!allowed) {
+			throw new Error(`Mutation ${name} rejected by plugin`);
+		}
+
 		const context = await this.contextFactory();
 
 		try {
-			return await runWithContext(this.ctx, context, async () => {
+			const result = await runWithContext(this.ctx, context, async () => {
 				const resolver = mutationDef._resolve;
 				if (!resolver) {
 					throw new Error(`Mutation ${name} has no resolver`);
@@ -1180,21 +1243,27 @@ class LensServerImpl<
 					onCleanup,
 				};
 
-				const result = await resolver({
+				const mutationResult = await resolver({
 					input: input as TInput,
 					ctx: lensContext,
 				});
 
 				// Emit to GraphStateManager
 				const entityName = this.getEntityNameFromMutation(name);
-				const entities = this.extractEntities(entityName, result);
+				const entities = this.extractEntities(entityName, mutationResult);
 
 				for (const { entity, id, entityData } of entities) {
 					this.stateManager.emit(entity, id, entityData);
 				}
 
-				return result as TOutput;
+				return mutationResult as TOutput;
 			});
+
+			// Run afterMutation hooks
+			const duration = Date.now() - startTime;
+			await this.pluginManager.runAfterMutation({ name, input, result, duration });
+
+			return result;
 		} finally {
 			this.clearLoaders();
 		}

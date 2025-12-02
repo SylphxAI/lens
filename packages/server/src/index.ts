@@ -71,6 +71,27 @@ export {
 } from "./state/index.js";
 
 // =============================================================================
+// Plugin System
+// =============================================================================
+
+export {
+	// Context types
+	type AfterMutationContext,
+	type AfterSendContext,
+	type BeforeMutationContext,
+	type BeforeSendContext,
+	type ConnectContext,
+	// Plugin manager
+	createPluginManager,
+	type DisconnectContext,
+	PluginManager,
+	// Plugin interface
+	type ServerPlugin,
+	type SubscribeContext,
+	type UnsubscribeContext,
+} from "./plugin/index.js";
+
+// =============================================================================
 // SSE Transport Adapter
 // =============================================================================
 
