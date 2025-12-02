@@ -58,7 +58,7 @@
     },
     "packages/client": {
       "name": "@sylphx/lens-client",
-      "version": "1.7.5",
+      "version": "1.10.0",
       "dependencies": {
         "@msgpack/msgpack": "^3.1.2",
         "@sylphx/lens-core": "workspace:*",
@@ -79,7 +79,7 @@
     },
     "packages/core": {
       "name": "@sylphx/lens-core",
-      "version": "1.15.0",
+      "version": "1.17.0",
       "dependencies": {
         "@sylphx/reify": "^0.1.2",
         "@sylphx/standard-entity": "^0.1.0",
@@ -91,7 +91,7 @@
     },
     "packages/fresh": {
       "name": "@sylphx/lens-fresh",
-      "version": "1.2.22",
+      "version": "1.2.23",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-preact": "workspace:*",
@@ -112,7 +112,7 @@
     },
     "packages/lens": {
       "name": "@sylphx/lens",
-      "version": "1.2.6",
+      "version": "1.2.7",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-core": "workspace:*",
@@ -124,7 +124,7 @@
     },
     "packages/next": {
       "name": "@sylphx/lens-next",
-      "version": "1.2.13",
+      "version": "1.2.14",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-react": "workspace:*",
@@ -147,7 +147,7 @@
     },
     "packages/nuxt": {
       "name": "@sylphx/lens-nuxt",
-      "version": "1.2.22",
+      "version": "1.2.23",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
@@ -165,7 +165,7 @@
     },
     "packages/preact": {
       "name": "@sylphx/lens-preact",
-      "version": "1.2.22",
+      "version": "1.2.23",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -186,7 +186,7 @@
     },
     "packages/react": {
       "name": "@sylphx/lens-react",
-      "version": "1.2.13",
+      "version": "1.2.14",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -205,7 +205,7 @@
     },
     "packages/server": {
       "name": "@sylphx/lens-server",
-      "version": "1.5.6",
+      "version": "1.6.0",
       "dependencies": {
         "@sylphx/lens-core": "workspace:*",
       },
@@ -216,7 +216,7 @@
     },
     "packages/solid": {
       "name": "@sylphx/lens-solid",
-      "version": "1.2.22",
+      "version": "1.2.23",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -231,7 +231,7 @@
     },
     "packages/solidstart": {
       "name": "@sylphx/lens-solidstart",
-      "version": "1.2.22",
+      "version": "1.2.23",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
@@ -251,7 +251,7 @@
     },
     "packages/svelte": {
       "name": "@sylphx/lens-svelte",
-      "version": "1.2.13",
+      "version": "1.2.14",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },
@@ -268,7 +268,7 @@
     },
     "packages/vue": {
       "name": "@sylphx/lens-vue",
-      "version": "1.2.13",
+      "version": "1.2.14",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
       },

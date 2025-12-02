@@ -1,13 +1,12 @@
 {
-	"extends": "@sylphx/tsconfig",
+	"extends": "../../tsconfig.json",
 	"compilerOptions": {
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"jsx": "preserve",
 		"jsxImportSource": "solid-js",
 		"lib": ["ES2022", "DOM"],
-		"noEmit": false,
-		"declaration": true
+		"noEmit": false
 	},
 	"include": ["src/**/*"],
 	"exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.tsx"]
