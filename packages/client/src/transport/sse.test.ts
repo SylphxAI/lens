@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import { sse, type SseConnectionState } from "./sse.js";
+import { type SseConnectionState, sse } from "./sse.js";
 
 // =============================================================================
 // Mock EventSource

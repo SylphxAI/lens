@@ -6,20 +6,13 @@ import { describe, expect, it } from "bun:test";
 import type {
 	FullTransport,
 	MutationCapable,
-	Observable,
 	Operation,
 	QueryCapable,
 	RequestTransport,
-	Result,
 	SubscriptionCapable,
 	Transport,
 } from "./types.js";
-import {
-	isLegacyTransport,
-	isMutationCapable,
-	isQueryCapable,
-	isSubscriptionCapable,
-} from "./types.js";
+import { isLegacyTransport, isMutationCapable, isQueryCapable, isSubscriptionCapable } from "./types.js";
 
 // =============================================================================
 // Mock Transports for Testing

@@ -33,20 +33,31 @@ export {
 // =============================================================================
 
 export {
+	// Transport capability interfaces
+	type FullTransport,
 	type HttpServerTransportOptions,
 	type HttpTransportOptions,
 	// Transports
 	http,
 	type InProcessTransportOptions,
 	inProcess,
+	// Type guards
+	isLegacyTransport,
+	isMutationCapable,
+	isOptimisticDSL,
+	isQueryCapable,
+	isSubscriptionCapable,
 	type LensServerInterface,
 	type Metadata,
+	type MutationCapable,
 	type Observable,
 	type Observer,
 	type Operation,
 	type OperationMeta,
 	type OperationsMap,
 	type OptimisticDSL,
+	type QueryCapable,
+	type RequestTransport,
 	type Result,
 	type RouteByTypeConfig,
 	type RouteConfig,
@@ -59,8 +70,12 @@ export {
 	type SseConnectionState,
 	type SseTransportInstance,
 	type SseTransportOptions,
+	type SubscriptionCapable,
+	type SubscriptionOnlyTransport,
 	// Types
 	type Transport,
+	type TransportBase,
+	type TypeSafeRouteByTypeConfig,
 	type Unsubscribable,
 	type WsTransportOptions,
 	ws,
