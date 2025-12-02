@@ -99,7 +99,88 @@ export interface Metadata {
 }
 
 // =============================================================================
-// Transport Interface
+// Transport Capability Interfaces
+// =============================================================================
+
+/**
+ * Base transport interface with connection capability.
+ * All transports must implement this.
+ */
+export interface TransportBase {
+	/**
+	 * Connect to server and get operation metadata.
+	 * Called once during client initialization.
+	 *
+	 * For route transport, this merges metadata from all child transports.
+	 */
+	connect(): Promise<Metadata>;
+
+	/**
+	 * Optional: Close the transport connection.
+	 */
+	close?(): void;
+}
+
+/**
+ * Transport capability for query operations.
+ */
+export interface QueryCapable extends TransportBase {
+	/**
+	 * Execute a query operation.
+	 * @param op - Operation with type: 'query'
+	 * @returns Promise resolving to result
+	 */
+	query(op: Operation): Promise<Result>;
+}
+
+/**
+ * Transport capability for mutation operations.
+ */
+export interface MutationCapable extends TransportBase {
+	/**
+	 * Execute a mutation operation.
+	 * @param op - Operation with type: 'mutation'
+	 * @returns Promise resolving to result
+	 */
+	mutation(op: Operation): Promise<Result>;
+}
+
+/**
+ * Transport capability for subscription operations.
+ */
+export interface SubscriptionCapable extends TransportBase {
+	/**
+	 * Execute a subscription operation.
+	 * @param op - Operation with type: 'subscription'
+	 * @returns Observable for streaming results
+	 */
+	subscription(op: Operation): Observable<Result>;
+}
+
+// =============================================================================
+// Transport Type Combinations
+// =============================================================================
+
+/**
+ * Transport that supports query and mutation (no subscriptions).
+ * Example: http()
+ */
+export type RequestTransport = QueryCapable & MutationCapable;
+
+/**
+ * Transport that only supports subscriptions.
+ * Example: pusher(), ably()
+ */
+export type SubscriptionOnlyTransport = SubscriptionCapable;
+
+/**
+ * Full transport supporting all operation types.
+ * Example: ws(), sse()
+ */
+export type FullTransport = QueryCapable & MutationCapable & SubscriptionCapable;
+
+// =============================================================================
+// Legacy Transport Interface (backwards compatibility)
 // =============================================================================
 
 /**
@@ -116,6 +197,9 @@ export interface Metadata {
  * const metadata = await httpTransport.connect()
  * const result = await httpTransport.execute({ path: 'user.get', input: { id: '1' } })
  * ```
+ *
+ * @deprecated Use capability interfaces (QueryCapable, MutationCapable, SubscriptionCapable)
+ * for type-safe transport composition. This interface is kept for backwards compatibility.
  */
 export interface Transport {
 	/**
@@ -136,4 +220,41 @@ export interface Transport {
 	 * - SSE uses EventSource
 	 */
 	execute(op: Operation): Promise<Result> | Observable<Result>;
+
+	/**
+	 * Optional: Close the transport connection.
+	 */
+	close?(): void;
+}
+
+// =============================================================================
+// Type Guards
+// =============================================================================
+
+/**
+ * Check if transport supports queries.
+ */
+export function isQueryCapable(t: TransportBase): t is QueryCapable {
+	return "query" in t && typeof (t as QueryCapable).query === "function";
+}
+
+/**
+ * Check if transport supports mutations.
+ */
+export function isMutationCapable(t: TransportBase): t is MutationCapable {
+	return "mutation" in t && typeof (t as MutationCapable).mutation === "function";
+}
+
+/**
+ * Check if transport supports subscriptions.
+ */
+export function isSubscriptionCapable(t: TransportBase): t is SubscriptionCapable {
+	return "subscription" in t && typeof (t as SubscriptionCapable).subscription === "function";
+}
+
+/**
+ * Check if transport is a legacy Transport (uses execute method).
+ */
+export function isLegacyTransport(t: TransportBase): t is Transport {
+	return "execute" in t && typeof (t as Transport).execute === "function";
 }

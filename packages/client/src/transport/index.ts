@@ -9,7 +9,10 @@
 // =============================================================================
 
 export type {
+	// Transport capability interfaces
+	FullTransport,
 	Metadata,
+	MutationCapable,
 	// Observable types
 	Observable,
 	Observer,
@@ -17,14 +20,26 @@ export type {
 	OperationMeta,
 	OperationsMap,
 	OptimisticDSL,
+	QueryCapable,
+	RequestTransport,
 	Result,
+	SubscriptionCapable,
+	SubscriptionOnlyTransport,
 	// Core types
 	Transport,
+	TransportBase,
 	Unsubscribable,
 } from "./types.js";
 
-// Type guard functions (re-exported from core)
-export { isOptimisticDSL } from "./types.js";
+// Type guard functions
+export {
+	isLegacyTransport,
+	isMutationCapable,
+	// Re-exported from core
+	isOptimisticDSL,
+	isQueryCapable,
+	isSubscriptionCapable,
+} from "./types.js";
 
 // =============================================================================
 // Plugins
