@@ -18,6 +18,7 @@
  * the server send full data on each update.
  */
 
+import { createUpdate, type Update } from "@sylphx/lens-core";
 import { GraphStateManager, type GraphStateManagerConfig } from "../state/graph-state-manager.js";
 import type {
 	AfterSendContext,
@@ -67,7 +68,10 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 	const stateManager = new GraphStateManager(options);
 	const debug = options.debug ?? false;
 
-	// Track client-entity subscriptions for diff computation
+	// Per-client state tracking: clientId → entityKey → lastState
+	const clientStates = new Map<string, Map<string, Record<string, unknown>>>();
+
+	// Track client-entity subscriptions
 	const clientSubscriptions = new Map<string, Set<string>>(); // clientId -> Set<entityKey>
 
 	const log = (...args: unknown[]) => {
@@ -75,6 +79,8 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 			console.log("[diffOptimizer]", ...args);
 		}
 	};
+
+	const makeEntityKey = (entity: string, entityId: string) => `${entity}:${entityId}`;
 
 	return {
 		name: "diffOptimizer",
@@ -88,13 +94,11 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 		},
 
 		/**
-		 * When a client connects, register them with the state manager.
+		 * When a client connects, initialize their state tracking.
 		 */
 		onConnect(ctx: ConnectContext): void {
 			log("Client connected:", ctx.clientId);
-
-			// Note: We don't register with stateManager here because
-			// we don't have the send function. The server handles that.
+			clientStates.set(ctx.clientId, new Map());
 			clientSubscriptions.set(ctx.clientId, new Set());
 		},
 
@@ -103,21 +107,19 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 		 */
 		onDisconnect(ctx: DisconnectContext): void {
 			log("Client disconnected:", ctx.clientId, "subscriptions:", ctx.subscriptionCount);
-
-			// Clean up client subscriptions tracking
+			clientStates.delete(ctx.clientId);
 			clientSubscriptions.delete(ctx.clientId);
 		},
 
 		/**
-		 * When a client subscribes, track the subscription for diff computation.
+		 * When a client subscribes, track the subscription.
 		 */
 		onSubscribe(ctx: SubscribeContext): void {
 			log("Subscribe:", ctx.clientId, ctx.operation, ctx.entity, ctx.entityId);
 
-			// Track subscription
 			const subs = clientSubscriptions.get(ctx.clientId);
 			if (subs && ctx.entity && ctx.entityId) {
-				const entityKey = `${ctx.entity}:${ctx.entityId}`;
+				const entityKey = makeEntityKey(ctx.entity, ctx.entityId);
 				subs.add(entityKey);
 			}
 		},
@@ -128,33 +130,97 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 		onUnsubscribe(ctx: UnsubscribeContext): void {
 			log("Unsubscribe:", ctx.clientId, ctx.subscriptionId);
 
-			// Remove tracked entities
 			const subs = clientSubscriptions.get(ctx.clientId);
-			if (subs) {
+			const states = clientStates.get(ctx.clientId);
+
+			if (subs || states) {
 				for (const entityKey of ctx.entityKeys) {
-					subs.delete(entityKey);
+					subs?.delete(entityKey);
+					states?.delete(entityKey);
 				}
 			}
 		},
 
 		/**
 		 * Before sending data, compute optimal diff if we have previous state.
+		 * This is the core optimization logic.
 		 */
 		beforeSend(ctx: BeforeSendContext): Record<string, unknown> | void {
-			log("beforeSend:", ctx.clientId, ctx.entity, ctx.entityId, "initial:", ctx.isInitial);
+			const { clientId, entity, entityId, data, isInitial, fields } = ctx;
+			const entityKey = makeEntityKey(entity, entityId);
 
-			// If this is initial data, just pass through
-			if (ctx.isInitial) {
-				return ctx.data;
+			log("beforeSend:", clientId, entityKey, "initial:", isInitial);
+
+			// Get or create client state map
+			let clientStateMap = clientStates.get(clientId);
+			if (!clientStateMap) {
+				clientStateMap = new Map();
+				clientStates.set(clientId, clientStateMap);
 			}
 
-			// For subsequent updates, the server already uses GraphStateManager
-			// which computes diffs. This hook is for additional processing.
-			return ctx.data;
+			// Initial send: store state, return full data
+			if (isInitial) {
+				clientStateMap.set(entityKey, { ...data });
+				log("  Initial send, storing state");
+				return data;
+			}
+
+			// Get client's last known state
+			const lastState = clientStateMap.get(entityKey);
+
+			// No previous state: treat as initial
+			if (!lastState) {
+				clientStateMap.set(entityKey, { ...data });
+				log("  No previous state, storing and sending full");
+				return data;
+			}
+
+			// Compute diff: only send changed fields
+			const fieldsToCheck = fields === "*" ? Object.keys(data) : fields;
+			const updates: Record<string, Update> = {};
+			let hasChanges = false;
+
+			for (const field of fieldsToCheck) {
+				const oldValue = lastState[field];
+				const newValue = data[field];
+
+				// Skip if unchanged (deep equality check)
+				if (oldValue === newValue) continue;
+				if (
+					typeof oldValue === "object" &&
+					typeof newValue === "object" &&
+					JSON.stringify(oldValue) === JSON.stringify(newValue)
+				) {
+					continue;
+				}
+
+				// Compute optimal update strategy
+				const update = createUpdate(oldValue, newValue);
+				updates[field] = update;
+				hasChanges = true;
+			}
+
+			// Update client's last known state
+			clientStateMap.set(entityKey, { ...data });
+
+			// No changes: return empty update
+			if (!hasChanges) {
+				log("  No changes detected");
+				return {};
+			}
+
+			// Return optimized payload with updates
+			log("  Computed diff with", Object.keys(updates).length, "field changes");
+			return {
+				_type: "update",
+				entity,
+				id: entityId,
+				updates,
+			};
 		},
 
 		/**
-		 * After sending data, update tracking.
+		 * After sending data, log for debugging.
 		 */
 		afterSend(ctx: AfterSendContext): void {
 			log("afterSend:", ctx.clientId, ctx.entity, ctx.entityId, "timestamp:", ctx.timestamp);

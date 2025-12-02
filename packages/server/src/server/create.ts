@@ -156,7 +156,8 @@ export type ClientSendFn = (message: unknown) => void;
  * Subscription support (used by adapters):
  * - addClient() / removeClient() - Client connection management
  * - subscribe() / unsubscribe() - Subscription lifecycle
- * - emit() - Push updates to subscribed clients
+ * - send() - Send data to client (runs through plugin hooks)
+ * - broadcast() - Broadcast to all entity subscribers
  * - handleReconnect() - Handle client reconnection
  *
  * The server handles all business logic including state management (via plugins).
@@ -208,15 +209,37 @@ export interface LensServer {
 	unsubscribe(ctx: UnsubscribeContext): void;
 
 	/**
-	 * Emit data for an entity.
-	 * If diffOptimizer plugin is enabled, computes optimal diff and pushes to clients.
-	 * If not, this is a no-op (stateless mode).
+	 * Send data to a client for a specific subscription.
+	 * Runs through plugin hooks (beforeSend/afterSend) for optimization.
+	 *
+	 * This is the primary method for adapters to deliver data.
+	 * Plugins can intercept and transform the data (e.g., compute diffs).
+	 *
+	 * @param clientId - Client identifier
+	 * @param subscriptionId - Subscription identifier
+	 * @param entity - Entity type name
+	 * @param entityId - Entity ID
+	 * @param data - Entity data
+	 * @param isInitial - Whether this is initial subscription data
+	 */
+	send(
+		clientId: string,
+		subscriptionId: string,
+		entity: string,
+		entityId: string,
+		data: Record<string, unknown>,
+		isInitial: boolean,
+	): Promise<void>;
+
+	/**
+	 * Broadcast data to all subscribers of an entity.
+	 * Runs through plugin hooks for each subscriber.
 	 *
 	 * @param entity - Entity type name
 	 * @param entityId - Entity ID
 	 * @param data - Entity data
 	 */
-	emit(entity: string, entityId: string, data: Record<string, unknown>): void;
+	broadcast(entity: string, entityId: string, data: Record<string, unknown>): Promise<void>;
 
 	/**
 	 * Handle a reconnection request from a client.
@@ -386,6 +409,14 @@ class LensServerImpl<
 	private pluginManager: PluginManager;
 	private stateManager: GraphStateManager | undefined;
 	private clientSendFns = new Map<string, ClientSendFn>();
+
+	// Subscription tracking: clientId → subscriptionId → { entity, entityId, fields }
+	private subscriptions = new Map<
+		string,
+		Map<string, { entity: string; entityId: string; fields: string[] | "*" }>
+	>();
+	// Entity subscribers: entityKey → Set<{ clientId, subscriptionId }>
+	private entitySubscribers = new Map<string, Set<{ clientId: string; subscriptionId: string }>>();
 
 	constructor(config: LensServerConfig<TContext> & { queries?: Q; mutations?: M }) {
 		const queries: QueriesMap = { ...(config.queries ?? {}) };
@@ -783,6 +814,27 @@ class LensServerImpl<
 	}
 
 	removeClient(clientId: string, subscriptionCount: number): void {
+		// Clean up subscription tracking
+		const clientSubs = this.subscriptions.get(clientId);
+		if (clientSubs) {
+			for (const [subscriptionId, { entity, entityId }] of clientSubs) {
+				const entityKey = `${entity}:${entityId}`;
+				const subscribers = this.entitySubscribers.get(entityKey);
+				if (subscribers) {
+					for (const sub of subscribers) {
+						if (sub.clientId === clientId && sub.subscriptionId === subscriptionId) {
+							subscribers.delete(sub);
+							break;
+						}
+					}
+					if (subscribers.size === 0) {
+						this.entitySubscribers.delete(entityKey);
+					}
+				}
+			}
+			this.subscriptions.delete(clientId);
+		}
+
 		// Remove from state manager if available
 		if (this.stateManager) {
 			this.stateManager.removeClient(clientId);
@@ -802,18 +854,62 @@ class LensServerImpl<
 			return false;
 		}
 
-		// If state management is enabled, register subscription
-		if (this.stateManager && ctx.entity && ctx.entityId) {
-			this.stateManager.subscribe(ctx.clientId, ctx.entity, ctx.entityId, ctx.fields);
+		// Track subscription
+		if (ctx.entity && ctx.entityId) {
+			// Add to client's subscriptions
+			let clientSubs = this.subscriptions.get(ctx.clientId);
+			if (!clientSubs) {
+				clientSubs = new Map();
+				this.subscriptions.set(ctx.clientId, clientSubs);
+			}
+			clientSubs.set(ctx.subscriptionId, {
+				entity: ctx.entity,
+				entityId: ctx.entityId,
+				fields: ctx.fields,
+			});
+
+			// Add to entity subscribers
+			const entityKey = `${ctx.entity}:${ctx.entityId}`;
+			let subscribers = this.entitySubscribers.get(entityKey);
+			if (!subscribers) {
+				subscribers = new Set();
+				this.entitySubscribers.set(entityKey, subscribers);
+			}
+			subscribers.add({ clientId: ctx.clientId, subscriptionId: ctx.subscriptionId });
+
+			// If state management is enabled, register subscription
+			if (this.stateManager) {
+				this.stateManager.subscribe(ctx.clientId, ctx.entity, ctx.entityId, ctx.fields);
+			}
 		}
 
 		return true;
 	}
 
 	unsubscribe(ctx: UnsubscribeContext): void {
-		// Unsubscribe from entities in state manager
-		if (this.stateManager) {
-			for (const entityKey of ctx.entityKeys) {
+		// Clean up subscription tracking
+		const clientSubs = this.subscriptions.get(ctx.clientId);
+		if (clientSubs) {
+			clientSubs.delete(ctx.subscriptionId);
+		}
+
+		// Clean up entity subscribers
+		for (const entityKey of ctx.entityKeys) {
+			const subscribers = this.entitySubscribers.get(entityKey);
+			if (subscribers) {
+				for (const sub of subscribers) {
+					if (sub.clientId === ctx.clientId && sub.subscriptionId === ctx.subscriptionId) {
+						subscribers.delete(sub);
+						break;
+					}
+				}
+				if (subscribers.size === 0) {
+					this.entitySubscribers.delete(entityKey);
+				}
+			}
+
+			// Unsubscribe from state manager
+			if (this.stateManager) {
 				const [entity, id] = entityKey.split(":");
 				this.stateManager.unsubscribe(ctx.clientId, entity, id);
 			}
@@ -823,12 +919,58 @@ class LensServerImpl<
 		this.pluginManager.runOnUnsubscribe(ctx);
 	}
 
-	emit(entity: string, entityId: string, data: Record<string, unknown>): void {
-		// Only emit if state management is enabled
-		if (this.stateManager) {
-			this.stateManager.emit(entity, entityId, data);
+	async send(
+		clientId: string,
+		subscriptionId: string,
+		entity: string,
+		entityId: string,
+		data: Record<string, unknown>,
+		isInitial: boolean,
+	): Promise<void> {
+		const sendFn = this.clientSendFns.get(clientId);
+		if (!sendFn) return;
+
+		// Get subscription fields
+		const clientSubs = this.subscriptions.get(clientId);
+		const subInfo = clientSubs?.get(subscriptionId);
+		const fields = subInfo?.fields ?? "*";
+
+		// Run beforeSend hooks (plugins can transform data)
+		const ctx = {
+			clientId,
+			subscriptionId,
+			entity,
+			entityId,
+			data,
+			isInitial,
+			fields,
+		};
+		const optimizedData = await this.pluginManager.runBeforeSend(ctx);
+
+		// Deliver to client
+		sendFn({
+			type: "data",
+			id: subscriptionId,
+			data: optimizedData,
+		});
+
+		// Run afterSend hooks
+		await this.pluginManager.runAfterSend({
+			...ctx,
+			data: optimizedData,
+			timestamp: Date.now(),
+		});
+	}
+
+	async broadcast(entity: string, entityId: string, data: Record<string, unknown>): Promise<void> {
+		const entityKey = `${entity}:${entityId}`;
+		const subscribers = this.entitySubscribers.get(entityKey);
+		if (!subscribers) return;
+
+		// Send to all subscribers
+		for (const { clientId, subscriptionId } of subscribers) {
+			await this.send(clientId, subscriptionId, entity, entityId, data, false);
 		}
-		// In stateless mode, this is a no-op - adapter sends full data directly
 	}
 
 	handleReconnect(message: ReconnectMessage): ReconnectResult[] | null {

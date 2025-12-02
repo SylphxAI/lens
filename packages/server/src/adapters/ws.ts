@@ -24,7 +24,6 @@
 
 import type { ReconnectMessage } from "@sylphx/lens-core";
 import type { LensServer, SelectionObject, WebSocketLike } from "../server/create.js";
-import type { GraphStateManager } from "../state/graph-state-manager.js";
 
 // =============================================================================
 // Types
@@ -60,11 +59,6 @@ export interface WSAdapter {
 		close(ws: unknown): void;
 		open?(ws: unknown): void;
 	};
-
-	/**
-	 * Get the GraphStateManager (if provided).
-	 */
-	getStateManager(): GraphStateManager | undefined;
 
 	/**
 	 * Close all connections and cleanup.
@@ -184,9 +178,6 @@ interface ClientSubscription {
  */
 export function createWSAdapter(server: LensServer, options: WSAdapterOptions = {}): WSAdapter {
 	const { logger = {} } = options;
-
-	// Get state manager from server (if diffOptimizer plugin is configured)
-	const stateManager = server.getStateManager();
 
 	// Connection tracking
 	const connections = new Map<string, ClientConnection>();
@@ -324,7 +315,7 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 
 		// Register subscriptions with server for each entity
 		for (const { entity, entityId, entityData } of entities) {
-			// Server handles plugin hooks and state manager registration
+			// Server handles plugin hooks and subscription tracking
 			const allowed = await server.subscribe({
 				clientId: conn.id,
 				subscriptionId: id,
@@ -346,44 +337,29 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 				return;
 			}
 
-			// Emit initial data to state manager (if enabled)
-			server.emit(entity, entityId, entityData);
+			// Send initial data through server (runs through plugin hooks)
+			await server.send(conn.id, id, entity, entityId, entityData, true);
 		}
 
 		conn.subscriptions.set(id, sub);
-
-		// Send initial data to client
-		conn.ws.send(
-			JSON.stringify({
-				type: "data",
-				id,
-				data: result.data,
-			}),
-		);
 	}
 
 	// Handle updateFields
+	// Note: This updates local tracking only. The server tracks fields via subscribe().
+	// Field updates affect future sends through the subscription context.
 	function handleUpdateFields(conn: ClientConnection, message: UpdateFieldsMessage): void {
 		const sub = conn.subscriptions.get(message.id);
-		if (!sub || !stateManager) return;
+		if (!sub) return;
 
 		// Handle upgrade to full subscription ("*")
 		if (message.addFields?.includes("*")) {
 			sub.fields = "*";
-			for (const entityKey of sub.entityKeys) {
-				const [entity, id] = entityKey.split(":");
-				stateManager.updateSubscription(conn.id, entity, id, "*");
-			}
 			return;
 		}
 
 		// Handle downgrade from "*" to specific fields
 		if (message.setFields !== undefined) {
 			sub.fields = message.setFields;
-			for (const entityKey of sub.entityKeys) {
-				const [entity, id] = entityKey.split(":");
-				stateManager.updateSubscription(conn.id, entity, id, sub.fields);
-			}
 			return;
 		}
 
@@ -408,12 +384,6 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 		}
 
 		sub.fields = Array.from(fields);
-
-		// Update subscriptions
-		for (const entityKey of sub.entityKeys) {
-			const [entity, id] = entityKey.split(":");
-			stateManager.updateSubscription(conn.id, entity, id, sub.fields);
-		}
 	}
 
 	// Handle unsubscribe
@@ -500,11 +470,11 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 				return;
 			}
 
-			// Emit to server (handles state manager if configured)
+			// Broadcast to all subscribers of affected entities
 			if (result.data) {
 				const entities = extractEntities(result.data);
 				for (const { entity, entityId, entityData } of entities) {
-					server.emit(entity, entityId, entityData);
+					await server.broadcast(entity, entityId, entityData);
 				}
 			}
 
@@ -527,10 +497,10 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 	}
 
 	// Handle reconnect
-	function handleReconnect(conn: ClientConnection, message: ReconnectMessage): void {
+	async function handleReconnect(conn: ClientConnection, message: ReconnectMessage): Promise<void> {
 		const startTime = Date.now();
 
-		// Check if server supports reconnection (has state manager)
+		// Check if server supports reconnection
 		const results = server.handleReconnect(message);
 
 		if (results === null) {
@@ -548,7 +518,7 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 		}
 
 		try {
-			// Re-establish subscriptions in adapter tracking
+			// Re-establish subscriptions in adapter tracking and server
 			for (const sub of message.subscriptions) {
 				let clientSub = conn.subscriptions.get(sub.id);
 				if (!clientSub) {
@@ -565,9 +535,15 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 				}
 
 				// Re-register subscription with server
-				if (stateManager) {
-					stateManager.subscribe(conn.id, sub.entity, sub.entityId, sub.fields);
-				}
+				await server.subscribe({
+					clientId: conn.id,
+					subscriptionId: sub.id,
+					operation: "",
+					input: sub.input,
+					fields: sub.fields,
+					entity: sub.entity,
+					entityId: sub.entityId,
+				});
 			}
 
 			conn.ws.send(
@@ -722,10 +698,6 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 					handleDisconnect(conn);
 				}
 			},
-		},
-
-		getStateManager(): GraphStateManager | undefined {
-			return stateManager;
 		},
 
 		async close(): Promise<void> {

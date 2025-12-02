@@ -45,18 +45,25 @@ export interface UnsubscribeContext {
 
 /**
  * Context passed to beforeSend hook.
+ *
+ * The beforeSend hook is the key integration point for optimization plugins.
+ * Plugins can intercept the data and return an optimized payload (e.g., diff).
  */
 export interface BeforeSendContext {
 	/** Client ID */
 	clientId: string;
+	/** Subscription ID (unique per client subscription) */
+	subscriptionId: string;
 	/** Entity type */
 	entity: string;
 	/** Entity ID */
 	entityId: string;
-	/** Data to be sent */
+	/** Data to be sent (full entity data) */
 	data: Record<string, unknown>;
-	/** Whether this is the first send (full state) */
+	/** Whether this is the first send (initial subscription data) */
 	isInitial: boolean;
+	/** Fields the client is subscribed to */
+	fields: string[] | "*";
 }
 
 /**
@@ -65,14 +72,18 @@ export interface BeforeSendContext {
 export interface AfterSendContext {
 	/** Client ID */
 	clientId: string;
+	/** Subscription ID */
+	subscriptionId: string;
 	/** Entity type */
 	entity: string;
 	/** Entity ID */
 	entityId: string;
-	/** Data that was sent */
+	/** Data that was sent (may be optimized/transformed by beforeSend) */
 	data: Record<string, unknown>;
 	/** Whether this was the first send */
 	isInitial: boolean;
+	/** Fields the client is subscribed to */
+	fields: string[] | "*";
 	/** Timestamp of send */
 	timestamp: number;
 }
