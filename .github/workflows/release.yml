@@ -6,7 +6,102 @@ on:
 
 jobs:
   release:
-    uses: SylphxAI/.github/.github/workflows/release.yml@main
-    secrets: inherit
-    with:
-      prebuild: "turbo build"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Prebuild all packages
+        run: bun run build
+
+      - uses: SylphxAI/bump@main
+        id: bump
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          npm-token: ${{ secrets.NPM_TOKEN }}
+          skip-install: true
+
+      - name: Format release message
+        id: message
+        if: steps.bump.outputs.published == 'true'
+        shell: bash
+        env:
+          VERSIONS: ${{ steps.bump.outputs.versions }}
+          REPO: ${{ github.repository }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          [ -z "$SLACK_WEBHOOK" ] && exit 0
+          REPO_URL="https://github.com/$REPO"
+          REPO_NAME="${REPO#*/}"
+          NL=$'\n'
+
+          if [ -n "$VERSIONS" ] && [ "$VERSIONS" != "{}" ] && [ "$VERSIONS" != "null" ]; then
+            PKG_COUNT=$(echo "$VERSIONS" | jq 'keys | length' 2>/dev/null || echo "0")
+
+            if [ "$PKG_COUNT" = "1" ]; then
+              pkg=$(echo "$VERSIONS" | jq -r 'keys[0]')
+              ver=$(echo "$VERSIONS" | jq -r --arg p "$pkg" '.[$p]')
+              NPM_URL="https://www.npmjs.com/package/${pkg}/v/${ver}"
+              RELEASE_URL="${REPO_URL}/releases/tag/v${ver}"
+
+              MSG="📦 *${REPO_NAME}* released${NL}${NL}"
+              MSG="${MSG}<${NPM_URL}|\`${pkg}@${ver}\`>${NL}${NL}"
+              MSG="${MSG}<${RELEASE_URL}|GitHub Release> · <${REPO_URL}|Repository>"
+            else
+              MSG="📦 *${REPO_NAME}* released ${PKG_COUNT} packages${NL}${NL}"
+
+              for pkg in $(echo "$VERSIONS" | jq -r 'keys[]'); do
+                ver=$(echo "$VERSIONS" | jq -r --arg p "$pkg" '.[$p]')
+                NPM_URL="https://www.npmjs.com/package/${pkg}/v/${ver}"
+                RELEASE_URL="${REPO_URL}/releases/tag/${pkg}@${ver}"
+                MSG="${MSG}<${NPM_URL}|\`${pkg}@${ver}\`>  ·  <${RELEASE_URL}|release>${NL}"
+              done
+
+              MSG="${MSG}${NL}<${REPO_URL}|View Repository>"
+            fi
+          else
+            MSG="📦 *${REPO_NAME}* released${NL}${NL}<${REPO_URL}|View Repository>"
+          fi
+
+          echo "text<<EOF" >> $GITHUB_OUTPUT
+          echo "$MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification on success
+        if: steps.bump.outputs.published == 'true'
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          MESSAGE: ${{ steps.message.outputs.text }}
+        run: |
+          [ -z "$SLACK_WEBHOOK" ] && exit 0
+          [ -z "$MESSAGE" ] && exit 0
+          curl -s -X POST "$SLACK_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg text "$MESSAGE" '{text: $text}')"
+
+      - name: Send Slack notification on failure
+        if: failure()
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -z "$SLACK_WEBHOOK" ] && exit 0
+          NL=$'\n'
+          MESSAGE="❌ *Release failed*${NL}Repository: ${REPO}${NL}<${RUN_URL}|View Workflow>"
+          curl -s -X POST "$SLACK_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg text "$MESSAGE" '{text: $text}')"
