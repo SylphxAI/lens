@@ -303,3 +303,68 @@ export {
 	// Main factory
 	lens,
 } from "./lens.js";
+
+// =============================================================================
+// Reconnection System
+// =============================================================================
+
+export {
+	// Types
+	type Version,
+	type VersionedEntityState,
+	type VersionedArrayState,
+	type OperationLogEntry,
+	type OperationLogConfig,
+	type OperationLogStats,
+	type SubscriptionState,
+	type TrackedSubscription,
+	type SubscriptionObserver,
+	type SubscriptionResult,
+	type SubscriptionRegistryStats,
+	type ReconnectSubscription,
+	type ReconnectMessage,
+	type ReconnectStatus,
+	type ReconnectResult,
+	type ReconnectAckMessage,
+	type SubscriptionAckMessage,
+	type VersionedFieldUpdate,
+	type VersionedEntityUpdate,
+	type VersionedUpdateMessage,
+	type ConnectionState,
+	type ReconnectConfig,
+	type ConnectionQuality,
+	type ReconnectionMetrics,
+	type ReconnectionHealth,
+	type CompressionAlgorithm,
+	type CompressedPayload,
+
+	// Constants
+	PROTOCOL_VERSION,
+	DEFAULT_OPERATION_LOG_CONFIG,
+	DEFAULT_RECONNECT_CONFIG,
+
+	// Utilities
+	isCompressedPayload,
+	generateReconnectId,
+
+	// Hashing
+	murmurhash3,
+	hashValue,
+	stableStringify,
+	hashEntityState,
+	hashEntityFields,
+	HashCache,
+	FieldHashMap,
+	valuesEqual,
+	deepEqual,
+
+	// Operation Log
+	OperationLog,
+	coalescePatches,
+	estimatePatchSize,
+	applyPatch,
+
+	// Subscription Registry
+	SubscriptionRegistry,
+	createSubscriptionRegistry,
+} from "./reconnect/index.js";
