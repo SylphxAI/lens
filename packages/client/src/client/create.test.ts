@@ -74,7 +74,7 @@ describe("Connection failure and retry", () => {
 				// Second call succeeds
 				return app.getMetadata();
 			},
-			execute: app.execute.bind(server),
+			execute: app.execute.bind(app),
 		};
 
 		const client = createClient({
@@ -106,7 +106,7 @@ describe("Connection failure and retry", () => {
 				// Always fail initially, but client shouldn't throw
 				throw new Error("Initial connection failed");
 			},
-			execute: app.execute.bind(server),
+			execute: app.execute.bind(app),
 		};
 
 		// Should not throw - client creation is synchronous
@@ -960,7 +960,7 @@ describe("createAccessor subscribe", () => {
 				connectResolved = true;
 				return app.getMetadata();
 			},
-			execute: app.execute.bind(server),
+			execute: app.execute.bind(app),
 		};
 
 		const client = createClient({

@@ -165,6 +165,12 @@ class ClientImpl {
 		{ path: string; input: Record<string, unknown> }
 	>();
 
+	/** Maps original callbacks to their wrapped versions for proper cleanup */
+	private callbackWrappers = new WeakMap<
+		(data: unknown) => void,
+		(data: unknown) => void
+	>();
+
 	constructor(config: LensClientConfig) {
 		this.transport = config.transport;
 		this.plugins = config.plugins ?? [];
@@ -318,9 +324,14 @@ class ClientImpl {
 			},
 
 			subscribe: (callback?: (data: T) => void) => {
-				// Add callback
+				// Add callback with proper wrapper tracking for cleanup
 				if (callback) {
-					const wrapped = (data: unknown) => callback(data as T);
+					const typedCallback = callback as (data: unknown) => void;
+					let wrapped = this.callbackWrappers.get(typedCallback);
+					if (!wrapped) {
+						wrapped = (data: unknown) => callback(data as T);
+						this.callbackWrappers.set(typedCallback, wrapped);
+					}
 					sub.callbacks.add(wrapped);
 
 					// If data available, call immediately
@@ -336,8 +347,11 @@ class ClientImpl {
 
 				return () => {
 					if (callback) {
-						const wrapped = (data: unknown) => callback(data as T);
-						sub.callbacks.delete(wrapped);
+						const typedCallback = callback as (data: unknown) => void;
+						const wrapped = this.callbackWrappers.get(typedCallback);
+						if (wrapped) {
+							sub.callbacks.delete(wrapped);
+						}
 					}
 					// Cleanup if no more callbacks
 					if (sub.callbacks.size === 0 && sub.unsubscribe) {
