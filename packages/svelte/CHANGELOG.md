@@ -1,5 +1,9 @@
 # @sylphx/lens-svelte
 
+## 1.2.22 (2025-12-02)
+
+No notable changes.
+
 ## 1.2.21 (2025-12-02)
 
 Release patch version

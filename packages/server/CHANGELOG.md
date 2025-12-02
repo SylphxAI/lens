@@ -1,5 +1,9 @@
 # @sylphx/lens-server
 
+## 1.11.3 (2025-12-02)
+
+No notable changes.
+
 ## 1.11.2 (2025-12-02)
 
 Release patch version

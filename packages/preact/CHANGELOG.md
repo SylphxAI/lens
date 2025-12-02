@@ -1,5 +1,9 @@
 # @sylphx/lens-preact
 
+## 1.2.31 (2025-12-02)
+
+No notable changes.
+
 ## 1.2.30 (2025-12-02)
 
 Release patch version

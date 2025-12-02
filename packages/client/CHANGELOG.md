@@ -1,5 +1,9 @@
 # @sylphx/lens-client
 
+## 1.15.3 (2025-12-02)
+
+No notable changes.
+
 ## 1.15.2 (2025-12-02)
 
 Release patch version
