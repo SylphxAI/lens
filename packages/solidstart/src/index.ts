@@ -428,7 +428,13 @@ export function createLensQuery<T>(
 
 export function createLensMutation<TInput, TOutput>(
 	mutationFn: (input: TInput) => Promise<MutationResult<TOutput>>,
-) {
+): {
+	mutate: (input: TInput) => Promise<MutationResult<TOutput>>;
+	pending: Accessor<boolean>;
+	error: Accessor<Error | null>;
+	data: Accessor<TOutput | null>;
+	reset: () => void;
+} {
 	const [pending, setPending] = createSignal(false);
 	const [error, setError] = createSignal<Error | null>(null);
 	const [data, setData] = createSignal<TOutput | null>(null);
