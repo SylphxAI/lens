@@ -612,17 +612,19 @@ class ResolverDefImpl<
  */
 export function resolver<TContext = FieldResolverContext>(): <
 	TEntity extends EntityDef<string, EntityDefinition>,
+	TFields extends Record<string, FieldDef<any, any, TContext>>,
 >(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any, any>>,
-) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>;
+	builder: (f: FieldBuilder<TEntity, TContext>) => TFields,
+) => ResolverDef<TEntity, TFields, TContext>;
 
-export function resolver<TEntity extends EntityDef<string, EntityDefinition>>(
+export function resolver<
+	TEntity extends EntityDef<string, EntityDefinition>,
+	TFields extends Record<string, FieldDef<any, any, FieldResolverContext>>,
+>(
 	entity: TEntity,
-	builder: (
-		f: FieldBuilder<TEntity, FieldResolverContext>,
-	) => Record<string, FieldDef<any, any, any>>,
-): ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, FieldResolverContext>;
+	builder: (f: FieldBuilder<TEntity, FieldResolverContext>) => TFields,
+): ResolverDef<TEntity, TFields, FieldResolverContext>;
 
 export function resolver<TContext = FieldResolverContext>(
 	entityOrNothing?: EntityDef<string, EntityDefinition>,

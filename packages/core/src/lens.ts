@@ -72,14 +72,16 @@ import type { EntityDefinition } from "./schema/types.js";
 // =============================================================================
 
 /**
- * Typed resolver factory function
+ * Typed resolver factory function.
+ * Uses TFields generic to preserve exact field types from the builder.
  */
-export type LensResolver<TContext> = <TEntity extends EntityDef<string, EntityDefinition>>(
+export type LensResolver<TContext> = <
+	TEntity extends EntityDef<string, EntityDefinition>,
+	TFields extends Record<string, FieldDef<any, any, TContext>>,
+>(
 	entity: TEntity,
-	builder: (
-		f: FieldBuilder<TEntity, TContext>,
-	) => Record<string, FieldDef<unknown, unknown, TContext>>,
-) => ResolverDef<TEntity, Record<string, FieldDef<unknown, unknown, TContext>>, TContext>;
+	builder: (f: FieldBuilder<TEntity, TContext>) => TFields,
+) => ResolverDef<TEntity, TFields, TContext>;
 
 /**
  * Typed query factory function
