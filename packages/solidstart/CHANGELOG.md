@@ -1,5 +1,19 @@
 # @sylphx/lens-solidstart
 
+## 1.2.26 (2025-12-02)
+
+### 🐛 Bug Fixes
+
+- revert all package versions to match npm ([c1a2832](https://github.com/SylphxAI/Lens/commit/c1a2832fa0ca0464af25256bce7a85f021825859))
+
+### ♻️ Refactoring
+
+- **build:** migrate packages to bunup, fix build issues ([6a3412e](https://github.com/SylphxAI/Lens/commit/6a3412eff5e1d5c94136935787a310ed905c4afd))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
 ## 1.2.25 (2025-12-02)
 
 ### 🐛 Bug Fixes

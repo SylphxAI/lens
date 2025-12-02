@@ -1,5 +1,25 @@
 # @sylphx/lens-core
 
+## 1.20.0 (2025-12-02)
+
+### ✨ Features
+
+- **core:** move emit and onCleanup into ctx ([40097cd](https://github.com/SylphxAI/Lens/commit/40097cd7f2730df86dc4acb398309b0714853790))
+
+### 🐛 Bug Fixes
+
+- revert all package versions to match npm ([c1a2832](https://github.com/SylphxAI/Lens/commit/c1a2832fa0ca0464af25256bce7a85f021825859))
+- revert lens-core version to 1.15.1 for proper workflow release ([6330e34](https://github.com/SylphxAI/Lens/commit/6330e34b45f9ec551e539e1b947e82831cac9416))
+- **core:** correct version to 1.16.0 after deprecating 2.0.0 ([47676f2](https://github.com/SylphxAI/Lens/commit/47676f2e1883967d7b3d8c53c641ad8f24c27df0))
+
+### ♻️ Refactoring
+
+- **core:** remove unused Prisma-style types ([aa5fc6f](https://github.com/SylphxAI/Lens/commit/aa5fc6f18fc36b2813d62dd2633740dd4933a309))
+
+### ✅ Tests
+
+- comprehensive test coverage for all packages ([567987b](https://github.com/SylphxAI/Lens/commit/567987be1413b46346a36af26d2d9fa8b67cafb7))
+
 ## 1.19.0 (2025-12-02)
 
 ### ✨ Features
