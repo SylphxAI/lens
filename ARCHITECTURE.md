@@ -78,9 +78,57 @@
 
 ## 1. Transport System
 
-### Transport Interface
+### Type-Safe Transport Capabilities
 
-Every transport implements this simple interface:
+Transports declare what operation types they support via capability interfaces:
+
+```typescript
+// ============================================
+// Capability Interfaces
+// ============================================
+interface QueryCapable {
+  query(op: Operation): Promise<Result>
+}
+
+interface MutationCapable {
+  mutation(op: Operation): Promise<Result>
+}
+
+interface SubscriptionCapable {
+  subscription(op: Operation): Observable<Result>
+}
+
+// ============================================
+// Transport Types (combinations)
+// ============================================
+type HttpTransport = QueryCapable & MutationCapable
+type WsTransport = QueryCapable & MutationCapable & SubscriptionCapable
+type SseTransport = QueryCapable & MutationCapable & SubscriptionCapable
+type PusherTransport = SubscriptionCapable
+type AblyTransport = SubscriptionCapable
+
+// ============================================
+// Factory functions return correctly typed transports
+// ============================================
+function http(opts: HttpOptions): HttpTransport
+function ws(opts: WsOptions): WsTransport
+function sse(opts: SseOptions): SseTransport
+function pusher(opts: PusherOptions): PusherTransport
+```
+
+### Transport Capability Matrix
+
+| Transport | Query | Mutation | Subscription | Use Case |
+|-----------|-------|----------|--------------|----------|
+| `http()` | ✅ | ✅ | ❌ | Simple REST-like |
+| `ws()` | ✅ | ✅ | ✅ | Full real-time |
+| `sse()` | ✅ | ✅ | ✅ | Serverless-friendly real-time |
+| `pusher()` | ❌ | ❌ | ✅ | Third-party subscription only |
+| `ably()` | ❌ | ❌ | ✅ | Third-party subscription only |
+
+### Transport Interface (Legacy/Full)
+
+For transports that support all operations, the full interface:
 
 ```typescript
 interface Transport {
@@ -210,32 +258,73 @@ function route(routes: [...[Condition, Transport][], Transport]): Transport {
 }
 ```
 
-### routeByType Shorthand
+### routeByType (Type-Safe)
 
-Common pattern for splitting by operation type:
+Common pattern for splitting by operation type with full type inference:
 
 ```typescript
-function routeByType(config: {
-  query?: Transport
-  mutation?: Transport
-  subscription?: Transport
-  default: Transport
-}): Transport {
-  const routes: [...[Condition, Transport][], Transport] = []
-
-  if (config.query) {
-    routes.push([op => op.type === 'query', config.query])
-  }
-  if (config.mutation) {
-    routes.push([op => op.type === 'mutation', config.mutation])
-  }
-  if (config.subscription) {
-    routes.push([op => op.type === 'subscription', config.subscription])
-  }
-  routes.push(config.default)
-
-  return route(routes)
+// Type-safe config - subscription transport must have SubscriptionCapable
+interface RouteByTypeConfig<
+  Q extends QueryCapable,
+  M extends MutationCapable,
+  S extends SubscriptionCapable
+> {
+  query?: Q
+  mutation?: M
+  subscription?: S
+  default: QueryCapable & MutationCapable
 }
+
+// Return type reflects actual capabilities
+function routeByType<Config extends RouteByTypeConfig>(
+  config: Config
+): InferCapabilities<Config>
+
+type InferCapabilities<Config> =
+  & (Config['query'] extends QueryCapable ? QueryCapable :
+     Config['default'] extends QueryCapable ? QueryCapable : never)
+  & (Config['mutation'] extends MutationCapable ? MutationCapable :
+     Config['default'] extends MutationCapable ? MutationCapable : never)
+  & (Config['subscription'] extends SubscriptionCapable ? SubscriptionCapable :
+     Config['default'] extends SubscriptionCapable ? SubscriptionCapable : never)
+```
+
+**Type-safe usage:**
+
+```typescript
+// ✅ Correct - pusher only for subscriptions
+const transport = routeByType({
+  default: http({ url: '/api' }),
+  subscription: pusher({ key: 'xxx' }),
+})
+
+// ❌ Type Error - pusher doesn't support query/mutation
+const transport = routeByType({
+  default: pusher({ key: 'xxx' }),  // Error!
+})
+
+// ❌ Type Error - no subscription capability
+const transport = routeByType({
+  default: http({ url: '/api' }),
+  // Missing subscription - client.*.subscribe() will error at compile time
+})
+```
+
+**Return type inference:**
+
+```typescript
+// If no subscription transport provided, return type has no SubscriptionCapable
+const t1 = routeByType({
+  default: http({ url: '/api' })
+})
+// t1: QueryCapable & MutationCapable (no subscription!)
+
+// With subscription, full capabilities
+const t2 = routeByType({
+  default: http({ url: '/api' }),
+  subscription: sse({ url: '/api' })
+})
+// t2: QueryCapable & MutationCapable & SubscriptionCapable ✅
 ```
 
 ### Transport Handles All Operation Types
@@ -438,9 +527,233 @@ const cache = (options?: { ttl?: number }): Plugin => {
 }
 ```
 
+### Paired Plugins
+
+Some plugins need matching implementations on both client and server (e.g., compression).
+Use `PairedPlugin` to write once, use on both sides:
+
+```typescript
+// Type definition
+interface PairedPlugin {
+  __paired: true
+  server: ServerPlugin
+  client: ClientPlugin
+}
+
+function isPairedPlugin(p: unknown): p is PairedPlugin {
+  return typeof p === 'object' && p !== null && '__paired' in p
+}
+```
+
+**Creating a paired plugin:**
+
+```typescript
+// @sylphx/lens-plugin-compression
+export const compression: PairedPlugin = {
+  __paired: true,
+  server: {
+    name: 'compression',
+    beforeSend(ctx, data) {
+      return gzip(data)
+    }
+  },
+  client: {
+    name: 'compression',
+    afterResponse(result) {
+      return gunzip(result)
+    }
+  }
+}
+```
+
+**Usage - same import, auto-detected:**
+
+```typescript
+import { compression } from '@sylphx/lens-plugin-compression'
+
+// Server - automatically uses compression.server
+createServer({
+  router,
+  plugins: [compression]  // PairedPlugin auto-resolved
+})
+
+// Client - automatically uses compression.client
+createClient({
+  transport: http({ url: '/api' }),
+  plugins: [compression]  // PairedPlugin auto-resolved
+})
+```
+
+**How it works internally:**
+
+```typescript
+// In @sylphx/lens-server
+function resolvePlugins(plugins: (ServerPlugin | PairedPlugin)[]): ServerPlugin[] {
+  return plugins.map(p => isPairedPlugin(p) ? p.server : p)
+}
+
+// In @sylphx/lens-client
+function resolvePlugins(plugins: (ClientPlugin | PairedPlugin)[]): ClientPlugin[] {
+  return plugins.map(p => isPairedPlugin(p) ? p.client : p)
+}
+```
+
+### Plugin Classification
+
+| Plugin | Server | Client | Paired? | Package |
+|--------|--------|--------|---------|---------|
+| `logger` | ✅ | ✅ | ❌ | core |
+| `auth` | ❌ | ✅ | ❌ | core |
+| `retry` | ❌ | ✅ | ❌ | core |
+| `cache` | ❌ | ✅ | ❌ | core |
+| `diffOptimizer` | ✅ | ❌* | ❌ | core |
+| `compression` | ✅ | ✅ | ✅ | separate |
+| `encryption` | ✅ | ✅ | ✅ | separate |
+
+*Client has built-in ability to apply diff/patch/delta - no plugin needed.
+
 ---
 
 ## 3. Server Architecture
+
+### Design Principle: Stateless Core + Optional Plugins
+
+The server is **stateless by default**. State tracking is opt-in via plugins.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      STATELESS SERVER                           │
+│                                                                 │
+│  resolver → emit(data) → [plugins] → subscriptionTransport     │
+│                              │                                  │
+│                        beforeSend                               │
+│                        afterSend                                │
+│                                                                 │
+│  No state storage needed!                                       │
+│  Server just processes requests and emits                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Without plugins:** `emit()` sends data directly as specified by resolver.
+
+**With `diffOptimizer()` plugin:** Tracks state, computes optimal diff before send.
+
+### Server Plugin System
+
+Server plugins use hooks for lifecycle events:
+
+```typescript
+interface ServerPlugin {
+  name: string
+
+  // Subscription lifecycle
+  onSubscribe?(ctx: SubscribeContext): void
+  onUnsubscribe?(ctx: SubscribeContext): void
+
+  // Send transformation (per-client)
+  beforeSend?(ctx: SendContext, data: unknown): unknown | null  // null = skip
+  afterSend?(ctx: SendContext, data: unknown): void
+}
+
+interface SubscribeContext {
+  entity: string
+  id: string
+  clientId: string
+  fields?: string[]
+}
+
+interface SendContext {
+  entity: string
+  id: string
+  clientId: string
+}
+```
+
+### Built-in Server Plugins
+
+```typescript
+// diffOptimizer - tracks state, computes optimal diff
+function diffOptimizer(): ServerPlugin {
+  const clientStates = new Map<string, unknown>()
+
+  return {
+    name: 'diffOptimizer',
+    onSubscribe({ clientId, entity, id }) { /* init state */ },
+    onUnsubscribe({ clientId, entity, id }) {
+      clientStates.delete(`${clientId}:${entity}:${id}`)
+    },
+    beforeSend({ clientId, entity, id }, data) {
+      const key = `${clientId}:${entity}:${id}`
+      const prev = clientStates.get(key)
+      const diff = computeDiff(prev, data)
+      clientStates.set(key, data)
+      return diff
+    }
+  }
+}
+
+// compress - compress large payloads
+function compress({ threshold = 1024 }): ServerPlugin {
+  return {
+    name: 'compress',
+    beforeSend(ctx, data) {
+      const size = JSON.stringify(data).length
+      return size > threshold ? gzip(data) : data
+    }
+  }
+}
+
+// logger - log all sends
+function logger(): ServerPlugin {
+  return {
+    name: 'logger',
+    onSubscribe(ctx) { console.log('subscribe:', ctx) },
+    onUnsubscribe(ctx) { console.log('unsubscribe:', ctx) },
+    beforeSend(ctx, data) { console.log('send:', ctx, data); return data }
+  }
+}
+```
+
+### Subscription Transport
+
+How `emit()` reaches subscribers. Different strategies for different deployments:
+
+```typescript
+// Direct - in-memory, for stateful servers (default)
+function direct(): SubscriptionTransport
+
+// Pusher - third-party service, for serverless
+function pusher(opts: { appId, key, secret }): SubscriptionTransport
+
+// Redis - pub/sub, for horizontal scaling
+function redis(opts: { url }): SubscriptionTransport
+
+// Ably - third-party service, for serverless
+function ably(opts: { apiKey }): SubscriptionTransport
+```
+
+**Usage scenarios:**
+
+```typescript
+// Scenario 1: Stateful server (default)
+createServer({ router })
+// → Uses direct(), server manages connections
+
+// Scenario 2: Serverless (Lambda, Vercel)
+createServer({
+  router,
+  subscriptionTransport: pusher({ appId, key, secret })
+})
+// → emit() publishes to Pusher, clients connect to Pusher directly
+
+// Scenario 3: Horizontal scaling
+createServer({
+  router,
+  subscriptionTransport: redis({ url: REDIS_URL }),
+  plugins: [diffOptimizer()]
+})
+// → emit() publishes to Redis, all server instances receive
+```
 
 ### Server Interface
 
@@ -462,9 +775,9 @@ interface LensServer {
 
 ```typescript
 function createServer(config: {
-  transport: ServerTransport | ServerTransport[]
-  plugins?: Plugin[]
   router: Router
+  subscriptionTransport?: SubscriptionTransport  // default: direct()
+  plugins?: ServerPlugin[]
   context?: (req: Request) => Context | Promise<Context>
 }): LensServer {
 
@@ -959,6 +1272,134 @@ packages/
 
 ---
 
+## 8. Deployment Scenarios
+
+### Scenario A: Stateful Server (Default)
+
+Traditional server deployment with persistent connections.
+
+```typescript
+// Client
+createClient({
+  transport: ws({ url: 'ws://api.example.com' })
+})
+
+// Server
+createServer({
+  router,
+  plugins: [diffOptimizer(), logger()]
+})
+```
+
+```
+┌─────────┐      WebSocket      ┌─────────┐
+│ Client  │ ←─────────────────→ │ Server  │
+└─────────┘                     └─────────┘
+                                  (stateful)
+```
+
+**Best for:** Full-featured apps, games, real-time collaboration.
+
+### Scenario B: SSE (Serverless-Friendly)
+
+HTTP for query/mutation, SSE for subscriptions.
+
+```typescript
+// Client
+createClient({
+  transport: routeByType({
+    default: http({ url: '/api' }),
+    subscription: sse({ url: '/api' })
+  })
+})
+
+// Server (Vercel, Cloudflare)
+createServer({ router })  // stateless
+```
+
+```
+┌─────────┐      HTTP POST      ┌─────────┐
+│ Client  │ ──────────────────→ │ Server  │
+│         │ ←── SSE Stream ──── │         │
+└─────────┘                     └─────────┘
+                                (stateless)
+```
+
+**Best for:** Serverless platforms, edge functions.
+
+### Scenario C: Third-Party Realtime (Full Serverless)
+
+HTTP for query/mutation, Pusher/Ably for subscriptions.
+
+```typescript
+// Client
+createClient({
+  transport: routeByType({
+    default: http({ url: '/api' }),
+    subscription: pusher({ key: 'xxx' })
+  })
+})
+
+// Server (Lambda)
+createServer({
+  router,
+  subscriptionTransport: pusher({ appId, key, secret })
+})
+```
+
+```
+┌─────────┐    HTTP     ┌─────────┐
+│ Client  │ ──────────→ │ Lambda  │
+│         │             └────┬────┘
+│         │                  │ publish
+│         │             ┌────▼────┐
+│         │ ←── SSE ─── │ Pusher  │
+└─────────┘             └─────────┘
+```
+
+**Best for:** Fully serverless, no persistent infrastructure.
+
+### Scenario D: Horizontal Scaling (Redis)
+
+Multiple server instances with Redis pub/sub.
+
+```typescript
+// Client
+createClient({
+  transport: ws({ url: 'wss://api.example.com' })  // Load balanced
+})
+
+// Server (multiple instances)
+createServer({
+  router,
+  subscriptionTransport: redis({ url: REDIS_URL }),
+  plugins: [diffOptimizer()]
+})
+```
+
+```
+                        ┌─────────┐
+                    ┌──→│Server 1 │──┐
+┌─────────┐         │   └─────────┘  │
+│ Client  │ ←─ LB ──┤                ├──→ Redis PubSub
+└─────────┘         │   ┌─────────┐  │
+                    └──→│Server 2 │──┘
+                        └─────────┘
+```
+
+**Best for:** High availability, horizontal scaling.
+
+### Quick Reference
+
+| Scenario | Transport (Client) | Server Config | Use Case |
+|----------|-------------------|---------------|----------|
+| Stateful | `ws()` | default | Full-featured |
+| SSE | `http()` + `sse()` | default | Serverless |
+| Pusher | `http()` + `pusher()` | `subscriptionTransport: pusher()` | Full serverless |
+| Redis | `ws()` | `subscriptionTransport: redis()` | Horizontal scaling |
+
+---
+
 ## Philosophy
 
 **TypeScript-first:** Same code runs on client and server. No SDL, no codegen.
@@ -966,6 +1407,8 @@ packages/
 **Multi-server native:** Connect to multiple backends with full type safety.
 
 **Transport-agnostic:** HTTP, WebSocket, SSE, or custom - same API.
+
+**Stateless by default:** Server doesn't require state storage. Opt-in via plugins.
 
 **Plugin-based extension:** Add functionality without modifying core.
 
