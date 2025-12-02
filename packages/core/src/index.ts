@@ -379,3 +379,17 @@ export {
 	type VersionedUpdateMessage,
 	valuesEqual,
 } from "./reconnect/index.js";
+
+// =============================================================================
+// Plugin System
+// =============================================================================
+
+export {
+	// Type guard
+	isPairedPlugin,
+	// Types
+	type PairedPlugin,
+	// Resolvers
+	resolveClientPlugins,
+	resolveServerPlugins,
+} from "./plugin/index.js";
