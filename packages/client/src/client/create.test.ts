@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from "bun:test";
 import { entity, lens, router, t } from "@sylphx/lens-core";
-import { createServer } from "@sylphx/lens-server";
+import { createServer, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 import type { LensServerInterface } from "../transport/in-process";
 import { inProcess } from "../transport/in-process";
@@ -599,6 +599,7 @@ describe("rollbackOptimistic", () => {
 				}),
 			}),
 			context: () => ({ db: { users: db, posts: new Map() } }),
+			plugins: [optimisticPlugin()],
 		});
 
 		const client = createClient({
@@ -1037,6 +1038,7 @@ describe("Edge cases and error handling", () => {
 					})),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),
+			plugins: [optimisticPlugin()],
 		});
 
 		const client = createClient({
@@ -1110,6 +1112,7 @@ describe("Edge cases and error handling", () => {
 						}),
 				}),
 			}),
+			plugins: [optimisticPlugin()],
 			context: () => ({ db: { users: db, posts: new Map() } }),
 		});
 

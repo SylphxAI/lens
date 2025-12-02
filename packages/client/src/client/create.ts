@@ -510,8 +510,10 @@ class ClientImpl {
 		input: TInput,
 		dsl: OptimisticDSL,
 	): Promise<string> {
-		// OptimisticDSL is now always a Reify Pipeline
-		if (isPipeline(dsl)) {
+		// OptimisticDSL from server metadata is JSON-serialized Pipeline (an array).
+		// isPipeline() doesn't work for deserialized JSON, so we check for array.
+		// The server guarantees the format via optimisticPlugin.
+		if (Array.isArray(dsl) || isPipeline(dsl)) {
 			const txId = await this.store.applyPipelineOptimistic(dsl, input);
 
 			// Store mutation info for rollback notification
