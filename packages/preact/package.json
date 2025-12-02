@@ -16,7 +16,7 @@
 		}
 	},
 	"scripts": {
-		"build": "bun build ./src/index.ts ./src/signals.ts --outdir ./dist --target browser --external preact --external @preact/signals && tsc --emitDeclarationOnly --declaration --outDir ./dist",
+		"build": "bun build ./src/index.ts ./src/signals.ts --outdir ./dist --target browser --external preact --external @preact/signals && bunx tsc --emitDeclarationOnly --declaration --outDir ./dist",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"prepack": "[ -d dist ] || bun run build"
