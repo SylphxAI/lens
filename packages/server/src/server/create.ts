@@ -29,8 +29,6 @@ import {
 	type MutationDef,
 	type Pipeline,
 	type QueryDef,
-	type ReconnectMessage,
-	type ReconnectResult,
 	type ResolverDef,
 	type Resolvers,
 	type ReturnSpec,
@@ -38,14 +36,17 @@ import {
 	toResolverMap,
 } from "@sylphx/lens-core";
 import { createContext, runWithContext } from "../context/index.js";
+import { isDiffOptimizerPlugin } from "../plugin/diff-optimizer.js";
 import {
 	createPluginManager,
 	type PluginManager,
+	type ReconnectContext,
+	type ReconnectHookResult,
 	type ServerPlugin,
 	type SubscribeContext,
 	type UnsubscribeContext,
+	type UpdateFieldsContext,
 } from "../plugin/types.js";
-import { isDiffOptimizerPlugin } from "../plugin/diff-optimizer.js";
 import type { GraphStateManager } from "../state/graph-state-manager.js";
 
 // =============================================================================
@@ -243,12 +244,20 @@ export interface LensServer {
 
 	/**
 	 * Handle a reconnection request from a client.
-	 * Only works if diffOptimizer plugin is enabled.
+	 * Uses plugin hooks (onReconnect) for reconnection logic.
 	 *
-	 * @param message - Reconnection message from client
-	 * @returns Reconnection results or null if not supported
+	 * @param ctx - Reconnection context with client state
+	 * @returns Reconnection results or null if no plugin handles it
 	 */
-	handleReconnect(message: ReconnectMessage): ReconnectResult[] | null;
+	handleReconnect(ctx: ReconnectContext): Promise<ReconnectHookResult[] | null>;
+
+	/**
+	 * Update subscribed fields for a client's subscription.
+	 * Runs plugin hooks (onUpdateFields) to sync state.
+	 *
+	 * @param ctx - Update fields context
+	 */
+	updateFields(ctx: UpdateFieldsContext): Promise<void>;
 
 	/**
 	 * Check if server has state management enabled (diffOptimizer plugin).
@@ -407,7 +416,6 @@ class LensServerImpl<
 
 	// Plugin system
 	private pluginManager: PluginManager;
-	private stateManager: GraphStateManager | undefined;
 	private clientSendFns = new Map<string, ClientSendFn>();
 
 	// Subscription tracking: clientId → subscriptionId → { entity, entityId, fields }
@@ -446,10 +454,6 @@ class LensServerImpl<
 		this.pluginManager = createPluginManager();
 		for (const plugin of config.plugins ?? []) {
 			this.pluginManager.register(plugin);
-			// Extract stateManager from diffOptimizer plugin if present
-			if (isDiffOptimizerPlugin(plugin)) {
-				this.stateManager = plugin.getStateManager();
-			}
 		}
 
 		// Inject entity names
@@ -795,15 +799,7 @@ class LensServerImpl<
 		// Store client send function
 		this.clientSendFns.set(clientId, send);
 
-		// Register with state manager if available
-		if (this.stateManager) {
-			this.stateManager.addClient({
-				id: clientId,
-				send: (msg) => send(msg),
-			});
-		}
-
-		// Run plugin hooks
+		// Run plugin hooks (plugins like diffOptimizer handle their own state)
 		const allowed = await this.pluginManager.runOnConnect({ clientId });
 		if (!allowed) {
 			this.removeClient(clientId, 0);
@@ -835,26 +831,22 @@ class LensServerImpl<
 			this.subscriptions.delete(clientId);
 		}
 
-		// Remove from state manager if available
-		if (this.stateManager) {
-			this.stateManager.removeClient(clientId);
-		}
-
 		// Remove stored send function
 		this.clientSendFns.delete(clientId);
 
-		// Run plugin hooks
+		// Run plugin hooks (plugins like diffOptimizer clean up their own state)
 		this.pluginManager.runOnDisconnect({ clientId, subscriptionCount });
 	}
 
 	async subscribe(ctx: SubscribeContext): Promise<boolean> {
 		// Run plugin hooks - any plugin can reject
+		// (plugins like diffOptimizer handle their own subscription tracking)
 		const allowed = await this.pluginManager.runOnSubscribe(ctx);
 		if (!allowed) {
 			return false;
 		}
 
-		// Track subscription
+		// Track subscription (server-level tracking for broadcast)
 		if (ctx.entity && ctx.entityId) {
 			// Add to client's subscriptions
 			let clientSubs = this.subscriptions.get(ctx.clientId);
@@ -876,11 +868,6 @@ class LensServerImpl<
 				this.entitySubscribers.set(entityKey, subscribers);
 			}
 			subscribers.add({ clientId: ctx.clientId, subscriptionId: ctx.subscriptionId });
-
-			// If state management is enabled, register subscription
-			if (this.stateManager) {
-				this.stateManager.subscribe(ctx.clientId, ctx.entity, ctx.entityId, ctx.fields);
-			}
 		}
 
 		return true;
@@ -907,15 +894,9 @@ class LensServerImpl<
 					this.entitySubscribers.delete(entityKey);
 				}
 			}
-
-			// Unsubscribe from state manager
-			if (this.stateManager) {
-				const [entity, id] = entityKey.split(":");
-				this.stateManager.unsubscribe(ctx.clientId, entity, id);
-			}
 		}
 
-		// Run plugin hooks
+		// Run plugin hooks (plugins like diffOptimizer clean up their own state)
 		this.pluginManager.runOnUnsubscribe(ctx);
 	}
 
@@ -973,21 +954,71 @@ class LensServerImpl<
 		}
 	}
 
-	handleReconnect(message: ReconnectMessage): ReconnectResult[] | null {
-		// Only handle reconnection if state management is enabled
-		if (!this.stateManager) {
-			return null;
+	async handleReconnect(ctx: ReconnectContext): Promise<ReconnectHookResult[] | null> {
+		// Run plugin hooks - first plugin to return results wins
+		const results = await this.pluginManager.runOnReconnect(ctx);
+
+		// If plugins handled it, update server subscription tracking
+		if (results) {
+			for (let i = 0; i < ctx.subscriptions.length; i++) {
+				const sub = ctx.subscriptions[i];
+				const result = results[i];
+
+				// Only register subscription if not deleted/error
+				if (result.status !== "deleted" && result.status !== "error") {
+					// Add to client's subscriptions
+					let clientSubs = this.subscriptions.get(ctx.clientId);
+					if (!clientSubs) {
+						clientSubs = new Map();
+						this.subscriptions.set(ctx.clientId, clientSubs);
+					}
+					clientSubs.set(sub.id, {
+						entity: sub.entity,
+						entityId: sub.entityId,
+						fields: sub.fields,
+					});
+
+					// Add to entity subscribers
+					const entityKey = `${sub.entity}:${sub.entityId}`;
+					let subscribers = this.entitySubscribers.get(entityKey);
+					if (!subscribers) {
+						subscribers = new Set();
+						this.entitySubscribers.set(entityKey, subscribers);
+					}
+					subscribers.add({ clientId: ctx.clientId, subscriptionId: sub.id });
+				}
+			}
 		}
 
-		return this.stateManager.handleReconnect(message.subscriptions);
+		return results;
+	}
+
+	async updateFields(ctx: UpdateFieldsContext): Promise<void> {
+		// Update server subscription tracking
+		const clientSubs = this.subscriptions.get(ctx.clientId);
+		if (clientSubs) {
+			const subInfo = clientSubs.get(ctx.subscriptionId);
+			if (subInfo) {
+				subInfo.fields = ctx.fields;
+			}
+		}
+
+		// Run plugin hooks
+		await this.pluginManager.runOnUpdateFields(ctx);
 	}
 
 	hasStateManagement(): boolean {
-		return this.stateManager !== undefined;
+		// Check if diffOptimizer plugin is registered
+		return this.pluginManager.getPlugins().some((p) => isDiffOptimizerPlugin(p));
 	}
 
 	getStateManager(): GraphStateManager | undefined {
-		return this.stateManager;
+		// Get stateManager from diffOptimizer plugin if present
+		const plugin = this.pluginManager.getPlugins().find((p) => isDiffOptimizerPlugin(p));
+		if (plugin && isDiffOptimizerPlugin(plugin)) {
+			return plugin.getStateManager();
+		}
+		return undefined;
 	}
 
 	getPluginManager(): PluginManager {

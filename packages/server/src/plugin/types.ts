@@ -136,6 +136,66 @@ export interface AfterMutationContext {
 	duration: number;
 }
 
+/**
+ * Context passed to onReconnect hook.
+ */
+export interface ReconnectContext {
+	/** Client ID */
+	clientId: string;
+	/** Subscriptions to restore */
+	subscriptions: Array<{
+		id: string;
+		entity: string;
+		entityId: string;
+		fields: string[] | "*";
+		version: number;
+		dataHash?: string;
+		input?: unknown;
+	}>;
+	/** Client-generated reconnect ID */
+	reconnectId: string;
+}
+
+/**
+ * Result from onReconnect hook.
+ */
+export interface ReconnectHookResult {
+	/** Subscription ID */
+	id: string;
+	/** Entity type */
+	entity: string;
+	/** Entity ID */
+	entityId: string;
+	/** Sync status */
+	status: "current" | "patched" | "snapshot" | "deleted" | "error";
+	/** Current server version */
+	version: number;
+	/** For "patched": ordered patches to apply */
+	patches?: Array<Array<{ op: string; path: string; value?: unknown }>>;
+	/** For "snapshot": full current state */
+	data?: Record<string, unknown>;
+	/** Error message if status is "error" */
+	error?: string;
+}
+
+/**
+ * Context passed to onUpdateFields hook.
+ */
+export interface UpdateFieldsContext {
+	/** Client ID */
+	clientId: string;
+	/** Subscription ID */
+	subscriptionId: string;
+	/** Entity type */
+	entity: string;
+	/** Entity ID */
+	entityId: string;
+	/** New fields after update */
+	fields: string[] | "*";
+	/** Previous fields */
+	previousFields: string[] | "*";
+}
+
 // =============================================================================
 // Plugin Interface
 // =============================================================================
@@ -211,6 +271,21 @@ export interface ServerPlugin {
 	 * Called after a mutation is executed.
 	 */
 	afterMutation?: (ctx: AfterMutationContext) => void | Promise<void>;
+
+	/**
+	 * Called when a client reconnects with subscription state.
+	 * Plugin can return sync results for each subscription.
+	 *
+	 * @returns Array of sync results, or null to let other plugins handle
+	 */
+	onReconnect?: (
+		ctx: ReconnectContext,
+	) => ReconnectHookResult[] | null | Promise<ReconnectHookResult[] | null>;
+
+	/**
+	 * Called when a client updates subscribed fields for an entity.
+	 */
+	onUpdateFields?: (ctx: UpdateFieldsContext) => void | Promise<void>;
 }
 
 // =============================================================================
@@ -336,6 +411,33 @@ export class PluginManager {
 		for (const plugin of this.plugins) {
 			if (plugin.afterMutation) {
 				await plugin.afterMutation(ctx);
+			}
+		}
+	}
+
+	/**
+	 * Run onReconnect hooks.
+	 * Returns the first non-null result from a plugin.
+	 */
+	async runOnReconnect(ctx: ReconnectContext): Promise<ReconnectHookResult[] | null> {
+		for (const plugin of this.plugins) {
+			if (plugin.onReconnect) {
+				const result = await plugin.onReconnect(ctx);
+				if (result !== null) {
+					return result;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Run onUpdateFields hooks.
+	 */
+	async runOnUpdateFields(ctx: UpdateFieldsContext): Promise<void> {
+		for (const plugin of this.plugins) {
+			if (plugin.onUpdateFields) {
+				await plugin.onUpdateFields(ctx);
 			}
 		}
 	}

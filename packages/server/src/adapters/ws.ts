@@ -347,43 +347,59 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 	// Handle updateFields
 	// Note: This updates local tracking only. The server tracks fields via subscribe().
 	// Field updates affect future sends through the subscription context.
-	function handleUpdateFields(conn: ClientConnection, message: UpdateFieldsMessage): void {
+	async function handleUpdateFields(
+		conn: ClientConnection,
+		message: UpdateFieldsMessage,
+	): Promise<void> {
 		const sub = conn.subscriptions.get(message.id);
 		if (!sub) return;
 
+		const previousFields = sub.fields;
+		let newFields: string[] | "*";
+
 		// Handle upgrade to full subscription ("*")
 		if (message.addFields?.includes("*")) {
-			sub.fields = "*";
+			newFields = "*";
+		} else if (message.setFields !== undefined) {
+			// Handle downgrade from "*" to specific fields
+			newFields = message.setFields;
+		} else if (sub.fields === "*") {
+			// Already subscribing to all fields - no-op
 			return;
-		}
+		} else {
+			// Normal field add/remove
+			const fields = new Set(sub.fields);
 
-		// Handle downgrade from "*" to specific fields
-		if (message.setFields !== undefined) {
-			sub.fields = message.setFields;
-			return;
-		}
-
-		// Already subscribing to all fields - no-op
-		if (sub.fields === "*") {
-			return;
-		}
-
-		// Normal field add/remove
-		const fields = new Set(sub.fields);
-
-		if (message.addFields) {
-			for (const field of message.addFields) {
-				fields.add(field);
+			if (message.addFields) {
+				for (const field of message.addFields) {
+					fields.add(field);
+				}
 			}
-		}
 
-		if (message.removeFields) {
-			for (const field of message.removeFields) {
-				fields.delete(field);
+			if (message.removeFields) {
+				for (const field of message.removeFields) {
+					fields.delete(field);
+				}
 			}
+
+			newFields = Array.from(fields);
 		}
 
-		sub.fields = Array.from(fields);
+		// Update adapter tracking
+		sub.fields = newFields;
+
+		// Notify server (runs plugin hooks)
+		for (const entityKey of sub.entityKeys) {
+			const [entity, entityId] = entityKey.split(":");
+			await server.updateFields({
+				clientId: conn.id,
+				subscriptionId: sub.id,
+				entity,
+				entityId,
+				fields: newFields,
+				previousFields,
+			});
+		}
 	}
 
 	// Handle unsubscribe
@@ -500,8 +516,38 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 	async function handleReconnect(conn: ClientConnection, message: ReconnectMessage): Promise<void> {
 		const startTime = Date.now();
 
-		// Check if server supports reconnection
-		const results = server.handleReconnect(message);
+		// Convert ReconnectMessage to ReconnectContext
+		const ctx = {
+			clientId: conn.id,
+			reconnectId: message.reconnectId,
+			subscriptions: message.subscriptions.map((sub) => {
+				const mapped: {
+					id: string;
+					entity: string;
+					entityId: string;
+					fields: string[] | "*";
+					version: number;
+					dataHash?: string;
+					input?: unknown;
+				} = {
+					id: sub.id,
+					entity: sub.entity,
+					entityId: sub.entityId,
+					fields: sub.fields,
+					version: sub.version,
+				};
+				if (sub.dataHash !== undefined) {
+					mapped.dataHash = sub.dataHash;
+				}
+				if (sub.input !== undefined) {
+					mapped.input = sub.input;
+				}
+				return mapped;
+			}),
+		};
+
+		// Check if server supports reconnection (via plugins)
+		const results = await server.handleReconnect(ctx);
 
 		if (results === null) {
 			conn.ws.send(
@@ -518,7 +564,8 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 		}
 
 		try {
-			// Re-establish subscriptions in adapter tracking and server
+			// Re-establish subscriptions in adapter tracking
+			// (Server handles subscription registration via plugin hooks)
 			for (const sub of message.subscriptions) {
 				let clientSub = conn.subscriptions.get(sub.id);
 				if (!clientSub) {
@@ -533,17 +580,6 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 					};
 					conn.subscriptions.set(sub.id, clientSub);
 				}
-
-				// Re-register subscription with server
-				await server.subscribe({
-					clientId: conn.id,
-					subscriptionId: sub.id,
-					operation: "",
-					input: sub.input,
-					fields: sub.fields,
-					entity: sub.entity,
-					entityId: sub.entityId,
-				});
 			}
 
 			conn.ws.send(

@@ -25,9 +25,8 @@ This document defines the correct separation of concerns between Server, Adapter
 - Connection lifecycle (connect/disconnect)
 
 **不應該做：**
-- ❌ Know about state management (`getStateManager()`)
-- ❌ Call state manager directly (`stateManager.subscribe()`)
-- ❌ Check if server has state (`hasStateManagement()`)
+- ❌ Know about state management
+- ❌ Call state manager directly
 - ❌ Make decisions based on server mode (stateful vs stateless)
 - ❌ Compute diffs or optimizations
 
@@ -50,6 +49,7 @@ interface Adapter {
 - Manage plugin lifecycle
 - Route data through plugin hooks
 - Deliver data to clients (via registered send functions)
+- Track subscriptions for broadcast
 
 **Interface：**
 ```typescript
@@ -60,17 +60,26 @@ interface LensServer {
 
   // Client management
   addClient(clientId: string, send: SendFn): Promise<boolean>;
-  removeClient(clientId: string): void;
+  removeClient(clientId: string, subscriptionCount: number): void;
 
   // Subscription lifecycle (delegates to plugins)
   subscribe(ctx: SubscribeContext): Promise<boolean>;
   unsubscribe(ctx: UnsubscribeContext): void;
 
   // Data delivery (runs through plugin hooks)
-  send(clientId: string, subscriptionId: string, data: unknown): Promise<void>;
+  send(clientId, subscriptionId, entity, entityId, data, isInitial): Promise<void>;
 
   // Broadcast to all subscribers of an entity
-  broadcast(entity: string, entityId: string, data: Record<string, unknown>): void;
+  broadcast(entity: string, entityId: string, data: Record<string, unknown>): Promise<void>;
+
+  // Reconnection (delegates to plugin hooks)
+  handleReconnect(ctx: ReconnectContext): Promise<ReconnectHookResult[] | null>;
+
+  // Field updates (delegates to plugin hooks)
+  updateFields(ctx: UpdateFieldsContext): Promise<void>;
+
+  // Plugin access
+  getPluginManager(): PluginManager;
 }
 ```
 
@@ -80,11 +89,24 @@ interface LensServer {
 
 Plugins use hooks to intercept and modify server behavior. The `diffOptimizer` plugin adds stateful behavior.
 
+**Available Hooks:**
+- `onConnect(ctx)` - Client connects
+- `onDisconnect(ctx)` - Client disconnects
+- `onSubscribe(ctx)` - Client subscribes
+- `onUnsubscribe(ctx)` - Client unsubscribes
+- `beforeSend(ctx)` - Before sending data (can transform)
+- `afterSend(ctx)` - After sending data
+- `beforeMutation(ctx)` - Before mutation (can reject)
+- `afterMutation(ctx)` - After mutation
+- `onReconnect(ctx)` - Handle reconnection requests
+- `onUpdateFields(ctx)` - Handle field subscription updates
+
 **diffOptimizer Plugin 職責：**
-- Track per-client state
+- Track per-client state via internal maps
 - Compute minimal diffs in `beforeSend` hook
 - Determine optimal transfer strategy (value/delta/patch)
-- Handle reconnection with version tracking
+- Handle reconnection via `onReconnect` hook with version tracking
+- Sync field updates via `onUpdateFields` hook
 
 ---
 
@@ -103,8 +125,8 @@ Client                    Adapter                 Server                Plugin (
   |                         |                       |                         |-- track subscription
   |                         |                       |                         |
   |                         |-- send(data) -------->|-- beforeSend hook ----->|
-  |                         |                       |                         |-- compute if initial
-  |                         |                       |<-- optimized data ------|
+  |                         |                       |                         |-- store initial state
+  |                         |                       |<-- full data -----------|
   |                         |<-- deliver to client--|                         |
   |<-- data msg ------------|                       |                         |
 ```
@@ -123,105 +145,66 @@ External Event            Server                Plugin (diffOptimizer)        Cl
   |                         |-- deliver via sendFn --------------------------------->|
 ```
 
+### Reconnection Flow
+
+```
+Client                    Adapter                 Server                Plugin (diffOptimizer)
+  |                         |                       |                         |
+  |-- reconnect msg ------->|                       |                         |
+  |                         |                       |                         |
+  |                         |-- handleReconnect --->|                         |
+  |                         |    (ctx with subs)    |-- onReconnect hook ---->|
+  |                         |                       |                         |-- check versions
+  |                         |                       |                         |-- compute patches/snapshots
+  |                         |                       |<-- results array -------|
+  |                         |                       |                         |
+  |                         |                       |-- update tracking ------|
+  |                         |<-- results -----------|                         |
+  |<-- reconnect_ack -------|                       |                         |
+```
+
+### Update Fields Flow
+
+```
+Client                    Adapter                 Server                Plugin (diffOptimizer)
+  |                         |                       |                         |
+  |-- updateFields msg ---->|                       |                         |
+  |                         |-- updateFields(ctx) ->|                         |
+  |                         |                       |-- onUpdateFields hook ->|
+  |                         |                       |                         |-- update field tracking
+  |                         |                       |                         |
+```
+
 ---
 
-## Implementation Changes Required
+## Implementation Status
 
-### 1. Remove from WSAdapter
+### ✅ Completed
 
-```typescript
-// ❌ Remove these
-const stateManager = server.getStateManager();
-server.emit(entity, entityId, entityData);
-stateManager.updateSubscription(...);
-stateManager.subscribe(...);
-adapter.getStateManager();
-```
+1. **Server Methods**
+   - `send()` - Runs through beforeSend/afterSend hooks
+   - `broadcast()` - Sends to all entity subscribers via send()
+   - `handleReconnect()` - Delegates to onReconnect hook
+   - `updateFields()` - Delegates to onUpdateFields hook
 
-### 2. Add to Server
+2. **Plugin Hooks**
+   - `onReconnect` - Handle reconnection requests
+   - `onUpdateFields` - Handle field subscription updates
 
-```typescript
-// ✅ New server.send() method
-async send(clientId: string, subscriptionId: string, data: unknown): Promise<void> {
-  const sendFn = this.clientSendFns.get(clientId);
-  if (!sendFn) return;
+3. **diffOptimizer Plugin**
+   - `beforeSend` - Computes diffs using internal state tracking
+   - `onReconnect` - Uses GraphStateManager for version/patch logic
+   - `onUpdateFields` - Updates internal field tracking
 
-  // Run beforeSend hooks (plugins can transform data)
-  const ctx: BeforeSendContext = { clientId, data, isInitial, entity, entityId };
-  const optimizedData = await this.pluginManager.runBeforeSend(ctx);
+4. **WSAdapter Simplification**
+   - No longer references stateManager directly
+   - Uses server methods for all operations
+   - Converts ReconnectMessage to ReconnectContext
 
-  // Deliver to client
-  sendFn({ type: "data", id: subscriptionId, data: optimizedData });
-
-  // Run afterSend hooks
-  await this.pluginManager.runAfterSend({ ...ctx, timestamp: Date.now() });
-}
-
-// ✅ New server.broadcast() method
-broadcast(entity: string, entityId: string, data: Record<string, unknown>): void {
-  // Get all clients subscribed to this entity
-  const subscribers = this.getSubscribers(entity, entityId);
-
-  for (const { clientId, subscriptionId } of subscribers) {
-    this.send(clientId, subscriptionId, data);
-  }
-}
-```
-
-### 3. Update diffOptimizer Plugin
-
-```typescript
-// ✅ Plugin handles all state logic in beforeSend
-beforeSend(ctx: BeforeSendContext): Record<string, unknown> | void {
-  const { clientId, entity, entityId, data, isInitial } = ctx;
-
-  if (isInitial) {
-    // Store as initial state, return full data
-    this.stateManager.setInitialState(entity, entityId, data);
-    this.stateManager.updateClientState(clientId, entity, entityId, data);
-    return data;
-  }
-
-  // Compute diff against client's last known state
-  const lastState = this.stateManager.getClientState(clientId, entity, entityId);
-  const diff = this.stateManager.computeDiff(lastState, data);
-
-  // Update client's last known state
-  this.stateManager.updateClientState(clientId, entity, entityId, data);
-
-  // Return optimized payload (diff or full based on size)
-  return diff;
-}
-```
-
-### 4. Simplified WSAdapter
-
-```typescript
-async function handleSubscribe(conn: ClientConnection, message: SubscribeMessage) {
-  const { id, operation, input, fields } = message;
-
-  // 1. Execute query
-  const result = await server.execute({ path: operation, input });
-  if (result.error) { /* send error */ return; }
-
-  // 2. Register subscription (server handles plugin hooks)
-  const entities = extractEntities(result.data);
-  for (const { entity, entityId } of entities) {
-    const allowed = await server.subscribe({
-      clientId: conn.id,
-      subscriptionId: id,
-      operation, input, fields,
-      entity, entityId,
-    });
-    if (!allowed) { /* send error */ return; }
-  }
-
-  // 3. Send initial data (server handles optimization via plugins)
-  await server.send(conn.id, id, result.data);
-
-  // Done! Adapter doesn't know about state/diff
-}
-```
+5. **Server State Removal**
+   - Server no longer has direct `stateManager` field
+   - `hasStateManagement()` checks for diffOptimizer plugin
+   - `getStateManager()` retrieves from diffOptimizer plugin
 
 ---
 
@@ -243,7 +226,22 @@ Initial subscription - `data` message:
 
 Subsequent updates - `update` message (from plugin):
 ```json
-{ "type": "update", "entity": "User", "id": "123", "version": 2, "updates": { "name": { "strategy": "value", "data": "Jane" } } }
+{ "type": "data", "id": "sub_1", "data": { "_type": "update", "entity": "User", "id": "123", "updates": { "name": { "strategy": "value", "data": "Jane" } } } }
+```
+
+Reconnection response:
+```json
+{
+  "type": "reconnect_ack",
+  "reconnectId": "abc123",
+  "results": [
+    { "id": "sub_1", "entity": "User", "entityId": "123", "status": "current", "version": 5 },
+    { "id": "sub_2", "entity": "Post", "entityId": "456", "status": "patched", "version": 8, "patches": [...] },
+    { "id": "sub_3", "entity": "Comment", "entityId": "789", "status": "snapshot", "version": 3, "data": {...} }
+  ],
+  "serverTime": 1234567890,
+  "processingTime": 12
+}
 ```
 
 ---
@@ -258,22 +256,48 @@ Subsequent updates - `update` message (from plugin):
 
 ---
 
-## Migration Steps
+## Architecture Diagram
 
-1. Add `server.send()` method
-2. Add `server.broadcast()` method
-3. Update `diffOptimizer.beforeSend()` to handle diff computation
-4. Remove state manager references from WSAdapter
-5. Remove `getStateManager()` from adapter interface
-6. Remove `hasStateManagement()` checks from adapter
-7. Update tests
-8. Update documentation
-
----
-
-## Questions for Review
-
-1. Should `send()` be sync or async?
-2. Should we keep `emit()` method or replace with `broadcast()`?
-3. How should reconnection be handled? (Still need state manager access)
-4. Should message format be unified (always `data` type, plugin modifies content)?
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              Client                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Adapter (ws.ts)                                  │
+│  - Parse WebSocket messages                                             │
+│  - Call server methods                                                  │
+│  - Deliver responses                                                    │
+│  - Track local subscription IDs                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Server (create.ts)                               │
+│  - Execute operations                                                   │
+│  - Track subscriptions for broadcast                                    │
+│  - Route through plugin hooks                                           │
+│  - Manage client send functions                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      Plugin Manager                                      │
+│  - runOnConnect, runOnDisconnect                                        │
+│  - runOnSubscribe, runOnUnsubscribe                                     │
+│  - runBeforeSend, runAfterSend                                          │
+│  - runOnReconnect, runOnUpdateFields                                    │
+│  - runBeforeMutation, runAfterMutation                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    diffOptimizer Plugin                                  │
+│  - Per-client state tracking (clientStates Map)                         │
+│  - Per-client subscription tracking (clientSubscriptions Map)           │
+│  - Per-client field tracking (clientFields Map)                         │
+│  - GraphStateManager for reconnection                                   │
+│  - Diff computation in beforeSend                                       │
+└─────────────────────────────────────────────────────────────────────────┘
+```

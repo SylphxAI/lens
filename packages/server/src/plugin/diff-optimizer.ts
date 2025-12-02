@@ -25,9 +25,12 @@ import type {
 	BeforeSendContext,
 	ConnectContext,
 	DisconnectContext,
+	ReconnectContext,
+	ReconnectHookResult,
 	ServerPlugin,
 	SubscribeContext,
 	UnsubscribeContext,
+	UpdateFieldsContext,
 } from "./types.js";
 
 /**
@@ -74,6 +77,9 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 	// Track client-entity subscriptions
 	const clientSubscriptions = new Map<string, Set<string>>(); // clientId -> Set<entityKey>
 
+	// Track client-entity fields: clientId → entityKey → fields
+	const clientFields = new Map<string, Map<string, string[] | "*">>();
+
 	const log = (...args: unknown[]) => {
 		if (debug) {
 			console.log("[diffOptimizer]", ...args);
@@ -100,6 +106,7 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 			log("Client connected:", ctx.clientId);
 			clientStates.set(ctx.clientId, new Map());
 			clientSubscriptions.set(ctx.clientId, new Set());
+			clientFields.set(ctx.clientId, new Map());
 		},
 
 		/**
@@ -109,6 +116,7 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 			log("Client disconnected:", ctx.clientId, "subscriptions:", ctx.subscriptionCount);
 			clientStates.delete(ctx.clientId);
 			clientSubscriptions.delete(ctx.clientId);
+			clientFields.delete(ctx.clientId);
 		},
 
 		/**
@@ -118,9 +126,11 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 			log("Subscribe:", ctx.clientId, ctx.operation, ctx.entity, ctx.entityId);
 
 			const subs = clientSubscriptions.get(ctx.clientId);
+			const fields = clientFields.get(ctx.clientId);
 			if (subs && ctx.entity && ctx.entityId) {
 				const entityKey = makeEntityKey(ctx.entity, ctx.entityId);
 				subs.add(entityKey);
+				fields?.set(entityKey, ctx.fields);
 			}
 		},
 
@@ -132,11 +142,13 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 
 			const subs = clientSubscriptions.get(ctx.clientId);
 			const states = clientStates.get(ctx.clientId);
+			const fields = clientFields.get(ctx.clientId);
 
-			if (subs || states) {
+			if (subs || states || fields) {
 				for (const entityKey of ctx.entityKeys) {
 					subs?.delete(entityKey);
 					states?.delete(entityKey);
+					fields?.delete(entityKey);
 				}
 			}
 		},
@@ -224,6 +236,116 @@ export function diffOptimizer(options: DiffOptimizerOptions = {}): ServerPlugin 
 		 */
 		afterSend(ctx: AfterSendContext): void {
 			log("afterSend:", ctx.clientId, ctx.entity, ctx.entityId, "timestamp:", ctx.timestamp);
+		},
+
+		/**
+		 * Handle client reconnection with subscription state.
+		 * Uses GraphStateManager to determine sync strategy for each subscription.
+		 */
+		onReconnect(ctx: ReconnectContext): ReconnectHookResult[] {
+			log("Reconnect:", ctx.clientId, "subscriptions:", ctx.subscriptions.length);
+
+			const results: ReconnectHookResult[] = [];
+
+			// Initialize client state tracking if not exists
+			if (!clientStates.has(ctx.clientId)) {
+				clientStates.set(ctx.clientId, new Map());
+				clientSubscriptions.set(ctx.clientId, new Set());
+				clientFields.set(ctx.clientId, new Map());
+			}
+
+			// Process each subscription using GraphStateManager
+			const reconnectSubs = ctx.subscriptions.map((sub) => {
+				const mapped: {
+					id: string;
+					entity: string;
+					entityId: string;
+					version: number;
+					fields: string[] | "*";
+					dataHash?: string;
+				} = {
+					id: sub.id,
+					entity: sub.entity,
+					entityId: sub.entityId,
+					version: sub.version,
+					fields: sub.fields,
+				};
+				if (sub.dataHash !== undefined) {
+					mapped.dataHash = sub.dataHash;
+				}
+				return mapped;
+			});
+
+			const stateResults = stateManager.handleReconnect(reconnectSubs);
+
+			for (let i = 0; i < ctx.subscriptions.length; i++) {
+				const sub = ctx.subscriptions[i];
+				const stateResult = stateResults[i];
+				const entityKey = makeEntityKey(sub.entity, sub.entityId);
+
+				// Track subscription and fields in plugin state
+				const subs = clientSubscriptions.get(ctx.clientId);
+				const fieldsMap = clientFields.get(ctx.clientId);
+				subs?.add(entityKey);
+				fieldsMap?.set(entityKey, sub.fields);
+
+				// If we got a snapshot, update client's last known state
+				if (stateResult.status === "snapshot" && stateResult.data) {
+					const clientStateMap = clientStates.get(ctx.clientId);
+					clientStateMap?.set(entityKey, { ...stateResult.data });
+				}
+
+				// Convert to plugin result format
+				const result: ReconnectHookResult = {
+					id: stateResult.id,
+					entity: stateResult.entity,
+					entityId: stateResult.entityId,
+					status: stateResult.status,
+					version: stateResult.version,
+				};
+				if (stateResult.patches) {
+					result.patches = stateResult.patches;
+				}
+				if (stateResult.data) {
+					result.data = stateResult.data;
+				}
+				results.push(result);
+
+				log(
+					"  Subscription",
+					sub.id,
+					entityKey,
+					"status:",
+					stateResult.status,
+					"version:",
+					stateResult.version,
+				);
+			}
+
+			return results;
+		},
+
+		/**
+		 * Handle client updating subscribed fields for an entity.
+		 */
+		onUpdateFields(ctx: UpdateFieldsContext): void {
+			log(
+				"UpdateFields:",
+				ctx.clientId,
+				ctx.entity,
+				ctx.entityId,
+				"from:",
+				ctx.previousFields,
+				"to:",
+				ctx.fields,
+			);
+
+			const entityKey = makeEntityKey(ctx.entity, ctx.entityId);
+			const fieldsMap = clientFields.get(ctx.clientId);
+
+			if (fieldsMap) {
+				fieldsMap.set(entityKey, ctx.fields);
+			}
 		},
 	};
 }

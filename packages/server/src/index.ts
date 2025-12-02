@@ -65,10 +65,10 @@ export {
 // =============================================================================
 
 export {
-	// Factory
-	createServer,
 	// Types
 	type ClientSendFn,
+	// Factory
+	createServer,
 	type EntitiesMap,
 	type InferApi,
 	type InferInput,

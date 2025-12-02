@@ -4,6 +4,12 @@
  * Export all plugin-related types and utilities.
  */
 
+// Diff Optimizer Plugin
+export {
+	type DiffOptimizerOptions,
+	diffOptimizer,
+	isDiffOptimizerPlugin,
+} from "./diff-optimizer.js";
 export {
 	// Context types
 	type AfterMutationContext,
@@ -20,6 +26,3 @@ export {
 	type SubscribeContext,
 	type UnsubscribeContext,
 } from "./types.js";
-
-// Diff Optimizer Plugin
-export { diffOptimizer, type DiffOptimizerOptions, isDiffOptimizerPlugin } from "./diff-optimizer.js";
