@@ -1,12 +1,12 @@
 /**
- * @sylphx/lens-server - HTTP Adapter Tests
+ * @sylphx/lens-server - HTTP Handler Tests
  */
 
 import { describe, expect, it } from "bun:test";
 import { mutation, query } from "@sylphx/lens-core";
 import { z } from "zod";
-import { createServer } from "../server/create.js";
-import { createHTTPAdapter } from "./http.js";
+import { createApp } from "../server/create.js";
+import { createHTTPHandler } from "./http.js";
 
 // =============================================================================
 // Test Queries and Mutations
@@ -30,24 +30,24 @@ const createUser = mutation()
 // Tests
 // =============================================================================
 
-describe("createHTTPAdapter", () => {
-	it("creates an HTTP adapter from server", () => {
-		const server = createServer({
+describe("createHTTPHandler", () => {
+	it("creates an HTTP handler from app", () => {
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		expect(typeof handler).toBe("function");
 		expect(typeof handler.handle).toBe("function");
 	});
 
 	it("returns metadata on GET /__lens/metadata", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/__lens/metadata", {
 			method: "GET",
@@ -64,11 +64,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("executes query via POST", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/", {
 			method: "POST",
@@ -87,11 +87,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("executes mutation via POST", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/", {
 			method: "POST",
@@ -110,11 +110,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("supports path prefix", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server, { pathPrefix: "/api" });
+		const handler = createHTTPHandler(app, { pathPrefix: "/api" });
 
 		// Metadata at /api/__lens/metadata
 		const metadataRequest = new Request("http://localhost/api/__lens/metadata", {
@@ -140,11 +140,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("handles CORS preflight", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/", {
 			method: "OPTIONS",
@@ -156,11 +156,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("returns 404 for unknown paths", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/unknown", {
 			method: "GET",
@@ -171,11 +171,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("returns error for missing operation", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/", {
 			method: "POST",
@@ -191,11 +191,11 @@ describe("createHTTPAdapter", () => {
 	});
 
 	it("returns error for unknown operation", async () => {
-		const server = createServer({
+		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPAdapter(server);
+		const handler = createHTTPHandler(app);
 
 		const request = new Request("http://localhost/", {
 			method: "POST",

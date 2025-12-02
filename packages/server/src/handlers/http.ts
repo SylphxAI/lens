@@ -1,7 +1,7 @@
 /**
- * @sylphx/lens-server - HTTP Adapter
+ * @sylphx/lens-server - HTTP Handler
  *
- * Creates a fetch handler from a Lens server.
+ * Creates a fetch handler from a Lens app.
  * Works with Bun, Node (with adapter), Vercel, Cloudflare Workers.
  */
 
@@ -51,7 +51,7 @@ export interface HTTPHandler {
 }
 
 // =============================================================================
-// HTTP Adapter Factory
+// HTTP Handler Factory
 // =============================================================================
 
 /**

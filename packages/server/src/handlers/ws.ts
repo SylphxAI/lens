@@ -1,24 +1,24 @@
 /**
- * @sylphx/lens-server - WebSocket Adapter
+ * @sylphx/lens-server - WebSocket Handler
  *
  * Pure protocol handler for WebSocket connections.
  * Translates WebSocket messages to server calls and delivers responses.
  *
  * All business logic (state management, diff computation, plugin hooks)
- * is handled by the server. The adapter is just a delivery mechanism.
+ * is handled by the server. The handler is just a delivery mechanism.
  *
  * @example
  * ```typescript
  * // Stateless mode (sends full data)
- * const server = createServer({ router });
- * const wsAdapter = createWSAdapter(server);
+ * const app = createApp({ router });
+ * const wsHandler = createWSHandler(app);
  *
  * // Stateful mode (sends diffs) - add plugin at server level
- * const server = createServer({
+ * const app = createApp({
  *   router,
  *   plugins: [diffOptimizer()],
  * });
- * const wsAdapter = createWSAdapter(server);
+ * const wsHandler = createWSHandler(app);
  * ```
  */
 
@@ -52,7 +52,7 @@ export interface WSHandler {
 
 	/**
 	 * Bun-compatible websocket handler object.
-	 * Use directly with Bun.serve({ websocket: wsAdapter.handler })
+	 * Use directly with Bun.serve({ websocket: wsHandler.handler })
 	 */
 	handler: {
 		message(ws: unknown, message: string | Buffer): void;
@@ -144,35 +144,35 @@ interface ClientSubscription {
 }
 
 // =============================================================================
-// WebSocket Adapter Factory
+// WebSocket Handler Factory
 // =============================================================================
 
 /**
- * Create a WebSocket adapter from a Lens server.
+ * Create a WebSocket handler from a Lens app.
  *
- * The adapter is a pure protocol handler - all business logic is in the server.
+ * The handler is a pure protocol translator - all business logic is in the server.
  * State management is controlled by server plugins (e.g., diffOptimizer).
  *
  * @example
  * ```typescript
- * import { createServer, createWSAdapter, diffOptimizer } from '@sylphx/lens-server'
+ * import { createApp, createWSHandler, diffOptimizer } from '@sylphx/lens-server'
  *
  * // Stateless mode (default) - sends full data
- * const server = createServer({ router });
- * const wsAdapter = createWSAdapter(server);
+ * const app = createApp({ router });
+ * const wsHandler = createWSHandler(app);
  *
  * // Stateful mode - sends minimal diffs
- * const serverWithState = createServer({
+ * const appWithState = createApp({
  *   router,
  *   plugins: [diffOptimizer()],
  * });
- * const wsAdapterWithState = createWSAdapter(serverWithState);
+ * const wsHandlerWithState = createWSHandler(appWithState);
  *
  * // Bun
  * Bun.serve({
  *   port: 3000,
  *   fetch: httpHandler,
- *   websocket: wsAdapter.handler,
+ *   websocket: wsHandler.handler,
  * })
  * ```
  */
@@ -701,8 +701,8 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		return result;
 	}
 
-	// Create the adapter
-	const adapter: WSAdapter = {
+	// Create the handler
+	const handler: WSHandler = {
 		handleConnection,
 
 		handler: {
@@ -746,7 +746,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		},
 	};
 
-	return adapter;
+	return handler;
 }
 
 // =============================================================================

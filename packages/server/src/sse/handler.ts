@@ -1,7 +1,7 @@
 /**
- * @sylphx/lens-server - SSE Transport Adapter
+ * @sylphx/lens-server - SSE Handler
  *
- * Thin transport adapter for Server-Sent Events.
+ * Thin transport handler for Server-Sent Events.
  * Connects SSE streams to GraphStateManager.
  */
 
@@ -26,13 +26,13 @@ export interface SSEClientInfo {
 }
 
 // =============================================================================
-// SSE Handler (Transport Adapter)
+// SSE Handler
 // =============================================================================
 
 /**
- * SSE transport adapter for GraphStateManager.
+ * SSE transport handler for GraphStateManager.
  *
- * This is a thin adapter that:
+ * This is a thin handler that:
  * - Creates SSE connections
  * - Registers clients with GraphStateManager
  * - Forwards updates to SSE streams

@@ -7,12 +7,12 @@
  * - Stateless (default): Server only does getMetadata() and execute()
  * - Stateful (with diffOptimizer plugin): Server tracks state and manages subscriptions
  *
- * For protocol handling, use adapters:
- * - createHTTPAdapter - HTTP/REST
- * - createWSAdapter - WebSocket + subscriptions
- * - createSSEAdapter - Server-Sent Events
+ * For protocol handling, use handlers:
+ * - createHTTPHandler - HTTP/REST
+ * - createWSHandler - WebSocket + subscriptions
+ * - createSSEHandler - Server-Sent Events
  *
- * Adapters are pure delivery mechanisms - all business logic is in server/plugins.
+ * Handlers are pure delivery mechanisms - all business logic is in server/plugins.
  */
 
 import {
@@ -160,7 +160,7 @@ export type ClientSendFn = (message: unknown) => void;
  * - handleReconnect() - Handle client reconnection
  *
  * The server handles all business logic including state management (via plugins).
- * Adapters are pure protocol handlers that call these methods.
+ * Handlers are pure protocol translators that call these methods.
  */
 export interface LensServer {
 	/** Get server metadata for transport handshake */
@@ -169,7 +169,7 @@ export interface LensServer {
 	execute(op: LensOperation): Promise<LensResult>;
 
 	// =========================================================================
-	// Subscription Support (Optional - used by WS/SSE adapters)
+	// Subscription Support (Optional - used by WS/SSE handlers)
 	// =========================================================================
 
 	/**
@@ -1046,27 +1046,27 @@ export type ServerConfigLegacy<
  * - getMetadata() - Server metadata for transport handshake
  * - execute() - Execute any operation
  *
- * Subscription support (for WS/SSE adapters):
+ * Subscription support (for WS/SSE handlers):
  * - addClient() / removeClient() - Client connection lifecycle
  * - subscribe() / unsubscribe() - Subscription management
  * - emit() - Push updates to clients (stateful mode only)
  * - handleReconnect() - Handle client reconnection (stateful mode only)
  *
- * Adapters are pure protocol handlers - they call server methods and deliver responses.
+ * Handlers are pure protocol translators - they call server methods and deliver responses.
  * All business logic (state management, diff computation) is handled by server/plugins.
  *
  * @example
  * ```typescript
  * // Stateless mode (default)
- * const server = createApp({ router });
- * createWSAdapter(server); // Sends full data on each update
+ * const app = createApp({ router });
+ * createWSHandler(app); // Sends full data on each update
  *
  * // Stateful mode (with diffOptimizer)
- * const server = createApp({
+ * const app = createApp({
  *   router,
  *   plugins: [diffOptimizer()], // Enables state tracking & diffs
  * });
- * createWSAdapter(server); // Sends minimal diffs
+ * createWSHandler(app); // Sends minimal diffs
  * ```
  */
 export function createApp<
