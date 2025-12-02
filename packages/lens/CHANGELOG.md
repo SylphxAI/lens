@@ -1,5 +1,11 @@
 # @sylphx/lens
 
+## 1.2.12 (2025-12-02)
+
+### 🐛 Bug Fixes
+
+- revert all package versions to match npm ([c1a2832](https://github.com/SylphxAI/Lens/commit/c1a2832fa0ca0464af25256bce7a85f021825859))
+
 ## 1.2.11 (2025-12-02)
 
 ### 🐛 Bug Fixes

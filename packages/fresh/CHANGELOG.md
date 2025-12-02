@@ -1,5 +1,15 @@
 # @sylphx/lens-fresh
 
+## 1.2.28 (2025-12-02)
+
+### 🐛 Bug Fixes
+
+- revert all package versions to match npm ([c1a2832](https://github.com/SylphxAI/Lens/commit/c1a2832fa0ca0464af25256bce7a85f021825859))
+
+### ♻️ Refactoring
+
+- **build:** migrate packages to bunup, fix build issues ([6a3412e](https://github.com/SylphxAI/Lens/commit/6a3412eff5e1d5c94136935787a310ed905c4afd))
+
 ## 1.2.27 (2025-12-02)
 
 ### 🐛 Bug Fixes
