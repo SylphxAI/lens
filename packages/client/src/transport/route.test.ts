@@ -259,91 +259,150 @@ describe("route()", () => {
 });
 
 // =============================================================================
-// Tests: routeByType()
+// Capability-based Mock Transports for routeByType
+// =============================================================================
+
+import type { MutationCapable, QueryCapable, SubscriptionCapable } from "./types.js";
+
+function createQueryCapableTransport(name: string): QueryCapable {
+	return {
+		connect: async () => ({
+			version: "1.0.0",
+			operations: { [`${name}.op`]: { type: "query" as const } },
+		}),
+		query: async (op) => ({ data: { transport: name, path: op.path } }),
+	};
+}
+
+function createMutationCapableTransport(name: string): MutationCapable {
+	return {
+		connect: async () => ({
+			version: "1.0.0",
+			operations: { [`${name}.op`]: { type: "mutation" as const } },
+		}),
+		mutation: async (op) => ({ data: { transport: name, path: op.path } }),
+	};
+}
+
+function createSubscriptionCapableTransport(name: string): SubscriptionCapable {
+	return {
+		connect: async () => ({
+			version: "1.0.0",
+			operations: { [`${name}.op`]: { type: "subscription" as const } },
+		}),
+		subscription: (op) => ({
+			subscribe: (observer) => {
+				observer.next?.({ data: { transport: name, path: op.path } });
+				return { unsubscribe: () => {} };
+			},
+		}),
+	};
+}
+
+function createFullCapableTransport(name: string): QueryCapable & MutationCapable & SubscriptionCapable {
+	return {
+		connect: async () => ({
+			version: "1.0.0",
+			operations: { [`${name}.op`]: { type: "query" as const } },
+		}),
+		query: async (op) => ({ data: { transport: name, path: op.path } }),
+		mutation: async (op) => ({ data: { transport: name, path: op.path } }),
+		subscription: (op) => ({
+			subscribe: (observer) => {
+				observer.next?.({ data: { transport: name, path: op.path } });
+				return { unsubscribe: () => {} };
+			},
+		}),
+	};
+}
+
+// =============================================================================
+// Tests: routeByType() - Type-Safe Capability-Based
 // =============================================================================
 
 describe("routeByType()", () => {
 	it("routes query to query transport", async () => {
-		const queryTransport = createMockTransport("query");
-		const defaultTransport = createMockTransport("default");
+		const queryTransport = createQueryCapableTransport("query");
+		const defaultTransport = createFullCapableTransport("default");
 
 		const transport = routeByType({
 			query: queryTransport,
 			default: defaultTransport,
 		});
 
-		const result = (await transport.execute({
+		// Uses the query capability
+		const result = await transport.query({
 			id: "1",
 			path: "user.get",
 			type: "query",
-		})) as Result;
+			input: {},
+		});
 
 		expect(result.data).toEqual({ transport: "query", path: "user.get" });
 	});
 
 	it("routes mutation to mutation transport", async () => {
-		const mutationTransport = createMockTransport("mutation");
-		const defaultTransport = createMockTransport("default");
+		const mutationTransport = createMutationCapableTransport("mutation");
+		const defaultTransport = createFullCapableTransport("default");
 
 		const transport = routeByType({
 			mutation: mutationTransport,
 			default: defaultTransport,
 		});
 
-		const result = (await transport.execute({
+		// Uses the mutation capability
+		const result = await transport.mutation({
 			id: "1",
 			path: "user.create",
 			type: "mutation",
-		})) as Result;
+			input: {},
+		});
 
 		expect(result.data).toEqual({ transport: "mutation", path: "user.create" });
 	});
 
 	it("routes subscription to subscription transport", async () => {
-		const observable: Observable<Result> = {
-			subscribe: (observer) => {
-				observer.next?.({ data: { type: "subscription" } });
-				return { unsubscribe: () => {} };
-			},
-		};
+		const subscriptionTransport = createSubscriptionCapableTransport("subscription");
+		const defaultTransport = createFullCapableTransport("default");
 
 		const transport = routeByType({
-			subscription: {
-				connect: async () => ({ version: "1.0.0", operations: {} }),
-				execute: () => observable,
-			},
-			default: createMockTransport("default"),
+			subscription: subscriptionTransport,
+			default: defaultTransport,
 		});
 
-		const result = transport.execute({
+		// Uses the subscription capability
+		const observable = transport.subscription({
 			id: "1",
 			path: "events.watch",
 			type: "subscription",
-		}) as Observable<Result>;
+			input: {},
+		});
 
 		const values: unknown[] = [];
-		result.subscribe({ next: (r) => values.push(r.data) });
-		expect(values).toEqual([{ type: "subscription" }]);
+		observable.subscribe({ next: (r) => values.push(r.data) });
+		expect(values).toEqual([{ transport: "subscription", path: "events.watch" }]);
 	});
 
-	it("falls back to default transport", async () => {
-		const defaultTransport = createMockTransport("default");
+	it("falls back to default transport for capabilities", async () => {
+		const defaultTransport = createFullCapableTransport("default");
 
 		const transport = routeByType({
 			default: defaultTransport,
 		});
 
-		const result1 = (await transport.execute({
+		const result1 = await transport.query({
 			id: "1",
 			path: "user.get",
 			type: "query",
-		})) as Result;
+			input: {},
+		});
 
-		const result2 = (await transport.execute({
+		const result2 = await transport.mutation({
 			id: "2",
 			path: "user.create",
 			type: "mutation",
-		})) as Result;
+			input: {},
+		});
 
 		expect(result1.data).toEqual({ transport: "default", path: "user.get" });
 		expect(result2.data).toEqual({ transport: "default", path: "user.create" });
@@ -360,11 +419,21 @@ describe("routeByType()", () => {
 		}));
 
 		// Create shared transport object (same reference)
-		const sharedTransport = { connect: sharedConnect, execute: async () => ({}) };
+		const sharedTransport: QueryCapable = {
+			connect: sharedConnect,
+			query: async () => ({}),
+		};
+
+		const subscriptionTransport: SubscriptionCapable = {
+			connect: subscriptionConnect,
+			subscription: () => ({
+				subscribe: () => ({ unsubscribe: () => {} }),
+			}),
+		};
 
 		const transport = routeByType({
 			query: sharedTransport,
-			subscription: { connect: subscriptionConnect, execute: async () => ({}) },
+			subscription: subscriptionTransport,
 			default: sharedTransport, // Same reference as query
 		});
 
@@ -382,21 +451,24 @@ describe("routeByType()", () => {
 					version: "1.0.0",
 					operations: { "query.get": { type: "query" as const } },
 				}),
-				execute: async () => ({}),
+				query: async () => ({}),
 			},
 			subscription: {
 				connect: async () => ({
 					version: "1.0.0",
 					operations: { "sub.watch": { type: "subscription" as const } },
 				}),
-				execute: async () => ({}),
+				subscription: () => ({
+					subscribe: () => ({ unsubscribe: () => {} }),
+				}),
 			},
 			default: {
 				connect: async () => ({
 					version: "1.0.0",
 					operations: { "default.op": { type: "query" as const } },
 				}),
-				execute: async () => ({}),
+				query: async () => ({}),
+				mutation: async () => ({}),
 			},
 		});
 
@@ -405,6 +477,43 @@ describe("routeByType()", () => {
 		expect(Object.keys(metadata.operations)).toContain("query.get");
 		expect(Object.keys(metadata.operations)).toContain("sub.watch");
 		expect(Object.keys(metadata.operations)).toContain("default.op");
+	});
+
+	it("infers capabilities from config (type-safety)", async () => {
+		// HTTP for queries/mutations, WS for subscriptions
+		const httpTransport: QueryCapable & MutationCapable = {
+			connect: async () => ({ version: "1.0.0", operations: {} }),
+			query: async (op) => ({ data: `query:${op.path}` }),
+			mutation: async (op) => ({ data: `mutation:${op.path}` }),
+		};
+
+		const wsTransport: SubscriptionCapable = {
+			connect: async () => ({ version: "1.0.0", operations: {} }),
+			subscription: (op) => ({
+				subscribe: (observer) => {
+					observer.next?.({ data: `subscription:${op.path}` });
+					return { unsubscribe: () => {} };
+				},
+			}),
+		};
+
+		const transport = routeByType({
+			default: httpTransport,
+			subscription: wsTransport,
+		});
+
+		// Should have all three capabilities
+		const queryResult = await transport.query({ id: "1", path: "test", type: "query", input: {} });
+		const mutationResult = await transport.mutation({ id: "2", path: "test", type: "mutation", input: {} });
+
+		const subValues: unknown[] = [];
+		transport
+			.subscription({ id: "3", path: "test", type: "subscription", input: {} })
+			.subscribe({ next: (r) => subValues.push(r.data) });
+
+		expect(queryResult.data).toBe("query:test");
+		expect(mutationResult.data).toBe("mutation:test");
+		expect(subValues).toEqual(["subscription:test"]);
 	});
 });
 

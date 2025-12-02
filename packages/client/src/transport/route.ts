@@ -5,7 +5,18 @@
  * Supports multi-server architectures with automatic metadata merging.
  */
 
-import type { Metadata, Observable, Operation, Result, Transport } from "./types.js";
+import type {
+	Metadata,
+	MutationCapable,
+	Observable,
+	Operation,
+	QueryCapable,
+	Result,
+	SubscriptionCapable,
+	Transport,
+	TransportBase,
+} from "./types.js";
+import { isMutationCapable, isQueryCapable, isSubscriptionCapable } from "./types.js";
 
 // =============================================================================
 // Route Transport (Glob Pattern)
@@ -135,52 +146,100 @@ function findMatchingTransport(entries: [string, Transport][], path: string): Tr
 }
 
 // =============================================================================
-// Route By Type
+// Route By Type (Type-Safe)
 // =============================================================================
 
 /**
- * Route by type configuration.
+ * Type-safe route by type configuration.
+ *
+ * @template Q - Query transport type
+ * @template M - Mutation transport type
+ * @template S - Subscription transport type
+ * @template D - Default transport type
  */
-export interface RouteByTypeConfig {
-	/** Transport for queries */
-	query?: Transport;
-	/** Transport for mutations */
-	mutation?: Transport;
-	/** Transport for subscriptions */
-	subscription?: Transport;
+export interface TypeSafeRouteByTypeConfig<
+	Q extends QueryCapable | undefined = undefined,
+	M extends MutationCapable | undefined = undefined,
+	S extends SubscriptionCapable | undefined = undefined,
+	D extends TransportBase = TransportBase,
+> {
+	/** Transport for queries (must support queries) */
+	query?: Q;
+	/** Transport for mutations (must support mutations) */
+	mutation?: M;
+	/** Transport for subscriptions (must support subscriptions) */
+	subscription?: S;
 	/** Default transport (required) */
-	default: Transport;
+	default: D;
 }
 
 /**
- * Create route transport that routes by operation type.
+ * Infer capabilities from route by type config.
+ * Result type has capabilities based on what transports are configured.
+ */
+type InferRouteByTypeCapabilities<Config extends TypeSafeRouteByTypeConfig> = TransportBase &
+	// Query capability: from query transport or default
+	(Config["query"] extends QueryCapable
+		? QueryCapable
+		: Config["default"] extends QueryCapable
+			? QueryCapable
+			: unknown) &
+	// Mutation capability: from mutation transport or default
+	(Config["mutation"] extends MutationCapable
+		? MutationCapable
+		: Config["default"] extends MutationCapable
+			? MutationCapable
+			: unknown) &
+	// Subscription capability: from subscription transport or default
+	(Config["subscription"] extends SubscriptionCapable
+		? SubscriptionCapable
+		: Config["default"] extends SubscriptionCapable
+			? SubscriptionCapable
+			: unknown);
+
+/**
+ * Create type-safe route transport that routes by operation type.
+ *
+ * The returned transport type reflects the actual capabilities based on config:
+ * - If `query` or `default` is QueryCapable, result is QueryCapable
+ * - If `mutation` or `default` is MutationCapable, result is MutationCapable
+ * - If `subscription` or `default` is SubscriptionCapable, result is SubscriptionCapable
  *
  * @example
  * ```typescript
- * transport: routeByType({
+ * // HTTP for queries/mutations, WebSocket for subscriptions
+ * const transport = routeByType({
+ *   default: http({ url: '/api' }),      // QueryCapable & MutationCapable
+ *   subscription: ws({ url: 'ws://...' }), // SubscriptionCapable
+ * });
+ * // Result type: QueryCapable & MutationCapable & SubscriptionCapable
+ *
+ * // HTTP only (no subscription support)
+ * const httpOnly = routeByType({
  *   default: http({ url: '/api' }),
- *   subscription: ws({ url: 'ws://localhost:3000' }),
- * })
+ * });
+ * // Result type: QueryCapable & MutationCapable (no SubscriptionCapable)
  * ```
  */
-export function routeByType(config: RouteByTypeConfig): Transport {
+export function routeByType<Config extends TypeSafeRouteByTypeConfig>(
+	config: Config,
+): InferRouteByTypeCapabilities<Config> {
 	const { query, mutation, subscription, default: defaultTransport } = config;
 
 	// Collect all unique transports for connect
-	const transports = new Set<Transport>();
+	const transports = new Set<TransportBase>();
 	transports.add(defaultTransport);
 	if (query) transports.add(query);
 	if (mutation) transports.add(mutation);
 	if (subscription) transports.add(subscription);
 
-	return {
+	const result: TransportBase & Partial<QueryCapable & MutationCapable & SubscriptionCapable> = {
 		async connect(): Promise<Metadata> {
 			const results = await Promise.all(
 				Array.from(transports).map(async (t) => {
 					try {
 						return await t.connect();
 					} catch {
-						// Silently fall back to empty metadata for failed transports
 						return { version: "unknown", operations: {} } as Metadata;
 					}
 				}),
@@ -196,27 +255,48 @@ export function routeByType(config: RouteByTypeConfig): Transport {
 				operations: mergedOperations,
 			};
 		},
-
-		execute(op: Operation): Promise<Result> | Observable<Result> {
-			let transport: Transport;
-
-			switch (op.type) {
-				case "query":
-					transport = query ?? defaultTransport;
-					break;
-				case "mutation":
-					transport = mutation ?? defaultTransport;
-					break;
-				case "subscription":
-					transport = subscription ?? defaultTransport;
-					break;
-				default:
-					transport = defaultTransport;
-			}
-
-			return transport.execute(op);
-		},
 	};
+
+	// Add query method if any transport supports it
+	const queryTransport = query ?? (isQueryCapable(defaultTransport) ? defaultTransport : undefined);
+	if (queryTransport && isQueryCapable(queryTransport)) {
+		result.query = (op: Operation) => queryTransport.query(op);
+	}
+
+	// Add mutation method if any transport supports it
+	const mutationTransport =
+		mutation ?? (isMutationCapable(defaultTransport) ? defaultTransport : undefined);
+	if (mutationTransport && isMutationCapable(mutationTransport)) {
+		result.mutation = (op: Operation) => mutationTransport.mutation(op);
+	}
+
+	// Add subscription method if any transport supports it
+	const subscriptionTransport =
+		subscription ?? (isSubscriptionCapable(defaultTransport) ? defaultTransport : undefined);
+	if (subscriptionTransport && isSubscriptionCapable(subscriptionTransport)) {
+		result.subscription = (op: Operation) => subscriptionTransport.subscription(op);
+	}
+
+	return result as InferRouteByTypeCapabilities<Config>;
+}
+
+// =============================================================================
+// Legacy Route By Type (backwards compatibility)
+// =============================================================================
+
+/**
+ * Route by type configuration.
+ * @deprecated Use TypeSafeRouteByTypeConfig with routeByType() instead
+ */
+export interface RouteByTypeConfig {
+	/** Transport for queries */
+	query?: Transport;
+	/** Transport for mutations */
+	mutation?: Transport;
+	/** Transport for subscriptions */
+	subscription?: Transport;
+	/** Default transport (required) */
+	default: Transport;
 }
 
 // =============================================================================

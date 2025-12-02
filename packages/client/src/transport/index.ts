@@ -81,7 +81,15 @@ export {
 	// Legacy
 	routeByPath,
 	routeByType,
+	type TypeSafeRouteByTypeConfig,
 } from "./route.js";
+// SSE (Server-Sent Events)
+export {
+	type SseConnectionState,
+	type SseTransportInstance,
+	type SseTransportOptions,
+	sse,
+} from "./sse.js";
 // WebSocket
 export {
 	type ConnectionState,
@@ -89,10 +97,3 @@ export {
 	type WsTransportOptions,
 	ws,
 } from "./ws.js";
-// SSE (Server-Sent Events)
-export {
-	sse,
-	type SseConnectionState,
-	type SseTransportInstance,
-	type SseTransportOptions,
-} from "./sse.js";
