@@ -1,5 +1,10 @@
 # @sylphx/lens
 
+## 1.2.13 (2025-12-02)
+
+Release patch version
+
+
 ## 1.2.12 (2025-12-02)
 
 ### 🐛 Bug Fixes

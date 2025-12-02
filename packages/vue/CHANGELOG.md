@@ -1,5 +1,10 @@
 # @sylphx/lens-vue
 
+## 1.2.20 (2025-12-02)
+
+Release patch version
+
+
 ## 1.2.19 (2025-12-02)
 
 ### 🐛 Bug Fixes
