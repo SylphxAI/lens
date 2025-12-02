@@ -11,7 +11,7 @@ import type { LensServer } from "../server/create.js";
 // Types
 // =============================================================================
 
-export interface HTTPAdapterOptions {
+export interface HTTPHandlerOptions {
 	/**
 	 * Path prefix for Lens endpoints.
 	 * Default: "" (no prefix)
@@ -19,7 +19,7 @@ export interface HTTPAdapterOptions {
 	 * @example
 	 * ```typescript
 	 * // All endpoints under /api
-	 * createHTTPAdapter(server, { pathPrefix: '/api' })
+	 * createHTTPHandler(app, { pathPrefix: '/api' })
 	 * // Metadata: GET /api/__lens/metadata
 	 * // Operations: POST /api
 	 * ```
@@ -37,7 +37,7 @@ export interface HTTPAdapterOptions {
 	};
 }
 
-export interface HTTPAdapter {
+export interface HTTPHandler {
 	/**
 	 * Handle HTTP request.
 	 * Compatible with fetch API (Bun, Cloudflare Workers, Vercel).
@@ -55,14 +55,14 @@ export interface HTTPAdapter {
 // =============================================================================
 
 /**
- * Create an HTTP adapter from a Lens server.
+ * Create an HTTP handler from a Lens app.
  *
  * @example
  * ```typescript
- * import { createServer, createHTTPAdapter } from '@sylphx/lens-server'
+ * import { createApp, createHTTPHandler } from '@sylphx/lens-server'
  *
- * const server = createServer({ router })
- * const handler = createHTTPAdapter(server)
+ * const app = createApp({ router })
+ * const handler = createHTTPHandler(app)
  *
  * // Bun
  * Bun.serve({ port: 3000, fetch: handler })
@@ -74,10 +74,10 @@ export interface HTTPAdapter {
  * export default { fetch: handler }
  * ```
  */
-export function createHTTPAdapter(
+export function createHTTPHandler(
 	server: LensServer,
-	options: HTTPAdapterOptions = {},
-): HTTPAdapter {
+	options: HTTPHandlerOptions = {},
+): HTTPHandler {
 	const { pathPrefix = "", cors } = options;
 
 	// Build CORS headers
@@ -182,8 +182,21 @@ export function createHTTPAdapter(
 	};
 
 	// Make it callable as both function and object with handle method
-	const adapter = handler as HTTPAdapter;
-	adapter.handle = handler;
+	const result = handler as HTTPHandler;
+	result.handle = handler;
 
-	return adapter;
+	return result;
 }
+
+// =============================================================================
+// Deprecated Aliases
+// =============================================================================
+
+/** @deprecated Use `HTTPHandlerOptions` instead */
+export type HTTPAdapterOptions = HTTPHandlerOptions;
+
+/** @deprecated Use `HTTPHandler` instead */
+export type HTTPAdapter = HTTPHandler;
+
+/** @deprecated Use `createHTTPHandler` instead */
+export const createHTTPAdapter: typeof createHTTPHandler = createHTTPHandler;

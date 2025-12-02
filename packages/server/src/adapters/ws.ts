@@ -29,7 +29,7 @@ import type { LensServer, SelectionObject, WebSocketLike } from "../server/creat
 // Types
 // =============================================================================
 
-export interface WSAdapterOptions {
+export interface WSHandlerOptions {
 	/**
 	 * Logger for debugging.
 	 */
@@ -43,7 +43,7 @@ export interface WSAdapterOptions {
 /**
  * WebSocket adapter for Bun's websocket handler.
  */
-export interface WSAdapter {
+export interface WSHandler {
 	/**
 	 * Handle a new WebSocket connection.
 	 * Call this when a WebSocket connection is established.
@@ -176,7 +176,7 @@ interface ClientSubscription {
  * })
  * ```
  */
-export function createWSAdapter(server: LensServer, options: WSAdapterOptions = {}): WSAdapter {
+export function createWSHandler(server: LensServer, options: WSHandlerOptions = {}): WSHandler {
 	const { logger = {} } = options;
 
 	// Connection tracking
@@ -748,3 +748,16 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 
 	return adapter;
 }
+
+// =============================================================================
+// Deprecated Aliases
+// =============================================================================
+
+/** @deprecated Use `WSHandlerOptions` instead */
+export type WSAdapterOptions = WSHandlerOptions;
+
+/** @deprecated Use `WSHandler` instead */
+export type WSAdapter = WSHandler;
+
+/** @deprecated Use `createWSHandler` instead */
+export const createWSAdapter: typeof createWSHandler = createWSHandler;

@@ -89,21 +89,30 @@ export {
 } from "./server/create.js";
 
 // =============================================================================
-// Protocol Adapters
+// Protocol Handlers
 // =============================================================================
 
 export {
-	// HTTP Adapter
+	// Deprecated aliases
 	createHTTPAdapter,
-	// SSE Adapter (alias)
+	// HTTP Handler
+	createHTTPHandler,
 	createSSEAdapter,
-	// WebSocket Adapter
+	// SSE Handler
+	createSSEHandler,
 	createWSAdapter,
+	// WebSocket Handler
+	createWSHandler,
 	type HTTPAdapter,
 	type HTTPAdapterOptions,
+	type HTTPHandler,
+	type HTTPHandlerOptions,
 	type SSEAdapterOptions,
+	type SSEHandlerOptions,
 	type WSAdapter,
 	type WSAdapterOptions,
+	type WSHandler,
+	type WSHandlerOptions,
 } from "./adapters/index.js";
 
 // =============================================================================
@@ -155,12 +164,10 @@ export {
 } from "./plugin/index.js";
 
 // =============================================================================
-// SSE Handler (Legacy - prefer createSSEAdapter)
+// SSE Handler (additional exports not in adapters/index.js)
 // =============================================================================
 
 export {
-	// Factory
-	createSSEHandler,
 	type SSEClientInfo,
 	// Class
 	SSEHandler,
