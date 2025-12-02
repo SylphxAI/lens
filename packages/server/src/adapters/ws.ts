@@ -1,12 +1,28 @@
 /**
  * @sylphx/lens-server - WebSocket Adapter
  *
- * Creates a WebSocket handler from a Lens server.
- * Handles connection management, subscriptions, and real-time updates.
+ * Pure protocol handler for WebSocket connections.
+ * Translates WebSocket messages to server calls and delivers responses.
+ *
+ * All business logic (state management, diff computation, plugin hooks)
+ * is handled by the server. The adapter is just a delivery mechanism.
+ *
+ * @example
+ * ```typescript
+ * // Stateless mode (sends full data)
+ * const server = createServer({ router });
+ * const wsAdapter = createWSAdapter(server);
+ *
+ * // Stateful mode (sends diffs) - add plugin at server level
+ * const server = createServer({
+ *   router,
+ *   plugins: [diffOptimizer()],
+ * });
+ * const wsAdapter = createWSAdapter(server);
+ * ```
  */
 
 import type { ReconnectMessage } from "@sylphx/lens-core";
-import { createPluginManager, type ServerPlugin } from "../plugin/types.js";
 import type { LensServer, SelectionObject, WebSocketLike } from "../server/create.js";
 import type { GraphStateManager } from "../state/graph-state-manager.js";
 
@@ -15,17 +31,6 @@ import type { GraphStateManager } from "../state/graph-state-manager.js";
 // =============================================================================
 
 export interface WSAdapterOptions {
-	/**
-	 * GraphStateManager for tracking per-client state.
-	 * Required for subscription support.
-	 */
-	stateManager?: GraphStateManager;
-
-	/**
-	 * Server plugins for subscription lifecycle hooks.
-	 */
-	plugins?: ServerPlugin[];
-
 	/**
 	 * Logger for debugging.
 	 */
@@ -151,14 +156,23 @@ interface ClientSubscription {
 /**
  * Create a WebSocket adapter from a Lens server.
  *
+ * The adapter is a pure protocol handler - all business logic is in the server.
+ * State management is controlled by server plugins (e.g., diffOptimizer).
+ *
  * @example
  * ```typescript
- * import { createServer, createWSAdapter, createGraphStateManager } from '@sylphx/lens-server'
+ * import { createServer, createWSAdapter, diffOptimizer } from '@sylphx/lens-server'
  *
- * const server = createServer({ router })
- * const wsAdapter = createWSAdapter(server, {
- *   stateManager: createGraphStateManager(),
- * })
+ * // Stateless mode (default) - sends full data
+ * const server = createServer({ router });
+ * const wsAdapter = createWSAdapter(server);
+ *
+ * // Stateful mode - sends minimal diffs
+ * const serverWithState = createServer({
+ *   router,
+ *   plugins: [diffOptimizer()],
+ * });
+ * const wsAdapterWithState = createWSAdapter(serverWithState);
  *
  * // Bun
  * Bun.serve({
@@ -169,13 +183,10 @@ interface ClientSubscription {
  * ```
  */
 export function createWSAdapter(server: LensServer, options: WSAdapterOptions = {}): WSAdapter {
-	const { stateManager, plugins = [], logger = {} } = options;
+	const { logger = {} } = options;
 
-	// Initialize plugin manager
-	const pluginManager = createPluginManager();
-	for (const plugin of plugins) {
-		pluginManager.register(plugin);
-	}
+	// Get state manager from server (if diffOptimizer plugin is configured)
+	const stateManager = server.getStateManager();
 
 	// Connection tracking
 	const connections = new Map<string, ClientConnection>();
@@ -183,7 +194,7 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 	let connectionCounter = 0;
 
 	// Handle new WebSocket connection
-	function handleConnection(ws: WebSocketLike): void {
+	async function handleConnection(ws: WebSocketLike): Promise<void> {
 		const clientId = `client_${++connectionCounter}`;
 
 		const conn: ClientConnection = {
@@ -195,23 +206,16 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 		connections.set(clientId, conn);
 		wsToConnection.set(ws as object, conn);
 
-		// Register with GraphStateManager if available
-		if (stateManager) {
-			stateManager.addClient({
-				id: clientId,
-				send: (msg) => {
-					ws.send(JSON.stringify(msg));
-				},
-			});
+		// Register client with server (handles plugins + state manager)
+		const sendFn = (msg: unknown) => {
+			ws.send(JSON.stringify(msg));
+		};
+		const allowed = await server.addClient(clientId, sendFn);
+		if (!allowed) {
+			ws.close();
+			connections.delete(clientId);
+			return;
 		}
-
-		// Run onConnect hooks
-		pluginManager.runOnConnect({ clientId }).then((allowed) => {
-			if (!allowed) {
-				ws.close();
-				handleDisconnect(conn);
-			}
-		});
 
 		// Set up message and close handlers
 		ws.onmessage = (event) => {
@@ -278,42 +282,10 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 	async function handleSubscribe(conn: ClientConnection, message: SubscribeMessage): Promise<void> {
 		const { id, operation, input, fields } = message;
 
-		// Run onSubscribe hooks
-		const allowed = await pluginManager.runOnSubscribe({
-			clientId: conn.id,
-			subscriptionId: id,
-			operation,
-			input,
-			fields,
-		});
-
-		if (!allowed) {
-			conn.ws.send(
-				JSON.stringify({
-					type: "error",
-					id,
-					error: { code: "SUBSCRIPTION_REJECTED", message: "Subscription rejected by plugin" },
-				}),
-			);
-			return;
-		}
-
-		// Create subscription
-		const sub: ClientSubscription = {
-			id,
-			operation,
-			input,
-			fields,
-			entityKeys: new Set(),
-			cleanups: [],
-			lastData: null,
-		};
-
-		conn.subscriptions.set(id, sub);
-
-		// Execute query
+		// Execute query first to get data
+		let result: { data?: unknown; error?: Error };
 		try {
-			const result = await server.execute({ path: operation, input });
+			result = await server.execute({ path: operation, input });
 
 			if (result.error) {
 				conn.ws.send(
@@ -325,28 +297,6 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 				);
 				return;
 			}
-
-			// Send initial data
-			conn.ws.send(
-				JSON.stringify({
-					type: "data",
-					id,
-					data: result.data,
-				}),
-			);
-
-			sub.lastData = result.data;
-
-			// If stateManager exists, track entities for updates
-			if (stateManager && result.data) {
-				const entities = extractEntities(result.data);
-				for (const { entity, entityId, entityData } of entities) {
-					const entityKey = `${entity}:${entityId}`;
-					sub.entityKeys.add(entityKey);
-					stateManager.subscribe(conn.id, entity, entityId, fields);
-					stateManager.emit(entity, entityId, entityData);
-				}
-			}
 		} catch (error) {
 			conn.ws.send(
 				JSON.stringify({
@@ -355,7 +305,61 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 					error: { code: "EXECUTION_ERROR", message: String(error) },
 				}),
 			);
+			return;
 		}
+
+		// Extract entities from result
+		const entities = result.data ? extractEntities(result.data) : [];
+
+		// Create subscription tracking
+		const sub: ClientSubscription = {
+			id,
+			operation,
+			input,
+			fields,
+			entityKeys: new Set(entities.map(({ entity, entityId }) => `${entity}:${entityId}`)),
+			cleanups: [],
+			lastData: result.data,
+		};
+
+		// Register subscriptions with server for each entity
+		for (const { entity, entityId, entityData } of entities) {
+			// Server handles plugin hooks and state manager registration
+			const allowed = await server.subscribe({
+				clientId: conn.id,
+				subscriptionId: id,
+				operation,
+				input,
+				fields,
+				entity,
+				entityId,
+			});
+
+			if (!allowed) {
+				conn.ws.send(
+					JSON.stringify({
+						type: "error",
+						id,
+						error: { code: "SUBSCRIPTION_REJECTED", message: "Subscription rejected by plugin" },
+					}),
+				);
+				return;
+			}
+
+			// Emit initial data to state manager (if enabled)
+			server.emit(entity, entityId, entityData);
+		}
+
+		conn.subscriptions.set(id, sub);
+
+		// Send initial data to client
+		conn.ws.send(
+			JSON.stringify({
+				type: "data",
+				id,
+				data: result.data,
+			}),
+		);
 	}
 
 	// Handle updateFields
@@ -426,18 +430,10 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 			}
 		}
 
-		// Unsubscribe from entities
-		if (stateManager) {
-			for (const entityKey of sub.entityKeys) {
-				const [entity, id] = entityKey.split(":");
-				stateManager.unsubscribe(conn.id, entity, id);
-			}
-		}
-
 		conn.subscriptions.delete(message.id);
 
-		// Run onUnsubscribe hooks
-		pluginManager.runOnUnsubscribe({
+		// Server handles unsubscription (plugin hooks + state manager cleanup)
+		server.unsubscribe({
 			clientId: conn.id,
 			subscriptionId: message.id,
 			operation: sub.operation,
@@ -504,11 +500,11 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 				return;
 			}
 
-			// Emit to state manager if available
-			if (stateManager && result.data) {
+			// Emit to server (handles state manager if configured)
+			if (result.data) {
 				const entities = extractEntities(result.data);
 				for (const { entity, entityId, entityData } of entities) {
-					stateManager.emit(entity, entityId, entityData);
+					server.emit(entity, entityId, entityData);
 				}
 			}
 
@@ -532,13 +528,18 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 
 	// Handle reconnect
 	function handleReconnect(conn: ClientConnection, message: ReconnectMessage): void {
-		if (!stateManager) {
+		const startTime = Date.now();
+
+		// Check if server supports reconnection (has state manager)
+		const results = server.handleReconnect(message);
+
+		if (results === null) {
 			conn.ws.send(
 				JSON.stringify({
 					type: "error",
 					error: {
 						code: "RECONNECT_ERROR",
-						message: "State manager not available for reconnection",
+						message: "State management not available for reconnection",
 						reconnectId: message.reconnectId,
 					},
 				}),
@@ -546,23 +547,8 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 			return;
 		}
 
-		const startTime = Date.now();
-
 		try {
-			// Re-register client if needed
-			if (!stateManager.hasClient(conn.id)) {
-				stateManager.addClient({
-					id: conn.id,
-					send: (msg) => {
-						conn.ws.send(JSON.stringify(msg));
-					},
-				});
-			}
-
-			// Process reconnection
-			const results = stateManager.handleReconnect(message.subscriptions);
-
-			// Re-establish subscriptions
+			// Re-establish subscriptions in adapter tracking
 			for (const sub of message.subscriptions) {
 				let clientSub = conn.subscriptions.get(sub.id);
 				if (!clientSub) {
@@ -578,7 +564,10 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 					conn.subscriptions.set(sub.id, clientSub);
 				}
 
-				stateManager.subscribe(conn.id, sub.entity, sub.entityId, sub.fields);
+				// Re-register subscription with server
+				if (stateManager) {
+					stateManager.subscribe(conn.id, sub.entity, sub.entityId, sub.fields);
+				}
 			}
 
 			conn.ws.send(
@@ -619,19 +608,11 @@ export function createWSAdapter(server: LensServer, options: WSAdapterOptions = 
 			}
 		}
 
-		// Remove from state manager
-		if (stateManager) {
-			stateManager.removeClient(conn.id);
-		}
-
 		// Remove connection
 		connections.delete(conn.id);
 
-		// Run onDisconnect hooks
-		pluginManager.runOnDisconnect({
-			clientId: conn.id,
-			subscriptionCount,
-		});
+		// Server handles removal (plugin hooks + state manager cleanup)
+		server.removeClient(conn.id, subscriptionCount);
 	}
 
 	// Helper: Extract entities from data

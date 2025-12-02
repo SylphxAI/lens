@@ -1,13 +1,18 @@
 /**
  * @sylphx/lens-server - Lens Server
  *
- * Pure executor for Lens operations.
- * Server only does: getMetadata() and execute()
+ * Pure executor for Lens operations with optional plugin support.
+ *
+ * Server modes:
+ * - Stateless (default): Server only does getMetadata() and execute()
+ * - Stateful (with diffOptimizer plugin): Server tracks state and manages subscriptions
  *
  * For protocol handling, use adapters:
  * - createHTTPAdapter - HTTP/REST
  * - createWSAdapter - WebSocket + subscriptions
  * - createSSEAdapter - Server-Sent Events
+ *
+ * Adapters are pure delivery mechanisms - all business logic is in server/plugins.
  */
 
 import {
@@ -24,6 +29,8 @@ import {
 	type MutationDef,
 	type Pipeline,
 	type QueryDef,
+	type ReconnectMessage,
+	type ReconnectResult,
 	type ResolverDef,
 	type Resolvers,
 	type ReturnSpec,
@@ -31,6 +38,15 @@ import {
 	toResolverMap,
 } from "@sylphx/lens-core";
 import { createContext, runWithContext } from "../context/index.js";
+import {
+	createPluginManager,
+	type PluginManager,
+	type ServerPlugin,
+	type SubscribeContext,
+	type UnsubscribeContext,
+} from "../plugin/types.js";
+import { isDiffOptimizerPlugin } from "../plugin/diff-optimizer.js";
+import type { GraphStateManager } from "../state/graph-state-manager.js";
 
 // =============================================================================
 // Types
@@ -92,6 +108,19 @@ export interface LensServerConfig<
 	context?: ((req?: unknown) => TContext | Promise<TContext>) | undefined;
 	/** Server version */
 	version?: string | undefined;
+	/**
+	 * Server-level plugins for subscription lifecycle and state management.
+	 * Plugins are processed at the server level, not adapter level.
+	 *
+	 * @example
+	 * ```typescript
+	 * const server = createServer({
+	 *   router,
+	 *   plugins: [diffOptimizer()], // Adds stateful diff optimization
+	 * });
+	 * ```
+	 */
+	plugins?: ServerPlugin[] | undefined;
 }
 
 /** Server metadata for transport handshake */
@@ -113,19 +142,106 @@ export interface LensResult<T = unknown> {
 }
 
 /**
- * Lens server interface - Pure Executor
+ * Client send function type for subscription updates.
+ */
+export type ClientSendFn = (message: unknown) => void;
+
+/**
+ * Lens server interface
  *
- * Only two methods:
+ * Core methods:
  * - getMetadata() - Server metadata for transport handshake
  * - execute() - Execute any operation
  *
- * For protocol handling, use adapters.
+ * Subscription support (used by adapters):
+ * - addClient() / removeClient() - Client connection management
+ * - subscribe() / unsubscribe() - Subscription lifecycle
+ * - emit() - Push updates to subscribed clients
+ * - handleReconnect() - Handle client reconnection
+ *
+ * The server handles all business logic including state management (via plugins).
+ * Adapters are pure protocol handlers that call these methods.
  */
 export interface LensServer {
 	/** Get server metadata for transport handshake */
 	getMetadata(): ServerMetadata;
 	/** Execute operation - auto-detects query vs mutation */
 	execute(op: LensOperation): Promise<LensResult>;
+
+	// =========================================================================
+	// Subscription Support (Optional - used by WS/SSE adapters)
+	// =========================================================================
+
+	/**
+	 * Register a client connection.
+	 * Call when a client connects via WebSocket/SSE.
+	 *
+	 * @param clientId - Unique client identifier
+	 * @param send - Function to send messages to this client
+	 */
+	addClient(clientId: string, send: ClientSendFn): Promise<boolean>;
+
+	/**
+	 * Remove a client connection.
+	 * Call when a client disconnects.
+	 *
+	 * @param clientId - Client identifier
+	 * @param subscriptionCount - Number of active subscriptions at disconnect
+	 */
+	removeClient(clientId: string, subscriptionCount: number): void;
+
+	/**
+	 * Subscribe a client to an entity.
+	 * Runs plugin hooks and sets up state tracking (if diffOptimizer is enabled).
+	 *
+	 * @param ctx - Subscribe context
+	 * @returns true if subscription is allowed, false if rejected by plugin
+	 */
+	subscribe(ctx: SubscribeContext): Promise<boolean>;
+
+	/**
+	 * Unsubscribe a client from an entity.
+	 * Runs plugin hooks and cleans up state tracking.
+	 *
+	 * @param ctx - Unsubscribe context
+	 */
+	unsubscribe(ctx: UnsubscribeContext): void;
+
+	/**
+	 * Emit data for an entity.
+	 * If diffOptimizer plugin is enabled, computes optimal diff and pushes to clients.
+	 * If not, this is a no-op (stateless mode).
+	 *
+	 * @param entity - Entity type name
+	 * @param entityId - Entity ID
+	 * @param data - Entity data
+	 */
+	emit(entity: string, entityId: string, data: Record<string, unknown>): void;
+
+	/**
+	 * Handle a reconnection request from a client.
+	 * Only works if diffOptimizer plugin is enabled.
+	 *
+	 * @param message - Reconnection message from client
+	 * @returns Reconnection results or null if not supported
+	 */
+	handleReconnect(message: ReconnectMessage): ReconnectResult[] | null;
+
+	/**
+	 * Check if server has state management enabled (diffOptimizer plugin).
+	 */
+	hasStateManagement(): boolean;
+
+	/**
+	 * Get the underlying GraphStateManager (if diffOptimizer is enabled).
+	 * Used by adapters that need direct access for advanced operations.
+	 */
+	getStateManager(): GraphStateManager | undefined;
+
+	/**
+	 * Get the plugin manager for direct hook access.
+	 */
+	getPluginManager(): PluginManager;
 }
 
 /** WebSocket interface for adapters */
@@ -266,6 +382,11 @@ class LensServerImpl<
 	private ctx = createContext<TContext>();
 	private loaders = new Map<string, DataLoader<unknown, unknown>>();
 
+	// Plugin system
+	private pluginManager: PluginManager;
+	private stateManager: GraphStateManager | undefined;
+	private clientSendFns = new Map<string, ClientSendFn>();
+
 	constructor(config: LensServerConfig<TContext> & { queries?: Q; mutations?: M }) {
 		const queries: QueriesMap = { ...(config.queries ?? {}) };
 		const mutations: MutationsMap = { ...(config.mutations ?? {}) };
@@ -289,6 +410,16 @@ class LensServerImpl<
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
 		this.logger = config.logger ?? noopLogger;
+
+		// Initialize plugin system
+		this.pluginManager = createPluginManager();
+		for (const plugin of config.plugins ?? []) {
+			this.pluginManager.register(plugin);
+			// Extract stateManager from diffOptimizer plugin if present
+			if (isDiffOptimizerPlugin(plugin)) {
+				this.stateManager = plugin.getStateManager();
+			}
+		}
 
 		// Inject entity names
 		for (const [name, def] of Object.entries(this.entities)) {
@@ -624,6 +755,102 @@ class LensServerImpl<
 
 		return result;
 	}
+
+	// =========================================================================
+	// Subscription Support Methods
+	// =========================================================================
+
+	async addClient(clientId: string, send: ClientSendFn): Promise<boolean> {
+		// Store client send function
+		this.clientSendFns.set(clientId, send);
+
+		// Register with state manager if available
+		if (this.stateManager) {
+			this.stateManager.addClient({
+				id: clientId,
+				send: (msg) => send(msg),
+			});
+		}
+
+		// Run plugin hooks
+		const allowed = await this.pluginManager.runOnConnect({ clientId });
+		if (!allowed) {
+			this.removeClient(clientId, 0);
+			return false;
+		}
+
+		return true;
+	}
+
+	removeClient(clientId: string, subscriptionCount: number): void {
+		// Remove from state manager if available
+		if (this.stateManager) {
+			this.stateManager.removeClient(clientId);
+		}
+
+		// Remove stored send function
+		this.clientSendFns.delete(clientId);
+
+		// Run plugin hooks
+		this.pluginManager.runOnDisconnect({ clientId, subscriptionCount });
+	}
+
+	async subscribe(ctx: SubscribeContext): Promise<boolean> {
+		// Run plugin hooks - any plugin can reject
+		const allowed = await this.pluginManager.runOnSubscribe(ctx);
+		if (!allowed) {
+			return false;
+		}
+
+		// If state management is enabled, register subscription
+		if (this.stateManager && ctx.entity && ctx.entityId) {
+			this.stateManager.subscribe(ctx.clientId, ctx.entity, ctx.entityId, ctx.fields);
+		}
+
+		return true;
+	}
+
+	unsubscribe(ctx: UnsubscribeContext): void {
+		// Unsubscribe from entities in state manager
+		if (this.stateManager) {
+			for (const entityKey of ctx.entityKeys) {
+				const [entity, id] = entityKey.split(":");
+				this.stateManager.unsubscribe(ctx.clientId, entity, id);
+			}
+		}
+
+		// Run plugin hooks
+		this.pluginManager.runOnUnsubscribe(ctx);
+	}
+
+	emit(entity: string, entityId: string, data: Record<string, unknown>): void {
+		// Only emit if state management is enabled
+		if (this.stateManager) {
+			this.stateManager.emit(entity, entityId, data);
+		}
+		// In stateless mode, this is a no-op - adapter sends full data directly
+	}
+
+	handleReconnect(message: ReconnectMessage): ReconnectResult[] | null {
+		// Only handle reconnection if state management is enabled
+		if (!this.stateManager) {
+			return null;
+		}
+
+		return this.stateManager.handleReconnect(message.subscriptions);
+	}
+
+	hasStateManagement(): boolean {
+		return this.stateManager !== undefined;
+	}
+
+	getStateManager(): GraphStateManager | undefined {
+		return this.stateManager;
+	}
+
+	getPluginManager(): PluginManager {
+		return this.pluginManager;
+	}
 }
 
 // =============================================================================
@@ -657,6 +884,8 @@ export type ServerConfigWithInferredContext<
 	logger?: LensLogger;
 	context?: () => InferRouterContext<TRouter> | Promise<InferRouterContext<TRouter>>;
 	version?: string;
+	/** Server-level plugins (diffOptimizer, etc.) */
+	plugins?: ServerPlugin[];
 };
 
 export type ServerConfigLegacy<
@@ -672,6 +901,8 @@ export type ServerConfigLegacy<
 	logger?: LensLogger;
 	context?: () => TContext | Promise<TContext>;
 	version?: string;
+	/** Server-level plugins (diffOptimizer, etc.) */
+	plugins?: ServerPlugin[];
 };
 
 // =============================================================================
@@ -679,16 +910,38 @@ export type ServerConfigLegacy<
 // =============================================================================
 
 /**
- * Create Lens server - Pure Executor
+ * Create Lens server with optional plugin support.
  *
- * Server only provides:
- * - getMetadata() - For transport handshake
+ * Server modes:
+ * - **Stateless** (default): Pure executor, sends full data on each response
+ * - **Stateful** (with diffOptimizer plugin): Tracks state, sends minimal diffs
+ *
+ * Core methods:
+ * - getMetadata() - Server metadata for transport handshake
  * - execute() - Execute any operation
  *
- * For protocol handling, use adapters:
- * - createHTTPAdapter(server) - HTTP handler
- * - createWSAdapter(server, { stateManager }) - WebSocket handler
- * - createSSEAdapter(server) - SSE handler
+ * Subscription support (for WS/SSE adapters):
+ * - addClient() / removeClient() - Client connection lifecycle
+ * - subscribe() / unsubscribe() - Subscription management
+ * - emit() - Push updates to clients (stateful mode only)
+ * - handleReconnect() - Handle client reconnection (stateful mode only)
+ *
+ * Adapters are pure protocol handlers - they call server methods and deliver responses.
+ * All business logic (state management, diff computation) is handled by server/plugins.
+ *
+ * @example
+ * ```typescript
+ * // Stateless mode (default)
+ * const server = createServer({ router });
+ * createWSAdapter(server); // Sends full data on each update
+ *
+ * // Stateful mode (with diffOptimizer)
+ * const server = createServer({
+ *   router,
+ *   plugins: [diffOptimizer()], // Enables state tracking & diffs
+ * });
+ * createWSAdapter(server); // Sends minimal diffs
+ * ```
  */
 export function createServer<
 	TRouter extends RouterDef,

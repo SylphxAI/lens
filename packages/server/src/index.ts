@@ -4,10 +4,27 @@
  * Server runtime for Lens API framework.
  *
  * Architecture:
- * - Server = Pure executor (getMetadata, execute)
- * - Adapters = Protocol handlers (HTTP, WebSocket, SSE)
- * - State = Per-connection tracking (GraphStateManager)
- * - Plugins = Lifecycle hooks (diffOptimizer, logger)
+ * - Server = Executor with optional plugin support
+ *   - Stateless (default): Pure executor, sends full data
+ *   - Stateful (with diffOptimizer): Tracks state, sends diffs
+ * - Adapters = Pure protocol handlers (HTTP, WebSocket, SSE)
+ *   - No business logic - just translate protocol to server calls
+ * - Plugins = Server-level middleware (diffOptimizer, auth, logger)
+ *   - Configured at server level, not adapter level
+ *
+ * @example
+ * ```typescript
+ * // Stateless mode (default)
+ * const server = createServer({ router });
+ * const wsAdapter = createWSAdapter(server);
+ *
+ * // Stateful mode (with diffOptimizer plugin)
+ * const server = createServer({
+ *   router,
+ *   plugins: [diffOptimizer()],
+ * });
+ * const wsAdapter = createWSAdapter(server); // Now sends diffs
+ * ```
  */
 
 // =============================================================================
@@ -51,6 +68,7 @@ export {
 	// Factory
 	createServer,
 	// Types
+	type ClientSendFn,
 	type EntitiesMap,
 	type InferApi,
 	type InferInput,
