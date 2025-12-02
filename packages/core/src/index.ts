@@ -289,9 +289,11 @@ export {
 export {
 	// Types
 	type Lens,
+	type LensConfig,
 	type LensMutation,
 	type LensQuery,
 	type LensResolver,
+	type LensWithPlugins,
 	// Main factory
 	lens,
 } from "./lens.js";
@@ -375,11 +377,28 @@ export {
 // =============================================================================
 
 export {
-	// Type guard
+	type ExtractExtension,
+	type HasPlugin,
+	type IfPlugin,
+	isOptimisticPlugin,
+	// Paired Plugin (Client/Server plugin pairs)
 	isPairedPlugin,
-	// Types
+	isRuntimePlugin,
+	type MergeExtensions,
+	type MutationBuilderWithOptimisticExt,
+	type NoExtension,
+	OPTIMISTIC_PLUGIN_SYMBOL,
+	type OptimisticMutationMethods,
+	// Optimistic Plugin Extension
+	type OptimisticPluginExtension,
+	type OptimisticPluginMarker,
 	type PairedPlugin,
-	// Resolvers
+	// Plugin Extension Protocol
+	type PluginExtension,
+	type Prettify,
+	type RuntimePlugin,
 	resolveClientPlugins,
 	resolveServerPlugins,
+	// Type Utilities
+	type UnionToIntersection,
 } from "./plugin/index.js";
