@@ -4,26 +4,26 @@
  * Server runtime for Lens API framework.
  *
  * Architecture:
- * - Server = Executor with optional plugin support
+ * - App = Executor with optional plugin support
  *   - Stateless (default): Pure executor, sends full data
  *   - Stateful (with diffOptimizer): Tracks state, sends diffs
- * - Adapters = Pure protocol handlers (HTTP, WebSocket, SSE)
- *   - No business logic - just translate protocol to server calls
- * - Plugins = Server-level middleware (diffOptimizer, auth, logger)
- *   - Configured at server level, not adapter level
+ * - Handlers = Pure protocol handlers (HTTP, WebSocket, SSE)
+ *   - No business logic - just translate protocol to app calls
+ * - Plugins = App-level middleware (diffOptimizer, auth, logger)
+ *   - Configured at app level, not handler level
  *
  * @example
  * ```typescript
  * // Stateless mode (default)
- * const server = createServer({ router });
- * const wsAdapter = createWSAdapter(server);
+ * const app = createApp({ router });
+ * const wsHandler = createWSHandler(app);
  *
  * // Stateful mode (with diffOptimizer plugin)
- * const server = createServer({
+ * const app = createApp({
  *   router,
  *   plugins: [diffOptimizer()],
  * });
- * const wsAdapter = createWSAdapter(server); // Now sends diffs
+ * const wsHandler = createWSHandler(app); // Now sends diffs
  * ```
  */
 
@@ -113,7 +113,7 @@ export {
 	type WSAdapterOptions,
 	type WSHandler,
 	type WSHandlerOptions,
-} from "./adapters/index.js";
+} from "./handlers/index.js";
 
 // =============================================================================
 // State Management
@@ -164,7 +164,7 @@ export {
 } from "./plugin/index.js";
 
 // =============================================================================
-// SSE Handler (additional exports not in adapters/index.js)
+// SSE Handler (additional exports not in handlers/index.js)
 // =============================================================================
 
 export {
