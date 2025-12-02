@@ -1,5 +1,10 @@
 # @sylphx/lens-core
 
+## 1.22.2 (2025-12-02)
+
+Release patch version
+
+
 ## 1.22.1 (2025-12-02)
 
 Release patch version

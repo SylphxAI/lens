@@ -1,5 +1,10 @@
 # @sylphx/lens-solidstart
 
+## 1.2.30 (2025-12-02)
+
+Release patch version
+
+
 ## 1.2.29 (2025-12-02)
 
 Release patch version

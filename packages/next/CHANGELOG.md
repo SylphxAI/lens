@@ -1,5 +1,10 @@
 # @sylphx/lens-next
 
+## 1.2.21 (2025-12-02)
+
+Release patch version
+
+
 ## 1.2.20 (2025-12-02)
 
 Release patch version

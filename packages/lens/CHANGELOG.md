@@ -1,5 +1,13 @@
 # @sylphx/lens
 
+## 1.2.14 (2025-12-02)
+
+Release patch version
+
+### 🐛 Bug Fixes
+
+- **lens:** add bunup config for client/server exports ([2331a97](https://github.com/SylphxAI/Lens/commit/2331a97d27bc88eb9e228b22256527bd548b63c0))
+
 ## 1.2.13 (2025-12-02)
 
 Release patch version
