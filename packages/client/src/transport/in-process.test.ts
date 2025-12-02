@@ -10,10 +10,10 @@ import { type ExtractServerTypes, inProcess, type LensServerInterface, type Type
 import type { Observable, Result } from "./types.js";
 
 // =============================================================================
-// Mock Server
+// Mock App
 // =============================================================================
 
-function createMockServer(overrides: Partial<LensServerInterface> = {}): LensServerInterface {
+function createMockApp(overrides: Partial<LensServerInterface> = {}): LensServerInterface {
 	return {
 		getMetadata: () => ({
 			version: "1.0.0",
@@ -34,8 +34,8 @@ function createMockServer(overrides: Partial<LensServerInterface> = {}): LensSer
 describe("inProcess transport", () => {
 	describe("connect()", () => {
 		it("returns metadata from server", async () => {
-			const server = createMockServer();
-			const transport = inProcess({ server });
+			const app = createMockApp();
+			const transport = inProcess({ app });
 
 			const metadata = await transport.connect();
 
@@ -48,8 +48,8 @@ describe("inProcess transport", () => {
 				version: "2.0.0",
 				operations: {},
 			}));
-			const server = createMockServer({ getMetadata });
-			const transport = inProcess({ server });
+			const app = createMockApp({ getMetadata });
+			const transport = inProcess({ app });
 
 			await transport.connect();
 
@@ -59,8 +59,8 @@ describe("inProcess transport", () => {
 
 	describe("execute()", () => {
 		it("executes query operation", async () => {
-			const server = createMockServer();
-			const transport = inProcess({ server });
+			const app = createMockApp();
+			const transport = inProcess({ app });
 
 			const result = (await transport.execute({
 				id: "1",
@@ -74,8 +74,8 @@ describe("inProcess transport", () => {
 
 		it("executes mutation operation", async () => {
 			const execute = mock(async () => ({ data: { id: "new-1" } }));
-			const server = createMockServer({ execute });
-			const transport = inProcess({ server });
+			const app = createMockApp({ execute });
+			const transport = inProcess({ app });
 
 			const result = (await transport.execute({
 				id: "2",
@@ -102,10 +102,10 @@ describe("inProcess transport", () => {
 				},
 			};
 
-			const server = createMockServer({
+			const app = createMockApp({
 				execute: () => mockObservable,
 			});
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			const result = transport.execute({
 				id: "3",
@@ -127,8 +127,8 @@ describe("inProcess transport", () => {
 
 		it("passes operation input correctly", async () => {
 			const execute = mock(async (op) => ({ data: op.input }));
-			const server = createMockServer({ execute });
-			const transport = inProcess({ server });
+			const app = createMockApp({ execute });
+			const transport = inProcess({ app });
 
 			const input = { userId: "123", options: { includeDeleted: true } };
 			const result = (await transport.execute({
@@ -142,10 +142,10 @@ describe("inProcess transport", () => {
 		});
 
 		it("handles server errors", async () => {
-			const server = createMockServer({
+			const app = createMockApp({
 				execute: async () => ({ error: new Error("Database error") }),
 			});
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			const result = (await transport.execute({
 				id: "5",
@@ -158,12 +158,12 @@ describe("inProcess transport", () => {
 		});
 
 		it("handles server throwing", async () => {
-			const server = createMockServer({
+			const app = createMockApp({
 				execute: async () => {
 					throw new Error("Unexpected error");
 				},
 			});
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			await expect(
 				transport.execute({
@@ -177,14 +177,14 @@ describe("inProcess transport", () => {
 
 	describe("integration", () => {
 		it("works with multiple operations", async () => {
-			const server = createMockServer({
+			const app = createMockApp({
 				execute: async (op) => {
 					if (op.path === "user.get") return { data: { name: "John" } };
 					if (op.path === "post.create") return { data: { id: "post-1" } };
 					return { error: new Error("Unknown path") };
 				},
 			});
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			const [user, post] = await Promise.all([
 				transport.execute({ id: "1", path: "user.get", type: "query" }),
@@ -221,7 +221,7 @@ describe("inProcess type inference", () => {
 		it("preserves server type through phantom _api property", () => {
 			const { query } = lens<TestContext>();
 
-			const server = createServer({
+			const app = createServer({
 				router: router({
 					user: router({
 						get: query()
@@ -233,7 +233,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			// TypedTransport should have _api property type
 			type TransportType = typeof transport;
@@ -264,15 +264,15 @@ describe("inProcess type inference", () => {
 				}),
 			});
 
-			const server = createServer({
+			const app = createServer({
 				router: appRouter,
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			// Extract types
-			type ServerTypes = typeof server._types;
+			type ServerTypes = typeof app._types;
 			type TransportApi = (typeof transport)["_api"];
 
 			// TransportApi should match ServerTypes
@@ -286,7 +286,7 @@ describe("inProcess type inference", () => {
 		it("extracts _types from server with intersection type", () => {
 			const { query } = lens<TestContext>();
 
-			const server = createServer({
+			const app = createServer({
 				router: router({
 					test: query().resolve(() => ({ ok: true })),
 				}),
@@ -294,7 +294,7 @@ describe("inProcess type inference", () => {
 			});
 
 			// ExtractServerTypes should extract _types
-			type Extracted = ExtractServerTypes<typeof server>;
+			type Extracted = ExtractServerTypes<typeof app>;
 
 			// Should have router property
 			type _assertHasRouter = Assert<Extracted extends { router: unknown } ? true : false>;
@@ -316,7 +316,7 @@ describe("inProcess type inference", () => {
 		it("preserves router structure through transport", () => {
 			const { query, mutation } = lens<TestContext>();
 
-			const server = createServer({
+			const app = createServer({
 				router: router({
 					users: router({
 						list: query()
@@ -338,7 +338,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			// The transport's _api should have the full router structure
 			type Api = (typeof transport)["_api"];
@@ -355,7 +355,7 @@ describe("inProcess type inference", () => {
 		it("preserves query/mutation types through transport", () => {
 			const { query, mutation } = lens<TestContext>();
 
-			const server = createServer({
+			const app = createServer({
 				router: router({
 					getData: query()
 						.input(z.object({ id: z.string() }))
@@ -368,7 +368,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			type Api = (typeof transport)["_api"];
 			type RouterType = Api["router"];
@@ -394,7 +394,7 @@ describe("inProcess type inference", () => {
 			const db = new Map<string, { id: string; name: string; email: string }>();
 			db.set("1", { id: "1", name: "Alice", email: "alice@test.com" });
 
-			const server = createServer({
+			const app = createServer({
 				router: router({
 					user: router({
 						get: query()
@@ -418,7 +418,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db }),
 			});
 
-			const transport = inProcess({ server });
+			const transport = inProcess({ app });
 
 			// Test connect
 			const metadata = await transport.connect();

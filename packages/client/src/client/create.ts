@@ -771,7 +771,7 @@ export interface TypedClientConfig<TApi> {
  * ```typescript
  * const server = createServer({ router: appRouter });
  * const client = createClient({
- *   transport: inProcess({ server }),
+ *   transport: inProcess({ app }),
  * });
  * // client is fully typed automatically!
  * ```

@@ -238,8 +238,8 @@ function createTestServer() {
 
 describe("QueryResult.select() - Basic Field Selection", () => {
 	it("selects single field", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ name: true });
@@ -252,8 +252,8 @@ describe("QueryResult.select() - Basic Field Selection", () => {
 	});
 
 	it("selects multiple fields", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({
@@ -270,8 +270,8 @@ describe("QueryResult.select() - Basic Field Selection", () => {
 	});
 
 	it("selects all scalar fields", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({
@@ -296,8 +296,8 @@ describe("QueryResult.select() - Basic Field Selection", () => {
 	});
 
 	it("selects nullable field", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ age: true });
@@ -308,8 +308,8 @@ describe("QueryResult.select() - Basic Field Selection", () => {
 	});
 
 	it("selects enum field", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ role: true });
@@ -320,8 +320,8 @@ describe("QueryResult.select() - Basic Field Selection", () => {
 	});
 
 	it("selects boolean field", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ isActive: true });
@@ -338,8 +338,8 @@ describe("QueryResult.select() - Basic Field Selection", () => {
 
 describe("QueryResult.select() - Object Field Selection", () => {
 	it("selects object field entirely", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ metadata: true });
@@ -354,8 +354,8 @@ describe("QueryResult.select() - Object Field Selection", () => {
 	});
 
 	it("selects nested object fields", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.nested.deep();
 		const selected = result.select({
@@ -379,8 +379,8 @@ describe("QueryResult.select() - Object Field Selection", () => {
 	});
 
 	it("selects partial nested object", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.nested.complex();
 		const selected = result.select({
@@ -402,8 +402,8 @@ describe("QueryResult.select() - Object Field Selection", () => {
 
 describe("QueryResult.select() - Array Field Selection", () => {
 	it("selects array field entirely", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ tags: true });
@@ -414,8 +414,8 @@ describe("QueryResult.select() - Array Field Selection", () => {
 	});
 
 	it("selects array of objects", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.post.list();
 		const data = await result;
@@ -426,8 +426,8 @@ describe("QueryResult.select() - Array Field Selection", () => {
 	});
 
 	it("selects fields from array items", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.nested.complex();
 		const selected = result.select({
@@ -451,8 +451,8 @@ describe("QueryResult.select() - Array Field Selection", () => {
 
 describe("QueryResult.select() - Nested Relation Selection", () => {
 	it("selects user with posts", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.withPosts({ id: "user-1" });
 		const selected = result.select({
@@ -469,8 +469,8 @@ describe("QueryResult.select() - Nested Relation Selection", () => {
 	});
 
 	it("selects specific fields from nested relation", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.withPosts({ id: "user-1" });
 		const selected = result.select({
@@ -492,8 +492,8 @@ describe("QueryResult.select() - Nested Relation Selection", () => {
 	});
 
 	it("selects post with author", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.post.withAuthor({ id: "post-1" });
 		const selected = result.select({
@@ -514,8 +514,8 @@ describe("QueryResult.select() - Nested Relation Selection", () => {
 	});
 
 	it("selects post with comments", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.post.withComments({ id: "post-1" });
 		const selected = result.select({
@@ -535,8 +535,8 @@ describe("QueryResult.select() - Nested Relation Selection", () => {
 	});
 
 	it("selects deeply nested relations", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.withPostsAndComments({ id: "user-1" });
 		const selected = result.select({
@@ -569,8 +569,8 @@ describe("QueryResult.select() - Nested Relation Selection", () => {
 
 describe("QueryResult.select() - Chained Calls", () => {
 	it("chains multiple select calls", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 
@@ -587,8 +587,8 @@ describe("QueryResult.select() - Chained Calls", () => {
 	});
 
 	it("creates independent query results when selecting", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 
@@ -609,8 +609,8 @@ describe("QueryResult.select() - Chained Calls", () => {
 
 describe("QueryResult.select() - With Subscribe", () => {
 	it("subscribes to selected fields", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ name: true, email: true });
@@ -630,8 +630,8 @@ describe("QueryResult.select() - With Subscribe", () => {
 	});
 
 	it("select returns QueryResult with all methods", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ name: true });
@@ -643,8 +643,8 @@ describe("QueryResult.select() - With Subscribe", () => {
 	});
 
 	it("unsubscribe works on selected query", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ name: true });
@@ -716,8 +716,8 @@ describe("QueryResult.select() - Type Inference", () => {
 
 describe("QueryResult.select() - Edge Cases", () => {
 	it("handles empty selection object", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({});
@@ -731,7 +731,7 @@ describe("QueryResult.select() - Edge Cases", () => {
 	it("handles selection on null/undefined data gracefully", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				nullable: query().resolve(() => null),
 			}),
@@ -740,7 +740,7 @@ describe("QueryResult.select() - Edge Cases", () => {
 			}),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.nullable();
 		const selected = result.select({ field: true });
@@ -754,7 +754,7 @@ describe("QueryResult.select() - Edge Cases", () => {
 	it("handles selection when query throws", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				failing: query().resolve(() => {
 					throw new Error("Query failed");
@@ -765,7 +765,7 @@ describe("QueryResult.select() - Edge Cases", () => {
 			}),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.failing();
 		const selected = result.select({ field: true });
@@ -779,8 +779,8 @@ describe("QueryResult.select() - Edge Cases", () => {
 	});
 
 	it("handles concurrent select operations", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 
@@ -798,8 +798,8 @@ describe("QueryResult.select() - Edge Cases", () => {
 	});
 
 	it("select preserves query result value property", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 		const selected = result.select({ name: true });
@@ -815,8 +815,8 @@ describe("QueryResult.select() - Edge Cases", () => {
 	});
 
 	it("handles list queries with select", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.list();
 		const data = await result;
@@ -826,8 +826,8 @@ describe("QueryResult.select() - Edge Cases", () => {
 	});
 
 	it("handles deeply nested selection gracefully", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.nested.complex();
 		const selected = result.select({
@@ -866,8 +866,8 @@ describe("QueryResult.select() - Edge Cases", () => {
 
 describe("QueryResult.select() - Integration", () => {
 	it("works with real server round-trip", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		// Complex query with nested data
 		const result = client.user.withPostsAndComments({ id: "user-1" });
@@ -904,8 +904,8 @@ describe("QueryResult.select() - Integration", () => {
 	});
 
 	it("maintains consistency between multiple subscriptions", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 
@@ -927,8 +927,8 @@ describe("QueryResult.select() - Integration", () => {
 	});
 
 	it("handles rapid successive select calls", async () => {
-		const server = createTestServer();
-		const client = createClient({ transport: inProcess({ server }) });
+		const app = createTestServer();
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const result = client.user.get({ id: "user-1" });
 

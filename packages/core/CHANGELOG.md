@@ -901,7 +901,7 @@ move emit and onCleanup into ctx
 
   - `http({ url })` - HTTP transport with polling for subscriptions
   - `ws({ url })` - WebSocket transport with native streaming
-  - `inProcess({ server })` - Direct server calls for testing/SSR
+  - `inProcess({ app })` - Direct server calls for testing/SSR
   - `route({ 'pattern.*': transport })` - Pattern-based routing
   - `routeByType({ default, subscription })` - Route by operation type
 

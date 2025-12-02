@@ -10,7 +10,7 @@
  */
 
 import { createClient, inProcess } from "@sylphx/lens-client";
-import { server } from "./server";
+import { app } from "./server.js";
 
 // =============================================================================
 // Create Client
@@ -18,7 +18,7 @@ import { server } from "./server";
 
 // Full type inference from server - no manual type annotation needed!
 const client = createClient({
-	transport: inProcess({ server }),
+	transport: inProcess({ app }),
 });
 
 // =============================================================================

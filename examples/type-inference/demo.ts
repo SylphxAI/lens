@@ -34,7 +34,7 @@ const Post = entity("Post", {
 	published: t.boolean(),
 	authorId: t.string(),
 	viewCount: t.int(),
-	tags: t.json<string[]>(),
+	tags: t.object<string[]>(),
 });
 
 const Comment = entity("Comment", {
@@ -65,9 +65,9 @@ interface AppContext {
 
 console.log("🔧 Creating typed builders with lens<AppContext>()...\n");
 
-const { query, mutation, plugins } = lens<AppContext>({
-	plugins: [optimisticPlugin()],
-});
+const { query, mutation, plugins } = lens<AppContext>().withPlugins([
+	optimisticPlugin(),
+]);
 
 // =============================================================================
 // 4. Define Operations with .returns() for Type Inference
@@ -359,19 +359,16 @@ async function demonstrateTypeInference() {
 	console.log(`  Has rollback: ${typeof updateResult.rollback === "function"}`);
 	console.log();
 
-	// Example 5: Mutation without .returns() - inferred from resolver
-	console.log("5️⃣ Mutation without .returns() (inferred type)");
+	// Example 5: Mutation without .returns() - returns raw data
+	console.log("5️⃣ Mutation without .returns()");
 	console.log("-".repeat(40));
 	const setRoleResult = await client.user.setRole({
 		id: "2",
 		role: "moderator",
 	});
 
-	// Type is inferred from resolver return
-	const { success, userId, newRole } = setRoleResult.data!;
-	console.log(`  success: ${success} (type: boolean)`);
-	console.log(`  userId: ${userId} (type: string)`);
-	console.log(`  newRole: ${newRole} (type: string)`);
+	// Without .returns(), result is the resolved value directly
+	console.log(`  result: ${JSON.stringify(setRoleResult)}`);
 	console.log();
 
 	// Example 6: Different entity types have different shapes

@@ -3,7 +3,7 @@
  *
  * End-to-end tests for type inference from server to client.
  * Tests the full inference chain:
- *   server._types.router → inProcess() → TypedTransport → createClient() → typed methods
+ *   app._types.router → inProcess() → TypedTransport → createClient() → typed methods
  */
 
 import { describe, expect, it } from "bun:test";
@@ -72,7 +72,7 @@ type Assert<T extends true> = T;
 // =============================================================================
 
 describe("Server type inference", () => {
-	it("server._types.router contains correct router type", () => {
+	it("app._types.router contains correct router type", () => {
 		const { query } = lens<TestContext>();
 
 		const userRouter = router({
@@ -89,7 +89,7 @@ describe("Server type inference", () => {
 				.resolve(({ ctx }) => Array.from(ctx.db.users.values())),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: router({ user: userRouter }),
 			context: () => ({
 				db: { users: new Map(), posts: new Map() },
@@ -99,7 +99,7 @@ describe("Server type inference", () => {
 
 		// _types is a phantom type - exists only at type level, not runtime
 		// Type check - _types.router should exist at type level
-		type ServerTypes = typeof server._types;
+		type ServerTypes = typeof app._types;
 		type RouterType = ServerTypes["router"];
 
 		// RouterType should be a RouterDef
@@ -108,7 +108,7 @@ describe("Server type inference", () => {
 		expect(_check).toBe(true);
 
 		// Runtime check - server should have getMetadata
-		expect(typeof server.getMetadata).toBe("function");
+		expect(typeof app.getMetadata).toBe("function");
 	});
 });
 
@@ -120,7 +120,7 @@ describe("inProcess transport type inference", () => {
 	it("inProcess() returns TypedTransport with server types", () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					whoami: query()
@@ -139,7 +139,7 @@ describe("inProcess transport type inference", () => {
 			}),
 		});
 
-		const transport = inProcess({ server });
+		const transport = inProcess({ app });
 
 		// Transport should have _api property (phantom type)
 		type TransportType = typeof transport;
@@ -174,7 +174,7 @@ describe("inProcess transport type inference", () => {
 			}),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: appRouter,
 			context: () => ({
 				db: { users: new Map(), posts: new Map() },
@@ -182,7 +182,7 @@ describe("inProcess transport type inference", () => {
 			}),
 		});
 
-		const transport = inProcess({ server });
+		const transport = inProcess({ app });
 
 		// Extract the API type from transport
 		type TransportApi = (typeof transport)["_api"];
@@ -308,9 +308,9 @@ describe("createClient type inference", () => {
 	};
 
 	it("client methods are typed correctly from server router", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Query: client.user.get({ id }) returns User shape
@@ -333,9 +333,9 @@ describe("createClient type inference", () => {
 	});
 
 	it("client array query returns typed array", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Query: client.user.list() returns User[]
@@ -355,9 +355,9 @@ describe("createClient type inference", () => {
 	});
 
 	it("client query with input is typed correctly", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Query with input
@@ -367,9 +367,9 @@ describe("createClient type inference", () => {
 	});
 
 	it("client mutation returns typed result with data and rollback", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Mutation: client.user.create returns MutationResult<User>
@@ -393,9 +393,9 @@ describe("createClient type inference", () => {
 	});
 
 	it("client mutation with optimistic has correct types", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Mutation with .optimistic("merge")
@@ -411,9 +411,9 @@ describe("createClient type inference", () => {
 	});
 
 	it("nested router paths are typed correctly", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Nested: client.post.get
@@ -431,9 +431,9 @@ describe("createClient type inference", () => {
 	});
 
 	it("different routes have different types", async () => {
-		const server = createTestServer();
+		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// User has role field
@@ -456,7 +456,7 @@ describe("Type-level assertions", () => {
 	it("client type matches expected shape", () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -474,7 +474,7 @@ describe("Type-level assertions", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		// Extract types
 		type ClientType = typeof client;
@@ -493,7 +493,7 @@ describe("Type-level assertions", () => {
 	it("QueryResult type is correct", () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: router({
 					list: query()
@@ -504,7 +504,7 @@ describe("Type-level assertions", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		type ListResult = Awaited<ReturnType<typeof client.data.list>>;
 
@@ -526,7 +526,7 @@ describe("Edge cases", () => {
 	it("handles deeply nested routers", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				api: router({
 					v1: router({
@@ -550,7 +550,7 @@ describe("Edge cases", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		// Deep path should work
 		const user = await client.api.v1.users.profile.get({ userId: "1" });
@@ -568,14 +568,14 @@ describe("Edge cases", () => {
 	it("handles queries without input", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				health: query().resolve(() => ({ status: "ok", timestamp: Date.now() })),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		// Should be callable without arguments
 		const health = (await client.health()) as { status: string; timestamp: number };
@@ -587,7 +587,7 @@ describe("Edge cases", () => {
 	it("handles multiple entity types in same router", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: query()
 					.input(z.object({ id: z.string() }))
@@ -614,7 +614,7 @@ describe("Edge cases", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ server }) });
+		const client = createClient({ transport: inProcess({ app }) });
 
 		const user = await client.user({ id: "1" });
 		const post = await client.post({ id: "1" });

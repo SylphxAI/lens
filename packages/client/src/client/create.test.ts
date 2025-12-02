@@ -56,7 +56,7 @@ describe("Connection failure and retry", () => {
 	it("retries connection on first operation when initial connect fails", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				test: query().resolve(() => ({ ok: true })),
 			}),
@@ -72,9 +72,9 @@ describe("Connection failure and retry", () => {
 					throw new Error("Connection failed");
 				}
 				// Second call succeeds
-				return server.getMetadata();
+				return app.getMetadata();
 			},
-			execute: server.execute.bind(server),
+			execute: app.execute.bind(server),
 		};
 
 		const client = createClient({
@@ -94,7 +94,7 @@ describe("Connection failure and retry", () => {
 	it("catches initial connection error and continues without blocking", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ value: 42 })),
 			}),
@@ -106,7 +106,7 @@ describe("Connection failure and retry", () => {
 				// Always fail initially, but client shouldn't throw
 				throw new Error("Initial connection failed");
 			},
-			execute: server.execute.bind(server),
+			execute: app.execute.bind(server),
 		};
 
 		// Should not throw - client creation is synchronous
@@ -138,7 +138,7 @@ describe("QueryResult.subscribe()", () => {
 		const db = new Map<string, { id: string; name: string; email: string; role: "user" | "admin"; createdAt: Date }>();
 		db.set("1", { id: "1", name: "Alice", email: "alice@test.com", role: "admin", createdAt: new Date() });
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -155,7 +155,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.user.get({ id: "1" });
@@ -183,7 +183,7 @@ describe("QueryResult.subscribe()", () => {
 		const db = new Map<string, { id: string; name: string; email: string; role: "user" | "admin"; createdAt: Date }>();
 		db.set("1", { id: "1", name: "Bob", email: "bob@test.com", role: "user", createdAt: new Date() });
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -200,7 +200,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.user.get({ id: "1" });
@@ -226,7 +226,7 @@ describe("QueryResult.subscribe()", () => {
 		const db = new Map<string, { id: string; name: string; email: string; role: "user" | "admin"; createdAt: Date }>();
 		db.set("1", { id: "1", name: "Charlie", email: "charlie@test.com", role: "user", createdAt: new Date() });
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -243,7 +243,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.user.get({ id: "1" });
@@ -269,7 +269,7 @@ describe("QueryResult.subscribe()", () => {
 	it("handles subscribe without callback", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ value: 123 })),
 			}),
@@ -277,7 +277,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.data();
@@ -296,7 +296,7 @@ describe("QueryResult.subscribe()", () => {
 	it("cleans up when all callbacks are removed", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ id: "test" })),
 			}),
@@ -304,7 +304,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.data();
@@ -345,7 +345,7 @@ describe("QueryResult.select()", () => {
 			createdAt: new Date(),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -362,7 +362,7 @@ describe("QueryResult.select()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// NOTE: The accessor doesn't have select(), but QueryResult does
@@ -379,7 +379,7 @@ describe("QueryResult.select()", () => {
 	it("accessor returns queryable result", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({
 					id: "123",
@@ -391,7 +391,7 @@ describe("QueryResult.select()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.data();
@@ -422,7 +422,7 @@ describe("startSubscription", () => {
 			},
 		};
 
-		const mockServer: LensServerInterface = {
+		const mockApp: LensServerInterface = {
 			getMetadata: () => ({
 				version: "1.0.0",
 				operations: {
@@ -435,7 +435,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ server: mockServer }),
+			transport: inProcess({ app: mockApp }),
 		});
 
 		const result = client.counter.watch();
@@ -461,7 +461,7 @@ describe("startSubscription", () => {
 			},
 		};
 
-		const mockServer: LensServerInterface = {
+		const mockApp: LensServerInterface = {
 			getMetadata: () => ({
 				version: "1.0.0",
 				operations: {
@@ -474,7 +474,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ server: mockServer }),
+			transport: inProcess({ app: mockApp }),
 		});
 
 		const result = client.data.stream();
@@ -500,7 +500,7 @@ describe("startSubscription", () => {
 			},
 		};
 
-		const mockServer: LensServerInterface = {
+		const mockApp: LensServerInterface = {
 			getMetadata: () => ({
 				version: "1.0.0",
 				operations: {
@@ -513,7 +513,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ server: mockServer }),
+			transport: inProcess({ app: mockApp }),
 		});
 
 		const result = client.stream.data();
@@ -531,7 +531,7 @@ describe("startSubscription", () => {
 	it("falls back to query for non-subscription operations", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ value: 999 })),
 			}),
@@ -539,7 +539,7 @@ describe("startSubscription", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.data();
@@ -574,7 +574,7 @@ describe("rollbackOptimistic", () => {
 			createdAt: new Date(),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -603,7 +603,7 @@ describe("rollbackOptimistic", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 			optimistic: true,
 		});
 
@@ -655,7 +655,7 @@ describe("rollbackOptimistic", () => {
 			createdAt: new Date(),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -679,7 +679,7 @@ describe("rollbackOptimistic", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 			optimistic: true,
 		});
 
@@ -715,7 +715,7 @@ describe("rollbackOptimistic", () => {
 	it("handles rollback when optimistic entry doesn't exist", async () => {
 		const { mutation } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				test: mutation()
 					.input(z.object({ value: z.string() }))
@@ -733,7 +733,7 @@ describe("rollbackOptimistic", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 			optimistic: true,
 		});
 
@@ -761,7 +761,7 @@ describe("createAccessor subscribe", () => {
 			createdAt: new Date(),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -778,7 +778,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const accessor = client.user.get({ id: "1" });
@@ -800,7 +800,7 @@ describe("createAccessor subscribe", () => {
 	it("accessor subscribe delivers cached data immediately", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ cached: true })),
 			}),
@@ -808,7 +808,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const accessor = client.data();
@@ -831,7 +831,7 @@ describe("createAccessor subscribe", () => {
 	it("accessor subscribe on mutation is a no-op", async () => {
 		const { mutation } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				update: mutation()
 					.input(z.object({ value: z.string() }))
@@ -841,7 +841,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const accessor = client.update({ value: "test" });
@@ -863,7 +863,7 @@ describe("createAccessor subscribe", () => {
 	it("accessor subscribe cleanup when no callbacks remain", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ id: "cleanup-test" })),
 			}),
@@ -871,7 +871,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const accessor = client.data();
@@ -893,7 +893,7 @@ describe("createAccessor subscribe", () => {
 	it("accessor value property returns cached data", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ value: 42 })),
 			}),
@@ -901,7 +901,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const accessor = client.data();
@@ -918,7 +918,7 @@ describe("createAccessor subscribe", () => {
 	it("accessor subscribe without callback starts subscription", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ started: true })),
 			}),
@@ -926,7 +926,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const accessor = client.data();
@@ -945,7 +945,7 @@ describe("createAccessor subscribe", () => {
 	it("accessor handles connection wait correctly", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				delayed: query().resolve(() => ({ ready: true })),
 			}),
@@ -958,9 +958,9 @@ describe("createAccessor subscribe", () => {
 				// Simulate slow connection
 				await new Promise((resolve) => setTimeout(resolve, 50));
 				connectResolved = true;
-				return server.getMetadata();
+				return app.getMetadata();
 			},
-			execute: server.execute.bind(server),
+			execute: app.execute.bind(server),
 		};
 
 		const client = createClient({
@@ -993,7 +993,7 @@ describe("Edge cases and error handling", () => {
 	it("handles multiple subscribers on same query", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query().resolve(() => ({ shared: true })),
 			}),
@@ -1001,7 +1001,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		const result = client.data();
@@ -1023,7 +1023,7 @@ describe("Edge cases and error handling", () => {
 	it("handles optimistic updates with no matching subscriptions", async () => {
 		const { mutation } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				create: mutation()
 					.input(z.object({ name: z.string() }))
@@ -1042,7 +1042,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 			optimistic: true,
 		});
 
@@ -1056,7 +1056,7 @@ describe("Edge cases and error handling", () => {
 	it("handles query errors correctly", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				failing: query().resolve(() => {
 					throw new Error("Query failed");
@@ -1066,7 +1066,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		try {
@@ -1089,7 +1089,7 @@ describe("Edge cases and error handling", () => {
 			createdAt: new Date(),
 		});
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				user: router({
 					get: query()
@@ -1117,7 +1117,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 			optimistic: true,
 		});
 
@@ -1140,7 +1140,7 @@ describe("Edge cases and error handling", () => {
 	it("handles concurrent operations correctly", async () => {
 		const { query } = lens<TestContext>();
 
-		const server = createServer({
+		const app = createServer({
 			router: router({
 				data: query()
 					.input(z.object({ id: z.string() }))
@@ -1150,7 +1150,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ server }),
+			transport: inProcess({ app }),
 		});
 
 		// Execute multiple queries concurrently

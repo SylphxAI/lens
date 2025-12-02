@@ -16,7 +16,7 @@ type Client = InferRouterClient<AppRouter>;
 // Create client with in-process transport (direct execution)
 function createTestClient(): Client {
 	return createClient({
-		transport: inProcess({ server }),
+		transport: inProcess({ app }),
 	}) as unknown as Client;
 }
 
@@ -36,8 +36,8 @@ beforeEach(() => {
 // =============================================================================
 
 describe("Server Direct Execution", () => {
-	it("executes queries via server.execute()", async () => {
-		const result = await server.execute({
+	it("executes queries via app.execute()", async () => {
+		const result = await app.execute({
 			path: "user.get",
 			input: { id: "user-1" },
 		});
@@ -47,8 +47,8 @@ describe("Server Direct Execution", () => {
 		expect((result.data as { name: string }).name).toBe("Alice");
 	});
 
-	it("executes mutations via server.execute()", async () => {
-		const result = await server.execute({
+	it("executes mutations via app.execute()", async () => {
+		const result = await app.execute({
 			path: "user.create",
 			input: { name: "Charlie", email: "charlie@example.com" },
 		});
@@ -60,7 +60,7 @@ describe("Server Direct Execution", () => {
 	});
 
 	it("returns error for non-existent entity", async () => {
-		const result = await server.execute({
+		const result = await app.execute({
 			path: "user.get",
 			input: { id: "non-existent" },
 		});
@@ -159,7 +159,7 @@ describe("Post Operations", () => {
 
 describe("Server Metadata", () => {
 	it("returns metadata with operations", () => {
-		const metadata = server.getMetadata();
+		const metadata = app.getMetadata();
 
 		expect(metadata.version).toBe("1.0.0");
 		expect(metadata.operations).toBeDefined();
@@ -174,7 +174,7 @@ describe("Server Metadata", () => {
 	});
 
 	it("includes optimistic config in metadata", () => {
-		const metadata = server.getMetadata();
+		const metadata = app.getMetadata();
 
 		// Check optimistic configs are present (sugar is converted to Reify Pipeline)
 		const userCreate = metadata.operations.user as unknown as { create: { optimistic?: { $pipe: unknown[] } } };

@@ -500,7 +500,7 @@ Recovery release - bypass blocked version 1.1.0 on npm.
 
   - `http({ url })` - HTTP transport with polling for subscriptions
   - `ws({ url })` - WebSocket transport with native streaming
-  - `inProcess({ server })` - Direct server calls for testing/SSR
+  - `inProcess({ app })` - Direct server calls for testing/SSR
   - `route({ 'pattern.*': transport })` - Pattern-based routing
   - `routeByType({ default, subscription })` - Route by operation type
 
