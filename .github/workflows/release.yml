@@ -8,3 +8,5 @@ jobs:
   release:
     uses: SylphxAI/.github/.github/workflows/release.yml@main
     secrets: inherit
+    with:
+      prebuild: "turbo build"
