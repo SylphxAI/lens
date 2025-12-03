@@ -4,17 +4,20 @@
  * Export all plugin-related types and utilities.
  */
 
-// State Sync Plugin
+// Client State Plugin
 export {
-	// New names
+	// Current names
+	type ClientStateOptions,
+	clientState,
+	isClientStatePlugin,
+	// Deprecated aliases (backwards compatibility)
 	type StateSyncOptions,
 	stateSync,
 	isStateSyncPlugin,
-	// Deprecated aliases (backwards compatibility)
 	type DiffOptimizerOptions,
 	diffOptimizer,
 	isDiffOptimizerPlugin,
-} from "./state-sync.js";
+} from "./client-state.js";
 
 // Optimistic Updates Plugin
 export {

@@ -5,7 +5,7 @@
  *
  * Server modes:
  * - Stateless (default): Server only does getMetadata() and execute()
- * - Stateful (with stateSync plugin): Server tracks state and manages subscriptions
+ * - Stateful (with clientState plugin): Server tracks per-client state
  *
  * For protocol handling, use handlers:
  * - createHTTPHandler - HTTP/REST
@@ -113,7 +113,7 @@ export interface LensServerConfig<
 	 * ```typescript
 	 * const server = createApp({
 	 *   router,
-	 *   plugins: [stateSync()], // Adds stateful synchronization
+	 *   plugins: [clientState()], // Enables per-client state tracking
 	 * });
 	 * ```
 	 */
@@ -190,7 +190,7 @@ export interface LensServer {
 
 	/**
 	 * Subscribe a client to an entity.
-	 * Runs plugin hooks and sets up state tracking (if stateSync is enabled).
+	 * Runs plugin hooks and sets up state tracking (if clientState is enabled).
 	 *
 	 * @param ctx - Subscribe context
 	 * @returns true if subscription is allowed, false if rejected by plugin
@@ -842,7 +842,7 @@ export type ServerConfigWithInferredContext<
 	logger?: LensLogger;
 	context?: () => InferRouterContext<TRouter> | Promise<InferRouterContext<TRouter>>;
 	version?: string;
-	/** Server-level plugins (stateSync, etc.) */
+	/** Server-level plugins (clientState, etc.) */
 	plugins?: ServerPlugin[];
 };
 
@@ -859,7 +859,7 @@ export type ServerConfigLegacy<
 	logger?: LensLogger;
 	context?: () => TContext | Promise<TContext>;
 	version?: string;
-	/** Server-level plugins (stateSync, etc.) */
+	/** Server-level plugins (clientState, etc.) */
 	plugins?: ServerPlugin[];
 };
 
@@ -872,7 +872,7 @@ export type ServerConfigLegacy<
  *
  * Server modes:
  * - **Stateless** (default): Pure executor, sends full data on each response
- * - **Stateful** (with stateSync plugin): Tracks state, sends minimal diffs
+ * - **Stateful** (with clientState plugin): Tracks per-client state, sends diffs
  *
  * Core methods:
  * - getMetadata() - Server metadata for transport handshake
@@ -893,10 +893,10 @@ export type ServerConfigLegacy<
  * const app = createApp({ router });
  * createWSHandler(app); // Sends full data on each update
  *
- * // Stateful mode (with stateSync)
+ * // Stateful mode (with clientState)
  * const app = createApp({
  *   router,
- *   plugins: [stateSync()], // Enables state tracking & diffs
+ *   plugins: [clientState()], // Enables per-client state tracking
  * });
  * createWSHandler(app); // Sends minimal diffs
  * ```

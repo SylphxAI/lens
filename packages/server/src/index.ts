@@ -5,11 +5,11 @@
  *
  * Architecture:
  * - App = Executor with optional plugin support
- *   - Stateless (default): Pure executor, sends full data
- *   - Stateful (with stateSync): Tracks state, sends diffs
+ *   - Stateless (default): Pure executor
+ *   - Stateful (with clientState): Tracks per-client state
  * - Handlers = Pure protocol handlers (HTTP, WebSocket, SSE)
  *   - No business logic - just translate protocol to app calls
- * - Plugins = App-level middleware (stateSync, auth, logger)
+ * - Plugins = App-level middleware (clientState, auth, logger)
  *   - Configured at app level, not handler level
  *
  * @example
@@ -18,12 +18,12 @@
  * const app = createApp({ router });
  * const wsHandler = createWSHandler(app);
  *
- * // Stateful mode (with stateSync plugin)
+ * // Stateful mode (with clientState plugin)
  * const app = createApp({
  *   router,
- *   plugins: [stateSync()],
+ *   plugins: [clientState()],
  * });
- * const wsHandler = createWSHandler(app); // Now sends diffs
+ * const wsHandler = createWSHandler(app); // Tracks per-client state
  * ```
  */
 
@@ -130,8 +130,8 @@ export {
 // State Management
 // =============================================================================
 
-// GraphStateManager is internal to stateSync plugin - not exported
-// Use stateSync() plugin for stateful server behavior
+// GraphStateManager is internal to clientState plugin - not exported
+// Use clientState() plugin for per-client state tracking
 
 // =============================================================================
 // Plugin System
@@ -155,13 +155,16 @@ export {
 	PluginManager,
 	// Plugin interface
 	type ServerPlugin,
-	// State Sync Plugin
-	type StateSyncOptions,
-	stateSync,
-	isStateSyncPlugin,
+	// Client State Plugin
+	type ClientStateOptions,
+	clientState,
+	isClientStatePlugin,
 	type SubscribeContext,
 	type UnsubscribeContext,
 	// Deprecated aliases (backwards compatibility)
+	type StateSyncOptions,
+	stateSync,
+	isStateSyncPlugin,
 	type DiffOptimizerOptions,
 	diffOptimizer,
 	isDiffOptimizerPlugin,

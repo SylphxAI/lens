@@ -1,12 +1,12 @@
 /**
- * @sylphx/lens-server - State Sync Plugin
+ * @sylphx/lens-server - Client State Plugin
  *
- * Server-side plugin that enables stateful real-time synchronization.
- * By default, the server operates in stateless mode (sends full data).
+ * Server-side plugin that enables per-client state tracking.
+ * By default, the server operates in stateless mode.
  * Adding this plugin enables:
- * - Per-client state tracking
+ * - Per-client state tracking (what each client has seen)
  * - Subscription management
- * - Minimal diff computation (only send changes)
+ * - Efficient diff computation (only send changes)
  * - Reconnection support with state recovery
  *
  * This plugin is ideal for:
@@ -14,8 +14,7 @@
  * - Bandwidth-sensitive applications
  * - Real-time collaborative features
  *
- * For serverless/stateless deployments, skip this plugin and let
- * the server send full data on each update.
+ * For serverless/stateless deployments, skip this plugin.
  */
 
 import { createUpdate, type Update } from "@sylphx/lens-core";
@@ -35,9 +34,9 @@ import type {
 } from "./types.js";
 
 /**
- * State sync plugin configuration.
+ * Client state plugin configuration.
  */
-export interface StateSyncOptions extends GraphStateManagerConfig {
+export interface ClientStateOptions extends GraphStateManagerConfig {
 	/**
 	 * Whether to enable debug logging.
 	 * @default false
@@ -46,23 +45,22 @@ export interface StateSyncOptions extends GraphStateManagerConfig {
 }
 
 /**
- * Create a state sync plugin.
+ * Create a client state plugin.
  *
- * This plugin enables stateful real-time synchronization:
- * - Tracks state per-client
+ * This plugin enables per-client state tracking:
+ * - Tracks what each client has seen
  * - Manages subscriptions
- * - Computes minimal diffs (only sends changes)
+ * - Computes efficient diffs (only sends changes)
  * - Handles reconnection with state recovery
  *
- * Without this plugin, the server operates in stateless mode
- * and sends full data on each update.
+ * Without this plugin, the server operates in stateless mode.
  *
  * @example
  * ```typescript
  * const server = createApp({
  *   router: appRouter,
  *   plugins: [
- *     stateSync({
+ *     clientState({
  *       // Optional: operation log settings for reconnection
  *       operationLog: { maxAge: 60000 },
  *     }),
@@ -70,7 +68,7 @@ export interface StateSyncOptions extends GraphStateManagerConfig {
  * });
  * ```
  */
-export function stateSync(options: StateSyncOptions = {}): ServerPlugin & {
+export function clientState(options: ClientStateOptions = {}): ServerPlugin & {
 	/** Get the underlying GraphStateManager instance */
 	getStateManager(): GraphStateManager;
 } {
@@ -100,14 +98,14 @@ export function stateSync(options: StateSyncOptions = {}): ServerPlugin & {
 
 	const log = (...args: unknown[]) => {
 		if (debug) {
-			console.log("[stateSync]", ...args);
+			console.log("[clientState]", ...args);
 		}
 	};
 
 	const makeEntityKey = (entity: string, entityId: string) => `${entity}:${entityId}`;
 
 	return {
-		name: "stateSync",
+		name: "clientState",
 
 		/**
 		 * Get the underlying GraphStateManager instance.
@@ -599,25 +597,44 @@ export function stateSync(options: StateSyncOptions = {}): ServerPlugin & {
 }
 
 /**
- * Check if a plugin is a state sync plugin.
+ * Check if a plugin is a client state plugin.
  */
-export function isStateSyncPlugin(
+export function isClientStatePlugin(
 	plugin: ServerPlugin,
 ): plugin is ServerPlugin & { getStateManager(): GraphStateManager } {
-	return plugin.name === "stateSync" && "getStateManager" in plugin;
+	return plugin.name === "clientState" && "getStateManager" in plugin;
 }
 
-/**
- * @deprecated Use `stateSync` instead. Will be removed in v1.0.
- */
-export const diffOptimizer = stateSync;
+// =============================================================================
+// Deprecated Aliases (backwards compatibility)
+// =============================================================================
 
 /**
- * @deprecated Use `StateSyncOptions` instead. Will be removed in v1.0.
+ * @deprecated Use `clientState` instead. Will be removed in v1.0.
  */
-export type DiffOptimizerOptions = StateSyncOptions;
+export const stateSync = clientState;
 
 /**
- * @deprecated Use `isStateSyncPlugin` instead. Will be removed in v1.0.
+ * @deprecated Use `ClientStateOptions` instead. Will be removed in v1.0.
  */
-export const isDiffOptimizerPlugin = isStateSyncPlugin;
+export type StateSyncOptions = ClientStateOptions;
+
+/**
+ * @deprecated Use `isClientStatePlugin` instead. Will be removed in v1.0.
+ */
+export const isStateSyncPlugin = isClientStatePlugin;
+
+/**
+ * @deprecated Use `clientState` instead. Will be removed in v1.0.
+ */
+export const diffOptimizer = clientState;
+
+/**
+ * @deprecated Use `ClientStateOptions` instead. Will be removed in v1.0.
+ */
+export type DiffOptimizerOptions = ClientStateOptions;
+
+/**
+ * @deprecated Use `isClientStatePlugin` instead. Will be removed in v1.0.
+ */
+export const isDiffOptimizerPlugin = isClientStatePlugin;

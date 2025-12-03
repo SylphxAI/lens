@@ -1,8 +1,8 @@
 /**
  * @sylphx/lens-server - State Management
  *
- * Internal state management for stateSync plugin.
- * GraphStateManager is not exported - it's an implementation detail of stateSync.
+ * Internal state management for clientState plugin.
+ * GraphStateManager is not exported - it's an implementation detail of clientState.
  */
 
-// No public exports - GraphStateManager is internal to stateSync plugin
+// No public exports - GraphStateManager is internal to clientState plugin
