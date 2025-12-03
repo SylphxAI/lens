@@ -13,7 +13,7 @@ import { test as bunTest, describe, expect } from "bun:test";
 const test = hasDom ? bunTest : bunTest.skip;
 
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
-import { signal } from "@sylphx/lens-client";
+import { signal } from "@preact/signals";
 import { render, waitFor } from "@testing-library/preact";
 import { h } from "preact";
 import { useLazyQuery, useMutation, useQuery } from "./hooks.js";

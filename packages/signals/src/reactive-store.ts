@@ -1,5 +1,5 @@
 /**
- * @sylphx/lens-client - Reactive Store
+ * @sylphx/lens-signals - Reactive Store
  *
  * Manages entity signals, caching, and optimistic updates.
  */
@@ -13,7 +13,7 @@ import {
 	registerPlugin,
 	unregisterPlugin,
 } from "@sylphx/reify";
-import { batch, type Signal, signal, type WritableSignal } from "../signals/signal.js";
+import { batch, type Signal, signal, type WritableSignal } from "./signal.js";
 
 // Re-export for convenience
 export type { EntityKey };

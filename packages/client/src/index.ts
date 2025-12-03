@@ -102,40 +102,6 @@ export {
 } from "./transport/index.js";
 
 // =============================================================================
-// Signals
-// =============================================================================
-
-export {
-	batch,
-	computed,
-	derive,
-	effect,
-	isSignal,
-	// Types
-	type Signal,
-	type Subscriber,
-	// Functions
-	signal,
-	toPromise,
-	type Unsubscribe,
-	type WritableSignal,
-} from "./signals/signal.js";
-
-// =============================================================================
-// Store
-// =============================================================================
-
-export {
-	createStore,
-	type EntityKey,
-	type EntityState,
-	type OptimisticEntry as StoreOptimisticEntry,
-	type OptimisticTransaction,
-	ReactiveStore,
-	type StoreConfig,
-} from "./store/reactive-store.js";
-
-// =============================================================================
 // Reconnection
 // =============================================================================
 

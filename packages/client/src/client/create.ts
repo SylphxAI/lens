@@ -15,7 +15,7 @@ import type {
 	RouterRoutes,
 } from "@sylphx/lens-core";
 import { isPipeline } from "@sylphx/lens-core";
-import { createStore, type ReactiveStore } from "../store/reactive-store.js";
+import { createStore, type SimpleStore } from "../store/simple-store.js";
 import type { TypedTransport } from "../transport/in-process.js";
 import type { Plugin } from "../transport/plugin.js";
 import type { Metadata, Observable, Operation, Result, Transport } from "../transport/types.js";
@@ -142,8 +142,8 @@ class ClientImpl {
 	private plugins: Plugin[];
 	private optimistic: boolean;
 
-	/** Reactive store for entity caching and optimistic updates */
-	private store: ReactiveStore;
+	/** Store for entity caching and optimistic updates */
+	private store: SimpleStore;
 
 	/** Metadata from transport handshake (lazy loaded) */
 	private metadata: Metadata | null = null;
