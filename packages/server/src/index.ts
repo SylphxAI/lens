@@ -6,10 +6,10 @@
  * Architecture:
  * - App = Executor with optional plugin support
  *   - Stateless (default): Pure executor
- *   - Stateful (with clientState): Tracks per-client state
+ *   - Stateful (with opLog): Cursor-based state synchronization
  * - Handlers = Pure protocol handlers (HTTP, WebSocket, SSE)
  *   - No business logic - just translate protocol to app calls
- * - Plugins = App-level middleware (clientState, auth, logger)
+ * - Plugins = App-level middleware (opLog, auth, logger)
  *   - Configured at app level, not handler level
  *
  * @example
@@ -18,12 +18,17 @@
  * const app = createApp({ router });
  * const wsHandler = createWSHandler(app);
  *
- * // Stateful mode (with clientState plugin)
+ * // With opLog plugin (cursor-based state sync)
  * const app = createApp({
  *   router,
- *   plugins: [clientState()],
+ *   plugins: [opLog()],
  * });
- * const wsHandler = createWSHandler(app); // Tracks per-client state
+ *
+ * // With external storage for serverless
+ * const app = createApp({
+ *   router,
+ *   plugins: [opLog({ storage: redisStorage({ url: REDIS_URL }) })],
+ * });
  * ```
  */
 
@@ -159,6 +164,7 @@ export {
 	isOptimisticPlugin,
 	isStateSyncPlugin,
 	type OpLogOptions,
+	type OpLogPlugin,
 	type OptimisticPluginOptions,
 	opLog,
 	optimisticPlugin,
@@ -170,6 +176,20 @@ export {
 	stateSync,
 	type UnsubscribeContext,
 } from "./plugin/index.js";
+
+// =============================================================================
+// Storage (for opLog plugin)
+// =============================================================================
+
+export {
+	DEFAULT_STORAGE_CONFIG,
+	type EmitResult,
+	memoryStorage,
+	type OpLogStorage,
+	type OpLogStorageConfig,
+	type StoredEntityState,
+	type StoredPatchEntry,
+} from "./storage/index.js";
 
 // =============================================================================
 // SSE Handler (additional exports not in handlers/index.js)

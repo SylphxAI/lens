@@ -14,6 +14,7 @@ export {
 	isOpLogPlugin,
 	isStateSyncPlugin,
 	type OpLogOptions,
+	type OpLogPlugin,
 	opLog,
 	type StateSyncOptions,
 	stateSync,

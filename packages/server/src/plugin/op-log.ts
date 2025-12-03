@@ -15,15 +15,24 @@
  *
  * @example
  * ```typescript
+ * // Default (in-memory storage)
  * const server = createApp({
  *   router: appRouter,
  *   plugins: [opLog()],
+ * });
+ *
+ * // With external storage for serverless
+ * const server = createApp({
+ *   router: appRouter,
+ *   plugins: [opLog({
+ *     storage: redisStorage({ url: process.env.REDIS_URL }),
+ *   })],
  * });
  * ```
  */
 
 import type { PatchOperation } from "@sylphx/lens-core";
-import { GraphStateManager, type GraphStateManagerConfig } from "../state/graph-state-manager.js";
+import { memoryStorage, type OpLogStorage, type OpLogStorageConfig } from "../storage/index.js";
 import type {
 	BroadcastContext,
 	ReconnectContext,
@@ -34,7 +43,22 @@ import type {
 /**
  * Operation log plugin configuration.
  */
-export interface OpLogOptions extends GraphStateManagerConfig {
+export interface OpLogOptions extends OpLogStorageConfig {
+	/**
+	 * Storage adapter for state/version/patches.
+	 * Defaults to in-memory storage.
+	 *
+	 * @example
+	 * ```typescript
+	 * // In-memory (default)
+	 * opLog()
+	 *
+	 * // Redis for serverless
+	 * opLog({ storage: redisStorage({ url: REDIS_URL }) })
+	 * ```
+	 */
+	storage?: OpLogStorage;
+
 	/**
 	 * Whether to enable debug logging.
 	 * @default false
@@ -61,6 +85,20 @@ export interface BroadcastResult {
 }
 
 /**
+ * OpLog plugin instance type.
+ */
+export interface OpLogPlugin extends ServerPlugin {
+	/** Get the storage adapter */
+	getStorage(): OpLogStorage;
+	/** Get version for an entity (async) */
+	getVersion(entity: string, entityId: string): Promise<number>;
+	/** Get current canonical state for an entity (async) */
+	getState(entity: string, entityId: string): Promise<Record<string, unknown> | null>;
+	/** Get latest patch for an entity (async) */
+	getLatestPatch(entity: string, entityId: string): Promise<PatchOperation[] | null>;
+}
+
+/**
  * Create an operation log plugin.
  *
  * This plugin provides cursor-based state synchronization:
@@ -73,23 +111,23 @@ export interface BroadcastResult {
  *
  * @example
  * ```typescript
+ * // Default (in-memory)
  * const server = createApp({
  *   router: appRouter,
  *   plugins: [opLog()],
  * });
+ *
+ * // With Redis for serverless
+ * const server = createApp({
+ *   router: appRouter,
+ *   plugins: [opLog({
+ *     storage: redisStorage({ url: process.env.REDIS_URL }),
+ *   })],
+ * });
  * ```
  */
-export function opLog(options: OpLogOptions = {}): ServerPlugin & {
-	/** Get the underlying GraphStateManager instance */
-	getStateManager(): GraphStateManager;
-	/** Get version for an entity */
-	getVersion(entity: string, entityId: string): number;
-	/** Get current canonical state for an entity */
-	getState(entity: string, entityId: string): Record<string, unknown> | undefined;
-	/** Get latest patch for an entity */
-	getLatestPatch(entity: string, entityId: string): PatchOperation[] | null;
-} {
-	const stateManager = new GraphStateManager(options);
+export function opLog(options: OpLogOptions = {}): OpLogPlugin {
+	const storage = options.storage ?? memoryStorage(options);
 	const debug = options.debug ?? false;
 
 	const log = (...args: unknown[]) => {
@@ -102,103 +140,141 @@ export function opLog(options: OpLogOptions = {}): ServerPlugin & {
 		name: "opLog",
 
 		/**
-		 * Get the underlying GraphStateManager instance.
+		 * Get the storage adapter.
 		 */
-		getStateManager(): GraphStateManager {
-			return stateManager;
+		getStorage(): OpLogStorage {
+			return storage;
 		},
 
 		/**
 		 * Get version for an entity.
 		 */
-		getVersion(entity: string, entityId: string): number {
-			return stateManager.getVersion(entity, entityId);
+		async getVersion(entity: string, entityId: string): Promise<number> {
+			return storage.getVersion(entity, entityId);
 		},
 
 		/**
 		 * Get current canonical state for an entity.
 		 */
-		getState(entity: string, entityId: string): Record<string, unknown> | undefined {
-			return stateManager.getState(entity, entityId);
+		async getState(entity: string, entityId: string): Promise<Record<string, unknown> | null> {
+			return storage.getState(entity, entityId);
 		},
 
 		/**
 		 * Get latest patch for an entity.
 		 */
-		getLatestPatch(entity: string, entityId: string): PatchOperation[] | null {
-			return stateManager.getLatestPatch(entity, entityId);
+		async getLatestPatch(entity: string, entityId: string): Promise<PatchOperation[] | null> {
+			return storage.getLatestPatch(entity, entityId);
 		},
 
 		/**
 		 * Handle broadcast - update canonical state and return patch info.
 		 * Handler is responsible for routing to subscribers.
 		 */
-		onBroadcast(ctx: BroadcastContext): BroadcastResult {
+		async onBroadcast(ctx: BroadcastContext): Promise<BroadcastResult> {
 			const { entity, entityId, data } = ctx;
 
 			log("onBroadcast:", entity, entityId);
 
 			// Update canonical state (computes and logs patch)
-			stateManager.emit(entity, entityId, data);
+			const result = await storage.emit(entity, entityId, data);
 
-			// Return patch info for handler to use
-			const version = stateManager.getVersion(entity, entityId);
-			const patch = stateManager.getLatestPatch(entity, entityId);
+			log("  Version:", result.version, "Patch ops:", result.patch?.length ?? 0);
 
-			log("  Version:", version, "Patch ops:", patch?.length ?? 0);
-
-			return { version, patch, data };
+			return {
+				version: result.version,
+				patch: result.patch,
+				data,
+			};
 		},
 
 		/**
 		 * Handle reconnection - return patches or snapshot based on client's version.
 		 */
-		onReconnect(ctx: ReconnectContext): ReconnectHookResult[] {
+		async onReconnect(ctx: ReconnectContext): Promise<ReconnectHookResult[]> {
 			log("Reconnect:", ctx.clientId, "subscriptions:", ctx.subscriptions.length);
 
 			const results: ReconnectHookResult[] = [];
 
-			// Process each subscription using GraphStateManager
-			const reconnectSubs = ctx.subscriptions.map((sub) => ({
-				id: sub.id,
-				entity: sub.entity,
-				entityId: sub.entityId,
-				version: sub.version,
-				fields: sub.fields,
-				...(sub.dataHash !== undefined && { dataHash: sub.dataHash }),
-			}));
+			for (const sub of ctx.subscriptions) {
+				const currentVersion = await storage.getVersion(sub.entity, sub.entityId);
+				const currentState = await storage.getState(sub.entity, sub.entityId);
 
-			const stateResults = stateManager.handleReconnect(reconnectSubs);
-
-			for (let i = 0; i < ctx.subscriptions.length; i++) {
-				const sub = ctx.subscriptions[i];
-				const stateResult = stateResults[i];
-
-				const result: ReconnectHookResult = {
-					id: stateResult.id,
-					entity: stateResult.entity,
-					entityId: stateResult.entityId,
-					status: stateResult.status,
-					version: stateResult.version,
-				};
-
-				if (stateResult.patches) {
-					result.patches = stateResult.patches;
-				}
-				if (stateResult.data) {
-					result.data = stateResult.data;
+				// Entity doesn't exist (might have been deleted)
+				if (currentState === null) {
+					results.push({
+						id: sub.id,
+						entity: sub.entity,
+						entityId: sub.entityId,
+						status: "deleted",
+						version: 0,
+					});
+					log("  Subscription", sub.id, `${sub.entity}:${sub.entityId}`, "status: deleted");
+					continue;
 				}
 
-				results.push(result);
+				// Client is already at latest version
+				if (sub.version >= currentVersion) {
+					results.push({
+						id: sub.id,
+						entity: sub.entity,
+						entityId: sub.entityId,
+						status: "current",
+						version: currentVersion,
+					});
+					log(
+						"  Subscription",
+						sub.id,
+						`${sub.entity}:${sub.entityId}`,
+						"status: current",
+						"version:",
+						currentVersion,
+					);
+					continue;
+				}
 
+				// Try to get patches from operation log
+				const patches = await storage.getPatchesSince(sub.entity, sub.entityId, sub.version);
+
+				if (patches !== null && patches.length > 0) {
+					// Can patch - return patches
+					results.push({
+						id: sub.id,
+						entity: sub.entity,
+						entityId: sub.entityId,
+						status: "patched",
+						version: currentVersion,
+						patches,
+					});
+					log(
+						"  Subscription",
+						sub.id,
+						`${sub.entity}:${sub.entityId}`,
+						"status: patched",
+						"version:",
+						currentVersion,
+						"patches:",
+						patches.length,
+					);
+					continue;
+				}
+
+				// Patches not available - send full snapshot
+				results.push({
+					id: sub.id,
+					entity: sub.entity,
+					entityId: sub.entityId,
+					status: "snapshot",
+					version: currentVersion,
+					data: currentState,
+				});
 				log(
 					"  Subscription",
 					sub.id,
 					`${sub.entity}:${sub.entityId}`,
-					"status:",
-					stateResult.status,
+					"status: snapshot",
 					"version:",
-					stateResult.version,
+					currentVersion,
 				);
 			}
 
@@ -215,8 +291,8 @@ export const clientState = opLog;
 /**
  * Check if a plugin is an opLog plugin.
  */
-export function isOpLogPlugin(plugin: ServerPlugin): plugin is ReturnType<typeof opLog> {
-	return plugin.name === "opLog" && "getStateManager" in plugin;
+export function isOpLogPlugin(plugin: ServerPlugin): plugin is OpLogPlugin {
+	return plugin.name === "opLog" && "getStorage" in plugin;
 }
 
 /** @deprecated Use isOpLogPlugin */
