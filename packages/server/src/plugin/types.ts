@@ -96,6 +96,20 @@ export interface ConnectContext {
 	clientId: string;
 	/** Request object (if available) */
 	request?: Request;
+	/** Function to send messages to this client */
+	send?: (message: unknown) => void;
+}
+
+/**
+ * Context passed to onBroadcast hook.
+ */
+export interface BroadcastContext {
+	/** Entity type name */
+	entity: string;
+	/** Entity ID */
+	entityId: string;
+	/** Entity data */
+	data: Record<string, unknown>;
 }
 
 /**
@@ -316,6 +330,15 @@ export interface ServerPlugin {
 	 * ```
 	 */
 	enhanceOperationMeta?: (ctx: EnhanceOperationMetaContext) => void;
+
+	/**
+	 * Called when broadcasting data to subscribers of an entity.
+	 * Plugin should handle finding subscribers and sending data.
+	 * If no plugin handles it, broadcast is a no-op (stateless mode).
+	 *
+	 * @returns true if handled, false/void to let other plugins try
+	 */
+	onBroadcast?: (ctx: BroadcastContext) => boolean | void | Promise<boolean | void>;
 }
 
 // =============================================================================
@@ -482,6 +505,22 @@ export class PluginManager {
 				plugin.enhanceOperationMeta(ctx);
 			}
 		}
+	}
+
+	/**
+	 * Run onBroadcast hooks.
+	 * Returns true if any plugin handled the broadcast.
+	 */
+	async runOnBroadcast(ctx: BroadcastContext): Promise<boolean> {
+		for (const plugin of this.plugins) {
+			if (plugin.onBroadcast) {
+				const handled = await plugin.onBroadcast(ctx);
+				if (handled === true) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }
 

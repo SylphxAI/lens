@@ -25,6 +25,7 @@ export {
 	type AfterSendContext,
 	type BeforeMutationContext,
 	type BeforeSendContext,
+	type BroadcastContext,
 	type ConnectContext,
 	// Plugin manager
 	createPluginManager,

@@ -354,17 +354,8 @@ class LensServerImpl<
 	private ctx = createContext<TContext>();
 	private loaders = new Map<string, DataLoader<unknown, unknown>>();
 
-	// Plugin system
+	// Plugin system (handles all subscription state)
 	private pluginManager: PluginManager;
-	private clientSendFns = new Map<string, ClientSendFn>();
-
-	// Subscription tracking: clientId → subscriptionId → { entity, entityId, fields }
-	private subscriptions = new Map<
-		string,
-		Map<string, { entity: string; entityId: string; fields: string[] | "*" }>
-	>();
-	// Entity subscribers: entityKey → Set<{ clientId, subscriptionId }>
-	private entitySubscribers = new Map<string, Set<{ clientId: string; subscriptionId: string }>>();
 
 	constructor(config: LensServerConfig<TContext> & { queries?: Q; mutations?: M }) {
 		const queries: QueriesMap = { ...(config.queries ?? {}) };
@@ -737,112 +728,36 @@ class LensServerImpl<
 	}
 
 	// =========================================================================
-	// Subscription Support Methods
+	// Subscription Support Methods (Pure Plugin Passthrough - Stateless)
 	// =========================================================================
 
 	async addClient(clientId: string, send: ClientSendFn): Promise<boolean> {
-		// Store client send function
-		this.clientSendFns.set(clientId, send);
-
-		// Run plugin hooks (plugins like diffOptimizer handle their own state)
-		const allowed = await this.pluginManager.runOnConnect({ clientId });
-		if (!allowed) {
-			this.removeClient(clientId, 0);
-			return false;
-		}
-
-		return true;
+		// Pure passthrough to plugins - plugins handle their own state
+		const allowed = await this.pluginManager.runOnConnect({
+			clientId,
+			send: (msg) => send(msg as { type: string; id?: string; data?: unknown }),
+		});
+		return allowed;
 	}
 
 	removeClient(clientId: string, subscriptionCount: number): void {
-		// Clean up subscription tracking
-		const clientSubs = this.subscriptions.get(clientId);
-		if (clientSubs) {
-			for (const [subscriptionId, { entity, entityId }] of clientSubs) {
-				const entityKey = `${entity}:${entityId}`;
-				const subscribers = this.entitySubscribers.get(entityKey);
-				if (subscribers) {
-					for (const sub of subscribers) {
-						if (sub.clientId === clientId && sub.subscriptionId === subscriptionId) {
-							subscribers.delete(sub);
-							break;
-						}
-					}
-					if (subscribers.size === 0) {
-						this.entitySubscribers.delete(entityKey);
-					}
-				}
-			}
-			this.subscriptions.delete(clientId);
-		}
-
-		// Remove stored send function
-		this.clientSendFns.delete(clientId);
-
-		// Run plugin hooks (plugins like diffOptimizer clean up their own state)
+		// Pure passthrough to plugins
 		this.pluginManager.runOnDisconnect({ clientId, subscriptionCount });
 	}
 
 	async subscribe(ctx: SubscribeContext): Promise<boolean> {
-		// Run plugin hooks - any plugin can reject
-		// (plugins like diffOptimizer handle their own subscription tracking)
-		const allowed = await this.pluginManager.runOnSubscribe(ctx);
-		if (!allowed) {
-			return false;
-		}
-
-		// Track subscription (server-level tracking for broadcast)
-		if (ctx.entity && ctx.entityId) {
-			// Add to client's subscriptions
-			let clientSubs = this.subscriptions.get(ctx.clientId);
-			if (!clientSubs) {
-				clientSubs = new Map();
-				this.subscriptions.set(ctx.clientId, clientSubs);
-			}
-			clientSubs.set(ctx.subscriptionId, {
-				entity: ctx.entity,
-				entityId: ctx.entityId,
-				fields: ctx.fields,
-			});
-
-			// Add to entity subscribers
-			const entityKey = `${ctx.entity}:${ctx.entityId}`;
-			let subscribers = this.entitySubscribers.get(entityKey);
-			if (!subscribers) {
-				subscribers = new Set();
-				this.entitySubscribers.set(entityKey, subscribers);
-			}
-			subscribers.add({ clientId: ctx.clientId, subscriptionId: ctx.subscriptionId });
-		}
-
-		return true;
+		// Pure passthrough to plugins
+		return this.pluginManager.runOnSubscribe(ctx);
 	}
 
 	unsubscribe(ctx: UnsubscribeContext): void {
-		// Clean up subscription tracking
-		const clientSubs = this.subscriptions.get(ctx.clientId);
-		if (clientSubs) {
-			clientSubs.delete(ctx.subscriptionId);
-		}
-
-		// Clean up entity subscribers
-		for (const entityKey of ctx.entityKeys) {
-			const subscribers = this.entitySubscribers.get(entityKey);
-			if (subscribers) {
-				for (const sub of subscribers) {
-					if (sub.clientId === ctx.clientId && sub.subscriptionId === ctx.subscriptionId) {
-						subscribers.delete(sub);
-						break;
-					}
-				}
-				if (subscribers.size === 0) {
-					this.entitySubscribers.delete(entityKey);
-				}
-			}
-		}
-
-		// Run plugin hooks (plugins like diffOptimizer clean up their own state)
+		// Pure passthrough to plugins
 		this.pluginManager.runOnUnsubscribe(ctx);
+	}
+
+	async broadcast(entity: string, entityId: string, data: Record<string, unknown>): Promise<void> {
+		// Delegate to plugins - if no plugin handles it, no-op (stateless mode)
+		await this.pluginManager.runOnBroadcast({ entity, entityId, data });
 	}
 
 	async send(
@@ -853,102 +768,41 @@ class LensServerImpl<
 		data: Record<string, unknown>,
 		isInitial: boolean,
 	): Promise<void> {
-		const sendFn = this.clientSendFns.get(clientId);
-		if (!sendFn) return;
+		// Pure passthrough to plugins
+		// Plugins that need to send data store the send function from onConnect
+		// and use it within their beforeSend/afterSend hooks
 
-		// Get subscription fields
-		const clientSubs = this.subscriptions.get(clientId);
-		const subInfo = clientSubs?.get(subscriptionId);
-		const fields = subInfo?.fields ?? "*";
-
-		// Run beforeSend hooks (plugins can transform data)
-		const ctx = {
+		// Run beforeSend hooks - plugins may transform data and trigger sends
+		const transformedData = await this.pluginManager.runBeforeSend({
 			clientId,
 			subscriptionId,
 			entity,
 			entityId,
 			data,
 			isInitial,
-			fields,
-		};
-		const optimizedData = await this.pluginManager.runBeforeSend(ctx);
-
-		// Deliver to client
-		sendFn({
-			type: "data",
-			id: subscriptionId,
-			data: optimizedData,
+			fields: "*", // Plugins track actual fields
 		});
 
-		// Run afterSend hooks
+		// Run afterSend hooks for tracking/logging
 		await this.pluginManager.runAfterSend({
-			...ctx,
-			data: optimizedData,
+			clientId,
+			subscriptionId,
+			entity,
+			entityId,
+			data: transformedData,
+			isInitial,
+			fields: "*",
 			timestamp: Date.now(),
 		});
 	}
 
-	async broadcast(entity: string, entityId: string, data: Record<string, unknown>): Promise<void> {
-		const entityKey = `${entity}:${entityId}`;
-		const subscribers = this.entitySubscribers.get(entityKey);
-		if (!subscribers) return;
-
-		// Send to all subscribers
-		for (const { clientId, subscriptionId } of subscribers) {
-			await this.send(clientId, subscriptionId, entity, entityId, data, false);
-		}
-	}
-
 	async handleReconnect(ctx: ReconnectContext): Promise<ReconnectHookResult[] | null> {
-		// Run plugin hooks - first plugin to return results wins
-		const results = await this.pluginManager.runOnReconnect(ctx);
-
-		// If plugins handled it, update server subscription tracking
-		if (results) {
-			for (let i = 0; i < ctx.subscriptions.length; i++) {
-				const sub = ctx.subscriptions[i];
-				const result = results[i];
-
-				// Only register subscription if not deleted/error
-				if (result.status !== "deleted" && result.status !== "error") {
-					// Add to client's subscriptions
-					let clientSubs = this.subscriptions.get(ctx.clientId);
-					if (!clientSubs) {
-						clientSubs = new Map();
-						this.subscriptions.set(ctx.clientId, clientSubs);
-					}
-					clientSubs.set(sub.id, {
-						entity: sub.entity,
-						entityId: sub.entityId,
-						fields: sub.fields,
-					});
-
-					// Add to entity subscribers
-					const entityKey = `${sub.entity}:${sub.entityId}`;
-					let subscribers = this.entitySubscribers.get(entityKey);
-					if (!subscribers) {
-						subscribers = new Set();
-						this.entitySubscribers.set(entityKey, subscribers);
-					}
-					subscribers.add({ clientId: ctx.clientId, subscriptionId: sub.id });
-				}
-			}
-		}
-
-		return results;
+		// Pure passthrough to plugins - plugins handle their own state
+		return this.pluginManager.runOnReconnect(ctx);
 	}
 
 	async updateFields(ctx: UpdateFieldsContext): Promise<void> {
-		// Update server subscription tracking
-		const clientSubs = this.subscriptions.get(ctx.clientId);
-		if (clientSubs) {
-			const subInfo = clientSubs.get(ctx.subscriptionId);
-			if (subInfo) {
-				subInfo.fields = ctx.fields;
-			}
-		}
-
-		// Run plugin hooks
+		// Pure passthrough to plugins
 		await this.pluginManager.runOnUpdateFields(ctx);
 	}
 
