@@ -211,16 +211,6 @@ export {
 } from "./sse/handler.js";
 
 // =============================================================================
-// Subscription Helpers (for third-party services)
-// =============================================================================
-
-export {
-	createPusherSubscription,
-	type PusherLike,
-	type PusherTransportOptions,
-} from "./transport/index.js";
-
-// =============================================================================
 // Reconnection (Server-side)
 // =============================================================================
 
