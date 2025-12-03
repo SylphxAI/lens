@@ -604,37 +604,3 @@ export function isClientStatePlugin(
 ): plugin is ServerPlugin & { getStateManager(): GraphStateManager } {
 	return plugin.name === "clientState" && "getStateManager" in plugin;
 }
-
-// =============================================================================
-// Deprecated Aliases (backwards compatibility)
-// =============================================================================
-
-/**
- * @deprecated Use `clientState` instead. Will be removed in v1.0.
- */
-export const stateSync = clientState;
-
-/**
- * @deprecated Use `ClientStateOptions` instead. Will be removed in v1.0.
- */
-export type StateSyncOptions = ClientStateOptions;
-
-/**
- * @deprecated Use `isClientStatePlugin` instead. Will be removed in v1.0.
- */
-export const isStateSyncPlugin = isClientStatePlugin;
-
-/**
- * @deprecated Use `clientState` instead. Will be removed in v1.0.
- */
-export const diffOptimizer = clientState;
-
-/**
- * @deprecated Use `ClientStateOptions` instead. Will be removed in v1.0.
- */
-export type DiffOptimizerOptions = ClientStateOptions;
-
-/**
- * @deprecated Use `isClientStatePlugin` instead. Will be removed in v1.0.
- */
-export const isDiffOptimizerPlugin = isClientStatePlugin;

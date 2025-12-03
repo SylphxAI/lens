@@ -161,13 +161,6 @@ export {
 	isClientStatePlugin,
 	type SubscribeContext,
 	type UnsubscribeContext,
-	// Deprecated aliases (backwards compatibility)
-	type StateSyncOptions,
-	stateSync,
-	isStateSyncPlugin,
-	type DiffOptimizerOptions,
-	diffOptimizer,
-	isDiffOptimizerPlugin,
 } from "./plugin/index.js";
 
 // =============================================================================

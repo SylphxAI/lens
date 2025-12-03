@@ -6,17 +6,9 @@
 
 // Client State Plugin
 export {
-	// Current names
 	type ClientStateOptions,
 	clientState,
 	isClientStatePlugin,
-	// Deprecated aliases (backwards compatibility)
-	type StateSyncOptions,
-	stateSync,
-	isStateSyncPlugin,
-	type DiffOptimizerOptions,
-	diffOptimizer,
-	isDiffOptimizerPlugin,
 } from "./client-state.js";
 
 // Optimistic Updates Plugin
