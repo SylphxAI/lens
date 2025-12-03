@@ -17,7 +17,7 @@ export {
 	opLog,
 	type StateSyncOptions,
 	stateSync,
-} from "./client-state.js";
+} from "./op-log.js";
 
 // Optimistic Updates Plugin
 export {
