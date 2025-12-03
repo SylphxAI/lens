@@ -12,7 +12,6 @@ import { test as bunTest, describe, expect } from "bun:test";
 
 const test = hasDom ? bunTest : bunTest.skip;
 
-import { signal } from "@preact/signals-core";
 import type { MutationResult, QueryResult } from "@sylphx/lens-client";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useLazyQuery, useMutation, useQuery } from "./hooks.js";
@@ -26,7 +25,6 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 	_setError: (error: Error) => void;
 } {
 	let currentValue = initialValue;
-	let _currentError: Error | null = null;
 	const subscribers: Array<(value: T) => void> = [];
 	let resolved = false;
 	let resolvePromise: ((value: T) => void) | null = null;
@@ -45,9 +43,6 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 		get value() {
 			return currentValue;
 		},
-		signal: signal(currentValue),
-		loading: signal(initialValue === null),
-		error: signal<Error | null>(null),
 		subscribe(callback?: (data: T) => void): () => void {
 			if (callback) {
 				subscribers.push(callback);
@@ -72,9 +67,6 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 		// Test helpers
 		_setValue(value: T) {
 			currentValue = value;
-			result.signal.value = value;
-			result.loading.value = false;
-			result.error.value = null;
 			for (const cb of subscribers) cb(value);
 			if (!resolved && resolvePromise) {
 				resolved = true;
@@ -82,9 +74,6 @@ function createMockQueryResult<T>(initialValue: T | null = null): QueryResult<T>
 			}
 		},
 		_setError(error: Error) {
-			_currentError = error;
-			result.loading.value = false;
-			result.error.value = error;
 			if (!resolved && rejectPromise) {
 				resolved = true;
 				rejectPromise(error);
@@ -664,25 +653,6 @@ describe("useMutation", () => {
 
 		// Test passes if no error is thrown (state update after unmount would cause error)
 		expect(true).toBe(true);
-	});
-
-	test("mutation result includes rollback function when provided", async () => {
-		const rollbackFn = () => console.log("Rollback");
-		const mutationFn = async (input: { name: string }): Promise<MutationResult<{ id: string; name: string }>> => {
-			return {
-				data: { id: "new-id", name: input.name },
-				rollback: rollbackFn,
-			};
-		};
-
-		const { result } = renderHook(() => useMutation(mutationFn));
-
-		let mutationResult: MutationResult<{ id: string; name: string }> | undefined;
-		await act(async () => {
-			mutationResult = await result.current.mutate({ name: "New User" });
-		});
-
-		expect(mutationResult?.rollback).toBe(rollbackFn);
 	});
 });
 
