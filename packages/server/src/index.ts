@@ -182,13 +182,27 @@ export {
 // =============================================================================
 
 export {
+	// Types
 	DEFAULT_STORAGE_CONFIG,
 	type EmitResult,
+	// In-memory (default)
 	memoryStorage,
 	type OpLogStorage,
 	type OpLogStorageConfig,
+	// Redis (ioredis)
+	type RedisClient,
+	type RedisStorageOptions,
+	redisStorage,
 	type StoredEntityState,
 	type StoredPatchEntry,
+	// Upstash Redis (HTTP, serverless)
+	type UpstashRedisClient,
+	type UpstashStorageOptions,
+	upstashStorage,
+	// Vercel KV (Next.js/Vercel)
+	type VercelKVClient,
+	type VercelKVStorageOptions,
+	vercelKVStorage,
 } from "./storage/index.js";
 
 // =============================================================================
