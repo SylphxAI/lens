@@ -302,6 +302,27 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		// Extract entities from result
 		const entities = result.data ? extractEntities(result.data) : [];
 
+		// Check for duplicate subscription ID - cleanup old one first
+		const existingSub = conn.subscriptions.get(id);
+		if (existingSub) {
+			// Cleanup old subscription
+			for (const cleanup of existingSub.cleanups) {
+				try {
+					cleanup();
+				} catch (e) {
+					logger.error?.("Cleanup error:", e);
+				}
+			}
+			// Unsubscribe from server
+			server.unsubscribe({
+				clientId: conn.id,
+				subscriptionId: id,
+				operation: existingSub.operation,
+				entityKeys: Array.from(existingSub.entityKeys),
+			});
+			conn.subscriptions.delete(id);
+		}
+
 		// Create subscription tracking
 		const sub: ClientSubscription = {
 			id,
