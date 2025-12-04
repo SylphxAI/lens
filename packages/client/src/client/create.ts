@@ -63,6 +63,9 @@ class ClientImpl {
 		}
 	>();
 
+	/** Cached QueryResult objects by key (stable references for React) */
+	private queryResultCache = new Map<string, QueryResult<unknown>>();
+
 	/** Maps original callbacks to their wrapped versions for proper cleanup */
 	private callbackWrappers = new WeakMap<(data: unknown) => void, (data: unknown) => void>();
 
@@ -196,6 +199,12 @@ class ClientImpl {
 	executeQuery<T>(path: string, input: unknown, select?: SelectionObject): QueryResult<T> {
 		const key = this.makeQueryKey(path, input);
 
+		// Return cached QueryResult for stable reference (important for React hooks)
+		const cached = this.queryResultCache.get(key);
+		if (cached && !select) {
+			return cached as QueryResult<T>;
+		}
+
 		if (!this.subscriptions.has(key)) {
 			this.subscriptions.set(key, {
 				data: null,
@@ -285,6 +294,11 @@ class ClientImpl {
 				}
 			},
 		};
+
+		// Cache the QueryResult for stable reference (only for non-select queries)
+		if (!select) {
+			this.queryResultCache.set(key, result as QueryResult<unknown>);
+		}
 
 		return result;
 	}
