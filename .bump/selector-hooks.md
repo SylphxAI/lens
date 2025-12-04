@@ -26,3 +26,9 @@ const { data } = useQuery((client) => client.user.get, { id: userId });
 - Two patterns supported:
   - Route + Params: `useQuery((c) => c.user.get, { id })`
   - Accessor + Deps: `useQuery((c) => c.user.get({ id }), [id])`
+
+fix: prevent "Maximum update depth exceeded" during streaming
+
+- Fixed duplicate setState calls from subscribe + then firing simultaneously
+- Subscribe is now the primary data source for streaming queries
+- Then only handles completion/errors, avoiding duplicate data updates

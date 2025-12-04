@@ -243,19 +243,26 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 		setLoading(true);
 		setError(null);
 
-		// Subscribe to updates
+		// Track if subscribe has provided data (to avoid duplicate updates from then)
+		let hasReceivedData = false;
+
+		// Subscribe to updates - primary data source for streaming
 		const unsubscribe = query.subscribe((value) => {
 			if (mountedRef.current) {
+				hasReceivedData = true;
 				setData(transform(value));
 				setLoading(false);
 			}
 		});
 
-		// Handle initial load via promise (for one-shot queries)
+		// Handle completion/error via promise
+		// Only setData if subscribe hasn't already provided data (one-shot queries)
 		query.then(
 			(value) => {
-				if (mountedRef.current) {
+				if (mountedRef.current && !hasReceivedData) {
 					setData(transform(value));
+				}
+				if (mountedRef.current) {
 					setLoading(false);
 				}
 			},
