@@ -1,5 +1,13 @@
 # @sylphx/lens-next
 
+## 2.0.2 (2025-12-04)
+
+Fix: prevent infinite re-subscription loops in useQuery hook
+
+### 🐛 Bug Fixes
+
+- **react:** prevent infinite re-subscription loops in useQuery hook ([7184645](https://github.com/SylphxAI/Lens/commit/718464582e878d21750ac41d9053b3d54da098a8))
+
 ## 2.0.1 (2025-12-04)
 
 Fix: bypass deprecated 2.0.0 versions on npm registry.
