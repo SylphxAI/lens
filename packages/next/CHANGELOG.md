@@ -1,5 +1,39 @@
 # @sylphx/lens-next
 
+## 2.1.0 (2025-12-04)
+
+feat: selector-based hooks API - client auto-injected from context
+
+BREAKING: Hooks now use selector callbacks to auto-inject client from LensProvider context.
+
+Before:
+```tsx
+const client = useLensClient();
+const { data } = useQuery(client.user.get, { id: userId });
+```
+
+After:
+```tsx
+const { data } = useQuery((client) => client.user.get, { id: userId });
+```
+
+- `useQuery`, `useMutation`, `useLazyQuery` now accept selector callbacks
+- Client is automatically injected from `LensProvider` context
+- No need to call `useLensClient()` separately
+- Two patterns supported:
+  - Route + Params: `useQuery((c) => c.user.get, { id })`
+  - Accessor + Deps: `useQuery((c) => c.user.get({ id }), [id])`
+
+fix: prevent "Maximum update depth exceeded" during streaming
+
+- Fixed duplicate setState calls from subscribe + then firing simultaneously
+- Subscribe is now the primary data source for streaming queries
+- Then only handles completion/errors, avoiding duplicate data updates
+
+### ✨ Features
+
+- **react:** selector-based hooks API with auto-injected client ([fb24032](https://github.com/SylphxAI/Lens/commit/fb24032e5b29ffa42296aa304b1e068795b66a90))
+
 ## 2.0.2 (2025-12-04)
 
 Fix: prevent infinite re-subscription loops in useQuery hook
