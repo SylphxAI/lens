@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.2 (2025-12-04)
+
+Fix: prevent infinite re-subscription loops in useQuery hook by redesigning API with Route + Params pattern.
+
+
 ## 1.0.0 (2025-12-04)
 
 ### 🐛 Bug Fixes

@@ -1,5 +1,10 @@
 # @sylphx/lens-nuxt
 
+## 2.0.2 (2025-12-04)
+
+Fix: prevent infinite re-subscription loops in useQuery hook by redesigning API with Route + Params pattern.
+
+
 ## 2.0.1 (2025-12-04)
 
 Fix: bypass deprecated 2.0.0 versions on npm registry.
