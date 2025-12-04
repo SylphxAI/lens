@@ -1,5 +1,81 @@
 # @sylphx/lens-server
 
+## 1.5.0 (2025-12-04)
+
+Unified v1.5.0 release.
+
+### ✨ Features
+
+- **server:** add Redis, Upstash, Vercel KV storage adapters ([8c7c940](https://github.com/SylphxAI/Lens/commit/8c7c940e5b98b858c5029033db51c87a38e34560))
+- **server:** add storage adapter pattern for opLog ([34accec](https://github.com/SylphxAI/Lens/commit/34accec172773b2df7dd62e07ed98e995a5c55b3))
+- **server:** add unified createHandler (HTTP + SSE) ([8d53b16](https://github.com/SylphxAI/Lens/commit/8d53b16e794138baf148159b8fdaa5dabaa193e3))
+- **server:** implement OptimisticPluginMarker for unified lens/server plugin ([556e62f](https://github.com/SylphxAI/Lens/commit/556e62f39e97e090ff6e0599bc1ce0a3d0744700))
+- **server:** add optimisticPlugin for metadata enhancement ([8ec3f40](https://github.com/SylphxAI/Lens/commit/8ec3f403e7878f585992a6f5a5dcad12139d682f))
+- **server:** add Pusher subscription transport ([a745b38](https://github.com/SylphxAI/Lens/commit/a745b3804e921e83da934630c1b5657c4f696bf9))
+- **server:** add subscriptionTransport config for custom pub/sub ([52141a7](https://github.com/SylphxAI/Lens/commit/52141a7458901ca841a2782a531616bc84a515de))
+- **server:** add diffOptimizer plugin for opt-in state tracking ([e06e365](https://github.com/SylphxAI/Lens/commit/e06e365c50ae733d68150a0dafd79aa91cdabd97))
+- **server:** add plugin system with lifecycle hooks ([f3fa168](https://github.com/SylphxAI/Lens/commit/f3fa16845fe76c58f863549ea57f68f80b09c8c4))
+- **server:** integrate reconnect protocol into WebSocket message handler ([fa66ebf](https://github.com/SylphxAI/Lens/commit/fa66ebf816c27cfb30bc1db8321bc60ab446d60d))
+- **core:** add compression support for large reconnection payloads ([2459177](https://github.com/SylphxAI/Lens/commit/2459177c28d98a82670040b7a89fb751c4e7e943))
+- **server:** add version tracking and reconnection support to GraphStateManager ([6b0c04c](https://github.com/SylphxAI/Lens/commit/6b0c04ce6795a70c40f2b0e9e4742659e9126a33))
+
+### 🐛 Bug Fixes
+
+- restore package.json versions, add bump file for v1.5.0 ([d320b83](https://github.com/SylphxAI/Lens/commit/d320b838f2cce196dbd3dbc9ccaa7736d000788e))
+- **server:** cleanup duplicate subscription IDs in WS handler ([0636058](https://github.com/SylphxAI/Lens/commit/063605840913ae979f37b0eabb6352430453fefe))
+- resolve pre-existing build and test issues ([9785c30](https://github.com/SylphxAI/Lens/commit/9785c30f60f9673aac9d92d5494ee2a2b9815a58))
+- **server:** output Reify-compatible DSL format in optimisticPlugin ([3fdb9ee](https://github.com/SylphxAI/Lens/commit/3fdb9eee0e5819b1d26a23fb6524d5fc3e400e1c))
+
+### ♻️ Refactoring
+
+- remove deprecated aliases (createServer, WSAdapter, HTTPAdapter) ([1fdf821](https://github.com/SylphxAI/Lens/commit/1fdf821ba03c64993654f8897b95fd32bf55c893))
+- **server:** extract WS handler types to dedicated module ([0dc8446](https://github.com/SylphxAI/Lens/commit/0dc84460ec1cebe221ca61b43463bfb9695a4a6f))
+- extract types from god files ([f5c67c1](https://github.com/SylphxAI/Lens/commit/f5c67c1e54690d64e193999039299b8f137254d0))
+- **client:** remove optimistic updates from client core ([8c9618b](https://github.com/SylphxAI/Lens/commit/8c9618b39675718cb7fc45117837c7b5302678f2))
+- 💥 **server:** split storage adapters and pusher into separate packages ([2bf5ccf](https://github.com/SylphxAI/Lens/commit/2bf5ccfeac6dcc568590a9633271ff2135a8fbd7))
+- **server:** remove pusher transport from core library ([2748c0e](https://github.com/SylphxAI/Lens/commit/2748c0ecbc91798770ffd883565fe5525e694049))
+- **server:** remove dead code and add optimistic locking ([bcdd484](https://github.com/SylphxAI/Lens/commit/bcdd484bd8d50782fb41db06e2b24bb06638b89a))
+- **server:** rename client-state.ts to op-log.ts ([eea3061](https://github.com/SylphxAI/Lens/commit/eea30611f7713eaf66985c79f3c1028857126ef7))
+- **server:** rename stateSync to opLog ([8c8fd60](https://github.com/SylphxAI/Lens/commit/8c8fd603f252bcad2859f507aaa5e9bdd48dc622))
+- **server:** simplify plugin to only handle state, not routing ([08a2eaf](https://github.com/SylphxAI/Lens/commit/08a2eaf1dad436fe7131364a17dde4e4b1545d5f))
+- **server:** convert clientState to cursor-based architecture ([8580f6b](https://github.com/SylphxAI/Lens/commit/8580f6b5b9aa38bb339fbb3ea8bf14bbc3510f64))
+- **server:** rename stateSync to clientState ([be3430a](https://github.com/SylphxAI/Lens/commit/be3430a1982b659cc29eedd6ceb1dfaf5d0cb10d))
+- **server:** rename diffOptimizer to stateSync ([d507dae](https://github.com/SylphxAI/Lens/commit/d507dae76c18394009bc15aeb940e102fb624416))
+- **server:** make core server stateless, move state to plugins ([ca6b0a7](https://github.com/SylphxAI/Lens/commit/ca6b0a74d7873b77630efc62d1ec48d864eb2627))
+- **server:** decouple GraphStateManager from public API ([f715cd4](https://github.com/SylphxAI/Lens/commit/f715cd4550125052c456821703a98d6ecd0764f0))
+- **server:** extract framework handler utilities ([caa8d4f](https://github.com/SylphxAI/Lens/commit/caa8d4fe5a39f519076068e6c1eae8a5fcd73eaf))
+- **server:** complete Adapter → Handler naming migration ([b850eac](https://github.com/SylphxAI/Lens/commit/b850eacbdd8115a00e622a94e1dd99ee51546c5b))
+- 💥 **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+- **server:** rename adapters folder to handlers ([60a2bcb](https://github.com/SylphxAI/Lens/commit/60a2bcbfa5c328b9d1e20164556df3e0ec702a9b))
+- **server:** rename adapters to handlers ([6e12d32](https://github.com/SylphxAI/Lens/commit/6e12d322bb7daa7f3e3eac5ff005f4145a31bff0))
+- **server:** rename createServer to createApp ([2f804c2](https://github.com/SylphxAI/Lens/commit/2f804c2b4e4fc3caaf1dd9696f84dfd21f4dde52))
+- **server:** add type safety to OperationMeta.optimistic ([0307e6e](https://github.com/SylphxAI/Lens/commit/0307e6eaa4db4a801c81d18b4e43f5d0d59792dd))
+- **server:** delegate reconnect and updateFields to plugin hooks ([bd2c2b8](https://github.com/SylphxAI/Lens/commit/bd2c2b8c49aebf4b1c4323cb8742bf464b65e9f7))
+- **server:** clean separation of concerns between adapter, server, and plugin ([fa702cf](https://github.com/SylphxAI/Lens/commit/fa702cf637d1734a443eb6b5232a48d7599afc8f))
+- **server:** move plugins from adapter to server level ([fc36d8a](https://github.com/SylphxAI/Lens/commit/fc36d8a06a37745880df76bc85c149139c13c277))
+- **client:** move SubscriptionRegistry from core to client ([20a9468](https://github.com/SylphxAI/Lens/commit/20a9468f307fb14bb801e1c9ea92d9b43c22801f))
+- **core:** separate platform-specific code from core ([380a129](https://github.com/SylphxAI/Lens/commit/380a129241c8524c354431c857e436de0c6d7491))
+- **server:** pure executor architecture ([dbcc8aa](https://github.com/SylphxAI/Lens/commit/dbcc8aa58192a3ce23afd677f545de0e5e5103ea))
+- **server:** remove subscriptionTransport and deprecate legacy methods ([ab069cd](https://github.com/SylphxAI/Lens/commit/ab069cd784fb23977de448f29621038bae1c57f5))
+- **server:** add modular adapter pattern for protocol handlers ([564dfe0](https://github.com/SylphxAI/Lens/commit/564dfe0831ae860ef5471600e17f19a38cc96725))
+- **server:** remove subscriptionTransport from server config ([1f01a87](https://github.com/SylphxAI/Lens/commit/1f01a8743a189e3cdb7ff417596bfc1a3efb1abe))
+
+### ✅ Tests
+
+- add tests for PairedPlugin and Pusher transport ([c244877](https://github.com/SylphxAI/Lens/commit/c2448774eccf796313d7350e5e7e51bb2db33b65))
+
+### 🔧 Chores
+
+- reset all package versions to 1.5.0 ([97d09e6](https://github.com/SylphxAI/Lens/commit/97d09e6f7dbff083405c10f8b95625fd836b7715))
+- **server:** remove deprecated aliases for clientState ([7900407](https://github.com/SylphxAI/Lens/commit/7900407f7323a46497a7868fffb422c195f3331f))
+
+### 💥 Breaking Changes
+
+- **server:** split storage adapters and pusher into separate packages ([2bf5ccf](https://github.com/SylphxAI/Lens/commit/2bf5ccfeac6dcc568590a9633271ff2135a8fbd7))
+  External storage adapters moved to separate packages.
+- **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+  The `server` property in InProcessTransportOptions has been
+
 ## 1.11.3 (2025-12-02)
 
 No notable changes.

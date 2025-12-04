@@ -1,5 +1,31 @@
 # @sylphx/lens-react
 
+## 1.5.0 (2025-12-04)
+
+Unified v1.5.0 release.
+
+### 🐛 Bug Fixes
+
+- restore package.json versions, add bump file for v1.5.0 ([d320b83](https://github.com/SylphxAI/Lens/commit/d320b838f2cce196dbd3dbc9ccaa7736d000788e))
+
+### ♻️ Refactoring
+
+- **react:** remove signals dependency from react package ([f8d6883](https://github.com/SylphxAI/Lens/commit/f8d6883cd3eb8fdb994711658206ad41a24483a9))
+- **client:** remove optimistic updates from client core ([8c9618b](https://github.com/SylphxAI/Lens/commit/8c9618b39675718cb7fc45117837c7b5302678f2))
+- 💥 **client:** extract signals to separate package ([4a92e16](https://github.com/SylphxAI/Lens/commit/4a92e1648bac6ae8f72a50ec00cb17a11c51b79b))
+- 💥 **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+
+### 🔧 Chores
+
+- reset all package versions to 1.5.0 ([97d09e6](https://github.com/SylphxAI/Lens/commit/97d09e6f7dbff083405c10f8b95625fd836b7715))
+
+### 💥 Breaking Changes
+
+- **client:** extract signals to separate package ([4a92e16](https://github.com/SylphxAI/Lens/commit/4a92e1648bac6ae8f72a50ec00cb17a11c51b79b))
+  Signals and ReactiveStore moved to @sylphx/lens-signals.
+- **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+  The `server` property in InProcessTransportOptions has been
+
 ## 1.2.22 (2025-12-02)
 
 No notable changes.

@@ -1,5 +1,21 @@
 # @sylphx/lens-fresh
 
+## 1.5.0 (2025-12-04)
+
+Unified v1.5.0 release.
+
+### 🐛 Bug Fixes
+
+- restore package.json versions, add bump file for v1.5.0 ([d320b83](https://github.com/SylphxAI/Lens/commit/d320b838f2cce196dbd3dbc9ccaa7736d000788e))
+
+### ♻️ Refactoring
+
+- **server:** extract framework handler utilities ([caa8d4f](https://github.com/SylphxAI/Lens/commit/caa8d4fe5a39f519076068e6c1eae8a5fcd73eaf))
+
+### 🔧 Chores
+
+- reset all package versions to 1.5.0 ([97d09e6](https://github.com/SylphxAI/Lens/commit/97d09e6f7dbff083405c10f8b95625fd836b7715))
+
 ## 1.2.31 (2025-12-02)
 
 No notable changes.

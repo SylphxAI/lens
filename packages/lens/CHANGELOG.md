@@ -1,5 +1,27 @@
 # @sylphx/lens
 
+## 1.5.0 (2025-12-04)
+
+Unified v1.5.0 release.
+
+### 🐛 Bug Fixes
+
+- restore package.json versions, add bump file for v1.5.0 ([d320b83](https://github.com/SylphxAI/Lens/commit/d320b838f2cce196dbd3dbc9ccaa7736d000788e))
+
+### ♻️ Refactoring
+
+- remove deprecated aliases (createServer, WSAdapter, HTTPAdapter) ([1fdf821](https://github.com/SylphxAI/Lens/commit/1fdf821ba03c64993654f8897b95fd32bf55c893))
+- 💥 **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+
+### 🔧 Chores
+
+- reset all package versions to 1.5.0 ([97d09e6](https://github.com/SylphxAI/Lens/commit/97d09e6f7dbff083405c10f8b95625fd836b7715))
+
+### 💥 Breaking Changes
+
+- **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+  The `server` property in InProcessTransportOptions has been
+
 ## 1.2.15 (2025-12-02)
 
 No notable changes.

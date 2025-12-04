@@ -1,5 +1,59 @@
 # @sylphx/lens-core
 
+## 1.5.0 (2025-12-04)
+
+Unified v1.5.0 release.
+
+### ✨ Features
+
+- **core:** add extensible plugin registry with module augmentation ([071cd8e](https://github.com/SylphxAI/Lens/commit/071cd8e2616dd7548f27a2494afb2f9d43be798b))
+- **core:** wire up plugin-aware mutation builder types ([57166a6](https://github.com/SylphxAI/Lens/commit/57166a61827c3d0dc75381c018e14fc6ddd02668))
+- **core:** add plugin extension type infrastructure ([f886ff2](https://github.com/SylphxAI/Lens/commit/f886ff2fcb9ff11a0d7f4bc36b3c85ebd12b9d23))
+- **core:** add PairedPlugin type for cross-cutting concerns ([06001b8](https://github.com/SylphxAI/Lens/commit/06001b827a53702117d7feb0a259f882407d5c3f))
+- **server:** integrate reconnect protocol into WebSocket message handler ([fa66ebf](https://github.com/SylphxAI/Lens/commit/fa66ebf816c27cfb30bc1db8321bc60ab446d60d))
+- **core:** add metrics and observability for reconnection system ([5234e32](https://github.com/SylphxAI/Lens/commit/5234e32e6e458d6a129c2ac7fe73f15dd465a279))
+- **core:** add compression support for large reconnection payloads ([2459177](https://github.com/SylphxAI/Lens/commit/2459177c28d98a82670040b7a89fb751c4e7e943))
+- **server:** add version tracking and reconnection support to GraphStateManager ([6b0c04c](https://github.com/SylphxAI/Lens/commit/6b0c04ce6795a70c40f2b0e9e4742659e9126a33))
+- **core:** add reconnection system with version-based state sync ([5da5b74](https://github.com/SylphxAI/Lens/commit/5da5b74ee0e260652d3ada6bbbe04d9f76b4852d))
+
+### 🐛 Bug Fixes
+
+- restore package.json versions, add bump file for v1.5.0 ([d320b83](https://github.com/SylphxAI/Lens/commit/d320b838f2cce196dbd3dbc9ccaa7736d000788e))
+- resolve pre-existing build and test issues ([9785c30](https://github.com/SylphxAI/Lens/commit/9785c30f60f9673aac9d92d5494ee2a2b9815a58))
+- **core:** preserve resolver field types with TFields generic ([ec42445](https://github.com/SylphxAI/Lens/commit/ec42445e9a91606ae1be57169fd00456e27015a8))
+- **core:** conditionally expose .optimistic() based on plugin configuration ([4dca8eb](https://github.com/SylphxAI/Lens/commit/4dca8eb727f58e5faa802bff4d17bab968e94da9))
+- **core:** update LensConfig to accept any PluginExtension type ([6a3652d](https://github.com/SylphxAI/Lens/commit/6a3652d24bb7d40f473ac932c9fa7d4696b61f39))
+
+### ♻️ Refactoring
+
+- remove deprecated aliases (createServer, WSAdapter, HTTPAdapter) ([1fdf821](https://github.com/SylphxAI/Lens/commit/1fdf821ba03c64993654f8897b95fd32bf55c893))
+- **core:** extract resolver types to dedicated module ([36a72b6](https://github.com/SylphxAI/Lens/commit/36a72b64160e12bf23af05338a7043a298b284b9))
+- **core:** split strategies.ts into types and array modules ([1889b27](https://github.com/SylphxAI/Lens/commit/1889b27072435d494fb5b4242075bea2ae59b21e))
+- **core:** split operations/index.ts into focused modules ([cd43519](https://github.com/SylphxAI/Lens/commit/cd435193ab3c839747131836a62c3df2dd42a44e))
+- **client:** remove optimistic updates from client core ([8c9618b](https://github.com/SylphxAI/Lens/commit/8c9618b39675718cb7fc45117837c7b5302678f2))
+- **core:** extract router to separate module ([e71455b](https://github.com/SylphxAI/Lens/commit/e71455b040e1cca9a297a10c8dc3d4f89744c5af))
+- **core:** extract shared type utilities ([0b88836](https://github.com/SylphxAI/Lens/commit/0b888361eb6200af357c5fa1a6489d8a192f0f53))
+- 💥 **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+- **core:** replace module augmentation with direct type lookup for plugin system ([ebc9a24](https://github.com/SylphxAI/Lens/commit/ebc9a24f9b9434e4e3baeff3a73a00472d108dde))
+- **core:** replace module augmentation with direct type lookup for plugin system ([4b72a26](https://github.com/SylphxAI/Lens/commit/4b72a26988adefaff8f8cfb7ceb4318430bdd00b))
+- **client:** move SubscriptionRegistry from core to client ([20a9468](https://github.com/SylphxAI/Lens/commit/20a9468f307fb14bb801e1c9ea92d9b43c22801f))
+- **core:** separate platform-specific code from core ([380a129](https://github.com/SylphxAI/Lens/commit/380a129241c8524c354431c857e436de0c6d7491))
+- **server:** pure executor architecture ([dbcc8aa](https://github.com/SylphxAI/Lens/commit/dbcc8aa58192a3ce23afd677f545de0e5e5103ea))
+
+### ✅ Tests
+
+- add tests for PairedPlugin and Pusher transport ([c244877](https://github.com/SylphxAI/Lens/commit/c2448774eccf796313d7350e5e7e51bb2db33b65))
+- **core:** add integration tests for reconnection system ([10a7dd0](https://github.com/SylphxAI/Lens/commit/10a7dd05f04c910e598936e0bc8cbcce326aea8a))
+
+### 🔧 Chores
+
+- reset all package versions to 1.5.0 ([97d09e6](https://github.com/SylphxAI/Lens/commit/97d09e6f7dbff083405c10f8b95625fd836b7715))
+
+### 💥 Breaking Changes
+
+- **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+  The `server` property in InProcessTransportOptions has been
+
 ## 1.22.3 (2025-12-02)
 
 No notable changes.

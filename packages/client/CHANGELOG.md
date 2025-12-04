@@ -1,5 +1,48 @@
 # @sylphx/lens-client
 
+## 1.5.0 (2025-12-04)
+
+Unified v1.5.0 release.
+
+### ✨ Features
+
+- **client:** export transport capability types and guards ([811d01c](https://github.com/SylphxAI/Lens/commit/811d01cf57ddd44dffcdef5b2a66b1a7a7358b27))
+- **client:** add type-safe routeByType with generic inference ([9c6a901](https://github.com/SylphxAI/Lens/commit/9c6a9012e4f9c9e47495e84edce0f0ad8ee8d75d))
+- **client:** add type-safe transport capability interfaces ([4c14307](https://github.com/SylphxAI/Lens/commit/4c14307bc3746da20dbcbe15df0b8ef37b4cb0b2))
+- **client:** add SSE transport for serverless-friendly subscriptions ([45400d9](https://github.com/SylphxAI/Lens/commit/45400d9527f23c3376d8676594b1494b84394edf))
+- **core:** add compression support for large reconnection payloads ([2459177](https://github.com/SylphxAI/Lens/commit/2459177c28d98a82670040b7a89fb751c4e7e943))
+- **client:** add version-based reconnection flow to WebSocket transport ([0aa79ca](https://github.com/SylphxAI/Lens/commit/0aa79cac1125e06273d2f92a2ba22f8b74279d5f))
+
+### 🐛 Bug Fixes
+
+- restore package.json versions, add bump file for v1.5.0 ([d320b83](https://github.com/SylphxAI/Lens/commit/d320b838f2cce196dbd3dbc9ccaa7736d000788e))
+- resolve pre-existing build and test issues ([9785c30](https://github.com/SylphxAI/Lens/commit/9785c30f60f9673aac9d92d5494ee2a2b9815a58))
+- **client:** fix subscribe callback memory leak ([3c6abe0](https://github.com/SylphxAI/Lens/commit/3c6abe0e6fc50e04b9540c3313a9ebe31343d081))
+- **client:** update tests to use optimisticPlugin for optimistic updates ([4eae879](https://github.com/SylphxAI/Lens/commit/4eae8793dc3c240b7c2d3230b198b69a265b9782))
+
+### ♻️ Refactoring
+
+- remove deprecated aliases (createServer, WSAdapter, HTTPAdapter) ([1fdf821](https://github.com/SylphxAI/Lens/commit/1fdf821ba03c64993654f8897b95fd32bf55c893))
+- extract types from god files ([f5c67c1](https://github.com/SylphxAI/Lens/commit/f5c67c1e54690d64e193999039299b8f137254d0))
+- **client:** remove optimistic updates from client core ([8c9618b](https://github.com/SylphxAI/Lens/commit/8c9618b39675718cb7fc45117837c7b5302678f2))
+- 💥 **client:** extract signals to separate package ([4a92e16](https://github.com/SylphxAI/Lens/commit/4a92e1648bac6ae8f72a50ec00cb17a11c51b79b))
+- **server:** extract framework handler utilities ([caa8d4f](https://github.com/SylphxAI/Lens/commit/caa8d4fe5a39f519076068e6c1eae8a5fcd73eaf))
+- **client:** unify LensServerInterface definitions ([8f398fc](https://github.com/SylphxAI/Lens/commit/8f398fcc181971c8884d658930b298783c25fbbf))
+- **client:** unify ConnectionState type across transports ([81a579d](https://github.com/SylphxAI/Lens/commit/81a579ddd6ea38059ebe9f345a9de24324873dba))
+- 💥 **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+- **client:** move SubscriptionRegistry from core to client ([20a9468](https://github.com/SylphxAI/Lens/commit/20a9468f307fb14bb801e1c9ea92d9b43c22801f))
+
+### 🔧 Chores
+
+- reset all package versions to 1.5.0 ([97d09e6](https://github.com/SylphxAI/Lens/commit/97d09e6f7dbff083405c10f8b95625fd836b7715))
+
+### 💥 Breaking Changes
+
+- **client:** extract signals to separate package ([4a92e16](https://github.com/SylphxAI/Lens/commit/4a92e1648bac6ae8f72a50ec00cb17a11c51b79b))
+  Signals and ReactiveStore moved to @sylphx/lens-signals.
+- **client:** rename inProcess({ server }) to inProcess({ app }) ([415e87f](https://github.com/SylphxAI/Lens/commit/415e87f2d3ba2ebb086a5d757f8a22286e3c06ef))
+  The `server` property in InProcessTransportOptions has been
+
 ## 1.15.3 (2025-12-02)
 
 No notable changes.
