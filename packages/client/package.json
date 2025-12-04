@@ -1,41 +1,41 @@
 {
-	"name": "@sylphx/lens-client",
-	"version": "1.15.3",
-	"description": "Transport client for Lens API framework",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"client",
-		"transport",
-		"plugins"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/reify": "^0.1.2",
-		"@msgpack/msgpack": "^3.1.2"
-	},
-	"devDependencies": {
-		"typescript": "^5.9.3",
-		"zod": "^4.1.13"
-	}
+  "name": "@sylphx/lens-client",
+  "version": "1.5.0",
+  "description": "Transport client for Lens API framework",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "[ -d dist ] || bun run build"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "client",
+    "transport",
+    "plugins"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/reify": "^0.1.2",
+    "@msgpack/msgpack": "^3.1.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "zod": "^4.1.13"
+  }
 }

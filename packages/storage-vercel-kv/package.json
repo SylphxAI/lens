@@ -1,45 +1,45 @@
 {
-	"name": "@sylphx/lens-storage-vercel-kv",
-	"version": "1.0.0",
-	"description": "Vercel KV storage adapter for Lens opLog plugin",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "echo 'no tests yet'",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"storage",
-		"vercel",
-		"kv",
-		"serverless",
-		"nextjs"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/lens-server": "workspace:*"
-	},
-	"peerDependencies": {
-		"@vercel/kv": ">=1.0.0"
-	},
-	"devDependencies": {
-		"@vercel/kv": "^3.0.0",
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens-storage-vercel-kv",
+  "version": "1.5.0",
+  "description": "Vercel KV storage adapter for Lens opLog plugin",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'",
+    "prepack": "[ -d dist ] || bun run build"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "storage",
+    "vercel",
+    "kv",
+    "serverless",
+    "nextjs"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/lens-server": "workspace:*"
+  },
+  "peerDependencies": {
+    "@vercel/kv": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@vercel/kv": "^3.0.0",
+    "typescript": "^5.9.3"
+  }
 }

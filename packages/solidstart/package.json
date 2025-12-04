@@ -1,48 +1,48 @@
 {
-	"name": "@sylphx/lens-solidstart",
-	"version": "1.2.31",
-	"description": "SolidStart integration for Lens API framework",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"solid",
-		"solidstart",
-		"ssr"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-client": "workspace:*",
-		"@sylphx/lens-server": "workspace:*",
-		"@sylphx/lens-solid": "workspace:*"
-	},
-	"peerDependencies": {
-		"@solidjs/router": ">=0.13.0",
-		"@solidjs/start": ">=1.0.0",
-		"solid-js": ">=1.8.0"
-	},
-	"devDependencies": {
-		"@solidjs/router": "^0.15.3",
-		"@solidjs/start": "^1.1.0",
-		"solid-js": "^1.9.5",
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens-solidstart",
+  "version": "1.5.0",
+  "description": "SolidStart integration for Lens API framework",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "[ -d dist ] || bun run build"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "solid",
+    "solidstart",
+    "ssr"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-client": "workspace:*",
+    "@sylphx/lens-server": "workspace:*",
+    "@sylphx/lens-solid": "workspace:*"
+  },
+  "peerDependencies": {
+    "@solidjs/router": ">=0.13.0",
+    "@solidjs/start": ">=1.0.0",
+    "solid-js": ">=1.8.0"
+  },
+  "devDependencies": {
+    "@solidjs/router": "^0.15.3",
+    "@solidjs/start": "^1.1.0",
+    "solid-js": "^1.9.5",
+    "typescript": "^5.9.3"
+  }
 }

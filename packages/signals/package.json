@@ -1,44 +1,44 @@
 {
-	"name": "@sylphx/lens-signals",
-	"version": "1.0.0",
-	"description": "Signals-based reactive store for Lens client",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "echo 'no tests yet'",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"signals",
-		"reactive",
-		"store",
-		"preact"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/reify": "^0.1.2"
-	},
-	"peerDependencies": {
-		"@preact/signals-core": ">=1.8.0"
-	},
-	"devDependencies": {
-		"@preact/signals-core": "^1.8.0",
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens-signals",
+  "version": "1.5.0",
+  "description": "Signals-based reactive store for Lens client",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'",
+    "prepack": "[ -d dist ] || bun run build"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "signals",
+    "reactive",
+    "store",
+    "preact"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/reify": "^0.1.2"
+  },
+  "peerDependencies": {
+    "@preact/signals-core": ">=1.8.0"
+  },
+  "devDependencies": {
+    "@preact/signals-core": "^1.8.0",
+    "typescript": "^5.9.3"
+  }
 }

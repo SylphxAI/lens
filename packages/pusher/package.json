@@ -1,50 +1,50 @@
 {
-	"name": "@sylphx/lens-pusher",
-	"version": "1.0.0",
-	"description": "Pusher Channels integration for Lens real-time subscriptions",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "echo 'no tests yet'",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"pusher",
-		"realtime",
-		"serverless",
-		"websocket"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"peerDependencies": {
-		"pusher": ">=5.0.0",
-		"pusher-js": ">=8.0.0"
-	},
-	"peerDependenciesMeta": {
-		"pusher": {
-			"optional": true
-		},
-		"pusher-js": {
-			"optional": true
-		}
-	},
-	"devDependencies": {
-		"pusher": "^5.2.0",
-		"pusher-js": "^8.4.0",
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens-pusher",
+  "version": "1.5.0",
+  "description": "Pusher Channels integration for Lens real-time subscriptions",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'",
+    "prepack": "[ -d dist ] || bun run build"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "pusher",
+    "realtime",
+    "serverless",
+    "websocket"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "peerDependencies": {
+    "pusher": ">=5.0.0",
+    "pusher-js": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "pusher": {
+      "optional": true
+    },
+    "pusher-js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "pusher": "^5.2.0",
+    "pusher-js": "^8.4.0",
+    "typescript": "^5.9.3"
+  }
 }
