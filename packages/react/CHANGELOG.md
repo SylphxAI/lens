@@ -1,5 +1,18 @@
 # @sylphx/lens-react
 
+## 2.1.6 (2025-12-05)
+
+fix(react): use ref for selector to avoid useCallback requirement
+
+Previously, useQuery included `selector` in useMemo dependencies,
+causing infinite loops if users didn't wrap their selectors with
+useCallback. Now uses a ref to track the selector, matching the
+pattern already used for the `select` option.
+
+### 🐛 Bug Fixes
+
+- **react:** use ref for selector to avoid useCallback requirement ([7fefc87](https://github.com/SylphxAI/Lens/commit/7fefc87e6b1995812aabf2dd0d4058585bf63cf8))
+
 ## 2.1.5 (2025-12-05)
 
 fix(react): use global singleton for LensContext
