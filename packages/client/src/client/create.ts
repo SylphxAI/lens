@@ -374,105 +374,44 @@ class ClientImpl {
 	// =========================================================================
 
 	createAccessor(path: string): (input?: unknown) => unknown {
-		const accessor = (input?: unknown) => {
-			const key = this.makeQueryKey(path, input);
+		return (input?: unknown) => {
+			// Delegate to executeQuery for all query functionality (caching, subscriptions, etc.)
+			const queryResult = this.executeQuery<unknown>(path, input);
 
-			// Return cached result for stable reference (important for React hooks)
-			const cached = this.queryResultCache.get(key);
-			if (cached) {
-				return cached;
-			}
+			// Store original then for queries
+			const originalThen = queryResult.then.bind(queryResult);
 
-			if (!this.subscriptions.has(key)) {
-				this.subscriptions.set(key, {
-					data: null,
-					callbacks: new Set(),
-				});
-			}
-			const sub = this.subscriptions.get(key)!;
+			// Override then() to support mutations through the proxy API
+			(queryResult as { then: typeof queryResult.then }).then = async <
+				TResult1 = unknown,
+				TResult2 = never,
+			>(
+				onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+				onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+			): Promise<TResult1 | TResult2> => {
+				try {
+					await this.ensureConnected();
+					const meta = this.getOperationMeta(path);
 
-			const result = {
-				get value() {
-					return sub.data;
-				},
-
-				select: <S extends SelectionObject>(selection: S) => {
-					return this.executeQuery(path, input, selection);
-				},
-
-				subscribe: (callback?: (data: unknown) => void) => {
-					if (callback) {
-						let wrapped = this.callbackWrappers.get(callback);
-						if (!wrapped) {
-							wrapped = (data: unknown) => callback(data);
-							this.callbackWrappers.set(callback, wrapped);
-						}
-						sub.callbacks.add(wrapped);
-
-						if (sub.data !== null) {
-							callback(sub.data);
-						}
+					if (meta?.type === "mutation") {
+						const inputObj = (input ?? {}) as Record<string, unknown>;
+						const mutationResult = await this.executeMutation(path, inputObj);
+						return onfulfilled
+							? onfulfilled(mutationResult)
+							: (mutationResult as unknown as TResult1);
 					}
 
-					this.ensureConnected().then(() => {
-						const meta = this.getOperationMeta(path);
-						if (meta?.type === "mutation") {
-							return;
-						}
-						if (!sub.unsubscribe) {
-							this.startSubscription(path, input, key);
-						}
-					});
-
-					return () => {
-						if (callback) {
-							const wrapped = this.callbackWrappers.get(callback);
-							if (wrapped) {
-								sub.callbacks.delete(wrapped);
-							}
-						}
-						if (sub.callbacks.size === 0 && sub.unsubscribe) {
-							sub.unsubscribe();
-							sub.unsubscribe = undefined;
-						}
-					};
-				},
-
-				then: async <TResult1 = unknown, TResult2 = never>(
-					onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
-					onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-				): Promise<TResult1 | TResult2> => {
-					try {
-						await this.ensureConnected();
-						const meta = this.getOperationMeta(path);
-
-						if (meta?.type === "mutation") {
-							const inputObj = (input ?? {}) as Record<string, unknown>;
-							const mutationResult = await this.executeMutation(path, inputObj);
-							return onfulfilled
-								? onfulfilled(mutationResult)
-								: (mutationResult as unknown as TResult1);
-						}
-
-						const queryResult = this.executeQuery(path, input);
-						const data = await queryResult;
-						return onfulfilled ? onfulfilled(data) : (data as unknown as TResult1);
-					} catch (error) {
-						if (onrejected) {
-							return onrejected(error);
-						}
-						throw error;
+					return originalThen(onfulfilled, onrejected);
+				} catch (error) {
+					if (onrejected) {
+						return onrejected(error);
 					}
-				},
+					throw error;
+				}
 			};
 
-			// Cache for stable reference
-			this.queryResultCache.set(key, result as QueryResult<unknown>);
-
-			return result;
+			return queryResult;
 		};
-
-		return accessor;
 	}
 }
 
