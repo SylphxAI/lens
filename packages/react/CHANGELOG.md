@@ -1,5 +1,32 @@
 # @sylphx/lens-react
 
+## 2.1.5 (2025-12-05)
+
+fix(react): use global singleton for LensContext
+
+Fixes module duplication issue in monorepos where @sylphx/lens-react
+could be resolved to different paths, causing LensProvider and useQuery
+to use different React contexts (resulting in null client).
+
+- Store context in globalThis with Symbol.for key
+- Ensures same context instance across multiple module resolutions
+- Common pattern used by react-redux and other React libraries
+
+fix(react): use useReducer for atomic state updates in useQuery
+
+Prevents cascading re-renders when multiple components subscribe to the
+same query data. Previously, useQuery made 4-6 individual setState calls
+when data arrived, causing "Maximum update depth exceeded" errors.
+
+- Replace multiple useState with single useReducer
+- Atomic state transitions (data + loading + error in one dispatch)
+- Eliminates race conditions between state updates
+
+### 🐛 Bug Fixes
+
+- **react:** use global singleton for LensContext ([8919d7c](https://github.com/SylphxAI/Lens/commit/8919d7c01484fc264af4b513adbfe2a3e1956f80))
+- **react:** use useReducer for atomic state updates in useQuery ([ec532dd](https://github.com/SylphxAI/Lens/commit/ec532ddd9bd8422b0185fcc9e41c9afe89861e09))
+
 ## 2.1.4 (2025-12-05)
 
 ### 📦 Dependencies
