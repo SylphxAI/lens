@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-vue",
-	"version": "2.0.4",
+	"version": "2.0.5",
 	"description": "Vue composables for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

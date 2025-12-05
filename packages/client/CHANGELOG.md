@@ -1,5 +1,22 @@
 # @sylphx/lens-client
 
+## 2.0.5 (2025-12-05)
+
+refactor: simplify createAccessor to delegate to executeQuery
+
+Removed ~60 lines of duplicated code by having createAccessor delegate
+to executeQuery for all query functionality (caching, subscriptions,
+callback management). Only overrides then() to support mutations.
+
+- Eliminates code duplication between createAccessor and executeQuery
+- Single source of truth for query handling
+- Reduces bundle size by ~1.7KB
+- Prevents future bugs from diverging implementations
+
+### ♻️ Refactoring
+
+- **client:** simplify createAccessor to delegate to executeQuery ([a136dc8](https://github.com/SylphxAI/Lens/commit/a136dc8d7ff13b372f157eec5db6e113a8c8cec2))
+
 ## 2.0.4 (2025-12-05)
 
 fix: use callbackWrappers in createAccessor subscribe for proper cleanup
