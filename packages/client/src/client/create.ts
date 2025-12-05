@@ -377,6 +377,12 @@ class ClientImpl {
 		const accessor = (input?: unknown) => {
 			const key = this.makeQueryKey(path, input);
 
+			// Return cached result for stable reference (important for React hooks)
+			const cached = this.queryResultCache.get(key);
+			if (cached) {
+				return cached;
+			}
+
 			if (!this.subscriptions.has(key)) {
 				this.subscriptions.set(key, {
 					data: null,
@@ -452,6 +458,9 @@ class ClientImpl {
 					}
 				},
 			};
+
+			// Cache for stable reference
+			this.queryResultCache.set(key, result as QueryResult<unknown>);
 
 			return result;
 		};
