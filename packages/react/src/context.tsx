@@ -2,20 +2,45 @@
  * @sylphx/lens-react - Context Provider
  *
  * Provides Lens client to React component tree.
+ *
+ * Uses global singleton pattern to ensure the same context is shared
+ * across multiple module instances (important for monorepos where
+ * the same package may be resolved to different paths).
  */
 
 import type { LensClient } from "@sylphx/lens-client";
 import { createContext, type ReactElement, type ReactNode, useContext } from "react";
 
 // =============================================================================
-// Context
+// Context (Global Singleton)
 // =============================================================================
 
 /**
- * Context for Lens client
+ * Global key for storing the singleton context.
+ * Using a Symbol ensures no collision with other globals.
+ */
+const LENS_CONTEXT_KEY = Symbol.for("@sylphx/lens-react/context");
+
+/**
+ * Get or create the global singleton context.
+ * This ensures that even if the module is loaded multiple times
+ * (common in monorepos), all instances share the same React context.
+ */
+function getOrCreateContext(): React.Context<LensClient<any, any> | null> {
+	const globalObj = globalThis as unknown as Record<symbol, React.Context<LensClient<any, any> | null>>;
+
+	if (!globalObj[LENS_CONTEXT_KEY]) {
+		globalObj[LENS_CONTEXT_KEY] = createContext<LensClient<any, any> | null>(null);
+	}
+
+	return globalObj[LENS_CONTEXT_KEY];
+}
+
+/**
+ * Context for Lens client (singleton)
  * Using any for internal storage to avoid type constraint issues
  */
-const LensContext = createContext<LensClient<any, any> | null>(null);
+const LensContext = getOrCreateContext();
 
 // =============================================================================
 // Provider
