@@ -226,6 +226,10 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 	// Stable params key for Route + Params mode
 	const paramsKey = !isAccessorMode ? JSON.stringify(paramsOrDeps) : null;
 
+	// Use ref to track selector - avoids needing useCallback from users
+	const selectorRef = useRef(selector);
+	selectorRef.current = selector;
+
 	// Create query - memoized based on route/params or deps
 	const query = useMemo(
 		() => {
@@ -233,11 +237,11 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 
 			if (isAccessorMode) {
 				// Accessor mode: selector returns QueryResult directly
-				const querySelector = selector as QuerySelector<TResult>;
+				const querySelector = selectorRef.current as QuerySelector<TResult>;
 				return querySelector(client);
 			}
 			// Route + Params mode: selector returns route function
-			const routeSelector = selector as RouteSelector<TParams, TResult>;
+			const routeSelector = selectorRef.current as RouteSelector<TParams, TResult>;
 			const route = routeSelector(client);
 			if (!route) return null;
 			return route(paramsOrDeps as TParams);
@@ -247,7 +251,7 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 			? // eslint-disable-next-line react-hooks/exhaustive-deps
 				[client, options?.skip, ...(paramsOrDeps as DependencyList)]
 			: // eslint-disable-next-line react-hooks/exhaustive-deps
-				[client, selector, paramsKey, options?.skip],
+				[client, paramsKey, options?.skip],
 	);
 
 	// Use ref for select to avoid it being a dependency
