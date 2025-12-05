@@ -1,5 +1,18 @@
 # @sylphx/lens-client
 
+## 2.0.3 (2025-12-05)
+
+fix: cache accessor results for stable React references
+
+createAccessor() was returning new objects on every call, causing
+React hooks to infinite loop during streaming. Now accessor results
+are cached by key (path + input), providing stable references for
+React's referential equality checks.
+
+### 🐛 Bug Fixes
+
+- **client:** cache accessor results for stable React references ([563afae](https://github.com/SylphxAI/Lens/commit/563afae97a63b411a177567ca85513102989f831))
+
 ## 2.0.2 (2025-12-04)
 
 fix: cache QueryResult objects for stable React references
