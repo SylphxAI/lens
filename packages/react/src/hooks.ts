@@ -27,7 +27,15 @@
  */
 
 import type { LensClient, MutationResult, QueryResult } from "@sylphx/lens-client";
-import { type DependencyList, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type DependencyList,
+	useCallback,
+	useEffect,
+	useMemo,
+	useReducer,
+	useRef,
+	useState,
+} from "react";
 import { useLensClient } from "./context.js";
 
 // =============================================================================
@@ -66,6 +74,40 @@ export interface UseQueryOptions<TData = unknown, TSelected = TData> {
 	skip?: boolean;
 	/** Transform the query result */
 	select?: (data: TData) => TSelected;
+}
+
+// =============================================================================
+// Query State Reducer (for atomic state updates)
+// =============================================================================
+
+interface QueryState<T> {
+	data: T | null;
+	loading: boolean;
+	error: Error | null;
+}
+
+type QueryAction<T> =
+	| { type: "RESET" }
+	| { type: "START" }
+	| { type: "SUCCESS"; data: T }
+	| { type: "ERROR"; error: Error }
+	| { type: "LOADING_DONE" };
+
+function queryReducer<T>(state: QueryState<T>, action: QueryAction<T>): QueryState<T> {
+	switch (action.type) {
+		case "RESET":
+			return { data: null, loading: false, error: null };
+		case "START":
+			return { ...state, loading: true, error: null };
+		case "SUCCESS":
+			return { data: action.data, loading: false, error: null };
+		case "ERROR":
+			return { ...state, loading: false, error: action.error };
+		case "LOADING_DONE":
+			return { ...state, loading: false };
+		default:
+			return state;
+	}
 }
 
 /** Client type for callbacks */
@@ -212,9 +254,13 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 	const selectRef = useRef(options?.select);
 	selectRef.current = options?.select;
 
-	const [data, setData] = useState<TSelected | null>(null);
-	const [loading, setLoading] = useState(query != null && !options?.skip);
-	const [error, setError] = useState<Error | null>(null);
+	// Use reducer for atomic state updates (prevents cascading re-renders)
+	const initialState: QueryState<TSelected> = {
+		data: null,
+		loading: query != null && !options?.skip,
+		error: null,
+	};
+	const [state, dispatch] = useReducer(queryReducer<TSelected>, initialState);
 
 	// Track mounted state
 	const mountedRef = useRef(true);
@@ -234,14 +280,11 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 
 		// Handle null/undefined query
 		if (query == null) {
-			setData(null);
-			setLoading(false);
-			setError(null);
+			dispatch({ type: "RESET" });
 			return;
 		}
 
-		setLoading(true);
-		setError(null);
+		dispatch({ type: "START" });
 
 		// Track if subscribe has provided data (to avoid duplicate updates from then)
 		let hasReceivedData = false;
@@ -250,8 +293,7 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 		const unsubscribe = query.subscribe((value) => {
 			if (mountedRef.current) {
 				hasReceivedData = true;
-				setData(transform(value));
-				setLoading(false);
+				dispatch({ type: "SUCCESS", data: transform(value) });
 			}
 		});
 
@@ -259,17 +301,20 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 		// Only setData if subscribe hasn't already provided data (one-shot queries)
 		query.then(
 			(value) => {
-				if (mountedRef.current && !hasReceivedData) {
-					setData(transform(value));
-				}
 				if (mountedRef.current) {
-					setLoading(false);
+					if (!hasReceivedData) {
+						dispatch({ type: "SUCCESS", data: transform(value) });
+					} else {
+						dispatch({ type: "LOADING_DONE" });
+					}
 				}
 			},
 			(err) => {
 				if (mountedRef.current) {
-					setError(err instanceof Error ? err : new Error(String(err)));
-					setLoading(false);
+					dispatch({
+						type: "ERROR",
+						error: err instanceof Error ? err : new Error(String(err)),
+					});
 				}
 			},
 		);
@@ -285,26 +330,26 @@ export function useQuery<TParams, TResult, TSelected = TResult>(
 		const currentQuery = queryRef.current;
 		if (currentQuery == null) return;
 
-		setLoading(true);
-		setError(null);
+		dispatch({ type: "START" });
 
 		currentQuery.then(
 			(value) => {
 				if (mountedRef.current) {
-					setData(transform(value));
-					setLoading(false);
+					dispatch({ type: "SUCCESS", data: transform(value) });
 				}
 			},
 			(err) => {
 				if (mountedRef.current) {
-					setError(err instanceof Error ? err : new Error(String(err)));
-					setLoading(false);
+					dispatch({
+						type: "ERROR",
+						error: err instanceof Error ? err : new Error(String(err)),
+					});
 				}
 			},
 		);
 	}, [transform]);
 
-	return { data, loading, error, refetch };
+	return { data: state.data, loading: state.loading, error: state.error, refetch };
 }
 
 // =============================================================================
