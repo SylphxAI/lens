@@ -1,5 +1,21 @@
 # @sylphx/lens-client
 
+## 2.0.4 (2025-12-05)
+
+fix: use callbackWrappers in createAccessor subscribe for proper cleanup
+
+createAccessor's subscribe() was creating new wrapped functions but
+cleanup was trying to delete the original callback (not in the Set).
+This caused callbacks to accumulate, leading to multiple setData
+calls on each data update.
+
+Now uses the same callbackWrappers WeakMap pattern as executeQuery
+for proper callback tracking and cleanup.
+
+### 🐛 Bug Fixes
+
+- **client:** use callbackWrappers in createAccessor for proper cleanup ([4bcde1d](https://github.com/SylphxAI/Lens/commit/4bcde1d37c267f8162e697601e371306a0b3b4c1))
+
 ## 2.0.3 (2025-12-05)
 
 fix: cache accessor results for stable React references
