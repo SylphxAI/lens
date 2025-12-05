@@ -402,7 +402,11 @@ class ClientImpl {
 
 				subscribe: (callback?: (data: unknown) => void) => {
 					if (callback) {
-						const wrapped = (data: unknown) => callback(data);
+						let wrapped = this.callbackWrappers.get(callback);
+						if (!wrapped) {
+							wrapped = (data: unknown) => callback(data);
+							this.callbackWrappers.set(callback, wrapped);
+						}
 						sub.callbacks.add(wrapped);
 
 						if (sub.data !== null) {
@@ -422,7 +426,10 @@ class ClientImpl {
 
 					return () => {
 						if (callback) {
-							sub.callbacks.delete(callback as (data: unknown) => void);
+							const wrapped = this.callbackWrappers.get(callback);
+							if (wrapped) {
+								sub.callbacks.delete(wrapped);
+							}
 						}
 						if (sub.callbacks.size === 0 && sub.unsubscribe) {
 							sub.unsubscribe();
