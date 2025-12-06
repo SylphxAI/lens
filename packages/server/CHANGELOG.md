@@ -1,5 +1,13 @@
 # @sylphx/lens-server
 
+## 2.1.0 (2025-12-06)
+
+unified { input, select } API pattern for nested queries
+
+### ✨ Features
+
+- **client,server:** unified { input, select } API pattern ([b226d98](https://github.com/SylphxAI/Lens/commit/b226d984d7d60b42271b1267137d23b7b27b169a))
+
 ## 2.0.1 (2025-12-04)
 
 Fix: bypass deprecated 2.0.0 versions on npm registry.

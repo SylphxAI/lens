@@ -1,5 +1,23 @@
 # @sylphx/lens-vue
 
+## 2.1.0 (2025-12-06)
+
+add unified createClient API for tRPC-style endpoint access
+
+add reactive dependency tracking for query inputs
+
+### ✨ Features
+
+- **react,vue,solid,svelte:** add unified createClient API ([103e97b](https://github.com/SylphxAI/Lens/commit/103e97b41fcfc353f25fc4c8d28e0b753cf05e75))
+
+### 🐛 Bug Fixes
+
+- **vue,solid,svelte:** add reactive dependency tracking for query inputs ([88a1b43](https://github.com/SylphxAI/Lens/commit/88a1b43d18bd1c4cf811069ccf08a639e9dd4a98))
+
+### 📚 Documentation
+
+- **react,vue,solid,svelte:** update READMEs for new createClient API ([87212e0](https://github.com/SylphxAI/Lens/commit/87212e085194fc0d3bb7fe733b05b126926b3d20))
+
 ## 2.0.5 (2025-12-05)
 
 ### 📦 Dependencies
