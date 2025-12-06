@@ -251,10 +251,10 @@ function createQueryStore<TInput, TOutput>(
 		return queryResult.then((data) => data);
 	};
 
-	const endpoint = useQueryStore as QueryEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch;
+	// Attach fetch method to the store function
+	useQueryStore.fetch = fetch;
 
-	return endpoint;
+	return useQueryStore as unknown as QueryEndpoint<TInput, TOutput>;
 }
 
 /**
@@ -329,10 +329,10 @@ function createMutationStore<TInput, TOutput>(
 		return mutationResult.data;
 	};
 
-	const endpoint = useMutationStore as MutationEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch;
+	// Attach fetch method to the store function
+	useMutationStore.fetch = fetch;
 
-	return endpoint;
+	return useMutationStore as unknown as MutationEndpoint<TInput, TOutput>;
 }
 
 // =============================================================================
