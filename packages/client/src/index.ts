@@ -26,6 +26,7 @@ export {
 	type RouterLensClient,
 	type SelectedType,
 	type SelectionObject,
+	type TypedClientConfig,
 } from "./client/create.js";
 
 // =============================================================================

@@ -3,10 +3,44 @@
  *
  * Svelte stores for Lens API framework.
  * Provides reactive stores that integrate with Svelte's reactivity system.
+ *
+ * @example
+ * ```ts
+ * // lib/client.ts
+ * import { createClient } from '@sylphx/lens-svelte';
+ * import { httpTransport } from '@sylphx/lens-client';
+ * import type { AppRouter } from '@/server/router';
+ *
+ * export const client = createClient<AppRouter>({
+ *   transport: httpTransport({ url: '/api/lens' }),
+ * });
+ *
+ * // Component usage
+ * const userStore = client.user.get({ input: { id } });
+ * $: ({ data, loading } = $userStore);
+ *
+ * // SSR usage
+ * const user = await client.user.get.fetch({ input: { id } });
+ * ```
  */
 
 // =============================================================================
-// Stores
+// New API (v4) - Recommended
+// =============================================================================
+
+export {
+	createClient,
+	type MutationEndpoint,
+	type MutationHookOptions,
+	type MutationHookResult,
+	type QueryEndpoint,
+	type QueryHookOptions,
+	type QueryHookResult,
+	type TypedClient,
+} from "./create.js";
+
+// =============================================================================
+// Legacy API (v3) - Deprecated
 // =============================================================================
 
 export {
@@ -24,10 +58,6 @@ export {
 	// Store factories
 	query,
 } from "./stores.js";
-
-// =============================================================================
-// Context
-// =============================================================================
 
 export {
 	getLensClient,
