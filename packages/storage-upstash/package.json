@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-storage-upstash",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Upstash Redis storage adapter for Lens opLog plugin (HTTP-based)",
 	"type": "module",
 	"main": "./dist/index.js",

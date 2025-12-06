@@ -1,5 +1,17 @@
 # @sylphx/lens-react
 
+## 2.2.0 (2025-12-06)
+
+add unified createClient API for tRPC-style endpoint access
+
+### ✨ Features
+
+- **react,vue,solid,svelte:** add unified createClient API ([103e97b](https://github.com/SylphxAI/Lens/commit/103e97b41fcfc353f25fc4c8d28e0b753cf05e75))
+
+### 📚 Documentation
+
+- **react,vue,solid,svelte:** update READMEs for new createClient API ([87212e0](https://github.com/SylphxAI/Lens/commit/87212e085194fc0d3bb7fe733b05b126926b3d20))
+
 ## 2.1.7 (2025-12-05)
 
 fix(react): use production JSX runtime in build output

@@ -1,5 +1,14 @@
 # @sylphx/lens-client
 
+## 2.1.0 (2025-12-06)
+
+unified { input, select } API pattern for nested queries
+
+### ✨ Features
+
+- **react,vue,solid,svelte:** add unified createClient API ([103e97b](https://github.com/SylphxAI/Lens/commit/103e97b41fcfc353f25fc4c8d28e0b753cf05e75))
+- **client,server:** unified { input, select } API pattern ([b226d98](https://github.com/SylphxAI/Lens/commit/b226d984d7d60b42271b1267137d23b7b27b169a))
+
 ## 2.0.5 (2025-12-05)
 
 refactor: simplify createAccessor to delegate to executeQuery

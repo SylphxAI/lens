@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-next",
-	"version": "2.1.7",
+	"version": "2.1.8",
 	"description": "Next.js integration for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
