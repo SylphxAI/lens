@@ -1,5 +1,17 @@
 # @sylphx/lens-core
 
+## 2.2.0 (2025-12-07)
+
+### ✨ Features
+
+- **core,server:** implement field-level emit for independent field subscriptions ([aea81a4](https://github.com/SylphxAI/Lens/commit/aea81a43cf0d99c87fd60588a9898a62a9dc1cca))
+- **core,server:** add live query capabilities to field resolvers ([8a39b83](https://github.com/SylphxAI/Lens/commit/8a39b833a5b11f90c97c3a69efdfff5415b40043))
+
+### ♻️ Refactoring
+
+- **react,vue,svelte,solid:** unify client API with explicit hook/primitive methods ([cde4d11](https://github.com/SylphxAI/Lens/commit/cde4d11400790c016d8d37cc5ca132fed01ac147))
+- **core,server:** make emit/onCleanup non-optional in FieldLiveContext ([780c1b3](https://github.com/SylphxAI/Lens/commit/780c1b3c2284af1ba60d5dd8721f43fc07a936a2))
+
 ## 2.1.0 (2025-12-07)
 
 ### ✨ Features

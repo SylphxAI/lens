@@ -1,5 +1,11 @@
 # @sylphx/lens-react
 
+## 2.3.1 (2025-12-07)
+
+### ♻️ Refactoring
+
+- **react,vue,svelte,solid:** unify client API with explicit hook/primitive methods ([cde4d11](https://github.com/SylphxAI/Lens/commit/cde4d11400790c016d8d37cc5ca132fed01ac147))
+
 ## 2.3.0 (2025-12-07)
 
 ### ✨ Features

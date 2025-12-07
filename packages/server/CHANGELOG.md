@@ -1,5 +1,18 @@
 # @sylphx/lens-server
 
+## 2.3.0 (2025-12-07)
+
+### ✨ Features
+
+- **server:** add equality check to skip duplicate emissions ([708ac73](https://github.com/SylphxAI/Lens/commit/708ac7331189f63829a61d8359ea30562566f90f))
+- **core,server:** implement field-level emit for independent field subscriptions ([aea81a4](https://github.com/SylphxAI/Lens/commit/aea81a43cf0d99c87fd60588a9898a62a9dc1cca))
+- **core,server:** add live query capabilities to field resolvers ([8a39b83](https://github.com/SylphxAI/Lens/commit/8a39b833a5b11f90c97c3a69efdfff5415b40043))
+- **server:** wire up nested input to field resolvers (GraphQL-style) ([d977257](https://github.com/SylphxAI/Lens/commit/d97725760016e6f0096774fe5e470b7eea403b79))
+
+### ♻️ Refactoring
+
+- **core,server:** make emit/onCleanup non-optional in FieldLiveContext ([780c1b3](https://github.com/SylphxAI/Lens/commit/780c1b3c2284af1ba60d5dd8721f43fc07a936a2))
+
 ## 2.2.0 (2025-12-07)
 
 ### ✨ Features
