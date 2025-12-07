@@ -1,5 +1,11 @@
 # @sylphx/lens-core
 
+## 2.1.0 (2025-12-07)
+
+### ✨ Features
+
+- **server,client:** unified Observable-based streaming architecture ([233afb4](https://github.com/SylphxAI/Lens/commit/233afb4b49fe2257c7aa89590f1d7fbc5fec00be))
+
 ## 2.0.1 (2025-12-04)
 
 Fix: bypass deprecated 2.0.0 versions on npm registry.
