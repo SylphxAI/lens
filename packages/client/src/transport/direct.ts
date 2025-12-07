@@ -137,7 +137,7 @@ export function direct<TApp extends LensServerInterface>(
  * const client = createClient({ transport: direct({ app }) });
  * ```
  */
-export const inProcess = direct;
+export const inProcess: typeof direct = direct;
 
 /**
  * @deprecated Use `DirectTransportOptions` instead.
