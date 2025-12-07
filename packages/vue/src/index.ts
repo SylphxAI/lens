@@ -15,11 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // Component usage
- * const { data, loading } = client.user.get({ input: { id } });
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // SSR usage
- * const user = await client.user.get.fetch({ input: { id } });
+ * // Vue composables (in components)
+ * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
 

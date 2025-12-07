@@ -15,11 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // Component usage
- * const { data, loading } = client.user.get({ input: { id } });
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // SSR usage
- * const user = await client.user.get.fetch({ input: { id } });
+ * // SolidJS primitives (in components)
+ * const { data, loading } = client.user.get.createQuery({ input: { id } });
+ * const { mutate } = client.user.create.createMutation();
  * ```
  */
 
@@ -30,11 +32,11 @@
 export {
 	createClient,
 	type MutationEndpoint,
-	type MutationHookOptions,
-	type MutationHookResult,
+	type MutationPrimitiveOptions,
+	type MutationPrimitiveResult,
 	type QueryEndpoint,
-	type QueryHookOptions,
-	type QueryHookResult,
+	type QueryPrimitiveOptions,
+	type QueryPrimitiveResult,
 	type TypedClient,
 } from "./create.js";
 

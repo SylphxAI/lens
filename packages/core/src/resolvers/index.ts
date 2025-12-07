@@ -54,13 +54,11 @@ import type {
 	ExposedField,
 	FieldBuilder,
 	FieldDef,
-	FieldEmit,
 	FieldLiveContext,
 	FieldResolverContext,
 	FieldResolverFn,
 	FieldResolverFnNoArgs,
 	InferParent,
-	OnCleanup,
 	RelationFieldBuilder,
 	RelationFieldBuilderWithArgs,
 	ResolvedField,
@@ -356,10 +354,22 @@ class ResolverDefImpl<
 
 		const result: Record<string, unknown> = {};
 
+		// Create a no-op live context for batch resolution (no live query support)
+		const liveCtx: FieldLiveContext<TContext, unknown> = {
+			...ctx,
+			emit: () => {}, // No-op: resolveAll doesn't support live queries
+			onCleanup: () => {}, // No-op: resolveAll doesn't support live queries
+		};
+
 		await Promise.all(
 			fieldsToResolve.map(async ({ name, args }) => {
 				if (this.hasField(name)) {
-					result[name] = await this.resolveField(name as keyof TFields, parent, args ?? {}, ctx);
+					result[name] = await this.resolveField(
+						name as keyof TFields,
+						parent,
+						args ?? {},
+						liveCtx,
+					);
 				}
 			}),
 		);

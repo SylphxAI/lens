@@ -2,7 +2,7 @@
  * @sylphx/lens-solid - Create Client
  *
  * Creates a typed Lens client with SolidJS primitives.
- * Each endpoint can be called directly as a primitive or via .fetch() for promises.
+ * Base client methods work in vanilla JS, primitives are extensions.
  *
  * @example
  * ```tsx
@@ -15,11 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // In component
- * const { data, loading } = client.user.get({ input: { id } });
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // In SSR
- * const user = await client.user.get.fetch({ input: { id } });
+ * // SolidJS primitives (in components)
+ * const { data, loading } = client.user.get.createQuery({ input: { id } });
+ * const { mutate, loading } = client.user.create.createMutation();
  * ```
  */
 
@@ -31,14 +33,14 @@ import {
 	type TypedClientConfig,
 } from "@sylphx/lens-client";
 import type { MutationDef, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
-import { type Accessor, createEffect, createSignal, onCleanup } from "solid-js";
+import { type Accessor, createSignal, onCleanup } from "solid-js";
 
 // =============================================================================
 // Types
 // =============================================================================
 
-/** Query hook options */
-export interface QueryHookOptions<TInput> {
+/** Query primitive options */
+export interface QueryPrimitiveOptions<TInput> {
 	/** Query input parameters */
 	input?: TInput;
 	/** Field selection */
@@ -47,8 +49,8 @@ export interface QueryHookOptions<TInput> {
 	skip?: boolean;
 }
 
-/** Query hook result */
-export interface QueryHookResult<T> {
+/** Query primitive result */
+export interface QueryPrimitiveResult<T> {
 	/** Reactive data accessor */
 	data: Accessor<T | null>;
 	/** Reactive loading state */
@@ -59,8 +61,8 @@ export interface QueryHookResult<T> {
 	refetch: () => void;
 }
 
-/** Mutation hook options */
-export interface MutationHookOptions<TOutput> {
+/** Mutation primitive options */
+export interface MutationPrimitiveOptions<TOutput> {
 	/** Called on successful mutation */
 	onSuccess?: (data: TOutput) => void;
 	/** Called on mutation error */
@@ -69,8 +71,8 @@ export interface MutationHookOptions<TOutput> {
 	onSettled?: () => void;
 }
 
-/** Mutation hook result */
-export interface MutationHookResult<TInput, TOutput> {
+/** Mutation primitive result */
+export interface MutationPrimitiveResult<TInput, TOutput> {
 	/** Execute the mutation */
 	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
 	/** Reactive loading state */
@@ -83,31 +85,28 @@ export interface MutationHookResult<TInput, TOutput> {
 	reset: () => void;
 }
 
-/** Query endpoint type */
+/** Query endpoint with SolidJS primitives */
 export interface QueryEndpoint<TInput, TOutput> {
-	/** Primitive call (in component) */
-	<_TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
-	): QueryHookResult<TOutput>;
+	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
+	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void
-			? { input?: void; select?: TSelect } | void
-			: { input: TInput; select?: TSelect },
-	) => Promise<TOutput>;
+	/** SolidJS primitive for reactive queries */
+	createQuery: (
+		options?: TInput extends void
+			? QueryPrimitiveOptions<void> | void
+			: QueryPrimitiveOptions<TInput>,
+	) => QueryPrimitiveResult<TOutput>;
 }
 
-/** Mutation endpoint type */
+/** Mutation endpoint with SolidJS primitives */
 export interface MutationEndpoint<TInput, TOutput> {
-	/** Primitive call (in component) */
-	(options?: MutationHookOptions<TOutput>): MutationHookResult<TInput, TOutput>;
+	/** Vanilla JS call - returns Promise */
+	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(options: {
-		input: TInput;
-		select?: TSelect;
-	}) => Promise<TOutput>;
+	/** SolidJS primitive for mutations */
+	createMutation: (
+		options?: MutationPrimitiveOptions<TOutput>,
+	) => MutationPrimitiveResult<TInput, TOutput>;
 }
 
 /** Infer client type from router routes */
@@ -126,26 +125,18 @@ export type TypedClient<TRouter extends RouterDef> =
 	TRouter extends RouterDef<infer TRoutes> ? InferTypedClient<TRoutes> : never;
 
 // =============================================================================
-// Hook Factories
+// Primitive Factories
 // =============================================================================
 
 /**
- * Create a query primitive for a specific endpoint
+ * Create createQuery primitive for a specific endpoint
  */
-function createQueryHook<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): QueryEndpoint<TInput, TOutput> {
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<TOutput>;
-	};
-
-	const useQueryPrimitive = (options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> => {
+function createQueryPrimitiveFactory<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
+) {
+	return function createQuery(
+		options?: QueryPrimitiveOptions<TInput>,
+	): QueryPrimitiveResult<TOutput> {
 		const [data, setData] = createSignal<TOutput | null>(null);
 		const [loading, setLoading] = createSignal(!options?.skip);
 		const [error, setError] = createSignal<Error | null>(null);
@@ -165,7 +156,7 @@ function createQueryHook<TInput, TOutput>(
 				return;
 			}
 
-			const endpoint = getEndpoint(path);
+			const endpoint = getEndpoint();
 			const query = endpoint({ input: options?.input, select: options?.select });
 
 			setLoading(true);
@@ -191,15 +182,8 @@ function createQueryHook<TInput, TOutput>(
 			);
 		};
 
-		// Execute initial query synchronously
+		// Execute initial query
 		executeQuery();
-
-		// Use createEffect for reactive updates when options change
-		createEffect(() => {
-			// Access options to track them (Solid will re-run when they change)
-			const _ = JSON.stringify(options);
-			executeQuery();
-		});
 
 		onCleanup(() => {
 			if (unsubscribe) {
@@ -215,7 +199,7 @@ function createQueryHook<TInput, TOutput>(
 			}
 			setLoading(true);
 			setError(null);
-			const endpoint = getEndpoint(path);
+			const endpoint = getEndpoint();
 			const query = endpoint({ input: options?.input, select: options?.select });
 			if (query) {
 				unsubscribe = query.subscribe((value) => {
@@ -239,42 +223,17 @@ function createQueryHook<TInput, TOutput>(
 
 		return { data, loading, error, refetch };
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options?: {
-		input?: TInput;
-		select?: SelectionObject;
-	}): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const queryResult = endpoint({ input: options?.input, select: options?.select });
-		return queryResult.then((data) => data);
-	};
-
-	// Attach fetch method to the hook function
-	useQueryPrimitive.fetch = fetch;
-
-	return useQueryPrimitive as unknown as QueryEndpoint<TInput, TOutput>;
 }
 
 /**
- * Create a mutation primitive for a specific endpoint
+ * Create createMutation primitive for a specific endpoint
  */
-function createMutationHook<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): MutationEndpoint<TInput, TOutput> {
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<{ data: TOutput }>;
-	};
-
-	const useMutationPrimitive = (
-		hookOptions?: MutationHookOptions<TOutput>,
-	): MutationHookResult<TInput, TOutput> => {
+function createMutationPrimitiveFactory<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => Promise<{ data: TOutput }>,
+) {
+	return function createMutation(
+		primitiveOptions?: MutationPrimitiveOptions<TOutput>,
+	): MutationPrimitiveResult<TInput, TOutput> {
 		const [data, setData] = createSignal<TOutput | null>(null);
 		const [loading, setLoading] = createSignal(false);
 		const [error, setError] = createSignal<Error | null>(null);
@@ -287,24 +246,23 @@ function createMutationHook<TInput, TOutput>(
 			setError(null);
 
 			try {
-				const endpoint = getEndpoint(path);
+				const endpoint = getEndpoint();
 				const result = await endpoint({ input: options.input, select: options.select });
-				const mutationResult = result as unknown as { data: TOutput };
 
-				setData(() => mutationResult.data);
+				setData(() => result.data);
 				setLoading(false);
 
-				hookOptions?.onSuccess?.(mutationResult.data);
-				hookOptions?.onSettled?.();
+				primitiveOptions?.onSuccess?.(result.data);
+				primitiveOptions?.onSettled?.();
 
-				return mutationResult.data;
+				return result.data;
 			} catch (err) {
 				const mutationError = err instanceof Error ? err : new Error(String(err));
 				setError(mutationError);
 				setLoading(false);
 
-				hookOptions?.onError?.(mutationError);
-				hookOptions?.onSettled?.();
+				primitiveOptions?.onError?.(mutationError);
+				primitiveOptions?.onSettled?.();
 
 				throw mutationError;
 			}
@@ -318,34 +276,20 @@ function createMutationHook<TInput, TOutput>(
 
 		return { mutate, loading, error, data, reset };
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options: { input: TInput; select?: SelectionObject }): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const result = await endpoint({ input: options.input, select: options.select });
-		const mutationResult = result as unknown as { data: TOutput };
-		return mutationResult.data;
-	};
-
-	// Attach fetch method to the hook function
-	useMutationPrimitive.fetch = fetch;
-
-	return useMutationPrimitive as unknown as MutationEndpoint<TInput, TOutput>;
 }
 
 // =============================================================================
 // Create Client
 // =============================================================================
 
-// Cache for hook functions
-const hookCache = new Map<string, unknown>();
+// Cache for primitive functions to ensure stable references
+const primitiveCache = new Map<string, unknown>();
 
 /**
  * Create a Lens client with SolidJS primitives.
  *
- * Each endpoint can be called:
- * - Directly as a primitive: `client.user.get({ input: { id } })`
- * - Via .fetch() for promises: `await client.user.get.fetch({ input: { id } })`
+ * Base client methods work in vanilla JS (SSR, utilities, event handlers).
+ * SolidJS primitives are available as `.createQuery()` and `.createMutation()`.
  *
  * @example
  * ```tsx
@@ -358,14 +302,16 @@ const hookCache = new Map<string, unknown>();
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
+ * // Vanilla JS (anywhere)
+ * const user = await client.user.get({ input: { id } });
+ *
  * // Component usage
  * function UserProfile(props: { id: string }) {
- *   const { data, loading, error } = client.user.get({
+ *   const { data, loading, error } = client.user.get.createQuery({
  *     input: { id: props.id },
- *     select: { name: true },
  *   });
  *
- *   const { mutate, loading: saving } = client.user.update({
+ *   const { mutate, loading: saving } = client.user.update.createMutation({
  *     onSuccess: () => console.log('Updated!'),
  *   });
  *
@@ -386,6 +332,7 @@ const hookCache = new Map<string, unknown>();
 export function createClient<TRouter extends RouterDef>(
 	config: LensClientConfig | TypedClientConfig<{ router: TRouter }>,
 ): TypedClient<TRouter> {
+	// Create base client for transport
 	const baseClient = createBaseClient(config as LensClientConfig);
 
 	function createProxy(path: string): unknown {
@@ -394,27 +341,38 @@ export function createClient<TRouter extends RouterDef>(
 				if (typeof prop === "symbol") return undefined;
 				const key = prop as string;
 
-				if (key === "fetch") {
-					return async (options: unknown) => {
-						const parts = path.split(".");
-						let current: unknown = baseClient;
-						for (const part of parts) {
-							current = (current as Record<string, unknown>)[part];
-						}
-						const endpointFn = current as (opts: unknown) => QueryResult<unknown>;
-						const queryResult = endpointFn(options);
-						const result = await queryResult;
+				// Handle .createQuery() - SolidJS primitive for queries
+				if (key === "createQuery") {
+					const cacheKey = `${path}:createQuery`;
+					if (!primitiveCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => QueryResult<unknown>;
+						};
+						primitiveCache.set(cacheKey, createQueryPrimitiveFactory(getEndpoint));
+					}
+					return primitiveCache.get(cacheKey);
+				}
 
-						if (
-							result &&
-							typeof result === "object" &&
-							"data" in result &&
-							Object.keys(result).length === 1
-						) {
-							return (result as { data: unknown }).data;
-						}
-						return result;
-					};
+				// Handle .createMutation() - SolidJS primitive for mutations
+				if (key === "createMutation") {
+					const cacheKey = `${path}:createMutation`;
+					if (!primitiveCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => Promise<{ data: unknown }>;
+						};
+						primitiveCache.set(cacheKey, createMutationPrimitiveFactory(getEndpoint));
+					}
+					return primitiveCache.get(cacheKey);
 				}
 
 				if (key === "then") return undefined;
@@ -425,47 +383,19 @@ export function createClient<TRouter extends RouterDef>(
 			},
 
 			apply(_target, _thisArg, args) {
-				const options = args[0] as Record<string, unknown> | undefined;
-
-				const isQueryOptions =
-					options && ("input" in options || "select" in options || "skip" in options);
-
-				const isMutationOptions =
-					!options ||
-					(!isQueryOptions &&
-						(Object.keys(options).length === 0 ||
-							"onSuccess" in options ||
-							"onError" in options ||
-							"onSettled" in options));
-
-				const cacheKeyQuery = `${path}:query`;
-				const cacheKeyMutation = `${path}:mutation`;
-
-				if (isQueryOptions) {
-					if (!hookCache.has(cacheKeyQuery)) {
-						hookCache.set(cacheKeyQuery, createQueryHook(baseClient, path));
-					}
-					const hook = hookCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-					return hook(options);
+				// Direct call - delegate to base client (returns QueryResult or Promise)
+				const parts = path.split(".");
+				let current: unknown = baseClient;
+				for (const part of parts) {
+					current = (current as Record<string, unknown>)[part];
 				}
-
-				if (isMutationOptions) {
-					if (!hookCache.has(cacheKeyMutation)) {
-						hookCache.set(cacheKeyMutation, createMutationHook(baseClient, path));
-					}
-					const hook = hookCache.get(cacheKeyMutation) as (opts: unknown) => unknown;
-					return hook(options);
-				}
-
-				if (!hookCache.has(cacheKeyQuery)) {
-					hookCache.set(cacheKeyQuery, createQueryHook(baseClient, path));
-				}
-				const hook = hookCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-				return hook(options);
+				const endpoint = current as (options: unknown) => unknown;
+				return endpoint(args[0]);
 			},
 		};
 
-		return new Proxy((() => {}) as (...args: unknown[]) => unknown, handler);
+		const proxy = new Proxy((() => {}) as (...args: unknown[]) => unknown, handler);
+		return proxy;
 	}
 
 	return createProxy("") as TypedClient<TRouter>;

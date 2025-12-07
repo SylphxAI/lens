@@ -15,12 +15,15 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // Component usage
- * const userStore = client.user.get({ input: { id } });
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ *
+ * // Svelte stores (in components)
+ * const userStore = client.user.get.createQuery({ input: { id } });
  * $: ({ data, loading } = $userStore);
  *
- * // SSR usage
- * const user = await client.user.get.fetch({ input: { id } });
+ * const { mutate } = client.user.create.createMutation();
  * ```
  */
 
@@ -31,11 +34,13 @@
 export {
 	createClient,
 	type MutationEndpoint,
-	type MutationHookOptions,
-	type MutationHookResult,
+	type MutationStoreOptions,
+	type MutationStoreResult,
+	type MutationStoreValue,
 	type QueryEndpoint,
-	type QueryHookOptions,
-	type QueryHookResult,
+	type QueryStoreOptions,
+	type QueryStoreResult,
+	type QueryStoreValue,
 	type TypedClient,
 } from "./create.js";
 
@@ -58,13 +63,12 @@ export {
 	lazyQuery,
 	type MutationFn,
 	type MutationStore,
-	type MutationStoreValue,
+	// Note: MutationStoreValue exported from create.js (new API)
 	mutation,
 	// Types
 	type QueryInput,
 	type QueryStore,
-	type QueryStoreOptions,
-	type QueryStoreValue,
+	// Note: QueryStoreOptions, QueryStoreValue exported from create.js (new API)
 	// Store factories
 	query,
 } from "./stores.js";

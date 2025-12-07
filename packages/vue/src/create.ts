@@ -2,7 +2,7 @@
  * @sylphx/lens-vue - Create Client
  *
  * Creates a typed Lens client with Vue composables.
- * Each endpoint can be called directly as a composable or via .fetch() for promises.
+ * Base client methods work in vanilla JS, composables are extensions.
  *
  * @example
  * ```ts
@@ -15,11 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // In component
- * const { data, loading } = client.user.get({ input: { id } });
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // In SSR
- * const user = await client.user.get.fetch({ input: { id } });
+ * // Vue composables (in components)
+ * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
 
@@ -37,7 +39,7 @@ import { onUnmounted, type Ref, ref, type ShallowRef, shallowRef, watchEffect } 
 // Types
 // =============================================================================
 
-/** Query hook options */
+/** Query composable options */
 export interface QueryHookOptions<TInput> {
 	/** Query input parameters */
 	input?: TInput;
@@ -47,7 +49,7 @@ export interface QueryHookOptions<TInput> {
 	skip?: boolean | Ref<boolean>;
 }
 
-/** Query hook result */
+/** Query composable result */
 export interface QueryHookResult<T> {
 	/** Reactive data ref */
 	data: ShallowRef<T | null>;
@@ -59,7 +61,7 @@ export interface QueryHookResult<T> {
 	refetch: () => void;
 }
 
-/** Mutation hook options */
+/** Mutation composable options */
 export interface MutationHookOptions<TOutput> {
 	/** Called on successful mutation */
 	onSuccess?: (data: TOutput) => void;
@@ -69,7 +71,7 @@ export interface MutationHookOptions<TOutput> {
 	onSettled?: () => void;
 }
 
-/** Mutation hook result */
+/** Mutation composable result */
 export interface MutationHookResult<TInput, TOutput> {
 	/** Execute the mutation */
 	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
@@ -83,31 +85,24 @@ export interface MutationHookResult<TInput, TOutput> {
 	reset: () => void;
 }
 
-/** Query endpoint type */
+/** Query endpoint with Vue composables */
 export interface QueryEndpoint<TInput, TOutput> {
-	/** Composable call (in component) */
-	<_TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
-	): QueryHookResult<TOutput>;
+	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
+	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void
-			? { input?: void; select?: TSelect } | void
-			: { input: TInput; select?: TSelect },
-	) => Promise<TOutput>;
+	/** Vue composable for reactive queries */
+	useQuery: (
+		options?: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
+	) => QueryHookResult<TOutput>;
 }
 
-/** Mutation endpoint type */
+/** Mutation endpoint with Vue composables */
 export interface MutationEndpoint<TInput, TOutput> {
-	/** Composable call (in component) */
-	(options?: MutationHookOptions<TOutput>): MutationHookResult<TInput, TOutput>;
+	/** Vanilla JS call - returns Promise */
+	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(options: {
-		input: TInput;
-		select?: TSelect;
-	}) => Promise<TOutput>;
+	/** Vue composable for mutations */
+	useMutation: (options?: MutationHookOptions<TOutput>) => MutationHookResult<TInput, TOutput>;
 }
 
 /** Infer client type from router routes */
@@ -126,26 +121,16 @@ export type TypedClient<TRouter extends RouterDef> =
 	TRouter extends RouterDef<infer TRoutes> ? InferTypedClient<TRoutes> : never;
 
 // =============================================================================
-// Hook Factories
+// Composable Factories
 // =============================================================================
 
 /**
- * Create a query composable for a specific endpoint
+ * Create useQuery composable for a specific endpoint
  */
-function createQueryHook<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): QueryEndpoint<TInput, TOutput> {
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<TOutput>;
-	};
-
-	const useQueryComposable = (options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> => {
+function createUseQueryComposable<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
+) {
+	return function useQuery(options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> {
 		const data = shallowRef<TOutput | null>(null);
 		const loading = ref(true);
 		const error = shallowRef<Error | null>(null);
@@ -167,7 +152,7 @@ function createQueryHook<TInput, TOutput>(
 				return;
 			}
 
-			const endpoint = getEndpoint(path);
+			const endpoint = getEndpoint();
 			const query = endpoint({ input: options?.input, select: options?.select });
 
 			loading.value = true;
@@ -213,7 +198,7 @@ function createQueryHook<TInput, TOutput>(
 				unsubscribe = null;
 			}
 			loading.value = true;
-			const endpoint = getEndpoint(path);
+			const endpoint = getEndpoint();
 			const query = endpoint({ input: options?.input, select: options?.select });
 			if (query) {
 				unsubscribe = query.subscribe((value) => {
@@ -236,42 +221,17 @@ function createQueryHook<TInput, TOutput>(
 
 		return { data, loading, error, refetch };
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options?: {
-		input?: TInput;
-		select?: SelectionObject;
-	}): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const queryResult = endpoint({ input: options?.input, select: options?.select });
-		return queryResult.then((data) => data);
-	};
-
-	const endpoint = useQueryComposable as unknown as QueryEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch as QueryEndpoint<TInput, TOutput>["fetch"];
-
-	return endpoint;
 }
 
 /**
- * Create a mutation composable for a specific endpoint
+ * Create useMutation composable for a specific endpoint
  */
-function createMutationHook<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): MutationEndpoint<TInput, TOutput> {
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<{ data: TOutput }>;
-	};
-
-	const useMutationComposable = (
+function createUseMutationComposable<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => Promise<{ data: TOutput }>,
+) {
+	return function useMutation(
 		hookOptions?: MutationHookOptions<TOutput>,
-	): MutationHookResult<TInput, TOutput> => {
+	): MutationHookResult<TInput, TOutput> {
 		const data = shallowRef<TOutput | null>(null);
 		const loading = ref(false);
 		const error = shallowRef<Error | null>(null);
@@ -284,17 +244,16 @@ function createMutationHook<TInput, TOutput>(
 			error.value = null;
 
 			try {
-				const endpoint = getEndpoint(path);
+				const endpoint = getEndpoint();
 				const result = await endpoint({ input: options.input, select: options.select });
-				const mutationResult = result as unknown as { data: TOutput };
 
-				data.value = mutationResult.data;
+				data.value = result.data;
 				loading.value = false;
 
-				hookOptions?.onSuccess?.(mutationResult.data);
+				hookOptions?.onSuccess?.(result.data);
 				hookOptions?.onSettled?.();
 
-				return mutationResult.data;
+				return result.data;
 			} catch (err) {
 				const mutationError = err instanceof Error ? err : new Error(String(err));
 				error.value = mutationError;
@@ -315,34 +274,20 @@ function createMutationHook<TInput, TOutput>(
 
 		return { mutate, loading, error, data, reset };
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options: { input: TInput; select?: SelectionObject }): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const result = await endpoint({ input: options.input, select: options.select });
-		const mutationResult = result as unknown as { data: TOutput };
-		return mutationResult.data;
-	};
-
-	const endpoint = useMutationComposable as MutationEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch;
-
-	return endpoint;
 }
 
 // =============================================================================
 // Create Client
 // =============================================================================
 
-// Cache for hook functions to ensure stable references
-const hookCache = new Map<string, unknown>();
+// Cache for composable functions to ensure stable references
+const composableCache = new Map<string, unknown>();
 
 /**
  * Create a Lens client with Vue composables.
  *
- * Each endpoint can be called:
- * - Directly as a composable: `client.user.get({ input: { id } })`
- * - Via .fetch() for promises: `await client.user.get.fetch({ input: { id } })`
+ * Base client methods work in vanilla JS (SSR, utilities, event handlers).
+ * Vue composables are available as `.useQuery()` and `.useMutation()`.
  *
  * @example
  * ```ts
@@ -354,6 +299,9 @@ const hookCache = new Map<string, unknown>();
  * export const client = createClient<AppRouter>({
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
+ *
+ * // Vanilla JS (anywhere)
+ * const user = await client.user.get({ input: { id } });
  * ```
  *
  * ```vue
@@ -363,13 +311,12 @@ const hookCache = new Map<string, unknown>();
  * const props = defineProps<{ id: string }>();
  *
  * // Query composable - auto-subscribes
- * const { data, loading, error } = client.user.get({
+ * const { data, loading, error } = client.user.get.useQuery({
  *   input: { id: props.id },
- *   select: { name: true },
  * });
  *
  * // Mutation composable - returns mutate function
- * const { mutate, loading: saving } = client.user.update({
+ * const { mutate, loading: saving } = client.user.update.useMutation({
  *   onSuccess: () => console.log('Updated!'),
  * });
  *
@@ -390,6 +337,7 @@ const hookCache = new Map<string, unknown>();
 export function createClient<TRouter extends RouterDef>(
 	config: LensClientConfig | TypedClientConfig<{ router: TRouter }>,
 ): TypedClient<TRouter> {
+	// Create base client for transport
 	const baseClient = createBaseClient(config as LensClientConfig);
 
 	function createProxy(path: string): unknown {
@@ -398,28 +346,38 @@ export function createClient<TRouter extends RouterDef>(
 				if (typeof prop === "symbol") return undefined;
 				const key = prop as string;
 
-				// Handle .fetch() method
-				if (key === "fetch") {
-					return async (options: unknown) => {
-						const parts = path.split(".");
-						let current: unknown = baseClient;
-						for (const part of parts) {
-							current = (current as Record<string, unknown>)[part];
-						}
-						const endpointFn = current as (opts: unknown) => QueryResult<unknown>;
-						const queryResult = endpointFn(options);
-						const result = await queryResult;
+				// Handle .useQuery() - Vue composable for queries
+				if (key === "useQuery") {
+					const cacheKey = `${path}:useQuery`;
+					if (!composableCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => QueryResult<unknown>;
+						};
+						composableCache.set(cacheKey, createUseQueryComposable(getEndpoint));
+					}
+					return composableCache.get(cacheKey);
+				}
 
-						if (
-							result &&
-							typeof result === "object" &&
-							"data" in result &&
-							Object.keys(result).length === 1
-						) {
-							return (result as { data: unknown }).data;
-						}
-						return result;
-					};
+				// Handle .useMutation() - Vue composable for mutations
+				if (key === "useMutation") {
+					const cacheKey = `${path}:useMutation`;
+					if (!composableCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => Promise<{ data: unknown }>;
+						};
+						composableCache.set(cacheKey, createUseMutationComposable(getEndpoint));
+					}
+					return composableCache.get(cacheKey);
 				}
 
 				if (key === "then") return undefined;
@@ -430,47 +388,19 @@ export function createClient<TRouter extends RouterDef>(
 			},
 
 			apply(_target, _thisArg, args) {
-				const options = args[0] as Record<string, unknown> | undefined;
-
-				const isQueryOptions =
-					options && ("input" in options || "select" in options || "skip" in options);
-
-				const isMutationOptions =
-					!options ||
-					(!isQueryOptions &&
-						(Object.keys(options).length === 0 ||
-							"onSuccess" in options ||
-							"onError" in options ||
-							"onSettled" in options));
-
-				const cacheKeyQuery = `${path}:query`;
-				const cacheKeyMutation = `${path}:mutation`;
-
-				if (isQueryOptions) {
-					if (!hookCache.has(cacheKeyQuery)) {
-						hookCache.set(cacheKeyQuery, createQueryHook(baseClient, path));
-					}
-					const hook = hookCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-					return hook(options);
+				// Direct call - delegate to base client (returns QueryResult or Promise)
+				const parts = path.split(".");
+				let current: unknown = baseClient;
+				for (const part of parts) {
+					current = (current as Record<string, unknown>)[part];
 				}
-
-				if (isMutationOptions) {
-					if (!hookCache.has(cacheKeyMutation)) {
-						hookCache.set(cacheKeyMutation, createMutationHook(baseClient, path));
-					}
-					const hook = hookCache.get(cacheKeyMutation) as (opts: unknown) => unknown;
-					return hook(options);
-				}
-
-				if (!hookCache.has(cacheKeyQuery)) {
-					hookCache.set(cacheKeyQuery, createQueryHook(baseClient, path));
-				}
-				const hook = hookCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-				return hook(options);
+				const endpoint = current as (options: unknown) => unknown;
+				return endpoint(args[0]);
 			},
 		};
 
-		return new Proxy((() => {}) as (...args: unknown[]) => unknown, handler);
+		const proxy = new Proxy((() => {}) as (...args: unknown[]) => unknown, handler);
+		return proxy;
 	}
 
 	return createProxy("") as TypedClient<TRouter>;

@@ -2,7 +2,7 @@
  * @sylphx/lens-svelte - Create Client
  *
  * Creates a typed Lens client with Svelte stores.
- * Each endpoint can be called directly as a store or via .fetch() for promises.
+ * Base client methods work in vanilla JS, stores are extensions.
  *
  * @example
  * ```ts
@@ -15,12 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // In component
- * const userStore = client.user.get({ input: { id } });
- * $: ({ data, loading, error } = $userStore);
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // In SSR/load function
- * const user = await client.user.get.fetch({ input: { id } });
+ * // Svelte stores (in components)
+ * const { data, loading } = client.user.get.createQuery({ input: { id } });
+ * const { mutate, loading } = client.user.create.createMutation();
  * ```
  */
 
@@ -48,8 +49,8 @@ export interface QueryStoreValue<T> {
 	error: Error | null;
 }
 
-/** Query hook options */
-export interface QueryHookOptions<TInput> {
+/** Query store options */
+export interface QueryStoreOptions<TInput> {
 	/** Query input parameters */
 	input?: TInput;
 	/** Field selection */
@@ -58,14 +59,14 @@ export interface QueryHookOptions<TInput> {
 	skip?: boolean;
 }
 
-/** Query hook result - Svelte store with refetch */
-export interface QueryHookResult<T> extends Readable<QueryStoreValue<T>> {
+/** Query store result - Svelte store with refetch */
+export interface QueryStoreResult<T> extends Readable<QueryStoreValue<T>> {
 	/** Refetch the query */
 	refetch: () => void;
 }
 
-/** Mutation hook options */
-export interface MutationHookOptions<TOutput> {
+/** Mutation store options */
+export interface MutationStoreOptions<TOutput> {
 	/** Called on successful mutation */
 	onSuccess?: (data: TOutput) => void;
 	/** Called on mutation error */
@@ -84,39 +85,33 @@ export interface MutationStoreValue<TOutput> {
 	error: Error | null;
 }
 
-/** Mutation hook result - Svelte store with mutate/reset */
-export interface MutationHookResult<TInput, TOutput> extends Readable<MutationStoreValue<TOutput>> {
+/** Mutation store result - Svelte store with mutate/reset */
+export interface MutationStoreResult<TInput, TOutput>
+	extends Readable<MutationStoreValue<TOutput>> {
 	/** Execute the mutation */
 	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
 	/** Reset mutation state */
 	reset: () => void;
 }
 
-/** Query endpoint type */
+/** Query endpoint with Svelte stores */
 export interface QueryEndpoint<TInput, TOutput> {
-	/** Store call (in component) */
-	<_TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
-	): QueryHookResult<TOutput>;
+	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
+	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void
-			? { input?: void; select?: TSelect } | void
-			: { input: TInput; select?: TSelect },
-	) => Promise<TOutput>;
+	/** Svelte store for reactive queries */
+	createQuery: (
+		options?: TInput extends void ? QueryStoreOptions<void> | void : QueryStoreOptions<TInput>,
+	) => QueryStoreResult<TOutput>;
 }
 
-/** Mutation endpoint type */
+/** Mutation endpoint with Svelte stores */
 export interface MutationEndpoint<TInput, TOutput> {
-	/** Store call (in component) */
-	(options?: MutationHookOptions<TOutput>): MutationHookResult<TInput, TOutput>;
+	/** Vanilla JS call - returns Promise */
+	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(options: {
-		input: TInput;
-		select?: TSelect;
-	}) => Promise<TOutput>;
+	/** Svelte store for mutations */
+	createMutation: (options?: MutationStoreOptions<TOutput>) => MutationStoreResult<TInput, TOutput>;
 }
 
 /** Infer client type from router routes */
@@ -139,22 +134,12 @@ export type TypedClient<TRouter extends RouterDef> =
 // =============================================================================
 
 /**
- * Create a query store for a specific endpoint
+ * Create createQuery store for a specific endpoint
  */
-function createQueryStore<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): QueryEndpoint<TInput, TOutput> {
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<TOutput>;
-	};
-
-	const useQueryStore = (options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> => {
+function createQueryStoreFactory<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
+) {
+	return function createQuery(options?: QueryStoreOptions<TInput>): QueryStoreResult<TOutput> {
 		const store = writable<QueryStoreValue<TOutput>>({
 			data: null,
 			loading: !options?.skip,
@@ -162,7 +147,6 @@ function createQueryStore<TInput, TOutput>(
 		});
 
 		let queryUnsubscribe: (() => void) | null = null;
-		let _currentQuery: QueryResult<TOutput> | null = null;
 		let subscriberCount = 0;
 
 		const executeQuery = () => {
@@ -177,9 +161,8 @@ function createQueryStore<TInput, TOutput>(
 				return;
 			}
 
-			const endpoint = getEndpoint(path);
+			const endpoint = getEndpoint();
 			const query = endpoint({ input: options?.input, select: options?.select });
-			_currentQuery = query;
 
 			store.set({ data: null, loading: true, error: null });
 
@@ -230,7 +213,6 @@ function createQueryStore<TInput, TOutput>(
 						queryUnsubscribe();
 						queryUnsubscribe = null;
 					}
-					_currentQuery = null;
 				}
 			};
 		};
@@ -240,42 +222,17 @@ function createQueryStore<TInput, TOutput>(
 			refetch,
 		};
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options?: {
-		input?: TInput;
-		select?: SelectionObject;
-	}): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const queryResult = endpoint({ input: options?.input, select: options?.select });
-		return queryResult.then((data) => data);
-	};
-
-	// Attach fetch method to the store function
-	useQueryStore.fetch = fetch;
-
-	return useQueryStore as unknown as QueryEndpoint<TInput, TOutput>;
 }
 
 /**
- * Create a mutation store for a specific endpoint
+ * Create createMutation store for a specific endpoint
  */
-function createMutationStore<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): MutationEndpoint<TInput, TOutput> {
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<{ data: TOutput }>;
-	};
-
-	const useMutationStore = (
-		hookOptions?: MutationHookOptions<TOutput>,
-	): MutationHookResult<TInput, TOutput> => {
+function createMutationStoreFactory<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => Promise<{ data: TOutput }>,
+) {
+	return function createMutation(
+		storeOptions?: MutationStoreOptions<TOutput>,
+	): MutationStoreResult<TInput, TOutput> {
 		const store = writable<MutationStoreValue<TOutput>>({
 			data: null,
 			loading: false,
@@ -289,22 +246,21 @@ function createMutationStore<TInput, TOutput>(
 			store.set({ data: null, loading: true, error: null });
 
 			try {
-				const endpoint = getEndpoint(path);
+				const endpoint = getEndpoint();
 				const result = await endpoint({ input: options.input, select: options.select });
-				const mutationResult = result as unknown as { data: TOutput };
 
-				store.set({ data: mutationResult.data, loading: false, error: null });
+				store.set({ data: result.data, loading: false, error: null });
 
-				hookOptions?.onSuccess?.(mutationResult.data);
-				hookOptions?.onSettled?.();
+				storeOptions?.onSuccess?.(result.data);
+				storeOptions?.onSettled?.();
 
-				return mutationResult.data;
+				return result.data;
 			} catch (err) {
 				const mutationError = err instanceof Error ? err : new Error(String(err));
 				store.set({ data: null, loading: false, error: mutationError });
 
-				hookOptions?.onError?.(mutationError);
-				hookOptions?.onSettled?.();
+				storeOptions?.onError?.(mutationError);
+				storeOptions?.onSettled?.();
 
 				throw mutationError;
 			}
@@ -320,19 +276,6 @@ function createMutationStore<TInput, TOutput>(
 			reset,
 		};
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options: { input: TInput; select?: SelectionObject }): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const result = await endpoint({ input: options.input, select: options.select });
-		const mutationResult = result as unknown as { data: TOutput };
-		return mutationResult.data;
-	};
-
-	// Attach fetch method to the store function
-	useMutationStore.fetch = fetch;
-
-	return useMutationStore as unknown as MutationEndpoint<TInput, TOutput>;
 }
 
 // =============================================================================
@@ -345,9 +288,8 @@ const storeCache = new Map<string, unknown>();
 /**
  * Create a Lens client with Svelte stores.
  *
- * Each endpoint can be called:
- * - Directly as a store: `client.user.get({ input: { id } })`
- * - Via .fetch() for promises: `await client.user.get.fetch({ input: { id } })`
+ * Base client methods work in vanilla JS (SSR, utilities, event handlers).
+ * Svelte stores are available as `.createQuery()` and `.createMutation()`.
  *
  * @example
  * ```ts
@@ -359,6 +301,9 @@ const storeCache = new Map<string, unknown>();
  * export const client = createClient<AppRouter>({
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
+ *
+ * // Vanilla JS (anywhere)
+ * const user = await client.user.get({ input: { id } });
  * ```
  *
  * ```svelte
@@ -368,10 +313,10 @@ const storeCache = new Map<string, unknown>();
  *   export let id: string;
  *
  *   // Query store - auto-subscribes with $
- *   $: userStore = client.user.get({ input: { id } });
+ *   $: userStore = client.user.get.createQuery({ input: { id } });
  *
  *   // Mutation store
- *   const updateUser = client.user.update({
+ *   const updateUser = client.user.update.createMutation({
  *     onSuccess: () => console.log('Updated!'),
  *   });
  *
@@ -395,6 +340,7 @@ const storeCache = new Map<string, unknown>();
 export function createClient<TRouter extends RouterDef>(
 	config: LensClientConfig | TypedClientConfig<{ router: TRouter }>,
 ): TypedClient<TRouter> {
+	// Create base client for transport
 	const baseClient = createBaseClient(config as LensClientConfig);
 
 	function createProxy(path: string): unknown {
@@ -403,28 +349,38 @@ export function createClient<TRouter extends RouterDef>(
 				if (typeof prop === "symbol") return undefined;
 				const key = prop as string;
 
-				// Handle .fetch() method
-				if (key === "fetch") {
-					return async (options: unknown) => {
-						const parts = path.split(".");
-						let current: unknown = baseClient;
-						for (const part of parts) {
-							current = (current as Record<string, unknown>)[part];
-						}
-						const endpointFn = current as (opts: unknown) => QueryResult<unknown>;
-						const queryResult = endpointFn(options);
-						const result = await queryResult;
+				// Handle .createQuery() - Svelte store for queries
+				if (key === "createQuery") {
+					const cacheKey = `${path}:createQuery`;
+					if (!storeCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => QueryResult<unknown>;
+						};
+						storeCache.set(cacheKey, createQueryStoreFactory(getEndpoint));
+					}
+					return storeCache.get(cacheKey);
+				}
 
-						if (
-							result &&
-							typeof result === "object" &&
-							"data" in result &&
-							Object.keys(result).length === 1
-						) {
-							return (result as { data: unknown }).data;
-						}
-						return result;
-					};
+				// Handle .createMutation() - Svelte store for mutations
+				if (key === "createMutation") {
+					const cacheKey = `${path}:createMutation`;
+					if (!storeCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => Promise<{ data: unknown }>;
+						};
+						storeCache.set(cacheKey, createMutationStoreFactory(getEndpoint));
+					}
+					return storeCache.get(cacheKey);
 				}
 
 				if (key === "then") return undefined;
@@ -435,47 +391,19 @@ export function createClient<TRouter extends RouterDef>(
 			},
 
 			apply(_target, _thisArg, args) {
-				const options = args[0] as Record<string, unknown> | undefined;
-
-				const isQueryOptions =
-					options && ("input" in options || "select" in options || "skip" in options);
-
-				const isMutationOptions =
-					!options ||
-					(!isQueryOptions &&
-						(Object.keys(options).length === 0 ||
-							"onSuccess" in options ||
-							"onError" in options ||
-							"onSettled" in options));
-
-				const cacheKeyQuery = `${path}:query`;
-				const cacheKeyMutation = `${path}:mutation`;
-
-				if (isQueryOptions) {
-					if (!storeCache.has(cacheKeyQuery)) {
-						storeCache.set(cacheKeyQuery, createQueryStore(baseClient, path));
-					}
-					const store = storeCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-					return store(options);
+				// Direct call - delegate to base client (returns QueryResult or Promise)
+				const parts = path.split(".");
+				let current: unknown = baseClient;
+				for (const part of parts) {
+					current = (current as Record<string, unknown>)[part];
 				}
-
-				if (isMutationOptions) {
-					if (!storeCache.has(cacheKeyMutation)) {
-						storeCache.set(cacheKeyMutation, createMutationStore(baseClient, path));
-					}
-					const store = storeCache.get(cacheKeyMutation) as (opts: unknown) => unknown;
-					return store(options);
-				}
-
-				if (!storeCache.has(cacheKeyQuery)) {
-					storeCache.set(cacheKeyQuery, createQueryStore(baseClient, path));
-				}
-				const store = storeCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-				return store(options);
+				const endpoint = current as (options: unknown) => unknown;
+				return endpoint(args[0]);
 			},
 		};
 
-		return new Proxy((() => {}) as (...args: unknown[]) => unknown, handler);
+		const proxy = new Proxy((() => {}) as (...args: unknown[]) => unknown, handler);
+		return proxy;
 	}
 
 	return createProxy("") as TypedClient<TRouter>;

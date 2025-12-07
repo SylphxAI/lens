@@ -15,14 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // Component usage
- * function UserProfile({ id }: { id: string }) {
- *   const { data, loading } = client.user.get({ input: { id } });
- *   return <div>{data?.name}</div>;
- * }
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // SSR usage
- * const user = await client.user.get.fetch({ input: { id } });
+ * // React hooks (in components)
+ * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
 

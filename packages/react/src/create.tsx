@@ -2,7 +2,7 @@
  * @sylphx/lens-react - Create Client
  *
  * Creates a typed Lens client with React hooks.
- * Each endpoint can be called directly as a hook or via .fetch() for promises.
+ * Base client methods work in vanilla JS, hooks are extensions.
  *
  * @example
  * ```tsx
@@ -15,14 +15,13 @@
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // In component
- * function UserProfile({ id }: { id: string }) {
- *   const { data, loading } = client.user.get({ input: { id } });
- *   return <div>{data?.name}</div>;
- * }
+ * // Vanilla JS (anywhere - SSR, utilities, event handlers)
+ * const user = await client.user.get({ input: { id } });
+ * client.user.get({ input: { id } }).subscribe(data => console.log(data));
  *
- * // In SSR
- * const user = await client.user.get.fetch({ input: { id } });
+ * // React hooks (in components)
+ * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
 
@@ -34,7 +33,7 @@ import {
 	type TypedClientConfig,
 } from "@sylphx/lens-client";
 import type { MutationDef, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 // =============================================================================
 // Types
@@ -86,31 +85,24 @@ export interface MutationHookResult<TInput, TOutput> {
 	reset: () => void;
 }
 
-/** Query endpoint type */
+/** Query endpoint with React hooks */
 export interface QueryEndpoint<TInput, TOutput> {
-	/** Hook call (in component) */
-	<_TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
-	): QueryHookResult<TOutput>;
+	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
+	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(
-		options: TInput extends void
-			? { input?: void; select?: TSelect } | void
-			: { input: TInput; select?: TSelect },
-	) => Promise<TOutput>;
+	/** React hook for reactive queries */
+	useQuery: (
+		options?: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
+	) => QueryHookResult<TOutput>;
 }
 
-/** Mutation endpoint type */
+/** Mutation endpoint with React hooks */
 export interface MutationEndpoint<TInput, TOutput> {
-	/** Hook call (in component) */
-	(options?: MutationHookOptions<TOutput>): MutationHookResult<TInput, TOutput>;
+	/** Vanilla JS call - returns Promise */
+	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
-	/** Promise call (SSR) */
-	fetch: <TSelect extends SelectionObject = Record<string, never>>(options: {
-		input: TInput;
-		select?: TSelect;
-	}) => Promise<TOutput>;
+	/** React hook for mutations */
+	useMutation: (options?: MutationHookOptions<TOutput>) => MutationHookResult<TInput, TOutput>;
 }
 
 /** Infer client type from router routes */
@@ -167,33 +159,18 @@ function queryReducer<T>(state: QueryState<T>, action: QueryAction<T>): QuerySta
 // =============================================================================
 
 /**
- * Create a query hook for a specific endpoint
+ * Create useQuery hook for a specific endpoint
  */
-function createQueryHook<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): QueryEndpoint<TInput, TOutput> {
-	// Cache for stable hook reference
-	let cachedHook: QueryEndpoint<TInput, TOutput> | null = null;
-
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<TOutput>;
-	};
-
-	const useQueryHook = (options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> => {
-		const _optionsKey = JSON.stringify(options ?? {});
-
+function createUseQueryHook<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
+) {
+	return function useQuery(options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> {
 		// Get query result from base client
 		const query = useMemo(() => {
 			if (options?.skip) return null;
-			const endpoint = getEndpoint(path);
+			const endpoint = getEndpoint();
 			return endpoint({ input: options?.input, select: options?.select });
-		}, [options?.input, options?.select, options?.skip, path]);
+		}, [options?.input, options?.select, options?.skip, getEndpoint]);
 
 		// State management
 		const initialState: QueryState<TOutput> = {
@@ -280,49 +257,20 @@ function createQueryHook<TInput, TOutput>(
 
 		return { data: state.data, loading: state.loading, error: state.error, refetch };
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options?: {
-		input?: TInput;
-		select?: SelectionObject;
-	}): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const queryResult = endpoint({ input: options?.input, select: options?.select });
-		return queryResult.then((data) => data);
-	};
-
-	// Create the endpoint object with hook + fetch
-	const endpoint = useQueryHook as unknown as QueryEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch as QueryEndpoint<TInput, TOutput>["fetch"];
-
-	cachedHook = endpoint;
-	return cachedHook;
 }
 
 /**
- * Create a mutation hook for a specific endpoint
+ * Create useMutation hook for a specific endpoint
  */
-function createMutationHook<TInput, TOutput>(
-	baseClient: unknown,
-	path: string,
-): MutationEndpoint<TInput, TOutput> {
-	let cachedHook: MutationEndpoint<TInput, TOutput> | null = null;
-
-	const getEndpoint = (p: string) => {
-		const parts = p.split(".");
-		let current: unknown = baseClient;
-		for (const part of parts) {
-			current = (current as Record<string, unknown>)[part];
-		}
-		return current as (options: unknown) => QueryResult<{ data: TOutput }>;
-	};
-
-	const useMutationHook = (
+function createUseMutationHook<TInput, TOutput>(
+	getEndpoint: () => (options: unknown) => Promise<{ data: TOutput }>,
+) {
+	return function useMutation(
 		hookOptions?: MutationHookOptions<TOutput>,
-	): MutationHookResult<TInput, TOutput> => {
-		const [loading, setLoading] = React.useState(false);
-		const [error, setError] = React.useState<Error | null>(null);
-		const [data, setData] = React.useState<TOutput | null>(null);
+	): MutationHookResult<TInput, TOutput> {
+		const [loading, setLoading] = useState(false);
+		const [error, setError] = useState<Error | null>(null);
+		const [data, setData] = useState<TOutput | null>(null);
 
 		const mountedRef = useRef(true);
 		const hookOptionsRef = useRef(hookOptions);
@@ -341,19 +289,18 @@ function createMutationHook<TInput, TOutput>(
 				setError(null);
 
 				try {
-					const endpoint = getEndpoint(path);
+					const endpoint = getEndpoint();
 					const result = await endpoint({ input: options.input, select: options.select });
-					const mutationResult = result as unknown as { data: TOutput };
 
 					if (mountedRef.current) {
-						setData(mutationResult.data);
+						setData(result.data);
 						setLoading(false);
 					}
 
-					hookOptionsRef.current?.onSuccess?.(mutationResult.data);
+					hookOptionsRef.current?.onSuccess?.(result.data);
 					hookOptionsRef.current?.onSettled?.();
 
-					return mutationResult.data;
+					return result.data;
 				} catch (err) {
 					const mutationError = err instanceof Error ? err : new Error(String(err));
 
@@ -368,7 +315,7 @@ function createMutationHook<TInput, TOutput>(
 					throw mutationError;
 				}
 			},
-			[path],
+			[getEndpoint],
 		);
 
 		const reset = useCallback(() => {
@@ -379,27 +326,7 @@ function createMutationHook<TInput, TOutput>(
 
 		return { mutate, loading, error, data, reset };
 	};
-
-	// Fetch method for promises (SSR)
-	const fetch = async (options: { input: TInput; select?: SelectionObject }): Promise<TOutput> => {
-		const endpoint = getEndpoint(path);
-		const result = await endpoint({ input: options.input, select: options.select });
-		const mutationResult = result as unknown as { data: TOutput };
-		return mutationResult.data;
-	};
-
-	const endpoint = useMutationHook as MutationEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch;
-
-	cachedHook = endpoint;
-	return cachedHook;
 }
-
-// =============================================================================
-// React import for useState (needed in mutation hook)
-// =============================================================================
-
-import * as React from "react";
 
 // =============================================================================
 // Create Client
@@ -411,9 +338,8 @@ const hookCache = new Map<string, unknown>();
 /**
  * Create a Lens client with React hooks.
  *
- * Each endpoint can be called:
- * - Directly as a hook: `client.user.get({ input: { id } })`
- * - Via .fetch() for promises: `await client.user.get.fetch({ input: { id } })`
+ * Base client methods work in vanilla JS (SSR, utilities, event handlers).
+ * React hooks are available as `.useQuery()` and `.useMutation()`.
  *
  * @example
  * ```tsx
@@ -426,20 +352,14 @@ const hookCache = new Map<string, unknown>();
  *   transport: httpTransport({ url: '/api/lens' }),
  * });
  *
- * // Component usage
+ * // Vanilla JS (anywhere)
+ * const user = await client.user.get({ input: { id } });
+ *
+ * // React component
  * function UserProfile({ id }: { id: string }) {
- *   // Query hook - auto-subscribes
- *   const { data, loading, error } = client.user.get({
- *     input: { id },
- *     select: { name: true },
- *   });
+ *   const { data, loading } = client.user.get.useQuery({ input: { id } });
+ *   const { mutate } = client.user.update.useMutation();
  *
- *   // Mutation hook - returns mutate function
- *   const { mutate, loading: saving } = client.user.update({
- *     onSuccess: () => toast('Updated!'),
- *   });
- *
- *   if (loading) return <Spinner />;
  *   return (
  *     <div>
  *       <h1>{data?.name}</h1>
@@ -449,12 +369,6 @@ const hookCache = new Map<string, unknown>();
  *     </div>
  *   );
  * }
- *
- * // SSR usage
- * async function UserPage({ id }: { id: string }) {
- *   const user = await client.user.get.fetch({ input: { id } });
- *   return <div>{user.name}</div>;
- * }
  * ```
  */
 export function createClient<TRouter extends RouterDef>(
@@ -463,50 +377,44 @@ export function createClient<TRouter extends RouterDef>(
 	// Create base client for transport
 	const baseClient = createBaseClient(config as LensClientConfig);
 
-	// Track endpoint types (query vs mutation) - determined at runtime via metadata
-	// For now, we'll detect based on the operation result
-	const _endpointTypes = new Map<string, "query" | "mutation">();
-
 	function createProxy(path: string): unknown {
-		const cacheKey = path;
-
-		// Return cached hook if available
-		if (hookCache.has(cacheKey)) {
-			return hookCache.get(cacheKey);
-		}
-
 		const handler: ProxyHandler<(...args: unknown[]) => unknown> = {
 			get(_target, prop) {
 				if (typeof prop === "symbol") return undefined;
 				const key = prop as string;
 
-				// Handle .fetch() method - returns a promise
-				if (key === "fetch") {
-					return async (options: unknown) => {
-						// Navigate to the endpoint in base client
-						const parts = path.split(".");
-						let current: unknown = baseClient;
-						for (const part of parts) {
-							current = (current as Record<string, unknown>)[part];
-						}
-						const endpointFn = current as (opts: unknown) => QueryResult<unknown>;
-						const queryResult = endpointFn(options);
+				// Handle .useQuery() - React hook for queries
+				if (key === "useQuery") {
+					const cacheKey = `${path}:useQuery`;
+					if (!hookCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => QueryResult<unknown>;
+						};
+						hookCache.set(cacheKey, createUseQueryHook(getEndpoint));
+					}
+					return hookCache.get(cacheKey);
+				}
 
-						// Await the result
-						const result = await queryResult;
-
-						// For mutations, the result is { data: ... }
-						// For queries, the result is the data directly
-						if (
-							result &&
-							typeof result === "object" &&
-							"data" in result &&
-							Object.keys(result).length === 1
-						) {
-							return (result as { data: unknown }).data;
-						}
-						return result;
-					};
+				// Handle .useMutation() - React hook for mutations
+				if (key === "useMutation") {
+					const cacheKey = `${path}:useMutation`;
+					if (!hookCache.has(cacheKey)) {
+						const getEndpoint = () => {
+							const parts = path.split(".");
+							let current: unknown = baseClient;
+							for (const part of parts) {
+								current = (current as Record<string, unknown>)[part];
+							}
+							return current as (options: unknown) => Promise<{ data: unknown }>;
+						};
+						hookCache.set(cacheKey, createUseMutationHook(getEndpoint));
+					}
+					return hookCache.get(cacheKey);
 				}
 
 				if (key === "then") return undefined;
@@ -517,51 +425,14 @@ export function createClient<TRouter extends RouterDef>(
 			},
 
 			apply(_target, _thisArg, args) {
-				// This is called when the endpoint is invoked as a function
-				// Detect query vs mutation based on options shape:
-				// - Query: has `input` or `select` or `skip` (QueryHookOptions)
-				// - Mutation: has `onSuccess`, `onError`, `onSettled` or no options (MutationHookOptions)
-
-				const options = args[0] as Record<string, unknown> | undefined;
-
-				// Detect based on option keys
-				const isQueryOptions =
-					options && ("input" in options || "select" in options || "skip" in options);
-
-				const isMutationOptions =
-					!options ||
-					(!isQueryOptions &&
-						(Object.keys(options).length === 0 ||
-							"onSuccess" in options ||
-							"onError" in options ||
-							"onSettled" in options));
-
-				// Check cache - but we need to know the type first
-				const cacheKeyQuery = `${path}:query`;
-				const cacheKeyMutation = `${path}:mutation`;
-
-				if (isQueryOptions) {
-					if (!hookCache.has(cacheKeyQuery)) {
-						hookCache.set(cacheKeyQuery, createQueryHook(baseClient, path));
-					}
-					const hook = hookCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-					return hook(options);
+				// Direct call - delegate to base client (returns QueryResult or Promise)
+				const parts = path.split(".");
+				let current: unknown = baseClient;
+				for (const part of parts) {
+					current = (current as Record<string, unknown>)[part];
 				}
-
-				if (isMutationOptions) {
-					if (!hookCache.has(cacheKeyMutation)) {
-						hookCache.set(cacheKeyMutation, createMutationHook(baseClient, path));
-					}
-					const hook = hookCache.get(cacheKeyMutation) as (opts: unknown) => unknown;
-					return hook(options);
-				}
-
-				// Fallback to query
-				if (!hookCache.has(cacheKeyQuery)) {
-					hookCache.set(cacheKeyQuery, createQueryHook(baseClient, path));
-				}
-				const hook = hookCache.get(cacheKeyQuery) as (opts: unknown) => unknown;
-				return hook(options);
+				const endpoint = current as (options: unknown) => unknown;
+				return endpoint(args[0]);
 			},
 		};
 
