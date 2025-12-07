@@ -1,5 +1,13 @@
 # @sylphx/lens-nuxt
 
+## 2.1.1 (2025-12-07)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.2.0
+- Updated `@sylphx/lens-server` to 2.3.0
+- Updated `@sylphx/lens-vue` to 2.2.1
+
 ## 2.1.0 (2025-12-07)
 
 ### ✨ Features

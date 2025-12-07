@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3 (2025-12-07)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.2.0
+- Updated `@sylphx/lens-server` to 2.3.0
+
 ## 1.0.2 (2025-12-07)
 
 ### 📦 Dependencies

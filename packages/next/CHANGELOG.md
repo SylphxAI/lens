@@ -1,5 +1,13 @@
 # @sylphx/lens-next
 
+## 2.2.1 (2025-12-07)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.2.0
+- Updated `@sylphx/lens-react` to 2.3.1
+- Updated `@sylphx/lens-server` to 2.3.0
+
 ## 2.2.0 (2025-12-07)
 
 ### ✨ Features
