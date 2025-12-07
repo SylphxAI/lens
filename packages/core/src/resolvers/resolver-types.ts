@@ -16,26 +16,44 @@ import type { EntityDefinition, FieldType } from "../schema/types.js";
 /** Base context type for field resolvers - extend this for your app */
 export type FieldResolverContext = Record<string, unknown>;
 
+/** Cleanup function registration */
+export type OnCleanup = (fn: () => void) => void;
+
+/** Emit function for field updates (generic version) */
+export type FieldEmit<T> = (value: T) => void;
+
 // =============================================================================
 // Resolver Function Types
 // =============================================================================
 
-/** Resolver function params (object style) */
-export type FieldResolverParams<TParent, TArgs, TContext> = {
+/**
+ * Resolver function params (object style)
+ *
+ * Live query capabilities (emit, onCleanup) are optional:
+ * - Available when called from a live subscription context
+ * - Not available when called via DataLoader batching
+ */
+export type FieldResolverParams<TParent, TArgs, TContext, TResult = unknown> = {
 	parent: TParent;
 	args: TArgs;
 	ctx: TContext;
+	/** Emit a new value for this field (only available in live query context) */
+	emit?: FieldEmit<TResult>;
+	/** Register cleanup function (only available in live query context) */
+	onCleanup?: OnCleanup;
 };
 
-/** Resolver function signature (object style: { parent, args, ctx }) */
+/** Resolver function signature (object style: { parent, args, ctx, emit?, onCleanup? }) */
 export type FieldResolverFn<TParent, TArgs, TContext, TResult> = (
-	params: FieldResolverParams<TParent, TArgs, TContext>,
+	params: FieldResolverParams<TParent, TArgs, TContext, TResult>,
 ) => TResult | Promise<TResult>;
 
 /** Resolver function without args */
 export type FieldResolverFnNoArgs<TParent, TContext, TResult> = (params: {
 	parent: TParent;
 	ctx: TContext;
+	emit?: FieldEmit<TResult>;
+	onCleanup?: OnCleanup;
 }) => TResult | Promise<TResult>;
 
 // =============================================================================
@@ -58,7 +76,13 @@ export interface ResolvedField<
 	readonly _kind: "resolved";
 	readonly _returnType: T;
 	readonly _argsSchema: z.ZodType<TArgs> | null;
-	readonly _resolver: (params: { parent: unknown; args: TArgs; ctx: TContext }) => T | Promise<T>;
+	readonly _resolver: (params: {
+		parent: unknown;
+		args: TArgs;
+		ctx: TContext;
+		emit?: FieldEmit<T>;
+		onCleanup?: OnCleanup;
+	}) => T | Promise<T>;
 }
 
 /** Field definition (exposed or resolved) */
@@ -254,12 +278,14 @@ export interface ResolverDef<
 	/** Get the args schema for a field (if any) */
 	getArgsSchema(name: string): z.ZodType | null;
 
-	/** Resolve a single field with args */
+	/** Resolve a single field with args and optional live query context */
 	resolveField<K extends keyof TFields>(
 		name: K,
 		parent: InferParent<TEntity["fields"]>,
 		args: Record<string, unknown>,
 		ctx: TContext,
+		emit?: FieldEmit<unknown>,
+		onCleanup?: OnCleanup,
 	): Promise<unknown>;
 
 	/** Resolve all fields for a parent with args per field */

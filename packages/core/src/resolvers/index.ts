@@ -54,10 +54,12 @@ import type {
 	ExposedField,
 	FieldBuilder,
 	FieldDef,
+	FieldEmit,
 	FieldResolverContext,
 	FieldResolverFn,
 	FieldResolverFnNoArgs,
 	InferParent,
+	OnCleanup,
 	RelationFieldBuilder,
 	RelationFieldBuilderWithArgs,
 	ResolvedField,
@@ -72,6 +74,7 @@ export type {
 	ExposedField,
 	FieldBuilder,
 	FieldDef,
+	FieldEmit,
 	FieldResolverContext,
 	FieldResolverFn,
 	FieldResolverFnNoArgs,
@@ -79,6 +82,7 @@ export type {
 	InferParent,
 	InferResolverOutput,
 	InferResolverSelected,
+	OnCleanup,
 	RelationFieldBuilder,
 	RelationFieldBuilderWithArgs,
 	ResolvedField,
@@ -107,6 +111,8 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 					parent: unknown;
 					args: TArgs;
 					ctx: TContext;
+					emit?: FieldEmit<T>;
+					onCleanup?: OnCleanup;
 				}) => T | Promise<T>,
 			};
 		},
@@ -133,15 +139,19 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 		resolve(
 			fn: FieldResolverFnNoArgs<TParent, TContext, T>,
 		): ResolvedField<T, Record<string, never>, TContext> {
-			// Wrap the no-args function to include empty args
+			// Wrap the no-args function to pass through emit and onCleanup
 			const wrappedFn = ({
 				parent,
 				ctx,
+				emit,
+				onCleanup,
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: TContext;
-			}) => fn({ parent: parent as TParent, ctx });
+				emit?: FieldEmit<T>;
+				onCleanup?: OnCleanup;
+			}) => fn({ parent: parent as TParent, ctx, emit, onCleanup });
 			return {
 				_kind: "resolved",
 				_returnType: undefined as T,
@@ -169,6 +179,8 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 					parent: unknown;
 					args: TArgs;
 					ctx: TContext;
+					emit?: FieldEmit<T>;
+					onCleanup?: OnCleanup;
 				}) => T | Promise<T>,
 			};
 		},
@@ -195,15 +207,19 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 		resolve(
 			fn: FieldResolverFnNoArgs<TParent, TContext, T>,
 		): ResolvedField<T, Record<string, never>, TContext> {
-			// Wrap the no-args function to include empty args
+			// Wrap the no-args function to pass through emit and onCleanup
 			const wrappedFn = ({
 				parent,
 				ctx,
+				emit,
+				onCleanup,
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: TContext;
-			}) => fn({ parent: parent as TParent, ctx });
+				emit?: FieldEmit<T>;
+				onCleanup?: OnCleanup;
+			}) => fn({ parent: parent as TParent, ctx, emit, onCleanup });
 			return {
 				_kind: "resolved",
 				_returnType: undefined as T,
@@ -312,6 +328,8 @@ class ResolverDefImpl<
 		parent: InferParent<TEntity["fields"]>,
 		args: Record<string, unknown>,
 		ctx: TContext,
+		emit?: FieldEmit<unknown>,
+		onCleanup?: OnCleanup,
 	): Promise<unknown> {
 		const field = this.fields[name];
 		if (!field) {
@@ -331,7 +349,8 @@ class ResolverDefImpl<
 			parsedArgs = resolvedField._argsSchema.parse(args) as Record<string, unknown>;
 		}
 
-		return resolvedField._resolver({ parent, args: parsedArgs, ctx });
+		// Pass emit and onCleanup for live query capabilities
+		return resolvedField._resolver({ parent, args: parsedArgs, ctx, emit, onCleanup });
 	}
 
 	async resolveAll(

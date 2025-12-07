@@ -277,11 +277,42 @@ class LensServerImpl<
 								return;
 							}
 
-							// Create emit handler that pushes to observer
+							// Create emit handler with async queue processing
+							// Emit commands are queued and processed through processQueryResult
+							// to ensure field resolvers run on every emit
+							let emitProcessing = false;
+							const emitQueue: EmitCommand[] = [];
+
+							const processEmitQueue = async () => {
+								if (emitProcessing || cancelled) return;
+								emitProcessing = true;
+
+								while (emitQueue.length > 0 && !cancelled) {
+									const command = emitQueue.shift()!;
+									currentState = this.applyEmitCommand(command, currentState);
+
+									// Process through field resolvers (unlike before where we bypassed this)
+									const processed = isQuery
+										? await this.processQueryResult(path, currentState, select, context, onCleanup)
+										: currentState;
+
+									if (!cancelled) {
+										observer.next?.({ data: processed });
+									}
+								}
+
+								emitProcessing = false;
+							};
+
 							const emitHandler = (command: EmitCommand) => {
 								if (cancelled) return;
-								currentState = this.applyEmitCommand(command, currentState);
-								observer.next?.({ data: currentState });
+								emitQueue.push(command);
+								// Fire async processing (don't await - emit should be sync from caller's perspective)
+								processEmitQueue().catch((err) => {
+									if (!cancelled) {
+										observer.next?.({ error: err instanceof Error ? err : new Error(String(err)) });
+									}
+								});
 							};
 
 							const emit = createEmit(emitHandler);
@@ -301,7 +332,13 @@ class LensServerImpl<
 								for await (const value of result) {
 									if (cancelled) break;
 									currentState = value;
-									const processed = await this.processQueryResult(path, value, select, context);
+									const processed = await this.processQueryResult(
+										path,
+										value,
+										select,
+										context,
+										onCleanup,
+									);
 									observer.next?.({ data: processed });
 								}
 								if (!cancelled) {
@@ -312,7 +349,7 @@ class LensServerImpl<
 								const value = await result;
 								currentState = value;
 								const processed = isQuery
-									? await this.processQueryResult(path, value, select, context)
+									? await this.processQueryResult(path, value, select, context, onCleanup)
 									: value;
 								if (!cancelled) {
 									observer.next?.({ data: processed });
@@ -414,13 +451,14 @@ class LensServerImpl<
 		data: T,
 		select?: SelectionObject,
 		context?: TContext,
+		onCleanup?: (fn: () => void) => void,
 	): Promise<T> {
 		if (!data) return data;
 
 		// Extract nested inputs from selection for field resolver args
 		const nestedInputs = select ? extractNestedInputs(select) : undefined;
 
-		const processed = await this.resolveEntityFields(data, nestedInputs, context);
+		const processed = await this.resolveEntityFields(data, nestedInputs, context, "", onCleanup);
 		if (select) {
 			return applySelection(processed, select) as T;
 		}
@@ -435,18 +473,22 @@ class LensServerImpl<
 	 * @param nestedInputs - Map of field paths to their input args (from extractNestedInputs)
 	 * @param context - Request context to pass to field resolvers
 	 * @param fieldPath - Current path for nested field resolution
+	 * @param onCleanup - Cleanup registration for live query subscriptions
 	 */
 	private async resolveEntityFields<T>(
 		data: T,
 		nestedInputs?: Map<string, Record<string, unknown>>,
 		context?: TContext,
 		fieldPath = "",
+		onCleanup?: (fn: () => void) => void,
 	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 
 		if (Array.isArray(data)) {
 			return Promise.all(
-				data.map((item) => this.resolveEntityFields(item, nestedInputs, context, fieldPath)),
+				data.map((item) =>
+					this.resolveEntityFields(item, nestedInputs, context, fieldPath, onCleanup),
+				),
 			) as Promise<T>;
 		}
 
@@ -482,6 +524,7 @@ class LensServerImpl<
 					nestedInputs,
 					context,
 					currentPath,
+					onCleanup,
 				);
 				continue;
 			}
@@ -490,7 +533,15 @@ class LensServerImpl<
 			if (hasArgs || context) {
 				// Direct resolution when we have args or context (skip DataLoader)
 				try {
-					result[field] = await resolverDef.resolveField(field, obj, args, context ?? {});
+					// Pass onCleanup for live query cleanup registration
+					result[field] = await resolverDef.resolveField(
+						field,
+						obj,
+						args,
+						context ?? {},
+						undefined, // emit (field-level emit not yet implemented)
+						onCleanup,
+					);
 				} catch {
 					result[field] = null;
 				}
@@ -507,6 +558,7 @@ class LensServerImpl<
 				nestedInputs,
 				context,
 				currentPath,
+				onCleanup,
 			);
 		}
 

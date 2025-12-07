@@ -228,13 +228,16 @@ export {
 	type ExposedField,
 	type FieldBuilder,
 	type FieldDef,
+	type FieldEmit,
 	type FieldResolverContext,
+	type FieldResolverParams,
 	type InferResolverOutput,
 	type InferResolverSelected,
 	// Type guards
 	isExposedField,
 	isResolvedField,
 	isResolverDef,
+	type OnCleanup,
 	type ResolvedField,
 	type ResolverDef,
 	// Resolver array

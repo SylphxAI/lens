@@ -736,4 +736,182 @@ describe("field resolvers", () => {
 		const data = result.data as any;
 		expect(data.posts).toHaveLength(3); // All of Alice's posts (default limit 10)
 	});
+
+	it("emit() goes through field resolvers", async () => {
+		// Track how many times posts resolver is called
+		let postsResolverCallCount = 0;
+
+		const Author = entity("Author", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		const Post = entity("Post", {
+			id: t.id(),
+			title: t.string(),
+			authorId: t.string(),
+		});
+
+		const mockDb = {
+			authors: [{ id: "a1", name: "Alice" }],
+			posts: [
+				{ id: "p1", title: "Post 1", authorId: "a1" },
+				{ id: "p2", title: "Post 2", authorId: "a1" },
+			],
+		};
+
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f.many(Post).resolve(({ parent, ctx }) => {
+				postsResolverCallCount++;
+				return ctx.db.posts.filter((p) => p.authorId === parent.id);
+			}),
+		}));
+
+		type EmitFn = ((data: unknown) => void) & { merge: (partial: unknown) => void };
+		let capturedEmit: EmitFn | null = null;
+
+		const getAuthor = query<{ db: typeof mockDb; emit: EmitFn }>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				capturedEmit = ctx.emit as EmitFn;
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		// Subscribe to query with nested posts
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						name: true,
+						posts: { select: { id: true, title: true } },
+					},
+				},
+			})
+			.subscribe({
+				next: (result) => {
+					results.push(result);
+				},
+			});
+
+		// Wait for initial result
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(results.length).toBe(1);
+		expect(postsResolverCallCount).toBe(1); // Called once for initial query
+
+		// Add a new post to the mock DB
+		mockDb.posts.push({ id: "p3", title: "Post 3", authorId: "a1" });
+
+		// Emit updated author (this should trigger field resolvers)
+		capturedEmit!({ id: "a1", name: "Alice Updated" });
+
+		// Wait for emit to process
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(results.length).toBe(2);
+		expect(postsResolverCallCount).toBe(2); // Called again after emit!
+
+		// Verify the emitted result includes the new post (from re-running posts resolver)
+		const latestResult = results[1] as { data: { posts: { id: string }[] } };
+		expect(latestResult.data.posts).toHaveLength(3); // Should have 3 posts now
+
+		subscription.unsubscribe();
+	});
+
+	it("field resolvers receive onCleanup for cleanup registration", async () => {
+		let cleanupCalled = false;
+		let resolverReceivedOnCleanup = false;
+
+		const Author = entity("Author", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		const Post = entity("Post", {
+			id: t.id(),
+			title: t.string(),
+			authorId: t.string(),
+		});
+
+		const mockDb = {
+			authors: [{ id: "a1", name: "Alice" }],
+			posts: [{ id: "p1", title: "Post 1", authorId: "a1" }],
+		};
+
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f.many(Post).resolve(({ parent, ctx, onCleanup }) => {
+				// Track if onCleanup was received
+				resolverReceivedOnCleanup = onCleanup !== undefined;
+
+				// Register a cleanup if available
+				if (onCleanup) {
+					onCleanup(() => {
+						cleanupCalled = true;
+					});
+				}
+
+				return ctx.db.posts.filter((p) => p.authorId === parent.id);
+			}),
+		}));
+
+		const getAuthor = query<{ db: typeof mockDb }>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		const subscription = server
+			.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						posts: { select: { id: true } },
+					},
+				},
+			})
+			.subscribe({});
+
+		// Wait for query to execute
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		// Verify field resolver received onCleanup
+		expect(resolverReceivedOnCleanup).toBe(true);
+		expect(cleanupCalled).toBe(false); // Not called yet
+
+		// Unsubscribe should trigger cleanup
+		subscription.unsubscribe();
+
+		// Cleanup should be called
+		expect(cleanupCalled).toBe(true);
+	});
 });
