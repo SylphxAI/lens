@@ -24,7 +24,6 @@
 
 import {
 	firstValueFrom,
-	isObservable,
 	type ReconnectMessage,
 	type ReconnectSubscription,
 } from "@sylphx/lens-core";
@@ -179,12 +178,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		// Execute query first to get data
 		let result: { data?: unknown; error?: Error };
 		try {
-			const resultOrObservable = server.execute({ path: operation, input });
-
-			// Handle Observable (take first value)
-			result = isObservable(resultOrObservable)
-				? await firstValueFrom(resultOrObservable)
-				: await resultOrObservable;
+			result = await firstValueFrom(server.execute({ path: operation, input }));
 
 			if (result.error) {
 				conn.ws.send(
@@ -359,15 +353,12 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle query
 	async function handleQuery(conn: ClientConnection, message: QueryMessage): Promise<void> {
 		try {
-			const resultOrObservable = server.execute({
-				path: message.operation,
-				input: message.input,
-			});
-
-			// Handle Observable (take first value)
-			const result = isObservable(resultOrObservable)
-				? await firstValueFrom(resultOrObservable)
-				: await resultOrObservable;
+			const result = await firstValueFrom(
+				server.execute({
+					path: message.operation,
+					input: message.input,
+				}),
+			);
 
 			if (result.error) {
 				conn.ws.send(
@@ -404,15 +395,12 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle mutation
 	async function handleMutation(conn: ClientConnection, message: MutationMessage): Promise<void> {
 		try {
-			const resultOrObservable = server.execute({
-				path: message.operation,
-				input: message.input,
-			});
-
-			// Handle Observable (take first value)
-			const result = isObservable(resultOrObservable)
-				? await firstValueFrom(resultOrObservable)
-				: await resultOrObservable;
+			const result = await firstValueFrom(
+				server.execute({
+					path: message.operation,
+					input: message.input,
+				}),
+			);
 
 			if (result.error) {
 				conn.ws.send(

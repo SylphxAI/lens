@@ -18,7 +18,7 @@ import { describe, expect, it } from "bun:test";
 import { entity, lens, router, t } from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
-import { inProcess } from "../transport/in-process";
+import { inProcess } from "../transport/direct.js";
 import type { SelectedType } from "./create";
 import { createClient } from "./create";
 

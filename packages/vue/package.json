@@ -30,7 +30,8 @@
 	"author": "SylphxAI",
 	"license": "MIT",
 	"dependencies": {
-		"@sylphx/lens-client": "workspace:*"
+		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/lens-core": "workspace:*"
 	},
 	"peerDependencies": {
 		"vue": ">=3.0.0"

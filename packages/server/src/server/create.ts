@@ -195,12 +195,13 @@ class LensServerImpl<
 	}
 
 	/**
-	 * Execute operation and return result.
+	 * Execute operation and return Observable.
 	 *
-	 * Returns Observable for streaming operations (AsyncIterable resolvers or emit-based),
-	 * Promise for one-shot operations.
+	 * Always returns Observable<LensResult>:
+	 * - One-shot: emits once, then completes
+	 * - Streaming: emits multiple times (AsyncIterable or emit-based)
 	 */
-	execute(op: LensOperation): Promise<LensResult> | Observable<LensResult> {
+	execute(op: LensOperation): Observable<LensResult> {
 		const { path, input } = op;
 
 		// Check if operation exists
@@ -208,10 +209,15 @@ class LensServerImpl<
 		const isMutation = !!this.mutations[path];
 
 		if (!isQuery && !isMutation) {
-			return Promise.resolve({ error: new Error(`Operation not found: ${path}`) });
+			return {
+				subscribe: (observer) => {
+					observer.next?.({ error: new Error(`Operation not found: ${path}`) });
+					observer.complete?.();
+					return { unsubscribe: () => {} };
+				},
+			};
 		}
 
-		// For streaming support, return Observable
 		return this.executeAsObservable(path, input, isQuery);
 	}
 
@@ -235,7 +241,8 @@ class LensServerImpl<
 					try {
 						const def = isQuery ? this.queries[path] : this.mutations[path];
 						if (!def) {
-							observer.error?.(new Error(`Operation not found: ${path}`));
+							observer.next?.({ error: new Error(`Operation not found: ${path}`) });
+							observer.complete?.();
 							return;
 						}
 
@@ -252,7 +259,10 @@ class LensServerImpl<
 						if (def._input && cleanInput !== undefined) {
 							const result = def._input.safeParse(cleanInput);
 							if (!result.success) {
-								observer.error?.(new Error(`Invalid input: ${JSON.stringify(result.error)}`));
+								observer.next?.({
+									error: new Error(`Invalid input: ${JSON.stringify(result.error)}`),
+								});
+								observer.complete?.();
 								return;
 							}
 						}
@@ -262,7 +272,8 @@ class LensServerImpl<
 						await runWithContext(this.ctx, context, async () => {
 							const resolver = def._resolve;
 							if (!resolver) {
-								observer.error?.(new Error(`Operation ${path} has no resolver`));
+								observer.next?.({ error: new Error(`Operation ${path} has no resolver`) });
+								observer.complete?.();
 								return;
 							}
 
@@ -312,7 +323,8 @@ class LensServerImpl<
 						});
 					} catch (error) {
 						if (!cancelled) {
-							observer.error?.(error instanceof Error ? error : new Error(String(error)));
+							observer.next?.({ error: error instanceof Error ? error : new Error(String(error)) });
+							observer.complete?.();
 						}
 					} finally {
 						this.clearLoaders();

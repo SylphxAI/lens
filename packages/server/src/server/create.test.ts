@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { entity, mutation, query, router } from "@sylphx/lens-core";
+import { entity, firstValueFrom, mutation, query, router } from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
 import { createApp } from "./create.js";
@@ -190,10 +190,12 @@ describe("execute", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "getUser",
-			input: { id: "123" },
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: { id: "123" },
+			}),
+		);
 
 		expect(result.data).toEqual({
 			id: "123",
@@ -208,10 +210,12 @@ describe("execute", () => {
 			mutations: { createUser },
 		});
 
-		const result = await server.execute({
-			path: "createUser",
-			input: { name: "New User", email: "new@example.com" },
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "createUser",
+				input: { name: "New User", email: "new@example.com" },
+			}),
+		);
 
 		expect(result.data).toEqual({
 			id: "new-id",
@@ -226,10 +230,12 @@ describe("execute", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "unknownOperation",
-			input: {},
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "unknownOperation",
+				input: {},
+			}),
+		);
 
 		expect(result.data).toBeUndefined();
 		expect(result.error).toBeInstanceOf(Error);
@@ -241,10 +247,12 @@ describe("execute", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "getUser",
-			input: { invalid: true }, // Missing required 'id'
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: { invalid: true }, // Missing required 'id'
+			}),
+		);
 
 		expect(result.data).toBeUndefined();
 		expect(result.error).toBeInstanceOf(Error);
@@ -260,10 +268,12 @@ describe("execute", () => {
 
 		const server = createApp({ router: appRouter });
 
-		const queryResult = await server.execute({
-			path: "user.get",
-			input: { id: "456" },
-		});
+		const queryResult = await firstValueFrom(
+			server.execute({
+				path: "user.get",
+				input: { id: "456" },
+			}),
+		);
 
 		expect(queryResult.data).toEqual({
 			id: "456",
@@ -271,10 +281,12 @@ describe("execute", () => {
 			email: "test@example.com",
 		});
 
-		const mutationResult = await server.execute({
-			path: "user.create",
-			input: { name: "Router User" },
-		});
+		const mutationResult = await firstValueFrom(
+			server.execute({
+				path: "user.create",
+				input: { name: "Router User" },
+			}),
+		);
 
 		expect(mutationResult.data).toEqual({
 			id: "new-id",
@@ -294,10 +306,12 @@ describe("execute", () => {
 			queries: { errorQuery },
 		});
 
-		const result = await server.execute({
-			path: "errorQuery",
-			input: { id: "1" },
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "errorQuery",
+				input: { id: "1" },
+			}),
+		);
 
 		expect(result.data).toBeUndefined();
 		expect(result.error).toBeInstanceOf(Error);
@@ -309,9 +323,11 @@ describe("execute", () => {
 			queries: { getUsers },
 		});
 
-		const result = await server.execute({
-			path: "getUsers",
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUsers",
+			}),
+		);
 
 		expect(result.data).toHaveLength(2);
 	});
@@ -337,10 +353,12 @@ describe("context", () => {
 			context: () => ({ userId: "user-123", role: "admin" }),
 		});
 
-		await server.execute({
-			path: "contextQuery",
-			input: { id: "1" },
-		});
+		await firstValueFrom(
+			server.execute({
+				path: "contextQuery",
+				input: { id: "1" },
+			}),
+		);
 
 		expect(capturedContext).toMatchObject({
 			userId: "user-123",
@@ -366,10 +384,12 @@ describe("context", () => {
 			},
 		});
 
-		await server.execute({
-			path: "contextQuery",
-			input: { id: "1" },
-		});
+		await firstValueFrom(
+			server.execute({
+				path: "contextQuery",
+				input: { id: "1" },
+			}),
+		);
 
 		expect(capturedContext).toMatchObject({
 			userId: "async-user",
@@ -387,13 +407,15 @@ describe("selection", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "getUser",
-			input: {
-				id: "123",
-				$select: { name: true },
-			},
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: {
+					id: "123",
+					$select: { name: true },
+				},
+			}),
+		);
 
 		expect(result.data).toEqual({
 			id: "123", // id always included

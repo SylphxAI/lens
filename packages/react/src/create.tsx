@@ -292,8 +292,8 @@ function createQueryHook<TInput, TOutput>(
 	};
 
 	// Create the endpoint object with hook + fetch
-	const endpoint = useQueryHook as QueryEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch;
+	const endpoint = useQueryHook as unknown as QueryEndpoint<TInput, TOutput>;
+	endpoint.fetch = fetch as QueryEndpoint<TInput, TOutput>["fetch"];
 
 	cachedHook = endpoint;
 	return cachedHook;

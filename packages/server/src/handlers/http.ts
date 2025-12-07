@@ -5,7 +5,7 @@
  * Works with Bun, Node (with adapter), Vercel, Cloudflare Workers.
  */
 
-import { firstValueFrom, isObservable } from "@sylphx/lens-core";
+import { firstValueFrom } from "@sylphx/lens-core";
 import type { LensServer } from "../server/create.js";
 
 // =============================================================================
@@ -140,15 +140,12 @@ export function createHTTPHandler(
 					});
 				}
 
-				const resultOrObservable = server.execute({
-					path: operationPath,
-					input: body.input,
-				});
-
-				// Handle Observable (take first value for HTTP)
-				const result = isObservable(resultOrObservable)
-					? await firstValueFrom(resultOrObservable)
-					: await resultOrObservable;
+				const result = await firstValueFrom(
+					server.execute({
+						path: operationPath,
+						input: body.input,
+					}),
+				);
 
 				if (result.error) {
 					return new Response(JSON.stringify({ error: result.error.message }), {

@@ -116,13 +116,15 @@ class ClientImpl {
 		// Execute through transport
 		const resultOrObservable = this.transport.execute(processedOp);
 
-		// Handle Observable (subscription)
+		// Handle Observable (from direct transport returning Observable)
+		let result: Result;
 		if (this.isObservable(resultOrObservable)) {
-			return { data: resultOrObservable };
+			// Get first value from Observable
+			result = await this.firstValueFrom(resultOrObservable);
+		} else {
+			// Handle Promise
+			result = await resultOrObservable;
 		}
-
-		// Handle Promise (query/mutation)
-		let result = await resultOrObservable;
 
 		// Run afterResponse plugins
 		for (const plugin of this.plugins) {
@@ -156,6 +158,33 @@ class ClientImpl {
 			"subscribe" in value &&
 			typeof (value as Observable<Result>).subscribe === "function"
 		);
+	}
+
+	private firstValueFrom(observable: Observable<Result>): Promise<Result> {
+		return new Promise((resolve, reject) => {
+			let resolved = false;
+			const subscription = observable.subscribe({
+				next: (value) => {
+					if (!resolved) {
+						resolved = true;
+						subscription.unsubscribe?.();
+						resolve(value);
+					}
+				},
+				error: (err) => {
+					if (!resolved) {
+						resolved = true;
+						reject(err);
+					}
+				},
+				complete: () => {
+					if (!resolved) {
+						resolved = true;
+						reject(new Error("Observable completed without emitting a value"));
+					}
+				},
+			});
+		});
 	}
 
 	// =========================================================================

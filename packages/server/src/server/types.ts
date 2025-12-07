@@ -186,16 +186,16 @@ export interface LensServer {
 	/**
 	 * Execute operation - auto-detects query vs mutation.
 	 *
-	 * Returns:
-	 * - Promise<LensResult> for one-shot queries/mutations
-	 * - Observable<LensResult> for streaming (AsyncIterable resolvers or emit-based)
+	 * Always returns Observable<LensResult>:
+	 * - One-shot: emits once, then completes
+	 * - Streaming: emits multiple times (AsyncIterable or emit-based)
 	 *
-	 * Transports should handle both:
-	 * - HTTP: Use firstValueFrom() to get single value
-	 * - WS/SSE: Subscribe to Observable for streaming
-	 * - direct: Pass through as-is for full streaming support
+	 * Usage:
+	 * - HTTP: `await firstValueFrom(server.execute(op))`
+	 * - WS/SSE: `server.execute(op).subscribe(...)`
+	 * - direct: pass through Observable directly
 	 */
-	execute(op: LensOperation): Promise<LensResult> | Observable<LensResult>;
+	execute(op: LensOperation): Observable<LensResult>;
 
 	// =========================================================================
 	// Subscription Support (Optional - used by WS/SSE handlers)

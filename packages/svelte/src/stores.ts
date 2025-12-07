@@ -181,7 +181,7 @@ export function query<T>(queryInput: QueryInput<T>, options?: QueryStoreOptions)
 		// First subscriber - set up the query
 		if (subscriberCount === 1) {
 			// Check if input is a Readable store
-			if (isReadable(queryInput)) {
+			if (isReadable<QueryResult<T> | null | undefined>(queryInput)) {
 				// Subscribe to the input store for reactive updates
 				storeUnsubscribe = queryInput.subscribe(($query) => {
 					executeQuery($query);

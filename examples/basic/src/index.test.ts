@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { app, db, type AppRouter } from "./server";
 import { createClient, inProcess } from "@sylphx/lens-client";
 import type { InferRouterClient } from "@sylphx/lens-core";
+import { firstValueFrom } from "@sylphx/lens-core";
 
 // =============================================================================
 // Setup
@@ -37,10 +38,12 @@ beforeEach(() => {
 
 describe("Server Direct Execution", () => {
 	it("executes queries via app.execute()", async () => {
-		const result = await app.execute({
-			path: "user.get",
-			input: { id: "user-1" },
-		});
+		const result = await firstValueFrom(
+			app.execute({
+				path: "user.get",
+				input: { id: "user-1" },
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toBeDefined();
@@ -48,10 +51,12 @@ describe("Server Direct Execution", () => {
 	});
 
 	it("executes mutations via app.execute()", async () => {
-		const result = await app.execute({
-			path: "user.create",
-			input: { name: "Charlie", email: "charlie@example.com" },
-		});
+		const result = await firstValueFrom(
+			app.execute({
+				path: "user.create",
+				input: { name: "Charlie", email: "charlie@example.com" },
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toBeDefined();
@@ -60,10 +65,12 @@ describe("Server Direct Execution", () => {
 	});
 
 	it("returns error for non-existent entity", async () => {
-		const result = await app.execute({
-			path: "user.get",
-			input: { id: "non-existent" },
-		});
+		const result = await firstValueFrom(
+			app.execute({
+				path: "user.get",
+				input: { id: "non-existent" },
+			}),
+		);
 
 		expect(result.error).toBeDefined();
 		expect(result.error?.message).toBe("User not found");

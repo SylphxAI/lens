@@ -10,7 +10,7 @@ import { describe, expect, it } from "bun:test";
 import { entity, lens, router, t } from "@sylphx/lens-core";
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
-import { inProcess, type TypedTransport } from "../transport/in-process.js";
+import { inProcess, type TypedTransport } from "../transport/direct.js";
 import { createClient } from "./create.js";
 
 // =============================================================================

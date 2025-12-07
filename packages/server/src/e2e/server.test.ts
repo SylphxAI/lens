@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { entity, lens, mutation, query, t } from "@sylphx/lens-core";
+import { entity, firstValueFrom, lens, mutation, query, t } from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
 import { createApp } from "../server/create.js";
@@ -58,7 +58,7 @@ describe("E2E - Basic Operations", () => {
 			queries: { getUsers },
 		});
 
-		const result = await server.execute({ path: "getUsers" });
+		const result = await firstValueFrom(server.execute({ path: "getUsers" }));
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toEqual(mockUsers);
@@ -79,10 +79,12 @@ describe("E2E - Basic Operations", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "getUser",
-			input: { id: "user-1" },
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: { id: "user-1" },
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toEqual(mockUsers[0]);
@@ -104,10 +106,12 @@ describe("E2E - Basic Operations", () => {
 			mutations: { createUser },
 		});
 
-		const result = await server.execute({
-			path: "createUser",
-			input: { name: "Charlie", email: "charlie@example.com" },
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "createUser",
+				input: { name: "Charlie", email: "charlie@example.com" },
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toEqual({
@@ -129,10 +133,12 @@ describe("E2E - Basic Operations", () => {
 			queries: { failingQuery },
 		});
 
-		const result = await server.execute({
-			path: "failingQuery",
-			input: { id: "123" },
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "failingQuery",
+				input: { id: "123" },
+			}),
+		);
 
 		expect(result.data).toBeUndefined();
 		expect(result.error).toBeInstanceOf(Error);
@@ -142,10 +148,12 @@ describe("E2E - Basic Operations", () => {
 	it("handles unknown operation", async () => {
 		const server = createApp({});
 
-		const result = await server.execute({
-			path: "unknownOperation",
-			input: {},
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "unknownOperation",
+				input: {},
+			}),
+		);
 
 		expect(result.data).toBeUndefined();
 		expect(result.error?.message).toContain("not found");
@@ -172,10 +180,12 @@ describe("E2E - Context", () => {
 			context: () => ({ userId: "ctx-user-1", role: "admin" }),
 		});
 
-		await server.execute({
-			path: "getUser",
-			input: { id: "user-1" },
-		});
+		await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: { id: "user-1" },
+			}),
+		);
 
 		expect(capturedContext).toMatchObject({
 			userId: "ctx-user-1",
@@ -201,10 +211,12 @@ describe("E2E - Context", () => {
 			},
 		});
 
-		await server.execute({
-			path: "getUser",
-			input: { id: "user-1" },
-		});
+		await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: { id: "user-1" },
+			}),
+		);
 
 		expect(capturedContext).toMatchObject({
 			userId: "async-user",
@@ -232,13 +244,15 @@ describe("E2E - Selection", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "getUser",
-			input: {
-				id: "user-1",
-				$select: { name: true },
-			},
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: {
+					id: "user-1",
+					$select: { name: true },
+				},
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		// Should include id (always) and selected fields
@@ -262,13 +276,15 @@ describe("E2E - Selection", () => {
 			queries: { getUser },
 		});
 
-		const result = await server.execute({
-			path: "getUser",
-			input: {
-				id: "user-1",
-				$select: { email: true },
-			},
-		});
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: {
+					id: "user-1",
+					$select: { email: true },
+				},
+			}),
+		);
 
 		expect(result.data).toEqual({
 			id: "user-1",
@@ -318,20 +334,22 @@ describe("E2E - Entity Resolvers", () => {
 		});
 
 		// Test with $select for nested posts
-		const result = await server.execute({
-			path: "getUser",
-			input: {
-				id: "user-1",
-				$select: {
-					name: true,
-					posts: {
-						select: {
-							title: true,
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUser",
+				input: {
+					id: "user-1",
+					$select: {
+						name: true,
+						posts: {
+							select: {
+								title: true,
+							},
 						},
 					},
 				},
-			},
-		});
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.data).toMatchObject({
@@ -380,19 +398,21 @@ describe("E2E - Entity Resolvers", () => {
 		});
 
 		// Execute query with nested selection for all users
-		const result = await server.execute({
-			path: "getUsers",
-			input: {
-				$select: {
-					name: true,
-					posts: {
-						select: {
-							title: true,
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getUsers",
+				input: {
+					$select: {
+						name: true,
+						posts: {
+							select: {
+								title: true,
+							},
 						},
 					},
 				},
-			},
-		});
+			}),
+		);
 
 		expect(result.error).toBeUndefined();
 		// Resolvers are called - exact count depends on DataLoader batching behavior

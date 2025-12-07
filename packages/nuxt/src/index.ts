@@ -34,7 +34,7 @@
  */
 
 import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import { firstValueFrom, isObservable } from "@sylphx/lens-core";
+import { firstValueFrom } from "@sylphx/lens-core";
 import { createServerClientProxy, type LensServer } from "@sylphx/lens-server";
 import { type ComputedRef, computed, ref } from "vue";
 
@@ -210,12 +210,7 @@ async function handleQuery(
 		const inputParam = url.searchParams.get("input");
 		const input = inputParam ? JSON.parse(inputParam) : undefined;
 
-		const resultOrObservable = server.execute({ path, input });
-
-		// Handle Observable (take first value for HTTP)
-		const result = isObservable(resultOrObservable)
-			? await firstValueFrom(resultOrObservable)
-			: await resultOrObservable;
+		const result = await firstValueFrom(server.execute({ path, input }));
 
 		if (result.error) {
 			return { error: result.error.message };
@@ -245,12 +240,7 @@ async function handleMutation(
 		});
 
 		const input = body.input;
-		const resultOrObservable = server.execute({ path, input });
-
-		// Handle Observable (take first value for HTTP)
-		const result = isObservable(resultOrObservable)
-			? await firstValueFrom(resultOrObservable)
-			: await resultOrObservable;
+		const result = await firstValueFrom(server.execute({ path, input }));
 
 		if (result.error) {
 			return { error: result.error.message };

@@ -15,8 +15,8 @@ import { describe, expect, it } from "bun:test";
 import { entity, lens, router, t } from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
-import type { LensServerInterface } from "../transport/in-process";
-import { inProcess } from "../transport/in-process";
+import type { LensServerInterface } from "../transport/direct.js";
+import { inProcess } from "../transport/direct.js";
 import type { Observable, Result, Transport } from "../transport/types";
 import { createClient } from "./create";
 

@@ -247,8 +247,8 @@ function createQueryHook<TInput, TOutput>(
 		return queryResult.then((data) => data);
 	};
 
-	const endpoint = useQueryComposable as QueryEndpoint<TInput, TOutput>;
-	endpoint.fetch = fetch;
+	const endpoint = useQueryComposable as unknown as QueryEndpoint<TInput, TOutput>;
+	endpoint.fetch = fetch as QueryEndpoint<TInput, TOutput>["fetch"];
 
 	return endpoint;
 }
