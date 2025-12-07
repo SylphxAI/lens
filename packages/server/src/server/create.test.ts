@@ -857,13 +857,13 @@ describe("field resolvers", () => {
 		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
-			posts: f.many(Post).resolve(({ parent, ctx, onCleanup }) => {
-				// Track if onCleanup was received
-				resolverReceivedOnCleanup = onCleanup !== undefined;
+			posts: f.many(Post).resolve(({ parent, ctx }) => {
+				// Track if onCleanup was received (via ctx)
+				resolverReceivedOnCleanup = ctx.onCleanup !== undefined;
 
 				// Register a cleanup if available
-				if (onCleanup) {
-					onCleanup(() => {
+				if (ctx.onCleanup) {
+					ctx.onCleanup(() => {
 						cleanupCalled = true;
 					});
 				}
@@ -913,5 +913,110 @@ describe("field resolvers", () => {
 
 		// Cleanup should be called
 		expect(cleanupCalled).toBe(true);
+	});
+
+	it("field-level emit updates specific field and notifies observer", async () => {
+		const Author = entity("Author", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		const Post = entity("Post", {
+			id: t.id(),
+			title: t.string(),
+			authorId: t.string(),
+		});
+
+		const mockDb = {
+			authors: [{ id: "a1", name: "Alice" }],
+			posts: [
+				{ id: "p1", title: "Post 1", authorId: "a1" },
+				{ id: "p2", title: "Post 2", authorId: "a1" },
+			],
+		};
+
+		// Track field emit
+		let capturedFieldEmit: ((value: unknown) => void) | undefined;
+
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f.many(Post).resolve(({ parent, ctx }) => {
+				// Capture the field emit for later use
+				capturedFieldEmit = ctx.emit;
+
+				// Set up a mock subscription that will use field emit
+				if (ctx.emit && ctx.onCleanup) {
+					// Simulate subscription setup
+					ctx.onCleanup(() => {
+						capturedFieldEmit = undefined;
+					});
+				}
+
+				return ctx.db.posts.filter((p) => p.authorId === parent.id);
+			}),
+		}));
+
+		const getAuthor = query<{ db: typeof mockDb }>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						name: true,
+						posts: { select: { id: true, title: true } },
+					},
+				},
+			})
+			.subscribe({
+				next: (result) => {
+					results.push(result);
+				},
+			});
+
+		// Wait for initial result
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(results.length).toBe(1);
+		expect(capturedFieldEmit).toBeDefined();
+
+		const initialResult = results[0] as { data: { posts: { id: string }[] } };
+		expect(initialResult.data.posts).toHaveLength(2);
+
+		// Use field-level emit to update just the posts field
+		const newPosts = [
+			{ id: "p1", title: "Updated Post 1", authorId: "a1" },
+			{ id: "p2", title: "Updated Post 2", authorId: "a1" },
+			{ id: "p3", title: "New Post 3", authorId: "a1" },
+		];
+		capturedFieldEmit!(newPosts);
+
+		// Wait for field emit to process
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(results.length).toBe(2);
+		const updatedResult = results[1] as { data: { posts: { id: string; title: string }[] } };
+		expect(updatedResult.data.posts).toHaveLength(3);
+		expect(updatedResult.data.posts[2].title).toBe("New Post 3");
+
+		subscription.unsubscribe();
 	});
 });

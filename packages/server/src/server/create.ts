@@ -292,8 +292,33 @@ class LensServerImpl<
 									currentState = this.applyEmitCommand(command, currentState);
 
 									// Process through field resolvers (unlike before where we bypassed this)
+									// Note: createFieldEmit is created after this function but used lazily
+									const fieldEmitFactory = isQuery
+										? this.createFieldEmitFactory(
+												() => currentState,
+												(state) => {
+													currentState = state;
+												},
+												(data) => {
+													if (!cancelled) {
+														observer.next?.({ data });
+													}
+												},
+												select,
+												context,
+												onCleanup,
+											)
+										: undefined;
+
 									const processed = isQuery
-										? await this.processQueryResult(path, currentState, select, context, onCleanup)
+										? await this.processQueryResult(
+												path,
+												currentState,
+												select,
+												context,
+												onCleanup,
+												fieldEmitFactory,
+											)
 										: currentState;
 
 									if (!cancelled) {
@@ -324,6 +349,24 @@ class LensServerImpl<
 								};
 							};
 
+							// Create field emit factory for field-level live queries
+							const createFieldEmit = isQuery
+								? this.createFieldEmitFactory(
+										() => currentState,
+										(state) => {
+											currentState = state;
+										},
+										(data) => {
+											if (!cancelled) {
+												observer.next?.({ data });
+											}
+										},
+										select,
+										context,
+										onCleanup,
+									)
+								: undefined;
+
 							const lensContext = { ...context, emit, onCleanup };
 							const result = resolver({ input: cleanInput, ctx: lensContext });
 
@@ -338,6 +381,7 @@ class LensServerImpl<
 										select,
 										context,
 										onCleanup,
+										createFieldEmit,
 									);
 									observer.next?.({ data: processed });
 								}
@@ -349,7 +393,7 @@ class LensServerImpl<
 								const value = await result;
 								currentState = value;
 								const processed = isQuery
-									? await this.processQueryResult(path, value, select, context, onCleanup)
+									? await this.processQueryResult(path, value, select, context, onCleanup, createFieldEmit)
 									: value;
 								if (!cancelled) {
 									observer.next?.({ data: processed });
@@ -446,19 +490,105 @@ class LensServerImpl<
 	// Result Processing
 	// =========================================================================
 
+	/**
+	 * Factory type for creating field-level emit handlers.
+	 * Each field gets its own emit that updates just that field path.
+	 */
+	private createFieldEmitFactory(
+		getCurrentState: () => unknown,
+		setCurrentState: (state: unknown) => void,
+		notifyObserver: (data: unknown) => void,
+		select: SelectionObject | undefined,
+		context: TContext | undefined,
+		onCleanup: ((fn: () => void) => void) | undefined,
+	): (fieldPath: string) => ((value: unknown) => void) | undefined {
+		return (fieldPath: string) => {
+			if (!fieldPath) return undefined;
+
+			return (newValue: unknown) => {
+				// Get current state and update the field at the given path
+				const state = getCurrentState();
+				if (!state || typeof state !== "object") return;
+
+				const updatedState = this.setFieldByPath(state as Record<string, unknown>, fieldPath, newValue);
+				setCurrentState(updatedState);
+
+				// Resolve nested fields on the new value and notify observer
+				(async () => {
+					try {
+						const nestedInputs = select ? extractNestedInputs(select) : undefined;
+						const processed = await this.resolveEntityFields(
+							updatedState,
+							nestedInputs,
+							context,
+							"",
+							onCleanup,
+							this.createFieldEmitFactory(
+								getCurrentState,
+								setCurrentState,
+								notifyObserver,
+								select,
+								context,
+								onCleanup,
+							),
+						);
+						const result = select ? applySelection(processed, select) : processed;
+						notifyObserver(result);
+					} catch (err) {
+						// Field emit errors are logged but don't break the stream
+						console.error(`Field emit error at path "${fieldPath}":`, err);
+					}
+				})();
+			};
+		};
+	}
+
+	/**
+	 * Set a value at a nested path in an object.
+	 * Creates a shallow copy at each level.
+	 */
+	private setFieldByPath(
+		obj: Record<string, unknown>,
+		path: string,
+		value: unknown,
+	): Record<string, unknown> {
+		const parts = path.split(".");
+		if (parts.length === 1) {
+			return { ...obj, [path]: value };
+		}
+
+		const [first, ...rest] = parts;
+		const nested = obj[first];
+		if (nested && typeof nested === "object") {
+			return {
+				...obj,
+				[first]: this.setFieldByPath(nested as Record<string, unknown>, rest.join("."), value),
+			};
+		}
+		return obj;
+	}
+
 	private async processQueryResult<T>(
 		_operationName: string,
 		data: T,
 		select?: SelectionObject,
 		context?: TContext,
 		onCleanup?: (fn: () => void) => void,
+		createFieldEmit?: (fieldPath: string) => ((value: unknown) => void) | undefined,
 	): Promise<T> {
 		if (!data) return data;
 
 		// Extract nested inputs from selection for field resolver args
 		const nestedInputs = select ? extractNestedInputs(select) : undefined;
 
-		const processed = await this.resolveEntityFields(data, nestedInputs, context, "", onCleanup);
+		const processed = await this.resolveEntityFields(
+			data,
+			nestedInputs,
+			context,
+			"",
+			onCleanup,
+			createFieldEmit,
+		);
 		if (select) {
 			return applySelection(processed, select) as T;
 		}
@@ -474,6 +604,7 @@ class LensServerImpl<
 	 * @param context - Request context to pass to field resolvers
 	 * @param fieldPath - Current path for nested field resolution
 	 * @param onCleanup - Cleanup registration for live query subscriptions
+	 * @param createFieldEmit - Factory for creating field-specific emit handlers
 	 */
 	private async resolveEntityFields<T>(
 		data: T,
@@ -481,13 +612,14 @@ class LensServerImpl<
 		context?: TContext,
 		fieldPath = "",
 		onCleanup?: (fn: () => void) => void,
+		createFieldEmit?: (fieldPath: string) => ((value: unknown) => void) | undefined,
 	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 
 		if (Array.isArray(data)) {
 			return Promise.all(
 				data.map((item) =>
-					this.resolveEntityFields(item, nestedInputs, context, fieldPath, onCleanup),
+					this.resolveEntityFields(item, nestedInputs, context, fieldPath, onCleanup, createFieldEmit),
 				),
 			) as Promise<T>;
 		}
@@ -525,6 +657,7 @@ class LensServerImpl<
 					context,
 					currentPath,
 					onCleanup,
+					createFieldEmit,
 				);
 				continue;
 			}
@@ -533,15 +666,15 @@ class LensServerImpl<
 			if (hasArgs || context) {
 				// Direct resolution when we have args or context (skip DataLoader)
 				try {
-					// Pass onCleanup for live query cleanup registration
-					result[field] = await resolverDef.resolveField(
-						field,
-						obj,
-						args,
-						context ?? {},
-						undefined, // emit (field-level emit not yet implemented)
+					// Build extended context with emit and onCleanup for live query capabilities
+					// Create field-specific emit handler that updates just this field
+					const fieldEmit = createFieldEmit?.(currentPath);
+					const extendedCtx = {
+						...(context ?? {}),
+						emit: fieldEmit,
 						onCleanup,
-					);
+					};
+					result[field] = await resolverDef.resolveField(field, obj, args, extendedCtx);
 				} catch {
 					result[field] = null;
 				}
@@ -559,6 +692,7 @@ class LensServerImpl<
 				context,
 				currentPath,
 				onCleanup,
+				createFieldEmit,
 			);
 		}
 

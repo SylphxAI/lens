@@ -229,6 +229,7 @@ export {
 	type FieldBuilder,
 	type FieldDef,
 	type FieldEmit,
+	type FieldLiveContext,
 	type FieldResolverContext,
 	type FieldResolverParams,
 	type InferResolverOutput,
