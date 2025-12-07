@@ -1,5 +1,15 @@
 # @sylphx/lens-svelte
 
+## 2.2.0 (2025-12-07)
+
+### ✨ Features
+
+- **server,client:** unified Observable-based streaming architecture ([233afb4](https://github.com/SylphxAI/Lens/commit/233afb4b49fe2257c7aa89590f1d7fbc5fec00be))
+
+### ♻️ Refactoring
+
+- **server:** simplify execute() to always return Observable ([5adba81](https://github.com/SylphxAI/Lens/commit/5adba81b0fd405c14c32424a5fc69a1698341c95))
+
 ## 2.1.0 (2025-12-06)
 
 add unified createClient API for tRPC-style endpoint access

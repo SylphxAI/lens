@@ -1,5 +1,19 @@
 # @sylphx/lens-client
 
+## 2.2.0 (2025-12-07)
+
+### ✨ Features
+
+- **server,client:** unified Observable-based streaming architecture ([233afb4](https://github.com/SylphxAI/Lens/commit/233afb4b49fe2257c7aa89590f1d7fbc5fec00be))
+
+### 🐛 Bug Fixes
+
+- **client:** add explicit type annotation for inProcess export ([d3a6877](https://github.com/SylphxAI/Lens/commit/d3a6877d50a345a3b90d581923e72c52e9b9d0bc))
+
+### ♻️ Refactoring
+
+- **server:** simplify execute() to always return Observable ([5adba81](https://github.com/SylphxAI/Lens/commit/5adba81b0fd405c14c32424a5fc69a1698341c95))
+
 ## 2.1.0 (2025-12-06)
 
 unified { input, select } API pattern for nested queries
