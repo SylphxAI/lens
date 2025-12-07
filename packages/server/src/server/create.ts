@@ -393,7 +393,14 @@ class LensServerImpl<
 								const value = await result;
 								currentState = value;
 								const processed = isQuery
-									? await this.processQueryResult(path, value, select, context, onCleanup, createFieldEmit)
+									? await this.processQueryResult(
+											path,
+											value,
+											select,
+											context,
+											onCleanup,
+											createFieldEmit,
+										)
 									: value;
 								if (!cancelled) {
 									observer.next?.({ data: processed });
@@ -510,7 +517,11 @@ class LensServerImpl<
 				const state = getCurrentState();
 				if (!state || typeof state !== "object") return;
 
-				const updatedState = this.setFieldByPath(state as Record<string, unknown>, fieldPath, newValue);
+				const updatedState = this.setFieldByPath(
+					state as Record<string, unknown>,
+					fieldPath,
+					newValue,
+				);
 				setCurrentState(updatedState);
 
 				// Resolve nested fields on the new value and notify observer
@@ -619,7 +630,14 @@ class LensServerImpl<
 		if (Array.isArray(data)) {
 			return Promise.all(
 				data.map((item) =>
-					this.resolveEntityFields(item, nestedInputs, context, fieldPath, onCleanup, createFieldEmit),
+					this.resolveEntityFields(
+						item,
+						nestedInputs,
+						context,
+						fieldPath,
+						onCleanup,
+						createFieldEmit,
+					),
 				),
 			) as Promise<T>;
 		}
@@ -666,13 +684,12 @@ class LensServerImpl<
 			if (hasArgs || context) {
 				// Direct resolution when we have args or context (skip DataLoader)
 				try {
-					// Build extended context with emit and onCleanup for live query capabilities
-					// Create field-specific emit handler that updates just this field
-					const fieldEmit = createFieldEmit?.(currentPath);
+					// Build extended context with emit and onCleanup
+					// Lens is a live query library - these are always available
 					const extendedCtx = {
 						...(context ?? {}),
-						emit: fieldEmit,
-						onCleanup,
+						emit: createFieldEmit!(currentPath),
+						onCleanup: onCleanup!,
 					};
 					result[field] = await resolverDef.resolveField(field, obj, args, extendedCtx);
 				} catch {

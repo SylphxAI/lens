@@ -28,13 +28,16 @@ export type FieldEmit<T> = (value: T) => void;
 
 /**
  * Extended context with live query capabilities.
- * User context is extended with emit and onCleanup when in live query mode.
+ * User context is extended with emit and onCleanup.
+ *
+ * - emit: Always defined. No-op when not in live query mode.
+ * - onCleanup: Always defined. No-op when not in live query mode.
  */
 export type FieldLiveContext<TContext, TResult = unknown> = TContext & {
-	/** Emit a new value for this field (only available in live query context) */
-	emit?: FieldEmit<TResult>;
-	/** Register cleanup function (only available in live query context) */
-	onCleanup?: OnCleanup;
+	/** Emit a new value for this field. No-op when not in live query mode. */
+	emit: FieldEmit<TResult>;
+	/** Register cleanup function. No-op when not in live query mode. */
+	onCleanup: OnCleanup;
 };
 
 /**
