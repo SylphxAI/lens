@@ -41,7 +41,7 @@ import {
 	type UpdateFieldsContext,
 } from "../plugin/types.js";
 import { DataLoader } from "./dataloader.js";
-import { applySelection } from "./selection.js";
+import { applySelection, extractNestedInputs } from "./selection.js";
 import type {
 	ClientSendFn,
 	EntitiesMap,
@@ -301,7 +301,7 @@ class LensServerImpl<
 								for await (const value of result) {
 									if (cancelled) break;
 									currentState = value;
-									const processed = await this.processQueryResult(path, value, select);
+									const processed = await this.processQueryResult(path, value, select, context);
 									observer.next?.({ data: processed });
 								}
 								if (!cancelled) {
@@ -312,7 +312,7 @@ class LensServerImpl<
 								const value = await result;
 								currentState = value;
 								const processed = isQuery
-									? await this.processQueryResult(path, value, select)
+									? await this.processQueryResult(path, value, select, context)
 									: value;
 								if (!cancelled) {
 									observer.next?.({ data: processed });
@@ -413,21 +413,41 @@ class LensServerImpl<
 		_operationName: string,
 		data: T,
 		select?: SelectionObject,
+		context?: TContext,
 	): Promise<T> {
 		if (!data) return data;
 
-		const processed = await this.resolveEntityFields(data);
+		// Extract nested inputs from selection for field resolver args
+		const nestedInputs = select ? extractNestedInputs(select) : undefined;
+
+		const processed = await this.resolveEntityFields(data, nestedInputs, context);
 		if (select) {
 			return applySelection(processed, select) as T;
 		}
 		return processed as T;
 	}
 
-	private async resolveEntityFields<T>(data: T): Promise<T> {
+	/**
+	 * Resolve entity fields using field resolvers.
+	 * Supports nested inputs for field-level arguments (like GraphQL).
+	 *
+	 * @param data - The data to resolve
+	 * @param nestedInputs - Map of field paths to their input args (from extractNestedInputs)
+	 * @param context - Request context to pass to field resolvers
+	 * @param fieldPath - Current path for nested field resolution
+	 */
+	private async resolveEntityFields<T>(
+		data: T,
+		nestedInputs?: Map<string, Record<string, unknown>>,
+		context?: TContext,
+		fieldPath = "",
+	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 
 		if (Array.isArray(data)) {
-			return Promise.all(data.map((item) => this.resolveEntityFields(item))) as Promise<T>;
+			return Promise.all(
+				data.map((item) => this.resolveEntityFields(item, nestedInputs, context, fieldPath)),
+			) as Promise<T>;
 		}
 
 		if (typeof data !== "object") return data;
@@ -447,37 +467,96 @@ class LensServerImpl<
 			// Skip exposed fields
 			if (resolverDef.isExposed(field)) continue;
 
+			// Calculate the path for this field (for nested input lookup)
+			const currentPath = fieldPath ? `${fieldPath}.${field}` : field;
+
+			// Get args for this field from nested inputs
+			const args = nestedInputs?.get(currentPath) ?? {};
+			const hasArgs = Object.keys(args).length > 0;
+
 			// Skip if value already exists
 			const existingValue = result[field];
 			if (existingValue !== undefined) {
-				result[field] = await this.resolveEntityFields(existingValue);
+				result[field] = await this.resolveEntityFields(
+					existingValue,
+					nestedInputs,
+					context,
+					currentPath,
+				);
 				continue;
 			}
 
 			// Resolve the field
-			const loaderKey = `${typeName}.${field}`;
-			const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field);
-			result[field] = await loader.load(obj);
-			result[field] = await this.resolveEntityFields(result[field]);
+			if (hasArgs || context) {
+				// Direct resolution when we have args or context (skip DataLoader)
+				try {
+					result[field] = await resolverDef.resolveField(field, obj, args, context ?? {});
+				} catch {
+					result[field] = null;
+				}
+			} else {
+				// Use DataLoader for batching when no args (default case)
+				const loaderKey = `${typeName}.${field}`;
+				const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field);
+				result[field] = await loader.load(obj);
+			}
+
+			// Recursively resolve nested fields
+			result[field] = await this.resolveEntityFields(
+				result[field],
+				nestedInputs,
+				context,
+				currentPath,
+			);
 		}
 
 		return result as T;
 	}
 
+	/**
+	 * Get the type name for an object by matching against entity definitions.
+	 *
+	 * Matching priority:
+	 * 1. Explicit __typename or _type property
+	 * 2. Best matching entity (highest field overlap score)
+	 *
+	 * Requires at least 50% field match to avoid false positives.
+	 */
 	private getTypeName(obj: Record<string, unknown>): string | undefined {
+		// Priority 1: Explicit type marker
 		if ("__typename" in obj) return obj.__typename as string;
 		if ("_type" in obj) return obj._type as string;
 
+		// Priority 2: Find best matching entity by field overlap
+		let bestMatch: { name: string; score: number } | undefined;
+
 		for (const [name, def] of Object.entries(this.entities)) {
-			if (isEntityDef(def) && this.matchesEntity(obj, def)) {
-				return name;
+			if (!isEntityDef(def)) continue;
+
+			const score = this.getEntityMatchScore(obj, def);
+			// Require at least 50% field match to avoid false positives
+			if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
+				bestMatch = { name, score };
 			}
 		}
-		return undefined;
+
+		return bestMatch?.name;
 	}
 
-	private matchesEntity(obj: Record<string, unknown>, entityDef: EntityDef<string, any>): boolean {
-		return "id" in obj || entityDef._name! in obj;
+	/**
+	 * Calculate how well an object matches an entity definition.
+	 *
+	 * @returns Score between 0 and 1 (1 = perfect match, all entity fields present)
+	 */
+	private getEntityMatchScore(
+		obj: Record<string, unknown>,
+		entityDef: EntityDef<string, any>,
+	): number {
+		const fieldNames = Object.keys(entityDef.fields);
+		if (fieldNames.length === 0) return 0;
+
+		const matchingFields = fieldNames.filter((field) => field in obj);
+		return matchingFields.length / fieldNames.length;
 	}
 
 	private getOrCreateLoaderForField(

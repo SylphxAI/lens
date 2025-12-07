@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { entity, firstValueFrom, mutation, query, router } from "@sylphx/lens-core";
+import { entity, firstValueFrom, mutation, query, resolver, router, t } from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
 import { createApp } from "./create.js";
@@ -442,5 +442,298 @@ describe("type inference", () => {
 
 		// The _types property exists for type inference
 		expect((server as { _types?: unknown })._types).toBeUndefined(); // Runtime undefined, compile-time exists
+	});
+});
+
+// =============================================================================
+// Field Resolver Tests (GraphQL-style per-field resolution)
+// =============================================================================
+
+describe("field resolvers", () => {
+	// Test entities for field resolver tests
+	const Author = entity("Author", {
+		id: t.id(),
+		name: t.string(),
+	});
+
+	const Post = entity("Post", {
+		id: t.id(),
+		title: t.string(),
+		content: t.string(),
+		published: t.boolean(),
+		authorId: t.string(),
+	});
+
+	// Mock data
+	const mockDb = {
+		authors: [
+			{ id: "a1", name: "Alice" },
+			{ id: "a2", name: "Bob" },
+		],
+		posts: [
+			{ id: "p1", title: "Post 1", content: "Content 1", published: true, authorId: "a1" },
+			{ id: "p2", title: "Post 2", content: "Content 2", published: false, authorId: "a1" },
+			{ id: "p3", title: "Post 3", content: "Content 3", published: true, authorId: "a1" },
+			{ id: "p4", title: "Post 4", content: "Content 4", published: true, authorId: "a2" },
+		],
+	};
+
+	type TestContext = { db: typeof mockDb };
+
+	it("resolves field with nested input args (like GraphQL)", async () => {
+		// Define field resolver with args (like GraphQL)
+		const authorResolver = resolver<TestContext>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f
+				.many(Post)
+				.args(
+					z.object({
+						limit: z.number().optional(),
+						published: z.boolean().optional(),
+					}),
+				)
+				.resolve(({ parent, args, ctx }) => {
+					let posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+					if (args.published !== undefined) {
+						posts = posts.filter((p) => p.published === args.published);
+					}
+					if (args.limit !== undefined) {
+						posts = posts.slice(0, args.limit);
+					}
+					return posts;
+				}),
+		}));
+
+		const getAuthor = query<TestContext>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		// Test with nested input: get author with only published posts, limit 2
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						name: true,
+						posts: {
+							input: { published: true, limit: 2 },
+							select: { id: true, title: true },
+						},
+					},
+				},
+			}),
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.data).toBeDefined();
+
+		const data = result.data as { id: string; name: string; posts: { id: string; title: string }[] };
+		expect(data.id).toBe("a1");
+		expect(data.name).toBe("Alice");
+		expect(data.posts).toHaveLength(2); // limit: 2
+		expect(data.posts.every((p) => p.title)).toBe(true); // only selected fields
+	});
+
+	it("passes context to field resolvers", async () => {
+		let capturedContext: TestContext | null = null;
+
+		const authorResolver = resolver<TestContext>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f.many(Post).resolve(({ parent, ctx }) => {
+				capturedContext = ctx;
+				return ctx.db.posts.filter((p) => p.authorId === parent.id);
+			}),
+		}));
+
+		const getAuthor = query<TestContext>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		await firstValueFrom(
+			server.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						posts: true,
+					},
+				},
+			}),
+		);
+
+		expect(capturedContext).toBeDefined();
+		expect(capturedContext?.db).toBe(mockDb);
+	});
+
+	it("supports nested input at multiple levels", async () => {
+		// Comment entity for deeper nesting
+		const Comment = entity("Comment", {
+			id: t.id(),
+			body: t.string(),
+			postId: t.string(),
+		});
+
+		const mockDbWithComments = {
+			...mockDb,
+			comments: [
+				{ id: "c1", body: "Comment 1", postId: "p1" },
+				{ id: "c2", body: "Comment 2", postId: "p1" },
+				{ id: "c3", body: "Comment 3", postId: "p2" },
+			],
+		};
+
+		type CtxWithComments = { db: typeof mockDbWithComments };
+
+		const postResolver = resolver<CtxWithComments>()(Post, (f) => ({
+			id: f.expose("id"),
+			title: f.expose("title"),
+			comments: f
+				.many(Comment)
+				.args(z.object({ limit: z.number().optional() }))
+				.resolve(({ parent, args, ctx }) => {
+					let comments = ctx.db.comments.filter((c) => c.postId === parent.id);
+					if (args.limit !== undefined) {
+						comments = comments.slice(0, args.limit);
+					}
+					return comments;
+				}),
+		}));
+
+		const authorResolver = resolver<CtxWithComments>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f
+				.many(Post)
+				.args(z.object({ limit: z.number().optional() }))
+				.resolve(({ parent, args, ctx }) => {
+					let posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+					if (args.limit !== undefined) {
+						posts = posts.slice(0, args.limit);
+					}
+					return posts;
+				}),
+		}));
+
+		const getAuthor = query<CtxWithComments>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post, Comment },
+			queries: { getAuthor },
+			resolvers: [authorResolver, postResolver],
+			context: () => ({ db: mockDbWithComments }),
+		});
+
+		// Nested input at multiple levels:
+		// Author.posts(limit: 1) -> Post.comments(limit: 1)
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						posts: {
+							input: { limit: 1 },
+							select: {
+								id: true,
+								title: true,
+								comments: {
+									input: { limit: 1 },
+									select: { id: true, body: true },
+								},
+							},
+						},
+					},
+				},
+			}),
+		);
+
+		expect(result.error).toBeUndefined();
+		const data = result.data as any;
+		expect(data.posts).toHaveLength(1);
+		expect(data.posts[0].comments).toHaveLength(1);
+	});
+
+	it("works without nested input (default args)", async () => {
+		const authorResolver = resolver<TestContext>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f
+				.many(Post)
+				.args(z.object({ limit: z.number().default(10) }))
+				.resolve(({ parent, args, ctx }) => {
+					return ctx.db.posts.filter((p) => p.authorId === parent.id).slice(0, args.limit);
+				}),
+		}));
+
+		const getAuthor = query<TestContext>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		// Without nested input - should use default args
+		const result = await firstValueFrom(
+			server.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						posts: { select: { id: true } },
+					},
+				},
+			}),
+		);
+
+		expect(result.error).toBeUndefined();
+		const data = result.data as any;
+		expect(data.posts).toHaveLength(3); // All of Alice's posts (default limit 10)
 	});
 });
