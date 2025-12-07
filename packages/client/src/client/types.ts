@@ -5,7 +5,7 @@
  */
 
 import type { MutationDef, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
-import type { TypedTransport } from "../transport/in-process.js";
+import type { TypedTransport } from "../transport/direct.js";
 import type { Plugin } from "../transport/plugin.js";
 import type { Transport } from "../transport/types.js";
 
@@ -49,7 +49,10 @@ export interface SelectionObject {
  * Query descriptor with unified { input, select } pattern.
  * Used at top-level and nested levels for consistency.
  */
-export interface QueryDescriptor<TInput = unknown, TSelect extends SelectionObject = SelectionObject> {
+export interface QueryDescriptor<
+	TInput = unknown,
+	TSelect extends SelectionObject = SelectionObject,
+> {
 	/** Input params for the query */
 	input?: TInput;
 	/** Field selection */
@@ -172,7 +175,9 @@ export type QueryFn<TInput, TOutput> = TInput extends void
  */
 export type MutationFn<TInput, TOutput> = <TSelect extends SelectionObject = SelectionObject>(
 	descriptor: QueryDescriptor<TInput, TSelect>,
-) => Promise<MutationResult<TSelect extends SelectionObject ? SelectedType<TOutput, TSelect> : TOutput>>;
+) => Promise<
+	MutationResult<TSelect extends SelectionObject ? SelectedType<TOutput, TSelect> : TOutput>
+>;
 
 /** Infer client type from router routes */
 export type InferRouterClientType<TRoutes extends RouterRoutes> = {

@@ -22,7 +22,12 @@
  * ```
  */
 
-import type { ReconnectMessage, ReconnectSubscription } from "@sylphx/lens-core";
+import {
+	firstValueFrom,
+	isObservable,
+	type ReconnectMessage,
+	type ReconnectSubscription,
+} from "@sylphx/lens-core";
 import type { LensServer, WebSocketLike } from "../server/create.js";
 import type {
 	ClientConnection,
@@ -174,7 +179,12 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		// Execute query first to get data
 		let result: { data?: unknown; error?: Error };
 		try {
-			result = await server.execute({ path: operation, input });
+			const resultOrObservable = server.execute({ path: operation, input });
+
+			// Handle Observable (take first value)
+			result = isObservable(resultOrObservable)
+				? await firstValueFrom(resultOrObservable)
+				: await resultOrObservable;
 
 			if (result.error) {
 				conn.ws.send(
@@ -349,10 +359,15 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle query
 	async function handleQuery(conn: ClientConnection, message: QueryMessage): Promise<void> {
 		try {
-			const result = await server.execute({
+			const resultOrObservable = server.execute({
 				path: message.operation,
 				input: message.input,
 			});
+
+			// Handle Observable (take first value)
+			const result = isObservable(resultOrObservable)
+				? await firstValueFrom(resultOrObservable)
+				: await resultOrObservable;
 
 			if (result.error) {
 				conn.ws.send(
@@ -389,10 +404,15 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle mutation
 	async function handleMutation(conn: ClientConnection, message: MutationMessage): Promise<void> {
 		try {
-			const result = await server.execute({
+			const resultOrObservable = server.execute({
 				path: message.operation,
 				input: message.input,
 			});
+
+			// Handle Observable (take first value)
+			const result = isObservable(resultOrObservable)
+				? await firstValueFrom(resultOrObservable)
+				: await resultOrObservable;
 
 			if (result.error) {
 				conn.ws.send(

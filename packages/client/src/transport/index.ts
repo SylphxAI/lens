@@ -69,10 +69,16 @@ export {
 // Transports
 // =============================================================================
 
+// Direct (formerly In-Process)
+export {
+	type DirectTransportOptions,
+	direct,
+	// Legacy aliases (deprecated)
+	type InProcessTransportOptions,
+	inProcess,
+} from "./direct.js";
 // HTTP
 export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http.js";
-// In-Process
-export { type InProcessTransportOptions, inProcess } from "./in-process.js";
 // Route
 export {
 	type RouteByTypeConfig,

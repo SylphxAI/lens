@@ -27,7 +27,10 @@ const LENS_CONTEXT_KEY = Symbol.for("@sylphx/lens-react/context");
  * (common in monorepos), all instances share the same React context.
  */
 function getOrCreateContext(): React.Context<LensClient<any, any> | null> {
-	const globalObj = globalThis as unknown as Record<symbol, React.Context<LensClient<any, any> | null>>;
+	const globalObj = globalThis as unknown as Record<
+		symbol,
+		React.Context<LensClient<any, any> | null>
+	>;
 
 	if (!globalObj[LENS_CONTEXT_KEY]) {
 		globalObj[LENS_CONTEXT_KEY] = createContext<LensClient<any, any> | null>(null);

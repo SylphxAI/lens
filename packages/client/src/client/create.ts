@@ -382,7 +382,9 @@ class ClientImpl {
 	 * Backwards compatible: if descriptor has no 'input' or 'select' keys,
 	 * treats the entire object as input (legacy API).
 	 */
-	createAccessor(path: string): (descriptor?: { input?: unknown; select?: SelectionObject } | unknown) => unknown {
+	createAccessor(
+		path: string,
+	): (descriptor?: { input?: unknown; select?: SelectionObject } | unknown) => unknown {
 		return (descriptor?: { input?: unknown; select?: SelectionObject } | unknown) => {
 			// Backwards compatibility: detect legacy API (raw input without wrapper)
 			const isNewApi =
@@ -392,12 +394,8 @@ class ClientImpl {
 					descriptor !== null &&
 					("input" in descriptor || "select" in descriptor));
 
-			const input = isNewApi
-				? (descriptor as { input?: unknown })?.input
-				: descriptor;
-			const select = isNewApi
-				? (descriptor as { select?: SelectionObject })?.select
-				: undefined;
+			const input = isNewApi ? (descriptor as { input?: unknown })?.input : descriptor;
+			const select = isNewApi ? (descriptor as { select?: SelectionObject })?.select : undefined;
 
 			// Delegate to executeQuery for all query functionality (caching, subscriptions, etc.)
 			const queryResult = this.executeQuery<unknown>(path, input, select);

@@ -43,12 +43,6 @@ export {
 // =============================================================================
 
 export {
-	LensClientKey,
-	provideLensClient,
-	useLensClient,
-} from "./context.js";
-
-export {
 	type MutationFn,
 	type QueryInput,
 	type UseLazyQueryResult,
@@ -59,3 +53,8 @@ export {
 	useMutation,
 	useQuery,
 } from "./composables.js";
+export {
+	LensClientKey,
+	provideLensClient,
+	useLensClient,
+} from "./context.js";

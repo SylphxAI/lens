@@ -129,6 +129,7 @@
       "version": "2.1.7",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
+        "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-react": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
       },
@@ -152,6 +153,7 @@
       "version": "2.0.5",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
+        "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
         "@sylphx/lens-vue": "workspace:*",
       },

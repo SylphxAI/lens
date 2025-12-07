@@ -9,6 +9,7 @@ import type {
 	EntityDef,
 	InferRouterContext,
 	MutationDef,
+	Observable,
 	OptimisticDSL,
 	QueryDef,
 	Resolvers,
@@ -181,8 +182,20 @@ export interface WebSocketLike {
 export interface LensServer {
 	/** Get server metadata for transport handshake */
 	getMetadata(): ServerMetadata;
-	/** Execute operation - auto-detects query vs mutation */
-	execute(op: LensOperation): Promise<LensResult>;
+
+	/**
+	 * Execute operation - auto-detects query vs mutation.
+	 *
+	 * Returns:
+	 * - Promise<LensResult> for one-shot queries/mutations
+	 * - Observable<LensResult> for streaming (AsyncIterable resolvers or emit-based)
+	 *
+	 * Transports should handle both:
+	 * - HTTP: Use firstValueFrom() to get single value
+	 * - WS/SSE: Subscribe to Observable for streaming
+	 * - direct: Pass through as-is for full streaming support
+	 */
+	execute(op: LensOperation): Promise<LensResult> | Observable<LensResult>;
 
 	// =========================================================================
 	// Subscription Support (Optional - used by WS/SSE handlers)

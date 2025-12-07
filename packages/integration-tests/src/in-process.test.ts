@@ -13,7 +13,7 @@ import {
 	type Result,
 	type TypedTransport,
 } from "@sylphx/lens-client";
-import { entity, lens, router, t } from "@sylphx/lens-core";
+import { entity, firstValueFrom, isObservable, lens, router, t } from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 
@@ -433,12 +433,16 @@ describe("inProcess type inference", () => {
 			expect(metadata.version).toBeDefined();
 
 			// Test execute query
-			const queryResult = await transport.execute({
+			const queryResultOrObs = transport.execute({
 				id: "1",
 				path: "user.get",
 				type: "query",
 				input: { id: "1" },
 			});
+			// Handle Observable (execute now returns Observable for streaming support)
+			const queryResult = isObservable(queryResultOrObs)
+				? await firstValueFrom(queryResultOrObs)
+				: await queryResultOrObs;
 			expect((queryResult as Result).data).toEqual({
 				id: "1",
 				name: "Alice",
@@ -446,12 +450,16 @@ describe("inProcess type inference", () => {
 			});
 
 			// Test execute mutation
-			const mutationResult = await transport.execute({
+			const mutationResultOrObs = transport.execute({
 				id: "2",
 				path: "user.create",
 				type: "mutation",
 				input: { name: "Bob", email: "bob@test.com" },
 			});
+			// Handle Observable
+			const mutationResult = isObservable(mutationResultOrObs)
+				? await firstValueFrom(mutationResultOrObs)
+				: await mutationResultOrObs;
 			expect((mutationResult as Result).data).toEqual({
 				id: "2",
 				name: "Bob",

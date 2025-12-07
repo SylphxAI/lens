@@ -34,12 +34,16 @@ export {
 // =============================================================================
 
 export {
+	// Direct transport (primary)
+	type DirectTransportOptions,
+	direct,
 	// Transport capability interfaces
 	type FullTransport,
 	type HttpServerTransportOptions,
 	type HttpTransportOptions,
 	// Transports
 	http,
+	// Legacy alias (deprecated)
 	type InProcessTransportOptions,
 	inProcess,
 	// Type guards

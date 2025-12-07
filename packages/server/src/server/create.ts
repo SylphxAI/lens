@@ -18,12 +18,14 @@
 import {
 	type ContextValue,
 	createEmit,
+	type EmitCommand,
 	type EntityDef,
 	flattenRouter,
 	type InferRouterContext,
 	isEntityDef,
 	isMutationDef,
 	isQueryDef,
+	type Observable,
 	type ResolverDef,
 	type RouterDef,
 	toResolverMap,
@@ -192,109 +194,202 @@ class LensServerImpl<
 		};
 	}
 
-	async execute(op: LensOperation): Promise<LensResult> {
+	/**
+	 * Execute operation and return result.
+	 *
+	 * Returns Observable for streaming operations (AsyncIterable resolvers or emit-based),
+	 * Promise for one-shot operations.
+	 */
+	execute(op: LensOperation): Promise<LensResult> | Observable<LensResult> {
 		const { path, input } = op;
 
-		try {
-			if (this.queries[path]) {
-				const data = await this.executeQuery(path, input);
-				return { data };
-			}
-			if (this.mutations[path]) {
-				const data = await this.executeMutation(path, input);
-				return { data };
-			}
-			return { error: new Error(`Operation not found: ${path}`) };
-		} catch (error) {
-			return { error: error instanceof Error ? error : new Error(String(error)) };
+		// Check if operation exists
+		const isQuery = !!this.queries[path];
+		const isMutation = !!this.mutations[path];
+
+		if (!isQuery && !isMutation) {
+			return Promise.resolve({ error: new Error(`Operation not found: ${path}`) });
 		}
+
+		// For streaming support, return Observable
+		return this.executeAsObservable(path, input, isQuery);
 	}
 
-	// =========================================================================
-	// Query/Mutation Execution
-	// =========================================================================
+	/**
+	 * Execute operation and return Observable.
+	 * Observable allows streaming for AsyncIterable resolvers and emit-based updates.
+	 */
+	private executeAsObservable(
+		path: string,
+		input: unknown,
+		isQuery: boolean,
+	): Observable<LensResult> {
+		return {
+			subscribe: (observer) => {
+				let cancelled = false;
+				let currentState: unknown;
+				const cleanups: (() => void)[] = [];
 
-	private async executeQuery<TInput, TOutput>(name: string, input?: TInput): Promise<TOutput> {
-		const queryDef = this.queries[name];
-		if (!queryDef) throw new Error(`Query not found: ${name}`);
+				// Run the operation
+				(async () => {
+					try {
+						const def = isQuery ? this.queries[path] : this.mutations[path];
+						if (!def) {
+							observer.error?.(new Error(`Operation not found: ${path}`));
+							return;
+						}
 
-		// Extract $select from input
-		let select: SelectionObject | undefined;
-		let cleanInput = input;
-		if (input && typeof input === "object" && "$select" in input) {
-			const { $select, ...rest } = input as Record<string, unknown>;
-			select = $select as SelectionObject;
-			cleanInput = (Object.keys(rest).length > 0 ? rest : undefined) as TInput;
-		}
+						// Extract $select from input for queries
+						let select: SelectionObject | undefined;
+						let cleanInput = input;
+						if (isQuery && input && typeof input === "object" && "$select" in input) {
+							const { $select, ...rest } = input as Record<string, unknown>;
+							select = $select as SelectionObject;
+							cleanInput = Object.keys(rest).length > 0 ? rest : undefined;
+						}
 
-		// Validate input
-		if (queryDef._input && cleanInput !== undefined) {
-			const result = queryDef._input.safeParse(cleanInput);
-			if (!result.success) {
-				throw new Error(`Invalid input: ${JSON.stringify(result.error)}`);
-			}
-		}
+						// Validate input
+						if (def._input && cleanInput !== undefined) {
+							const result = def._input.safeParse(cleanInput);
+							if (!result.success) {
+								observer.error?.(new Error(`Invalid input: ${JSON.stringify(result.error)}`));
+								return;
+							}
+						}
 
-		const context = await this.contextFactory();
+						const context = await this.contextFactory();
 
-		try {
-			return await runWithContext(this.ctx, context, async () => {
-				const resolver = queryDef._resolve;
-				if (!resolver) throw new Error(`Query ${name} has no resolver`);
+						await runWithContext(this.ctx, context, async () => {
+							const resolver = def._resolve;
+							if (!resolver) {
+								observer.error?.(new Error(`Operation ${path} has no resolver`));
+								return;
+							}
 
-				const emit = createEmit(() => {});
-				const onCleanup = () => () => {};
-				const lensContext = { ...context, emit, onCleanup };
+							// Create emit handler that pushes to observer
+							const emitHandler = (command: EmitCommand) => {
+								if (cancelled) return;
+								currentState = this.applyEmitCommand(command, currentState);
+								observer.next?.({ data: currentState });
+							};
 
-				const result = resolver({ input: cleanInput as TInput, ctx: lensContext });
+							const emit = createEmit(emitHandler);
+							const onCleanup = (fn: () => void) => {
+								cleanups.push(fn);
+								return () => {
+									const idx = cleanups.indexOf(fn);
+									if (idx >= 0) cleanups.splice(idx, 1);
+								};
+							};
 
-				let data: TOutput;
-				if (isAsyncIterable(result)) {
-					for await (const value of result) {
-						data = value as TOutput;
-						break;
+							const lensContext = { ...context, emit, onCleanup };
+							const result = resolver({ input: cleanInput, ctx: lensContext });
+
+							if (isAsyncIterable(result)) {
+								// Streaming: emit each yielded value
+								for await (const value of result) {
+									if (cancelled) break;
+									currentState = value;
+									const processed = await this.processQueryResult(path, value, select);
+									observer.next?.({ data: processed });
+								}
+								if (!cancelled) {
+									observer.complete?.();
+								}
+							} else {
+								// One-shot: emit single value
+								const value = await result;
+								currentState = value;
+								const processed = isQuery
+									? await this.processQueryResult(path, value, select)
+									: value;
+								if (!cancelled) {
+									observer.next?.({ data: processed });
+									// Don't complete immediately - stay open for potential emit calls
+									// For true one-shot, client can unsubscribe after first value
+								}
+							}
+						});
+					} catch (error) {
+						if (!cancelled) {
+							observer.error?.(error instanceof Error ? error : new Error(String(error)));
+						}
+					} finally {
+						this.clearLoaders();
 					}
-					if (data! === undefined) {
-						throw new Error(`Query ${name} returned empty stream`);
-					}
-				} else {
-					data = (await result) as TOutput;
+				})();
+
+				return {
+					unsubscribe: () => {
+						cancelled = true;
+						for (const fn of cleanups) {
+							fn();
+						}
+					},
+				};
+			},
+		};
+	}
+
+	/**
+	 * Apply emit command to current state.
+	 */
+	private applyEmitCommand(command: EmitCommand, state: unknown): unknown {
+		switch (command.type) {
+			case "full":
+				if (command.replace) {
+					return command.data;
 				}
+				// Merge mode
+				if (state && typeof state === "object" && typeof command.data === "object") {
+					return { ...state, ...(command.data as Record<string, unknown>) };
+				}
+				return command.data;
 
-				return this.processQueryResult(name, data, select);
-			});
-		} finally {
-			this.clearLoaders();
-		}
-	}
+			case "field":
+				if (state && typeof state === "object") {
+					return {
+						...(state as Record<string, unknown>),
+						[command.field]: command.update.data,
+					};
+				}
+				return { [command.field]: command.update.data };
 
-	private async executeMutation<TInput, TOutput>(name: string, input: TInput): Promise<TOutput> {
-		const mutationDef = this.mutations[name];
-		if (!mutationDef) throw new Error(`Mutation not found: ${name}`);
+			case "batch":
+				if (state && typeof state === "object") {
+					const result = { ...(state as Record<string, unknown>) };
+					for (const update of command.updates) {
+						result[update.field] = update.update.data;
+					}
+					return result;
+				}
+				return state;
 
-		// Validate input
-		if (mutationDef._input) {
-			const result = mutationDef._input.safeParse(input);
-			if (!result.success) {
-				throw new Error(`Invalid input: ${JSON.stringify(result.error)}`);
+			case "array": {
+				// Array operations - simplified handling
+				const arr = Array.isArray(state) ? [...state] : [];
+				const op = command.operation;
+				switch (op.op) {
+					case "push":
+						return [...arr, op.item];
+					case "unshift":
+						return [op.item, ...arr];
+					case "insert":
+						arr.splice(op.index, 0, op.item);
+						return arr;
+					case "remove":
+						arr.splice(op.index, 1);
+						return arr;
+					case "update":
+						arr[op.index] = op.item;
+						return arr;
+					default:
+						return arr;
+				}
 			}
-		}
 
-		const context = await this.contextFactory();
-
-		try {
-			return await runWithContext(this.ctx, context, async () => {
-				const resolver = mutationDef._resolve;
-				if (!resolver) throw new Error(`Mutation ${name} has no resolver`);
-
-				const emit = createEmit(() => {});
-				const onCleanup = () => () => {};
-				const lensContext = { ...context, emit, onCleanup };
-
-				return (await resolver({ input: input as TInput, ctx: lensContext })) as TOutput;
-			});
-		} finally {
-			this.clearLoaders();
+			default:
+				return state;
 		}
 	}
 

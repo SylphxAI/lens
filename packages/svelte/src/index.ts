@@ -44,6 +44,16 @@ export {
 // =============================================================================
 
 export {
+	getLensClient,
+	// Context key
+	LENS_CLIENT_KEY,
+	// Context functions (recommended)
+	provideLensClient,
+	// Legacy aliases (deprecated)
+	setLensClient,
+	useLensClient,
+} from "./context.js";
+export {
 	type LazyQueryStore,
 	lazyQuery,
 	type MutationFn,
@@ -58,14 +68,3 @@ export {
 	// Store factories
 	query,
 } from "./stores.js";
-
-export {
-	getLensClient,
-	// Context key
-	LENS_CLIENT_KEY,
-	// Context functions (recommended)
-	provideLensClient,
-	// Legacy aliases (deprecated)
-	setLensClient,
-	useLensClient,
-} from "./context.js";

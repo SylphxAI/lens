@@ -17,6 +17,7 @@
  * ```
  */
 
+import { firstValueFrom, isObservable } from "@sylphx/lens-core";
 import type { LensServer } from "@sylphx/lens-server";
 
 // =============================================================================
@@ -77,10 +78,15 @@ async function handleQuery(server: LensServer, path: string, url: URL): Promise<
 		const inputParam = url.searchParams.get("input");
 		const input = inputParam ? JSON.parse(inputParam) : undefined;
 
-		const result = await server.execute({
+		const resultOrObservable = server.execute({
 			path,
 			input,
 		});
+
+		// Handle Observable (take first value for HTTP)
+		const result = isObservable(resultOrObservable)
+			? await firstValueFrom(resultOrObservable)
+			: await resultOrObservable;
 
 		if (result.error) {
 			return Response.json({ error: result.error.message }, { status: 400 });
@@ -104,10 +110,15 @@ async function handleMutation(
 		const body = await request.json();
 		const input = body.input;
 
-		const result = await server.execute({
+		const resultOrObservable = server.execute({
 			path,
 			input,
 		});
+
+		// Handle Observable (take first value for HTTP)
+		const result = isObservable(resultOrObservable)
+			? await firstValueFrom(resultOrObservable)
+			: await resultOrObservable;
 
 		if (result.error) {
 			return Response.json({ error: result.error.message }, { status: 400 });
@@ -223,10 +234,15 @@ function createServerProxy(server: LensServer, prefix: string): unknown {
 		},
 		async apply(_, __, args) {
 			const input = args[0];
-			const result = await server.execute({
+			const resultOrObservable = server.execute({
 				path: prefix,
 				input,
 			});
+
+			// Handle Observable (take first value)
+			const result = isObservable(resultOrObservable)
+				? await firstValueFrom(resultOrObservable)
+				: await resultOrObservable;
 
 			if (result.error) {
 				throw result.error;

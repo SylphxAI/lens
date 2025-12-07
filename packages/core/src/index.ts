@@ -374,6 +374,24 @@ export {
 } from "./reconnect/index.js";
 
 // =============================================================================
+// Observable Types
+// =============================================================================
+
+export {
+	// Functions
+	firstValueFrom,
+	fromAsyncIterable,
+	fromPromise,
+	isObservable,
+	// Types
+	type Observable,
+	type Observer,
+	of,
+	throwError,
+	type Unsubscribable,
+} from "./observable/index.js";
+
+// =============================================================================
 // Plugin System
 // =============================================================================
 
