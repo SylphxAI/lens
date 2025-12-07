@@ -1019,4 +1019,60 @@ describe("field resolvers", () => {
 
 		subscription.unsubscribe();
 	});
+
+	it("emit skips observer notification when value unchanged", async () => {
+		type EmitFn = (data: { id: string; name: string }) => void;
+		let capturedEmit: EmitFn | undefined;
+
+		// Query that captures emit for external use
+		const liveQuery = query()
+			.input(z.object({ id: z.string() }))
+			.returns(User)
+			.resolve(({ input, ctx }) => {
+				capturedEmit = ctx.emit as EmitFn;
+				return { id: input.id, name: "Initial" };
+			});
+
+		const testRouter = router({ liveQuery });
+		const app = createApp({ router: testRouter });
+
+		const results: unknown[] = [];
+		const observable = app.execute({
+			path: "liveQuery",
+			input: { id: "1" },
+		});
+
+		const subscription = observable.subscribe({
+			next: (value) => results.push(value),
+		});
+
+		// Wait for initial result
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(results.length).toBe(1);
+		const firstResult = results[0] as { data: { id: string; name: string } };
+		expect(firstResult.data.name).toBe("Initial");
+
+		// Emit same value - should be skipped (equality check)
+		capturedEmit!({ id: "1", name: "Initial" });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(results.length).toBe(1); // Still 1, not 2
+
+		// Emit same value again - should be skipped
+		capturedEmit!({ id: "1", name: "Initial" });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(results.length).toBe(1); // Still 1
+
+		// Emit different value - should emit
+		capturedEmit!({ id: "1", name: "Changed" });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(results.length).toBe(2); // Now 2
+		expect((results[1] as { data: { name: string } }).data.name).toBe("Changed");
+
+		// Emit same "Changed" value again - should be skipped
+		capturedEmit!({ id: "1", name: "Changed" });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(results.length).toBe(2); // Still 2
+
+		subscription.unsubscribe();
+	});
 });

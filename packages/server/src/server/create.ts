@@ -29,6 +29,7 @@ import {
 	type ResolverDef,
 	type RouterDef,
 	toResolverMap,
+	valuesEqual,
 } from "@sylphx/lens-core";
 import { createContext, runWithContext } from "../context/index.js";
 import {
@@ -234,7 +235,16 @@ class LensServerImpl<
 			subscribe: (observer) => {
 				let cancelled = false;
 				let currentState: unknown;
+				let lastEmittedResult: unknown;
 				const cleanups: (() => void)[] = [];
+
+				// Helper to emit only if value changed
+				const emitIfChanged = (data: unknown) => {
+					if (cancelled) return;
+					if (valuesEqual(data, lastEmittedResult)) return;
+					lastEmittedResult = data;
+					observer.next?.({ data });
+				};
 
 				// Run the operation
 				(async () => {
@@ -299,11 +309,7 @@ class LensServerImpl<
 												(state) => {
 													currentState = state;
 												},
-												(data) => {
-													if (!cancelled) {
-														observer.next?.({ data });
-													}
-												},
+												emitIfChanged,
 												select,
 												context,
 												onCleanup,
@@ -321,9 +327,7 @@ class LensServerImpl<
 											)
 										: currentState;
 
-									if (!cancelled) {
-										observer.next?.({ data: processed });
-									}
+									emitIfChanged(processed);
 								}
 
 								emitProcessing = false;
@@ -356,11 +360,7 @@ class LensServerImpl<
 										(state) => {
 											currentState = state;
 										},
-										(data) => {
-											if (!cancelled) {
-												observer.next?.({ data });
-											}
-										},
+										emitIfChanged,
 										select,
 										context,
 										onCleanup,
@@ -383,7 +383,7 @@ class LensServerImpl<
 										onCleanup,
 										createFieldEmit,
 									);
-									observer.next?.({ data: processed });
+									emitIfChanged(processed);
 								}
 								if (!cancelled) {
 									observer.complete?.();
@@ -402,11 +402,9 @@ class LensServerImpl<
 											createFieldEmit,
 										)
 									: value;
-								if (!cancelled) {
-									observer.next?.({ data: processed });
-									// Don't complete immediately - stay open for potential emit calls
-									// For true one-shot, client can unsubscribe after first value
-								}
+								emitIfChanged(processed);
+								// Don't complete immediately - stay open for potential emit calls
+								// For true one-shot, client can unsubscribe after first value
 							}
 						});
 					} catch (error) {
