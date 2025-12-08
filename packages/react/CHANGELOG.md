@@ -1,5 +1,11 @@
 # @sylphx/lens-react
 
+## 2.3.4 (2025-12-08)
+
+### 🐛 Bug Fixes
+
+- **hooks:** use stable dependency comparison for query input ([9b814db](https://github.com/SylphxAI/lens/commit/9b814dbb2ec1ebc5bcba6ff32212f14e15df9192))
+
 ## 2.3.3 (2025-12-08)
 
 No notable changes.
