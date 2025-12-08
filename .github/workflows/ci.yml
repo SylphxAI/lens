@@ -28,7 +28,7 @@ jobs:
         run: bun run build
 
       - name: Run tests
-        run: bun test --timeout 30000
+        run: bun test packages --timeout 30000
         timeout-minutes: 5
 
       - name: Type check
