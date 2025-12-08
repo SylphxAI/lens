@@ -1,5 +1,9 @@
 # @sylphx/lens-svelte
 
+## 2.2.3 (2025-12-08)
+
+No notable changes.
+
 ## 2.2.2 (2025-12-08)
 
 ### 📦 Dependencies

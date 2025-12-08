@@ -1,5 +1,9 @@
 # @sylphx/lens-preact
 
+## 2.0.10 (2025-12-08)
+
+No notable changes.
+
 ## 2.0.9 (2025-12-08)
 
 ### 📦 Dependencies
