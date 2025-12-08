@@ -1,5 +1,16 @@
 # @sylphx/lens-client
 
+## 2.3.0 (2025-12-08)
+
+### ✨ Features
+
+- **server:** add WebSocket security limits ([ae485fe](https://github.com/SylphxAI/lens/commit/ae485fe3d7c97d568693a39833472e90a08da3c0))
+- **client:** support both callback and Observer patterns in subscribe() ([6785dbc](https://github.com/SylphxAI/lens/commit/6785dbc12fde78b9c04abb7d5fcc3257f94b8e3e))
+
+### ⚡️ Performance
+
+- **client:** cache query key hashes with WeakMap ([c0acb44](https://github.com/SylphxAI/lens/commit/c0acb441cfdf2bbff7356295d39b16473f11a36d))
+
 ## 2.2.1 (2025-12-07)
 
 ### 📦 Dependencies
