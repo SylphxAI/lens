@@ -464,15 +464,16 @@ export { db };
 // Start Server (when run directly)
 // =============================================================================
 
-const PORT = 3000;
-const handler = createHandler(app);
+if (import.meta.main) {
+	const PORT = 3000;
+	const handler = createHandler(app);
 
-Bun.serve({
-	port: PORT,
-	fetch: handler,
-});
+	Bun.serve({
+		port: PORT,
+		fetch: handler,
+	});
 
-console.log(`
+	console.log(`
 🔭 Lens Server running on http://localhost:${PORT}
 
 Endpoints:
@@ -486,3 +487,4 @@ Routes:
   comment.add
   chat.send (🔥 Reify Pipeline with typed callback)
 `);
+}
