@@ -2,14 +2,14 @@
 
 ## Overview
 
-This document outlines the unified tRPC-style API for Lens. The key principle: **one `createClient`, one call pattern, automatic hook/promise based on usage**.
+This document outlines the unified API for Lens. The key principle: **vanilla JS base + explicit framework hooks**.
 
 ## Core Principles
 
-1. **Unified Client**: Single `createClient` from framework package gives you everything
-2. **No Redundancy**: No `.useQuery()` / `.useMutation()` - endpoint type determines behavior
-3. **Direct Calls**: `client.user.get({ input })` in component = hook
-4. **Explicit Fetch**: `client.user.get.fetch({ input })` = promise for SSR
+1. **Unified Base Client**: Direct calls always return Promise/Observable (vanilla JS)
+2. **Explicit Hooks**: `.useQuery()` / `.useMutation()` for React/Vue
+3. **Explicit Primitives**: `.createQuery()` / `.createMutation()` for Svelte/Solid
+4. **No Magic**: Clear distinction between vanilla JS and framework-specific code
 5. **Type Safety**: Full TypeScript inference from router to component
 
 ---
@@ -20,7 +20,7 @@ This document outlines the unified tRPC-style API for Lens. The key principle: *
 
 ```typescript
 // lib/client.ts
-import { createClient } from "@sylphx/lens-react";
+import { createClient } from "@sylphx/lens-react"; // or lens-vue, lens-solid, lens-svelte
 import { httpTransport } from "@sylphx/lens-client";
 import type { AppRouter } from "@/server/router";
 
@@ -34,9 +34,13 @@ export const client = createClient<AppRouter>({
 ```tsx
 import { client } from "@/lib/client";
 
-// Component - hook (auto-subscribes, reactive)
+// Vanilla JS (anywhere - SSR, utilities, event handlers)
+const user = await client.user.get({ input: { id } });
+client.user.get({ input: { id } }).subscribe(data => console.log(data));
+
+// React hooks (in components)
 function UserProfile({ id }: { id: string }) {
-  const { data, loading, error } = client.user.get({
+  const { data, loading, error } = client.user.get.useQuery({
     input: { id },
     select: { name: true, avatar: true },
   });
@@ -44,43 +48,41 @@ function UserProfile({ id }: { id: string }) {
   if (loading) return <Spinner />;
   return <h1>{data?.name}</h1>;
 }
-
-// SSR / Server Component - promise
-async function UserPage({ id }: { id: string }) {
-  const user = await client.user.get.fetch({
-    input: { id },
-  });
-
-  return <h1>{user.name}</h1>;
-}
 ```
 
 ---
 
 ## API Reference
 
-### Query Endpoints
+### Vanilla JS (Base Client)
 
 ```typescript
-// Query (hook) - in component
-const { data, loading, error, refetch } = client.user.get({
-  input: { id: "123" },           // Query parameters
-  select: { name: true },          // Optional field selection
-  skip: false,                     // Optional: skip execution
+// Query - returns QueryResult (Promise + Observable)
+const user = await client.user.get({ input: { id: "123" } });
+
+// Subscribe to live updates
+const unsubscribe = client.user.get({ input: { id: "123" } }).subscribe((user) => {
+  console.log("User updated:", user);
 });
 
-// Query (promise) - in SSR/scripts
-const user = await client.user.get.fetch({
-  input: { id: "123" },
-  select: { name: true },
+// Mutation - returns Promise
+const newUser = await client.user.create({
+  input: { name: "John", email: "john@example.com" },
 });
 ```
 
-### Mutation Endpoints
+### React Hooks
 
 ```typescript
-// Mutation (hook) - in component
-const { mutate, loading, error, data, reset } = client.user.create({
+// Query hook
+const { data, loading, error, refetch } = client.user.get.useQuery({
+  input: { id: "123" },
+  select: { name: true },
+  skip: false,
+});
+
+// Mutation hook
+const { mutate, loading, error, data, reset } = client.user.create.useMutation({
   onSuccess: (data) => toast("Created!"),
   onError: (err) => toast.error(err.message),
 });
@@ -90,53 +92,43 @@ await mutate({
   input: { name: "John", email: "john@example.com" },
   select: { id: true },
 });
-
-// Mutation (promise) - in SSR/scripts
-const newUser = await client.user.create.fetch({
-  input: { name: "John", email: "john@example.com" },
-});
 ```
 
-### Conditional Queries
-
-```tsx
-function UserProfile({ id }: { id: string | null }) {
-  // Use skip option for conditional queries
-  const { data } = client.user.get({
-    input: { id: id ?? "" },
-    skip: !id,  // Don't execute if no id
-  });
-
-  return <div>{data?.name}</div>;
-}
-```
-
-### Nested Selection with Input
+### Vue Composables
 
 ```typescript
-const { data } = client.user.get({
-  input: { id: "user-123" },
-  select: {
-    name: true,
-    email: true,
-    posts: {
-      input: { limit: 10, published: true },  // Nested input
-      select: {
-        title: true,
-        content: true,
-        comments: {
-          input: { limit: 5 },  // Deeply nested input
-          select: {
-            body: true,
-            author: {
-              select: { name: true },
-            },
-          },
-        },
-      },
-    },
-  },
+// Query composable - returns Refs
+const { data, loading, error, refetch } = client.user.get.useQuery({
+  input: { id: "123" },
 });
+
+// Mutation composable
+const { mutate, loading, error, data, reset } = client.user.create.useMutation();
+```
+
+### Svelte Stores
+
+```typescript
+// Query store
+const userStore = client.user.get.createQuery({ input: { id: "123" } });
+// Use with $: $userStore.data, $userStore.loading
+
+// Mutation store
+const mutation = client.user.create.createMutation();
+await mutation.mutate({ input: { name: "John" } });
+```
+
+### Solid Primitives
+
+```typescript
+// Query primitive - returns Accessors
+const { data, loading, error, refetch } = client.user.get.createQuery({
+  input: { id: "123" },
+});
+// Use: data(), loading()
+
+// Mutation primitive
+const { mutate, loading, error, data, reset } = client.user.create.createMutation();
 ```
 
 ---
@@ -150,13 +142,12 @@ import { createClient } from "@sylphx/lens-react";
 
 export const client = createClient<AppRouter>({ transport });
 
-// In component
 function UserProfile({ id }: { id: string }) {
-  // Query - returns { data, loading, error, refetch }
-  const { data, loading } = client.user.get({ input: { id } });
+  // .useQuery() - React hook
+  const { data, loading } = client.user.get.useQuery({ input: { id } });
 
-  // Mutation - returns { mutate, loading, error, data, reset }
-  const { mutate, loading: saving } = client.user.update();
+  // .useMutation() - React hook
+  const { mutate, loading: saving } = client.user.update.useMutation();
 
   return (
     <div>
@@ -166,6 +157,12 @@ function UserProfile({ id }: { id: string }) {
       </button>
     </div>
   );
+}
+
+// SSR / Server Component - use vanilla JS
+async function UserPage({ id }: { id: string }) {
+  const user = await client.user.get({ input: { id } });
+  return <h1>{user.name}</h1>;
 }
 ```
 
@@ -177,14 +174,14 @@ import { client } from "@/lib/client";
 
 const props = defineProps<{ id: string }>();
 
-// Query - returns Refs { data, loading, error, refetch }
-const { data, loading, error } = client.user.get({
+// .useQuery() - Vue composable, returns Refs
+const { data, loading, error } = client.user.get.useQuery({
   input: { id: props.id },
   select: { name: true },
 });
 
-// Mutation - returns Refs { mutate, loading, error, data }
-const { mutate, loading: saving } = client.user.update();
+// .useMutation() - Vue composable
+const { mutate, loading: saving } = client.user.update.useMutation();
 
 const handleUpdate = async () => {
   await mutate({ input: { id: props.id, name: "New Name" } });
@@ -208,14 +205,14 @@ import { createClient } from "@sylphx/lens-solid";
 export const client = createClient<AppRouter>({ transport });
 
 function UserProfile(props: { id: string }) {
-  // Query - returns Accessors { data, loading, error, refetch }
-  const { data, loading, error } = client.user.get({
+  // .createQuery() - Solid primitive, returns Accessors
+  const { data, loading, error } = client.user.get.createQuery({
     input: { id: props.id },
     select: { name: true },
   });
 
-  // Mutation - returns { mutate, loading, error, data }
-  const { mutate, loading: saving } = client.user.update();
+  // .createMutation() - Solid primitive
+  const { mutate, loading: saving } = client.user.update.createMutation();
 
   return (
     <Show when={!loading()} fallback={<Spinner />}>
@@ -239,14 +236,14 @@ function UserProfile(props: { id: string }) {
 
   export let id: string;
 
-  // Query - returns store with { data, loading, error } + refetch method
-  $: userQuery = client.user.get({
+  // .createQuery() - Svelte store
+  $: userQuery = client.user.get.createQuery({
     input: { id },
     select: { name: true },
   });
 
-  // Mutation - returns store with { loading, error, data } + mutate method
-  const updateMutation = client.user.update();
+  // .createMutation() - Svelte store
+  const updateMutation = client.user.update.createMutation();
 
   const handleUpdate = async () => {
     await updateMutation.mutate({ input: { id, name: "New Name" } });
@@ -269,7 +266,7 @@ function UserProfile(props: { id: string }) {
 
 ## Type Definitions
 
-### Query Hook Result
+### Query Hook Result (React/Vue)
 
 ```typescript
 interface QueryHookResult<T> {
@@ -280,7 +277,7 @@ interface QueryHookResult<T> {
 }
 ```
 
-### Mutation Hook Result
+### Mutation Hook Result (React/Vue)
 
 ```typescript
 interface MutationHookResult<TInput, TOutput> {
@@ -295,10 +292,10 @@ interface MutationHookResult<TInput, TOutput> {
 ### Query Options
 
 ```typescript
-interface QueryOptions<TInput, TSelect> {
-  input?: TInput;                    // Query parameters (required if endpoint needs input)
-  select?: TSelect;                  // Field selection (optional)
-  skip?: boolean;                    // Skip query execution (optional)
+interface QueryHookOptions<TInput> {
+  input?: TInput;
+  select?: SelectionObject;
+  skip?: boolean;
 }
 ```
 
@@ -324,27 +321,24 @@ type TypedClient<TRouter> = {
         : TypedClient<TRouter[K]>  // Nested routes
 };
 
+// React/Vue
 interface QueryEndpoint<TInput, TOutput> {
-  // Hook call (in component)
-  <TSelect extends SelectionObject = {}>(
-    options: QueryOptions<TInput, TSelect>
-  ): QueryHookResult<TSelect extends {} ? SelectedType<TOutput, TSelect> : TOutput>;
+  // Vanilla JS - returns QueryResult (Promise + Observable)
+  (options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
-  // Promise call (SSR)
-  fetch<TSelect extends SelectionObject = {}>(
-    options: QueryOptions<TInput, TSelect>
-  ): Promise<TSelect extends {} ? SelectedType<TOutput, TSelect> : TOutput>;
+  // React/Vue hook
+  useQuery: (options?: QueryHookOptions<TInput>) => QueryHookResult<TOutput>;
 }
 
 interface MutationEndpoint<TInput, TOutput> {
-  // Hook call (in component)
-  (options?: MutationHookOptions<TOutput>): MutationHookResult<TInput, TOutput>;
+  // Vanilla JS - returns Promise
+  (options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
-  // Promise call (SSR)
-  fetch<TSelect extends SelectionObject = {}>(
-    options: { input: TInput; select?: TSelect }
-  ): Promise<TSelect extends {} ? SelectedType<TOutput, TSelect> : TOutput>;
+  // React/Vue hook
+  useMutation: (options?: MutationHookOptions<TOutput>) => MutationHookResult<TInput, TOutput>;
 }
+
+// Svelte/Solid use createQuery/createMutation instead
 ```
 
 ---
@@ -353,17 +347,9 @@ interface MutationEndpoint<TInput, TOutput> {
 
 ### From v3 to v4
 
-#### Setup
+#### Setup (unchanged)
 
 ```typescript
-// v3 - Two layers
-import { createClient } from "@sylphx/lens-client";
-import { createLensReact } from "@sylphx/lens-react";
-
-const baseClient = createClient<AppRouter>({ transport });
-const { useQuery, useMutation, LensProvider } = createLensReact(baseClient);
-
-// v4 - One layer
 import { createClient } from "@sylphx/lens-react";
 
 const client = createClient<AppRouter>({ transport });
@@ -372,50 +358,43 @@ const client = createClient<AppRouter>({ transport });
 #### Query Usage
 
 ```typescript
-// v3 - useQuery with selector
-const { data } = useQuery(
-  (client) => client.user.get,
-  { id: userId },
-  { select: (user) => user.name }
-);
+// v3 - Direct call was a hook
+const { data } = client.user.get({ input: { id } });
 
-// v4 - Direct call
-const { data } = client.user.get({
-  input: { id: userId },
-  select: { name: true },
-});
+// v4 - Direct call is vanilla JS, use .useQuery() for hook
+const user = await client.user.get({ input: { id } }); // vanilla JS
+const { data } = client.user.get.useQuery({ input: { id } }); // React hook
 ```
 
 #### Mutation Usage
 
 ```typescript
-// v3 - useMutation with selector
-const { mutate } = useMutation((client) => client.user.create);
-await mutate({ name: "John" });
-
-// v4 - Direct call
+// v3 - Direct call returned hook
 const { mutate } = client.user.create();
-await mutate({ input: { name: "John" } });
+
+// v4 - Direct call is vanilla JS, use .useMutation() for hook
+const result = await client.user.create({ input: { name: "John" } }); // vanilla JS
+const { mutate } = client.user.create.useMutation(); // React hook
 ```
 
 #### SSR Usage
 
 ```typescript
-// v3 - Use base client
-const user = await baseClient.user.get({ id });
-
-// v4 - Use .fetch()
+// v3 - Used .fetch()
 const user = await client.user.get.fetch({ input: { id } });
+
+// v4 - Direct call works
+const user = await client.user.get({ input: { id } });
 ```
 
 ---
 
 ## Breaking Changes from v3
 
-1. **No separate hook functions**: `useQuery`, `useMutation` removed - use direct calls
-2. **No LensProvider needed**: Client works without React context (unless you need SSR hydration)
-3. **`.fetch()` for promises**: SSR uses `client.xxx.fetch()` instead of separate client
-4. **Mutation requires `.mutate()`**: The hook returns `{ mutate }`, call `mutate({ input })` to execute
+1. **Direct calls are now vanilla JS**: `client.user.get({ input })` returns Promise/Observable, not hook
+2. **Explicit hooks**: Use `.useQuery()` / `.useMutation()` for React/Vue hooks
+3. **Explicit primitives**: Use `.createQuery()` / `.createMutation()` for Svelte/Solid
+4. **No `.fetch()` needed**: Direct calls work for SSR
 
 ---
 
@@ -424,23 +403,21 @@ const user = await client.user.get.fetch({ input: { id } });
 Each framework package exports `createClient`:
 
 ```typescript
-// React
+// React - adds .useQuery() / .useMutation()
 import { createClient } from "@sylphx/lens-react";
 
-// Vue
+// Vue - adds .useQuery() / .useMutation()
 import { createClient } from "@sylphx/lens-vue";
 
-// Solid
+// Solid - adds .createQuery() / .createMutation()
 import { createClient } from "@sylphx/lens-solid";
 
-// Svelte
+// Svelte - adds .createQuery() / .createMutation()
 import { createClient } from "@sylphx/lens-svelte";
 
-// Pure (no hooks, promise-only)
+// Pure (no hooks, vanilla JS only)
 import { createClient } from "@sylphx/lens-client";
 ```
-
-The pure `@sylphx/lens-client` version only has promise-based methods (no hooks).
 
 ---
 
@@ -450,16 +427,17 @@ The pure `@sylphx/lens-client` version only has promise-based methods (no hooks)
 
 The client uses JavaScript Proxy to:
 1. Create nested route accessors dynamically
-2. Detect endpoint type (query vs mutation) at runtime
-3. Return appropriate hook or promise based on call pattern
+2. Handle direct calls (vanilla JS) via `apply` trap
+3. Handle `.useQuery()` / `.useMutation()` via `get` trap
+4. Cache hook/primitive factories for stable references
 
 ### Hook Caching
 
 Hook functions are cached to maintain stable references across re-renders:
 ```typescript
-// Internally, lens.user.get always returns the same function reference
-const hook1 = client.user.get;
-const hook2 = client.user.get;
+// Internally, client.user.get.useQuery always returns the same function reference
+const hook1 = client.user.get.useQuery;
+const hook2 = client.user.get.useQuery;
 console.log(hook1 === hook2); // true
 ```
 
@@ -468,4 +446,4 @@ console.log(hook1 === hook2); // true
 - **React**: Uses `useMemo` + `useEffect` with JSON-serialized options as deps
 - **Vue**: Uses `watchEffect` to track reactive dependencies
 - **Solid**: Uses `createEffect` to track signal dependencies
-- **Svelte**: Uses reactive statements (`$:`) or derived stores
+- **Svelte**: Uses reactive statements (`$:`) or stores

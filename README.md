@@ -686,12 +686,13 @@ unsubscribe()
 ### 3. Use with React
 
 ```tsx
-import { useQuery, useMutation } from '@sylphx/lens-react'
 import { client } from './api'
 
 function UserProfile({ userId }: { userId: string }) {
-  // Automatically subscribes and receives live updates
-  const { data: user, loading, error } = useQuery(client.user.get({ id: userId }))
+  // .useQuery() - React hook that auto-subscribes and receives live updates
+  const { data: user, loading, error } = client.user.get.useQuery({
+    input: { id: userId }
+  })
 
   if (loading) return <div>Loading...</div>
   if (error) return <div>Error: {error.message}</div>
@@ -700,12 +701,13 @@ function UserProfile({ userId }: { userId: string }) {
 }
 
 function UpdateUser({ userId }: { userId: string }) {
-  const { mutate, loading } = useMutation(client.user.update)
+  // .useMutation() - React hook for mutations
+  const { mutate, loading } = client.user.update.useMutation()
 
   return (
     <button
       disabled={loading}
-      onClick={() => mutate({ id: userId, name: 'New Name' })}
+      onClick={() => mutate({ input: { id: userId, name: 'New Name' } })}
     >
       Update
     </button>
@@ -1038,8 +1040,10 @@ export default async function UsersPage() {
 ```tsx
 // Client Component - live updates
 'use client'
+import { client } from '@/lib/client'
+
 export function UserProfile({ userId }: { userId: string }) {
-  const { data, loading } = lens.useQuery(c => c.user.get({ id: userId }))
+  const { data, loading } = client.user.get.useQuery({ input: { id: userId } })
   return <h1>{data?.name}</h1>
 }
 ```
@@ -1047,32 +1051,51 @@ export function UserProfile({ userId }: { userId: string }) {
 ### Nuxt 3
 
 ```typescript
-// server/lens.ts
-import { createLensNuxt } from '@sylphx/lens-nuxt'
-export const lens = createLensNuxt({ server })
+// lib/client.ts
+import { createClient } from '@sylphx/lens-vue'
+import { httpTransport } from '@sylphx/lens-client'
+import type { AppRouter } from '@/server/router'
+
+export const client = createClient<AppRouter>({
+  transport: httpTransport({ url: '/api/lens' }),
+})
 ```
 
 ```vue
-<script setup>
-const { data } = await lens.useQuery('user', c => c.user.get({ id: '123' }))
+<script setup lang="ts">
+import { client } from '@/lib/client'
+
+// .useQuery() - Vue composable for reactive queries
+const { data, loading } = client.user.get.useQuery({ input: { id: '123' } })
 </script>
 <template>
-  <h1>{{ data?.name }}</h1>
+  <div v-if="loading">Loading...</div>
+  <h1 v-else>{{ data?.name }}</h1>
 </template>
 ```
 
 ### SolidStart
 
 ```typescript
-// lib/lens.ts
-import { createLensSolidStart } from '@sylphx/lens-solidstart'
-export const lens = createLensSolidStart({ server })
+// lib/client.ts
+import { createClient } from '@sylphx/lens-solid'
+import { httpTransport } from '@sylphx/lens-client'
+import type { AppRouter } from '@/server/router'
+
+export const client = createClient<AppRouter>({
+  transport: httpTransport({ url: '/api/lens' }),
+})
 ```
 
 ```tsx
+import { client } from '@/lib/client'
+
 export default function UserProfile() {
-  const user = lens.createQuery(c => c.user.get({ id: '123' }))
-  return <h1>{user()?.name}</h1>
+  // .createQuery() - SolidJS primitive for reactive queries
+  const { data, loading } = client.user.get.createQuery({ input: { id: '123' } })
+  return <Show when={!loading()} fallback={<div>Loading...</div>}>
+    <h1>{data()?.name}</h1>
+  </Show>
 }
 ```
 
