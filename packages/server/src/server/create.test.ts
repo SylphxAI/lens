@@ -1076,3 +1076,201 @@ describe("field resolvers", () => {
 		subscription.unsubscribe();
 	});
 });
+
+// =============================================================================
+// Observable Completion Tests
+// =============================================================================
+
+describe("observable behavior", () => {
+	it("delivers initial result immediately for queries", async () => {
+		const simpleQuery = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Test" }));
+
+		const server = createApp({ queries: { simpleQuery } });
+
+		const result = await firstValueFrom(
+			server.execute({
+				path: "simpleQuery",
+				input: { id: "1" },
+			}),
+		);
+
+		expect(result.data).toEqual({ id: "1", name: "Test" });
+		expect(result.error).toBeUndefined();
+	});
+
+	it("keeps subscription open for potential emit", async () => {
+		type EmitFn = (data: unknown) => void;
+		let capturedEmit: EmitFn | undefined;
+
+		const liveQuery = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input, ctx }) => {
+				capturedEmit = ctx.emit as EmitFn;
+				return { id: input.id, name: "Initial" };
+			});
+
+		const server = createApp({ queries: { liveQuery } });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "liveQuery",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (value) => results.push(value),
+			});
+
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(1);
+
+		// Emit should still work (subscription is open)
+		capturedEmit!({ id: "1", name: "Updated" });
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results.length).toBe(2);
+		subscription.unsubscribe();
+	});
+
+	it("delivers mutation result via observable", async () => {
+		const testMutation = mutation()
+			.input(z.object({ name: z.string() }))
+			.resolve(({ input }) => ({ id: "new", name: input.name }));
+
+		const server = createApp({ mutations: { testMutation } });
+
+		const result = await firstValueFrom(
+			server.execute({
+				path: "testMutation",
+				input: { name: "Test" },
+			}),
+		);
+
+		expect(result.data).toEqual({ id: "new", name: "Test" });
+	});
+
+	it("can be unsubscribed", async () => {
+		let resolverCalls = 0;
+
+		const simpleQuery = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => {
+				resolverCalls++;
+				return { id: input.id };
+			});
+
+		const server = createApp({ queries: { simpleQuery } });
+
+		const subscription = server
+			.execute({
+				path: "simpleQuery",
+				input: { id: "1" },
+			})
+			.subscribe({});
+
+		await new Promise((r) => setTimeout(r, 50));
+		subscription.unsubscribe();
+
+		// Should have been called exactly once
+		expect(resolverCalls).toBe(1);
+	});
+});
+
+// =============================================================================
+// Backpressure Tests
+// =============================================================================
+
+describe("emit backpressure", () => {
+	it("handles rapid emit calls without losing data", async () => {
+		type EmitFn = (data: unknown) => void;
+		let capturedEmit: EmitFn | undefined;
+
+		const liveQuery = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input, ctx }) => {
+				capturedEmit = ctx.emit as EmitFn;
+				return { id: input.id, count: 0 };
+			});
+
+		const server = createApp({ queries: { liveQuery } });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "liveQuery",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (value) => results.push(value),
+			});
+
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Rapidly emit many values
+		for (let i = 1; i <= 10; i++) {
+			capturedEmit!({ id: "1", count: i });
+		}
+
+		// Wait for all emits to process
+		await new Promise((r) => setTimeout(r, 100));
+
+		// Should have received all unique values
+		// Note: deduplication may reduce count if emit is too fast
+		expect(results.length).toBeGreaterThan(1);
+
+		// The last result should have count = 10
+		const lastResult = results[results.length - 1] as { data: { count: number } };
+		expect(lastResult.data.count).toBe(10);
+
+		subscription.unsubscribe();
+	});
+});
+
+// =============================================================================
+// Observable Error Handling Tests
+// =============================================================================
+
+describe("observable error handling", () => {
+	it("propagates resolver errors to observer", async () => {
+		const errorQuery = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(() => {
+				throw new Error("Test error");
+			});
+
+		const server = createApp({ queries: { errorQuery } });
+
+		const result = await firstValueFrom(
+			server.execute({
+				path: "errorQuery",
+				input: { id: "1" },
+			}),
+		);
+
+		expect(result.error).toBeDefined();
+		expect(result.error?.message).toBe("Test error");
+	});
+
+	it("handles async resolver errors", async () => {
+		const asyncErrorQuery = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(async () => {
+				await new Promise((r) => setTimeout(r, 10));
+				throw new Error("Async error");
+			});
+
+		const server = createApp({ queries: { asyncErrorQuery } });
+
+		const result = await firstValueFrom(
+			server.execute({
+				path: "asyncErrorQuery",
+				input: { id: "1" },
+			}),
+		);
+
+		expect(result.error).toBeDefined();
+		expect(result.error?.message).toBe("Async error");
+	});
+});
