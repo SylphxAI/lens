@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.4.1 (2025-12-08)
+
+### ♻️ Refactoring
+
+- **server:** use firstValueFrom directly, remove Promise handling ([78eb1cf](https://github.com/SylphxAI/lens/commit/78eb1cfa69ee7c74727ad115d5df226a5309f00f))
+
 ## 2.4.0 (2025-12-08)
 
 ### ✨ Features

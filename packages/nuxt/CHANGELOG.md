@@ -1,5 +1,15 @@
 # @sylphx/lens-nuxt
 
+## 2.1.5 (2025-12-08)
+
+### ♻️ Refactoring
+
+- **server:** use firstValueFrom directly, remove Promise handling ([78eb1cf](https://github.com/SylphxAI/lens/commit/78eb1cfa69ee7c74727ad115d5df226a5309f00f))
+
+### ✅ Tests
+
+- **framework:** use Observable mocks for server.execute() ([8b16f19](https://github.com/SylphxAI/lens/commit/8b16f1920a8880672f0657fed7fc2bbfa0af800b))
+
 ## 2.1.4 (2025-12-08)
 
 ### 🐛 Bug Fixes
