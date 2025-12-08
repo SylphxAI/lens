@@ -303,6 +303,7 @@ class LensServerImpl<
 							// to ensure field resolvers run on every emit
 							let emitProcessing = false;
 							const emitQueue: EmitCommand[] = [];
+							const MAX_EMIT_QUEUE_SIZE = 100; // Backpressure: prevent memory bloat
 
 							const processEmitQueue = async () => {
 								if (emitProcessing || cancelled) return;
@@ -346,6 +347,13 @@ class LensServerImpl<
 
 							const emitHandler = (command: EmitCommand) => {
 								if (cancelled) return;
+
+								// Backpressure: if queue is full, drop oldest events to prevent memory bloat
+								// For live queries, latest state is most important
+								while (emitQueue.length >= MAX_EMIT_QUEUE_SIZE) {
+									emitQueue.shift();
+								}
+
 								emitQueue.push(command);
 								// Fire async processing (don't await - emit should be sync from caller's perspective)
 								processEmitQueue().catch((err) => {
