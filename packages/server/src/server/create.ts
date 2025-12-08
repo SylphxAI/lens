@@ -344,7 +344,9 @@ class LensServerImpl<
 								});
 							};
 
-							const emit = createEmit(emitHandler);
+							// Detect array output type: [EntityDef] is stored as single-element array
+							const isArrayOutput = Array.isArray(def._output);
+							const emit = createEmit(emitHandler, isArrayOutput);
 							const onCleanup = (fn: () => void) => {
 								cleanups.push(fn);
 								return () => {
