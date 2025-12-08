@@ -39,14 +39,34 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 // Types
 // =============================================================================
 
+/**
+ * Debug callbacks for query hooks.
+ * @internal For debugging purposes only - not recommended for production use.
+ */
+export interface QueryDebugOptions<T> {
+	/** Called when data is received */
+	onData?: (data: T) => void;
+	/** Called when an error occurs */
+	onError?: (error: Error) => void;
+	/** Called when subscription starts */
+	onSubscribe?: () => void;
+	/** Called when subscription ends */
+	onUnsubscribe?: () => void;
+}
+
 /** Query hook options */
-export interface QueryHookOptions<TInput> {
+export interface QueryHookOptions<TInput, TOutput = unknown> {
 	/** Query input parameters */
 	input?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
 	skip?: boolean;
+	/**
+	 * Debug callbacks for development.
+	 * @internal For debugging purposes only - not recommended for production use.
+	 */
+	debug?: QueryDebugOptions<TOutput>;
 }
 
 /** Query hook result */
@@ -92,7 +112,9 @@ export interface QueryEndpoint<TInput, TOutput> {
 
 	/** React hook for reactive queries */
 	useQuery: (
-		options?: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
+		options?: TInput extends void
+			? QueryHookOptions<void, TOutput> | void
+			: QueryHookOptions<TInput, TOutput>,
 	) => QueryHookResult<TOutput>;
 }
 
@@ -164,11 +186,15 @@ function queryReducer<T>(state: QueryState<T>, action: QueryAction<T>): QuerySta
 function createUseQueryHook<TInput, TOutput>(
 	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
 ) {
-	return function useQuery(options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> {
+	return function useQuery(options?: QueryHookOptions<TInput, TOutput>): QueryHookResult<TOutput> {
 		// Use JSON.stringify for stable dependency comparison
 		// This prevents re-fetching when input object reference changes but content is the same
 		const inputKey = JSON.stringify(options?.input);
 		const selectKey = JSON.stringify(options?.select);
+
+		// Store debug callbacks in ref to avoid dependency issues
+		const debugRef = useRef(options?.debug);
+		debugRef.current = options?.debug;
 
 		// Get query result from base client
 		// biome-ignore lint/correctness/useExhaustiveDependencies: Using JSON.stringify keys (inputKey, selectKey) for stable comparison instead of object references
@@ -201,6 +227,7 @@ function createUseQueryHook<TInput, TOutput>(
 			}
 
 			dispatch({ type: "START" });
+			debugRef.current?.onSubscribe?.();
 
 			let hasReceivedData = false;
 
@@ -208,6 +235,7 @@ function createUseQueryHook<TInput, TOutput>(
 				if (mountedRef.current) {
 					hasReceivedData = true;
 					dispatch({ type: "SUCCESS", data: value });
+					debugRef.current?.onData?.(value);
 				}
 			});
 
@@ -216,6 +244,7 @@ function createUseQueryHook<TInput, TOutput>(
 					if (mountedRef.current) {
 						if (!hasReceivedData) {
 							dispatch({ type: "SUCCESS", data: value });
+							debugRef.current?.onData?.(value);
 						} else {
 							dispatch({ type: "LOADING_DONE" });
 						}
@@ -223,10 +252,9 @@ function createUseQueryHook<TInput, TOutput>(
 				},
 				(err) => {
 					if (mountedRef.current) {
-						dispatch({
-							type: "ERROR",
-							error: err instanceof Error ? err : new Error(String(err)),
-						});
+						const error = err instanceof Error ? err : new Error(String(err));
+						dispatch({ type: "ERROR", error });
+						debugRef.current?.onError?.(error);
 					}
 				},
 			);
@@ -234,6 +262,7 @@ function createUseQueryHook<TInput, TOutput>(
 			return () => {
 				mountedRef.current = false;
 				unsubscribe();
+				debugRef.current?.onUnsubscribe?.();
 			};
 		}, [query]);
 

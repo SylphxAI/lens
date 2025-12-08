@@ -49,14 +49,34 @@ export interface QueryStoreValue<T> {
 	error: Error | null;
 }
 
+/**
+ * Debug callbacks for query stores.
+ * @internal For debugging purposes only - not recommended for production use.
+ */
+export interface QueryDebugOptions<T> {
+	/** Called when data is received */
+	onData?: (data: T) => void;
+	/** Called when an error occurs */
+	onError?: (error: Error) => void;
+	/** Called when subscription starts */
+	onSubscribe?: () => void;
+	/** Called when subscription ends */
+	onUnsubscribe?: () => void;
+}
+
 /** Query store options */
-export interface QueryStoreOptions<TInput> {
+export interface QueryStoreOptions<TInput, TOutput = unknown> {
 	/** Query input parameters */
 	input?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
 	skip?: boolean;
+	/**
+	 * Debug callbacks for development.
+	 * @internal For debugging purposes only - not recommended for production use.
+	 */
+	debug?: QueryDebugOptions<TOutput>;
 }
 
 /** Query store result - Svelte store with refetch */
@@ -101,7 +121,9 @@ export interface QueryEndpoint<TInput, TOutput> {
 
 	/** Svelte store for reactive queries */
 	createQuery: (
-		options?: TInput extends void ? QueryStoreOptions<void> | void : QueryStoreOptions<TInput>,
+		options?: TInput extends void
+			? QueryStoreOptions<void, TOutput> | void
+			: QueryStoreOptions<TInput, TOutput>,
 	) => QueryStoreResult<TOutput>;
 }
 
@@ -143,7 +165,9 @@ function createQueryStoreFactory<TInput, TOutput>(
 	// when input object reference changes but content is the same
 	const storeCache = new Map<string, QueryStoreResult<TOutput>>();
 
-	return function createQuery(options?: QueryStoreOptions<TInput>): QueryStoreResult<TOutput> {
+	return function createQuery(
+		options?: QueryStoreOptions<TInput, TOutput>,
+	): QueryStoreResult<TOutput> {
 		// Use JSON.stringify for stable key comparison
 		const cacheKey = JSON.stringify({
 			input: options?.input,
@@ -170,6 +194,7 @@ function createQueryStoreFactory<TInput, TOutput>(
 			// Cleanup previous subscription
 			if (queryUnsubscribe) {
 				queryUnsubscribe();
+				options?.debug?.onUnsubscribe?.();
 				queryUnsubscribe = null;
 			}
 
@@ -182,20 +207,24 @@ function createQueryStoreFactory<TInput, TOutput>(
 			const query = endpoint({ input: options?.input, select: options?.select });
 
 			store.set({ data: null, loading: true, error: null });
+			options?.debug?.onSubscribe?.();
 
 			// Subscribe to query updates
 			queryUnsubscribe = query.subscribe((value) => {
 				store.set({ data: value, loading: false, error: null });
+				options?.debug?.onData?.(value);
 			});
 
 			// Handle initial load via promise
 			query.then(
 				(value) => {
 					store.set({ data: value, loading: false, error: null });
+					options?.debug?.onData?.(value);
 				},
 				(err) => {
 					const error = err instanceof Error ? err : new Error(String(err));
 					store.set({ data: null, loading: false, error });
+					options?.debug?.onError?.(error);
 				},
 			);
 		};
@@ -203,6 +232,7 @@ function createQueryStoreFactory<TInput, TOutput>(
 		const refetch = () => {
 			if (queryUnsubscribe) {
 				queryUnsubscribe();
+				options?.debug?.onUnsubscribe?.();
 				queryUnsubscribe = null;
 			}
 			executeQuery();
@@ -228,6 +258,7 @@ function createQueryStoreFactory<TInput, TOutput>(
 				if (subscriberCount === 0) {
 					if (queryUnsubscribe) {
 						queryUnsubscribe();
+						options?.debug?.onUnsubscribe?.();
 						queryUnsubscribe = null;
 					}
 				}

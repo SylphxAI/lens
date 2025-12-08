@@ -39,14 +39,34 @@ import { onUnmounted, type Ref, ref, type ShallowRef, shallowRef, watch } from "
 // Types
 // =============================================================================
 
+/**
+ * Debug callbacks for query composables.
+ * @internal For debugging purposes only - not recommended for production use.
+ */
+export interface QueryDebugOptions<T> {
+	/** Called when data is received */
+	onData?: (data: T) => void;
+	/** Called when an error occurs */
+	onError?: (error: Error) => void;
+	/** Called when subscription starts */
+	onSubscribe?: () => void;
+	/** Called when subscription ends */
+	onUnsubscribe?: () => void;
+}
+
 /** Query composable options */
-export interface QueryHookOptions<TInput> {
+export interface QueryHookOptions<TInput, TOutput = unknown> {
 	/** Query input parameters */
 	input?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
 	skip?: boolean | Ref<boolean>;
+	/**
+	 * Debug callbacks for development.
+	 * @internal For debugging purposes only - not recommended for production use.
+	 */
+	debug?: QueryDebugOptions<TOutput>;
 }
 
 /** Query composable result */
@@ -92,7 +112,9 @@ export interface QueryEndpoint<TInput, TOutput> {
 
 	/** Vue composable for reactive queries */
 	useQuery: (
-		options?: TInput extends void ? QueryHookOptions<void> | void : QueryHookOptions<TInput>,
+		options?: TInput extends void
+			? QueryHookOptions<void, TOutput> | void
+			: QueryHookOptions<TInput, TOutput>,
 	) => QueryHookResult<TOutput>;
 }
 
@@ -130,7 +152,7 @@ export type TypedClient<TRouter extends RouterDef> =
 function createUseQueryComposable<TInput, TOutput>(
 	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
 ) {
-	return function useQuery(options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> {
+	return function useQuery(options?: QueryHookOptions<TInput, TOutput>): QueryHookResult<TOutput> {
 		const data = shallowRef<TOutput | null>(null);
 		const loading = ref(true);
 		const error = shallowRef<Error | null>(null);
@@ -140,6 +162,7 @@ function createUseQueryComposable<TInput, TOutput>(
 		const executeQuery = () => {
 			if (unsubscribe) {
 				unsubscribe();
+				options?.debug?.onUnsubscribe?.();
 				unsubscribe = null;
 			}
 
@@ -157,11 +180,13 @@ function createUseQueryComposable<TInput, TOutput>(
 
 			loading.value = true;
 			error.value = null;
+			options?.debug?.onSubscribe?.();
 
 			unsubscribe = query.subscribe((value) => {
 				data.value = value;
 				loading.value = false;
 				error.value = null;
+				options?.debug?.onData?.(value);
 			});
 
 			query.then(
@@ -169,10 +194,13 @@ function createUseQueryComposable<TInput, TOutput>(
 					data.value = value;
 					loading.value = false;
 					error.value = null;
+					options?.debug?.onData?.(value);
 				},
 				(err) => {
-					error.value = err instanceof Error ? err : new Error(String(err));
+					const queryError = err instanceof Error ? err : new Error(String(err));
+					error.value = queryError;
 					loading.value = false;
+					options?.debug?.onError?.(queryError);
 				},
 			);
 		};
@@ -197,6 +225,7 @@ function createUseQueryComposable<TInput, TOutput>(
 			stopWatch();
 			if (unsubscribe) {
 				unsubscribe();
+				options?.debug?.onUnsubscribe?.();
 				unsubscribe = null;
 			}
 		});

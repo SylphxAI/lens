@@ -39,14 +39,34 @@ import { type Accessor, createEffect, createSignal, on, onCleanup } from "solid-
 // Types
 // =============================================================================
 
+/**
+ * Debug callbacks for query primitives.
+ * @internal For debugging purposes only - not recommended for production use.
+ */
+export interface QueryDebugOptions<T> {
+	/** Called when data is received */
+	onData?: (data: T) => void;
+	/** Called when an error occurs */
+	onError?: (error: Error) => void;
+	/** Called when subscription starts */
+	onSubscribe?: () => void;
+	/** Called when subscription ends */
+	onUnsubscribe?: () => void;
+}
+
 /** Query primitive options */
-export interface QueryPrimitiveOptions<TInput> {
+export interface QueryPrimitiveOptions<TInput, TOutput = unknown> {
 	/** Query input parameters */
 	input?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
 	skip?: boolean;
+	/**
+	 * Debug callbacks for development.
+	 * @internal For debugging purposes only - not recommended for production use.
+	 */
+	debug?: QueryDebugOptions<TOutput>;
 }
 
 /** Query primitive result */
@@ -93,8 +113,8 @@ export interface QueryEndpoint<TInput, TOutput> {
 	/** SolidJS primitive for reactive queries */
 	createQuery: (
 		options?: TInput extends void
-			? QueryPrimitiveOptions<void> | void
-			: QueryPrimitiveOptions<TInput>,
+			? QueryPrimitiveOptions<void, TOutput> | void
+			: QueryPrimitiveOptions<TInput, TOutput>,
 	) => QueryPrimitiveResult<TOutput>;
 }
 
@@ -135,7 +155,7 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
 ) {
 	return function createQuery(
-		options?: QueryPrimitiveOptions<TInput>,
+		options?: QueryPrimitiveOptions<TInput, TOutput>,
 	): QueryPrimitiveResult<TOutput> {
 		const [data, setData] = createSignal<TOutput | null>(null);
 		const [loading, setLoading] = createSignal(!options?.skip);
@@ -146,6 +166,7 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 		const executeQuery = () => {
 			if (unsubscribe) {
 				unsubscribe();
+				options?.debug?.onUnsubscribe?.();
 				unsubscribe = null;
 			}
 
@@ -161,11 +182,13 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 
 			setLoading(true);
 			setError(null);
+			options?.debug?.onSubscribe?.();
 
 			unsubscribe = query.subscribe((value) => {
 				setData(() => value);
 				setLoading(false);
 				setError(null);
+				options?.debug?.onData?.(value);
 			});
 
 			query.then(
@@ -173,11 +196,13 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 					setData(() => value);
 					setLoading(false);
 					setError(null);
+					options?.debug?.onData?.(value);
 				},
 				(err) => {
 					const queryError = err instanceof Error ? err : new Error(String(err));
 					setError(queryError);
 					setLoading(false);
+					options?.debug?.onError?.(queryError);
 				},
 			);
 		};
@@ -205,6 +230,7 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 		onCleanup(() => {
 			if (unsubscribe) {
 				unsubscribe();
+				options?.debug?.onUnsubscribe?.();
 				unsubscribe = null;
 			}
 		});
