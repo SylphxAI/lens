@@ -42,6 +42,26 @@ export type {
 } from "./types.js";
 
 // =============================================================================
+// Internal Types
+// =============================================================================
+
+/** Observer entry for subscription tracking */
+interface ObserverEntry {
+	next?: (data: unknown) => void;
+	error?: (err: Error) => void;
+	complete?: () => void;
+}
+
+/** Subscription state */
+interface SubscriptionState {
+	data: unknown;
+	error: Error | null;
+	completed: boolean;
+	observers: Set<ObserverEntry>;
+	unsubscribe?: (() => void) | undefined;
+}
+
+// =============================================================================
 // Client Implementation
 // =============================================================================
 
@@ -54,20 +74,13 @@ class ClientImpl {
 	private connectPromise: Promise<Metadata> | null = null;
 
 	/** Subscription states */
-	private subscriptions = new Map<
-		string,
-		{
-			data: unknown;
-			callbacks: Set<(data: unknown) => void>;
-			unsubscribe?: (() => void) | undefined;
-		}
-	>();
+	private subscriptions = new Map<string, SubscriptionState>();
 
 	/** Cached QueryResult objects by key (stable references for React) */
 	private queryResultCache = new Map<string, QueryResult<unknown>>();
 
-	/** Maps original callbacks to their wrapped versions for proper cleanup */
-	private callbackWrappers = new WeakMap<(data: unknown) => void, (data: unknown) => void>();
+	/** Maps original observer/callback to entry for proper cleanup */
+	private observerEntries = new WeakMap<object | ((...args: never[]) => unknown), ObserverEntry>();
 
 	constructor(config: LensClientConfig) {
 		this.transport = config.transport;
@@ -237,7 +250,9 @@ class ClientImpl {
 		if (!this.subscriptions.has(key)) {
 			this.subscriptions.set(key, {
 				data: null,
-				callbacks: new Set(),
+				error: null,
+				completed: false,
+				observers: new Set(),
 			});
 		}
 		const sub = this.subscriptions.get(key)!;
@@ -247,36 +262,66 @@ class ClientImpl {
 				return sub.data as T | null;
 			},
 
-			subscribe: (callback?: (data: T) => void) => {
-				if (callback) {
-					const typedCallback = callback as (data: unknown) => void;
-					let wrapped = this.callbackWrappers.get(typedCallback);
-					if (!wrapped) {
-						wrapped = (data: unknown) => callback(data as T);
-						this.callbackWrappers.set(typedCallback, wrapped);
-					}
-					sub.callbacks.add(wrapped);
+			subscribe: (
+				observerOrCallback?: import("@sylphx/lens-core").Observer<T> | ((data: T) => void),
+			) => {
+				// Normalize to ObserverEntry
+				let entry: ObserverEntry;
 
-					if (sub.data !== null) {
-						callback(sub.data as T);
-					}
+				if (typeof observerOrCallback === "function") {
+					// Callback function pattern
+					const callback = observerOrCallback;
+					entry = { next: (data: unknown) => callback(data as T) };
+				} else if (observerOrCallback && typeof observerOrCallback === "object") {
+					// Observer object pattern
+					const observer = observerOrCallback;
+					entry = {
+						next: observer.next ? (data: unknown) => observer.next!(data as T) : undefined,
+						error: observer.error,
+						complete: observer.complete,
+					};
+				} else {
+					// No observer provided - just trigger subscription
+					entry = {};
 				}
 
+				// Store mapping for cleanup
+				if (observerOrCallback) {
+					this.observerEntries.set(observerOrCallback, entry);
+				}
+
+				sub.observers.add(entry);
+
+				// Replay current state to new observer
+				if (sub.error && entry.error) {
+					entry.error(sub.error);
+				} else if (sub.data !== null && entry.next) {
+					entry.next(sub.data);
+				}
+				if (sub.completed && entry.complete) {
+					entry.complete();
+				}
+
+				// Start subscription if not already running
 				if (!sub.unsubscribe) {
 					this.startSubscription(path, input, key);
 				}
 
+				// Return unsubscribe function
 				return () => {
-					if (callback) {
-						const typedCallback = callback as (data: unknown) => void;
-						const wrapped = this.callbackWrappers.get(typedCallback);
-						if (wrapped) {
-							sub.callbacks.delete(wrapped);
+					if (observerOrCallback) {
+						const storedEntry = this.observerEntries.get(observerOrCallback);
+						if (storedEntry) {
+							sub.observers.delete(storedEntry);
 						}
 					}
-					if (sub.callbacks.size === 0 && sub.unsubscribe) {
+					// Cleanup subscription when no observers remain
+					if (sub.observers.size === 0 && sub.unsubscribe) {
 						sub.unsubscribe();
 						sub.unsubscribe = undefined;
+						// Clean up subscription state to prevent memory leak
+						this.subscriptions.delete(key);
+						this.queryResultCache.delete(key);
 					}
 				};
 			},
@@ -308,14 +353,23 @@ class ClientImpl {
 
 					sub.data = response.data;
 
-					for (const cb of sub.callbacks) {
-						cb(response.data);
+					// Notify all observers
+					for (const observer of sub.observers) {
+						observer.next?.(response.data);
 					}
 
 					return onfulfilled
 						? onfulfilled(response.data as T)
 						: (response.data as unknown as TResult1);
 				} catch (error) {
+					const err = error instanceof Error ? error : new Error(String(error));
+					sub.error = err;
+
+					// Notify error observers
+					for (const observer of sub.observers) {
+						observer.error?.(err);
+					}
+
 					if (onrejected) {
 						return onrejected(error);
 					}
@@ -356,13 +410,32 @@ class ClientImpl {
 					next: (result) => {
 						if (result.data !== undefined) {
 							sub.data = result.data;
-							for (const cb of sub.callbacks) {
-								cb(result.data);
+							sub.error = null; // Clear previous error on new data
+							for (const observer of sub.observers) {
+								observer.next?.(result.data);
+							}
+						}
+						if (result.error) {
+							const err =
+								result.error instanceof Error ? result.error : new Error(String(result.error));
+							sub.error = err;
+							for (const observer of sub.observers) {
+								observer.error?.(err);
 							}
 						}
 					},
-					error: () => {},
-					complete: () => {},
+					error: (err) => {
+						sub.error = err;
+						for (const observer of sub.observers) {
+							observer.error?.(err);
+						}
+					},
+					complete: () => {
+						sub.completed = true;
+						for (const observer of sub.observers) {
+							observer.complete?.();
+						}
+					},
 				});
 
 				sub.unsubscribe = () => subscription.unsubscribe();

@@ -35,6 +35,7 @@
 		"@msgpack/msgpack": "^3.1.2"
 	},
 	"devDependencies": {
+		"@sylphx/lens-server": "workspace:*",
 		"typescript": "^5.9.3",
 		"zod": "^4.1.13"
 	}

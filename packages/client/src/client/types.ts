@@ -4,7 +4,7 @@
  * Type definitions for Lens client configuration and operations.
  */
 
-import type { MutationDef, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
+import type { MutationDef, Observer, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
 import type { TypedTransport } from "../transport/direct.js";
 import type { Plugin } from "../transport/plugin.js";
 import type { Transport } from "../transport/types.js";
@@ -108,12 +108,32 @@ export interface TypedClientConfig<TApi> {
 // Query/Mutation Results
 // =============================================================================
 
-/** Query result with reactive subscription support */
+/**
+ * Query result with reactive subscription support.
+ *
+ * Supports both simple callback and RxJS-style Observer patterns:
+ * @example
+ * ```typescript
+ * // Simple callback (returns unsubscribe function)
+ * const unsubscribe = result.subscribe((data) => console.log(data));
+ *
+ * // RxJS-style Observer object
+ * const unsubscribe = result.subscribe({
+ *   next: (data) => console.log(data),
+ *   error: (err) => console.error(err),
+ *   complete: () => console.log('done'),
+ * });
+ * ```
+ */
 export interface QueryResult<T> {
 	/** Current value (for peeking without subscribing) */
 	readonly value: T | null;
-	/** Subscribe to updates */
-	subscribe(callback?: (data: T) => void): () => void;
+	/**
+	 * Subscribe to updates.
+	 * @param observerOrCallback - Either a callback function or an Observer object
+	 * @returns Unsubscribe function
+	 */
+	subscribe(observerOrCallback?: Observer<T> | ((data: T) => void)): () => void;
 	/** Select specific fields */
 	select<S extends SelectionObject>(selection: S): QueryResult<SelectedType<T, S>>;
 	/** Promise interface */
