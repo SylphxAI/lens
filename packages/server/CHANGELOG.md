@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.3.1 (2025-12-08)
+
+### 🐛 Bug Fixes
+
+- **server:** auto-detect array outputs for emit API ([f972f03](https://github.com/SylphxAI/lens/commit/f972f03c3605a624217b62552e8cbceb4bfa0149))
+
 ## 2.3.0 (2025-12-07)
 
 ### ✨ Features
