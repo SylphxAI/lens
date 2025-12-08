@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "bun:test";
 import { createClient, inProcess } from "@sylphx/lens-client";
-import type { InferRouterClient } from "@sylphx/lens-core";
+import { firstValueFrom, type InferRouterClient } from "@sylphx/lens-core";
 import { app, db, type AppRouter } from "./server";
 
 // =============================================================================
@@ -38,20 +38,20 @@ beforeEach(() => {
 
 describe("V2 Server Direct Execution", () => {
 	it("executes user.whoami query", async () => {
-		const result = await app.execute({ path: "user.whoami" });
+		const result = await firstValueFrom(app.execute({ path: "user.whoami" }));
 		expect(result.error).toBeUndefined();
 		expect(result.data).toBeDefined();
 		expect((result.data as { name: string }).name).toBe("Alice");
 	});
 
 	it("executes user.get query", async () => {
-		const result = await app.execute({ path: "user.get", input: { id: "2" } });
+		const result = await firstValueFrom(app.execute({ path: "user.get", input: { id: "2" } }));
 		expect(result.error).toBeUndefined();
 		expect((result.data as { name: string }).name).toBe("Bob");
 	});
 
 	it("executes user.search query", async () => {
-		const result = await app.execute({ path: "user.search", input: { query: "al", limit: 5 } });
+		const result = await firstValueFrom(app.execute({ path: "user.search", input: { query: "al", limit: 5 } }));
 		expect(result.error).toBeUndefined();
 		const users = result.data as Array<{ name: string }>;
 		expect(users.length).toBe(1);
@@ -59,7 +59,7 @@ describe("V2 Server Direct Execution", () => {
 	});
 
 	it("executes post.trending query", async () => {
-		const result = await app.execute({ path: "post.trending", input: { limit: 10 } });
+		const result = await firstValueFrom(app.execute({ path: "post.trending", input: { limit: 10 } }));
 		expect(result.error).toBeUndefined();
 		const posts = result.data as Array<{ title: string }>;
 		expect(posts.length).toBe(2);
@@ -68,19 +68,19 @@ describe("V2 Server Direct Execution", () => {
 
 describe("V2 Mutations", () => {
 	it("executes user.update mutation", async () => {
-		const result = await app.execute({
+		const result = await firstValueFrom(app.execute({
 			path: "user.update",
 			input: { id: "1", name: "Alice Updated" },
-		});
+		}));
 		expect(result.error).toBeUndefined();
 		expect((result.data as { name: string }).name).toBe("Alice Updated");
 	});
 
 	it("executes post.create mutation", async () => {
-		const result = await app.execute({
+		const result = await firstValueFrom(app.execute({
 			path: "post.create",
 			input: { title: "New Post", content: "Test content" },
-		});
+		}));
 		expect(result.error).toBeUndefined();
 		const post = result.data as { title: string; published: boolean };
 		expect(post.title).toBe("New Post");
@@ -89,24 +89,24 @@ describe("V2 Mutations", () => {
 
 	it("executes post.publish mutation", async () => {
 		// Create unpublished post first
-		await app.execute({
+		await firstValueFrom(app.execute({
 			path: "post.create",
 			input: { title: "Draft", content: "..." },
-		});
+		}));
 
-		const result = await app.execute({
+		const result = await firstValueFrom(app.execute({
 			path: "post.publish",
 			input: { id: "3" },
-		});
+		}));
 		expect(result.error).toBeUndefined();
 		expect((result.data as { published: boolean }).published).toBe(true);
 	});
 
 	it("executes comment.add mutation", async () => {
-		const result = await app.execute({
+		const result = await firstValueFrom(app.execute({
 			path: "comment.add",
 			input: { postId: "1", content: "Great post!" },
-		});
+		}));
 		expect(result.error).toBeUndefined();
 		const comment = result.data as { content: string; postId: string };
 		expect(comment.content).toBe("Great post!");
@@ -114,10 +114,10 @@ describe("V2 Mutations", () => {
 	});
 
 	it("executes user.bulkPromote mutation", async () => {
-		const result = await app.execute({
+		const result = await firstValueFrom(app.execute({
 			path: "user.bulkPromote",
 			input: { userIds: ["2", "3"], newRole: "vip" },
-		});
+		}));
 		expect(result.error).toBeUndefined();
 		expect((result.data as { count: number }).count).toBe(2);
 
