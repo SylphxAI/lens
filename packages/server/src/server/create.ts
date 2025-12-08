@@ -416,8 +416,12 @@ class LensServerImpl<
 										)
 									: value;
 								emitIfChanged(processed);
-								// Don't complete immediately - stay open for potential emit calls
-								// For true one-shot, client can unsubscribe after first value
+
+								// Mutations complete immediately - they're truly one-shot
+								// Queries stay open for potential emit calls from field resolvers
+								if (!isQuery && !cancelled) {
+									observer.complete?.();
+								}
 							}
 						});
 					} catch (error) {
