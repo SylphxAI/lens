@@ -136,8 +136,19 @@ class LensServerImpl<
 
 		this.queries = queries as Q;
 		this.mutations = mutations as M;
-		this.entities = config.entities ?? {};
 		this.resolverMap = config.resolvers ? toResolverMap(config.resolvers) : undefined;
+
+		// Build entities map: explicit config + auto-extracted from resolvers
+		const entities: EntitiesMap = { ...(config.entities ?? {}) };
+		if (config.resolvers) {
+			for (const resolver of config.resolvers) {
+				const entityName = resolver.entity._name;
+				if (entityName && !entities[entityName]) {
+					entities[entityName] = resolver.entity;
+				}
+			}
+		}
+		this.entities = entities;
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
 		this.logger = config.logger ?? noopLogger;
