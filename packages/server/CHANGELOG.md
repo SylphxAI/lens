@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.3.2 (2025-12-08)
+
+### 🐛 Bug Fixes
+
+- **server:** auto-extract entities from resolvers for field resolution ([59a9ddf](https://github.com/SylphxAI/lens/commit/59a9ddf2325916e42b5792bc7d8854e2bd3fbdb5))
+
 ## 2.3.1 (2025-12-08)
 
 ### 🐛 Bug Fixes
