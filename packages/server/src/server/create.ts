@@ -31,7 +31,7 @@ import {
 	toResolverMap,
 	valuesEqual,
 } from "@sylphx/lens-core";
-import { createContext, runWithContext } from "../context/index.js";
+import { createContext, runWithContext, tryUseContext } from "../context/index.js";
 import {
 	createPluginManager,
 	type PluginManager,
@@ -781,6 +781,8 @@ class LensServerImpl<
 		let loader = this.loaders.get(loaderKey);
 		if (!loader) {
 			loader = new DataLoader(async (parents: unknown[]) => {
+				// Get context from AsyncLocalStorage - maintains request context in batched calls
+				const context = tryUseContext<TContext>() ?? ({} as TContext);
 				const results: unknown[] = [];
 				for (const parent of parents) {
 					try {
@@ -788,7 +790,7 @@ class LensServerImpl<
 							fieldName,
 							parent as Record<string, unknown>,
 							{},
-							{},
+							context,
 						);
 						results.push(result);
 					} catch {
