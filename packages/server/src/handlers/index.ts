@@ -40,6 +40,8 @@ export {
 
 export {
 	createHTTPHandler,
+	type HealthCheckOptions,
+	type HealthCheckResponse,
 	type HTTPHandler,
 	type HTTPHandlerOptions,
 } from "./http.js";

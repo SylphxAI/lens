@@ -245,4 +245,198 @@ describe("createHTTPHandler", () => {
 		const data = await response.json();
 		expect(data.error).toContain("not found");
 	});
+
+	describe("health check", () => {
+		it("returns health status on GET /__lens/health", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app);
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(200);
+
+			const data = await response.json();
+			expect(data.status).toBe("healthy");
+			expect(data.service).toBe("lens-server");
+			expect(data.version).toBeDefined();
+			expect(data.uptime).toBeGreaterThanOrEqual(0);
+			expect(data.timestamp).toBeDefined();
+		});
+
+		it("supports path prefix for health endpoint", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, { pathPrefix: "/api" });
+
+			const request = new Request("http://localhost/api/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(200);
+
+			const data = await response.json();
+			expect(data.status).toBe("healthy");
+		});
+
+		it("supports custom health check path", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, {
+				health: { path: "/healthz" },
+			});
+
+			const request = new Request("http://localhost/healthz", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(200);
+		});
+
+		it("can be disabled", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, {
+				health: { enabled: false },
+			});
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(404);
+		});
+
+		it("includes custom health checks", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, {
+				health: {
+					checks: () => ({
+						database: { status: "pass", message: "Connected" },
+						cache: { status: "pass" },
+					}),
+				},
+			});
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(200);
+
+			const data = await response.json();
+			expect(data.checks?.database.status).toBe("pass");
+			expect(data.checks?.cache.status).toBe("pass");
+		});
+
+		it("returns 503 when custom health check fails", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, {
+				health: {
+					checks: () => ({
+						database: { status: "fail", message: "Connection refused" },
+					}),
+				},
+			});
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(503);
+
+			const data = await response.json();
+			expect(data.status).toBe("degraded");
+			expect(data.checks?.database.status).toBe("fail");
+		});
+
+		it("handles async health checks", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, {
+				health: {
+					checks: async () => {
+						await new Promise((r) => setTimeout(r, 10));
+						return { async: { status: "pass" } };
+					},
+				},
+			});
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(200);
+
+			const data = await response.json();
+			expect(data.checks?.async.status).toBe("pass");
+		});
+
+		it("handles health check errors gracefully", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app, {
+				health: {
+					checks: () => {
+						throw new Error("Check failed");
+					},
+				},
+			});
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.status).toBe(503);
+
+			const data = await response.json();
+			expect(data.status).toBe("degraded");
+			expect(data.checks?.healthCheck.status).toBe("fail");
+		});
+
+		it("includes Cache-Control header", async () => {
+			const app = createApp({
+				queries: { getUser },
+				mutations: { createUser },
+			});
+			const handler = createHTTPHandler(app);
+
+			const request = new Request("http://localhost/__lens/health", {
+				method: "GET",
+			});
+
+			const response = await handler(request);
+			expect(response.headers.get("Cache-Control")).toBe(
+				"no-cache, no-store, must-revalidate",
+			);
+		});
+	});
 });

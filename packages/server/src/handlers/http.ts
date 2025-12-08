@@ -27,6 +27,49 @@ export interface ErrorSanitizationOptions {
 	sanitize?: (error: Error) => string;
 }
 
+/**
+ * Health check response data
+ */
+export interface HealthCheckResponse {
+	/** Overall status */
+	status: "healthy" | "degraded" | "unhealthy";
+	/** Service name */
+	service: string;
+	/** Server version */
+	version: string;
+	/** Uptime in seconds */
+	uptime: number;
+	/** Timestamp of health check */
+	timestamp: string;
+	/** Optional checks with their status */
+	checks?: Record<string, { status: "pass" | "fail"; message?: string }>;
+}
+
+/**
+ * Health check options
+ */
+export interface HealthCheckOptions {
+	/**
+	 * Enable health check endpoint.
+	 * Default: true
+	 */
+	enabled?: boolean;
+
+	/**
+	 * Custom health check path.
+	 * Default: "/__lens/health"
+	 */
+	path?: string;
+
+	/**
+	 * Custom health check function.
+	 * Return additional checks to include in the response.
+	 */
+	checks?: () =>
+		| Promise<Record<string, { status: "pass" | "fail"; message?: string }>>
+		| Record<string, { status: "pass" | "fail"; message?: string }>;
+}
+
 export interface HTTPHandlerOptions {
 	/**
 	 * Path prefix for Lens endpoints.
@@ -57,6 +100,12 @@ export interface HTTPHandlerOptions {
 	 * Controls what error information is exposed to clients.
 	 */
 	errors?: ErrorSanitizationOptions;
+
+	/**
+	 * Health check endpoint configuration.
+	 * Enabled by default at /__lens/health
+	 */
+	health?: HealthCheckOptions;
 }
 
 export interface HTTPHandler {
@@ -147,8 +196,13 @@ export function createHTTPHandler(
 	server: LensServer,
 	options: HTTPHandlerOptions = {},
 ): HTTPHandler {
-	const { pathPrefix = "", cors, errors } = options;
+	const { pathPrefix = "", cors, errors, health } = options;
 	const isDevelopment = errors?.development ?? false;
+
+	// Health check configuration
+	const healthEnabled = health?.enabled !== false; // Enabled by default
+	const healthPath = health?.path ?? "/__lens/health";
+	const startTime = Date.now();
 
 	// Error sanitization function
 	const sanitize = (error: Error): string => {
@@ -194,6 +248,51 @@ export function createHTTPHandler(
 			return new Response(null, {
 				status: 204,
 				headers: baseHeaders,
+			});
+		}
+
+		// Health check endpoint: GET /__lens/health
+		const fullHealthPath = `${pathPrefix}${healthPath}`;
+		if (healthEnabled && request.method === "GET" && pathname === fullHealthPath) {
+			const metadata = server.getMetadata();
+			const uptimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+
+			// Run custom health checks if provided
+			let customChecks: Record<string, { status: "pass" | "fail"; message?: string }> = {};
+			let hasFailure = false;
+
+			if (health?.checks) {
+				try {
+					customChecks = await health.checks();
+					hasFailure = Object.values(customChecks).some((c) => c.status === "fail");
+				} catch (error) {
+					customChecks.healthCheck = {
+						status: "fail",
+						message: error instanceof Error ? error.message : "Health check failed",
+					};
+					hasFailure = true;
+				}
+			}
+
+			const response: HealthCheckResponse = {
+				status: hasFailure ? "degraded" : "healthy",
+				service: "lens-server",
+				version: metadata.version,
+				uptime: uptimeSeconds,
+				timestamp: new Date().toISOString(),
+			};
+
+			if (Object.keys(customChecks).length > 0) {
+				response.checks = customChecks;
+			}
+
+			return new Response(JSON.stringify(response), {
+				status: hasFailure ? 503 : 200,
+				headers: {
+					"Content-Type": "application/json",
+					"Cache-Control": "no-cache, no-store, must-revalidate",
+					...baseHeaders,
+				},
 			});
 		}
 
