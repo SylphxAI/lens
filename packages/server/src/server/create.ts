@@ -21,6 +21,7 @@ import {
 	type EmitCommand,
 	type EntityDef,
 	flattenRouter,
+	hashValue,
 	type InferRouterContext,
 	isEntityDef,
 	isMutationDef,
@@ -295,13 +296,19 @@ class LensServerImpl<
 				let cancelled = false;
 				let currentState: unknown;
 				let lastEmittedResult: unknown;
+				let lastEmittedHash: string | undefined;
 				const cleanups: (() => void)[] = [];
 
 				// Helper to emit only if value changed
+				// Uses cached hash for O(1) comparison after first call
 				const emitIfChanged = (data: unknown) => {
 					if (cancelled) return;
-					if (valuesEqual(data, lastEmittedResult)) return;
+					const dataHash = hashValue(data);
+					if (lastEmittedHash !== undefined && valuesEqual(data, lastEmittedResult, dataHash, lastEmittedHash)) {
+						return;
+					}
 					lastEmittedResult = data;
+					lastEmittedHash = dataHash;
 					observer.next?.({ data });
 				};
 
