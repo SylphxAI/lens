@@ -186,3 +186,24 @@ export {
 // =============================================================================
 
 export { coalescePatches, estimatePatchSize, OperationLog } from "./reconnect/index.js";
+
+// =============================================================================
+// Logging
+// =============================================================================
+
+export {
+	createStructuredLogger,
+	jsonOutput,
+	prettyOutput,
+	toBasicLogger,
+	type ErrorContext,
+	type LogContext,
+	type LogEntry,
+	type LogLevel,
+	type LogOutput,
+	type PerformanceContext,
+	type RequestContext,
+	type StructuredLogger,
+	type StructuredLoggerOptions,
+	type WebSocketContext,
+} from "./logging/index.js";
