@@ -218,7 +218,7 @@ export interface EnhanceOperationMetaContext {
 	/** Operation path (e.g., 'user.create') */
 	path: string;
 	/** Operation type */
-	type: "query" | "mutation";
+	type: "query" | "mutation" | "subscription";
 	/** Current metadata (can be modified) */
 	meta: Record<string, unknown>;
 	/** Operation definition (MutationDef or QueryDef) */

@@ -416,6 +416,8 @@ class ClientImpl {
 		const meta = this.getOperationMeta(path);
 		const isSubscription = meta?.type === "subscription";
 
+		// For subscriptions: use Observable streaming (WS/SSE)
+		// For queries: use Promise path (HTTP) - subscribe() on query just gets 1 value
 		if (isSubscription) {
 			const op: Operation = {
 				id: this.generateId("subscription", path),
@@ -462,7 +464,13 @@ class ClientImpl {
 				sub.unsubscribe = () => subscription.unsubscribe();
 			}
 		} else {
-			this.executeQuery(path, input).then(() => {});
+			// Query: execute once via Promise, notify observers, complete
+			this.executeQuery(path, input).then(() => {
+				sub.completed = true;
+				for (const observer of sub.observers) {
+					observer.complete?.();
+				}
+			});
 		}
 	}
 

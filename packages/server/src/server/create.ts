@@ -897,10 +897,15 @@ class LensServerImpl<
 		};
 
 		for (const [name, def] of Object.entries(this.queries)) {
-			const meta: OperationMeta = { type: "query" };
+			// Auto-detect subscription: if resolver is AsyncGeneratorFunction → subscription
+			const isSubscription =
+				def._resolve?.constructor?.name === "AsyncGeneratorFunction" ||
+				def._resolve?.constructor?.name === "GeneratorFunction";
+			const opType = isSubscription ? "subscription" : "query";
+			const meta: OperationMeta = { type: opType };
 			this.pluginManager.runEnhanceOperationMeta({
 				path: name,
-				type: "query",
+				type: opType,
 				meta: meta as unknown as Record<string, unknown>,
 				definition: def,
 			});
