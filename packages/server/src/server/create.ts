@@ -367,8 +367,8 @@ class LensServerImpl<
 								if (emitProcessing || cancelled) return;
 								emitProcessing = true;
 
-								let command: EmitCommand | null;
-								while ((command = emitQueue.dequeue()) !== null && !cancelled) {
+								let command = emitQueue.dequeue();
+								while (command !== null && !cancelled) {
 									currentState = this.applyEmitCommand(command, currentState);
 
 									// Process through field resolvers (unlike before where we bypassed this)
@@ -398,6 +398,7 @@ class LensServerImpl<
 										: currentState;
 
 									emitIfChanged(processed);
+									command = emitQueue.dequeue();
 								}
 
 								emitProcessing = false;

@@ -2,7 +2,7 @@
  * @sylphx/lens-server - Structured Logger Tests
  */
 
-import { describe, expect, it, mock, spyOn } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
 import {
 	createStructuredLogger,
 	jsonOutput,

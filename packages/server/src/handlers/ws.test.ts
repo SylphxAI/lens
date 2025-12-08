@@ -325,7 +325,7 @@ describe("createWSHandler", () => {
 			});
 			await wait(50);
 
-			const messagesBeforeUnsub = ws.sentMessages.length;
+			const _messagesBeforeUnsub = ws.sentMessages.length;
 
 			// Unsubscribe
 			simulateMessage(ws, {
