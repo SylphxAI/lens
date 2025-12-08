@@ -213,7 +213,7 @@ export function createStructuredLogger(options: StructuredLoggerOptions = {}) {
 		if (error) {
 			errorContext.errorType = error.name;
 			errorContext.errorMessage = error.message;
-			if (includeStackTrace) {
+			if (includeStackTrace && error.stack) {
 				errorContext.stack = error.stack;
 			}
 		}
@@ -257,11 +257,7 @@ export function createStructuredLogger(options: StructuredLoggerOptions = {}) {
 		/**
 		 * Log with request context (for tracking request lifecycle).
 		 */
-		request: (
-			requestId: string,
-			message: string,
-			context?: Record<string, unknown>,
-		) => {
+		request: (requestId: string, message: string, context?: Record<string, unknown>) => {
 			log("info", message, { requestId, ...context });
 		},
 

@@ -5,8 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mutation, query } from "@sylphx/lens-core";
 import { z } from "zod";
-import { createApp } from "../server/create.js";
 import type { WebSocketLike } from "../server/create.js";
+import { createApp } from "../server/create.js";
 import { createWSHandler } from "./ws.js";
 
 // =============================================================================
@@ -304,9 +304,7 @@ describe("createWSHandler", () => {
 			// Subscription should be established without errors
 			// (No error message with id "sub-1")
 			const errorMsg = ws.sentMessages.find(
-				(msg) =>
-					(msg as { type?: string; id?: string }).type === "error" &&
-					(msg as { id?: string }).id === "sub-1",
+				(msg) => (msg as { type?: string; id?: string }).type === "error" && (msg as { id?: string }).id === "sub-1",
 			);
 			expect(errorMsg).toBeUndefined();
 			expect(ws.closed).toBe(false);
@@ -379,9 +377,7 @@ describe("createWSHandler", () => {
 
 			// Find the error message for sub-3
 			const errorMsg = ws.sentMessages.find(
-				(msg) =>
-					(msg as { type?: string; id?: string }).type === "error" &&
-					(msg as { id?: string }).id === "sub-3",
+				(msg) => (msg as { type?: string; id?: string }).type === "error" && (msg as { id?: string }).id === "sub-3",
 			) as { error?: { code?: string } } | undefined;
 
 			expect(errorMsg).toBeDefined();
@@ -413,9 +409,9 @@ describe("createWSHandler", () => {
 			}
 			await wait();
 
-			const errorMsg = ws.sentMessages.find(
-				(msg) => (msg as { type?: string }).type === "error",
-			) as { error?: { code?: string } } | undefined;
+			const errorMsg = ws.sentMessages.find((msg) => (msg as { type?: string }).type === "error") as
+				| { error?: { code?: string } }
+				| undefined;
 
 			expect(errorMsg).toBeDefined();
 			expect(errorMsg?.error?.code).toBe("MESSAGE_TOO_LARGE");

@@ -434,9 +434,7 @@ describe("createHTTPHandler", () => {
 			});
 
 			const response = await handler(request);
-			expect(response.headers.get("Cache-Control")).toBe(
-				"no-cache, no-store, must-revalidate",
-			);
+			expect(response.headers.get("Cache-Control")).toBe("no-cache, no-store, must-revalidate");
 		});
 	});
 });

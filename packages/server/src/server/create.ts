@@ -304,7 +304,10 @@ class LensServerImpl<
 				const emitIfChanged = (data: unknown) => {
 					if (cancelled) return;
 					const dataHash = hashValue(data);
-					if (lastEmittedHash !== undefined && valuesEqual(data, lastEmittedResult, dataHash, lastEmittedHash)) {
+					if (
+						lastEmittedHash !== undefined &&
+						valuesEqual(data, lastEmittedResult, dataHash, lastEmittedHash)
+					) {
 						return;
 					}
 					lastEmittedResult = data;

@@ -6,10 +6,10 @@ import { describe, expect, it, mock, spyOn } from "bun:test";
 import {
 	createStructuredLogger,
 	jsonOutput,
-	prettyOutput,
-	toBasicLogger,
 	type LogEntry,
 	type LogOutput,
+	prettyOutput,
+	toBasicLogger,
 } from "./structured-logger.js";
 
 // =============================================================================

@@ -13,7 +13,7 @@
         "@biomejs/biome": "^2.3.8",
         "@sylphx/biome-config": "^0.4.1",
         "@sylphx/bump": "^1.5.1",
-        "@sylphx/doctor": "^1.30.1",
+        "@sylphx/doctor": "^1.33.0",
         "@sylphx/tsconfig": "0.3.1",
         "@types/bun": "^1.3.3",
         "@typescript/native-preview": "^7.0.0-dev.20251201.1",
@@ -84,7 +84,7 @@
     },
     "packages/fresh": {
       "name": "@sylphx/lens-fresh",
-      "version": "2.0.9",
+      "version": "2.0.10",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-preact": "workspace:*",
@@ -115,7 +115,7 @@
     },
     "packages/lens": {
       "name": "@sylphx/lens",
-      "version": "2.0.9",
+      "version": "2.0.10",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-core": "workspace:*",
@@ -127,7 +127,7 @@
     },
     "packages/next": {
       "name": "@sylphx/lens-next",
-      "version": "2.2.2",
+      "version": "2.2.3",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-core": "workspace:*",
@@ -151,7 +151,7 @@
     },
     "packages/nuxt": {
       "name": "@sylphx/lens-nuxt",
-      "version": "2.1.2",
+      "version": "2.1.3",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-core": "workspace:*",
@@ -228,7 +228,7 @@
     },
     "packages/server": {
       "name": "@sylphx/lens-server",
-      "version": "2.3.1",
+      "version": "2.3.2",
       "dependencies": {
         "@sylphx/lens-core": "workspace:*",
       },
@@ -270,7 +270,7 @@
     },
     "packages/solidstart": {
       "name": "@sylphx/lens-solidstart",
-      "version": "2.0.9",
+      "version": "2.0.10",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
@@ -290,7 +290,7 @@
     },
     "packages/storage-redis": {
       "name": "@sylphx/lens-storage-redis",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "dependencies": {
         "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
@@ -305,7 +305,7 @@
     },
     "packages/storage-upstash": {
       "name": "@sylphx/lens-storage-upstash",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "dependencies": {
         "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
@@ -320,7 +320,7 @@
     },
     "packages/storage-vercel-kv": {
       "name": "@sylphx/lens-storage-vercel-kv",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "dependencies": {
         "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
@@ -918,7 +918,7 @@
 
     "@sylphx/bump": ["@sylphx/bump@1.5.1", "", { "dependencies": { "citty": "^0.1.6", "consola": "^3.4.2", "defu": "^6.1.4", "picocolors": "^1.1.1", "semver": "^7.6.3", "zx": "^8.8.5" }, "bin": { "bump": "dist/cli.js" } }, "sha512-OTp8t8aRS/eECSTKMlPRG7vwoA/G6WO289i0KrEhafGG4IzS/+oSzk6Nuz34FC8Ejz3UnU0QEvaRc7DGpwVTPw=="],
 
-    "@sylphx/doctor": ["@sylphx/doctor@1.30.1", "", { "dependencies": { "citty": "^0.1.6", "consola": "^3.4.2", "defu": "^6.1.4", "jiti": "^2.4.2", "picocolors": "^1.1.1" }, "bin": { "doctor": "dist/cli.js" } }, "sha512-Jm+uG0Qhx7VBkS0MjaNll60hK7rkX3FF00Q1AX2uIp7j78Y52/OkMuKAQVOztTWNzC9lnBoO7bwx8YHo7qPy0Q=="],
+    "@sylphx/doctor": ["@sylphx/doctor@1.33.0", "", { "dependencies": { "citty": "^0.1.6", "consola": "^3.4.2", "defu": "^6.1.4", "jiti": "^2.4.2", "picocolors": "^1.1.1" }, "bin": { "doctor": "dist/cli.js" } }, "sha512-4Qgbkp/vrFce8Ntm+ha6RpWJdRjQ9O3ly2i/13rF1C+vT7ok8nzhVDbBdVhOnNrsKnq0o8baKY68Zpw58BtbZA=="],
 
     "@sylphx/lens": ["@sylphx/lens@workspace:packages/lens"],
 
