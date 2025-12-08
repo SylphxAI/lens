@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { type Observable, of } from "@sylphx/lens-core";
+import { type Observable, of, throwError } from "@sylphx/lens-core";
 import { createLensNuxt } from "./index.js";
 
 // =============================================================================
@@ -354,9 +354,7 @@ describe("handler", () => {
 
 	test("handles POST request with non-Error exception", async () => {
 		const server = {
-			execute: async () => {
-				throw "String error";
-			},
+			execute: () => throwError(() => "String error"),
 		};
 		const lens = createLensNuxt({ server: server as any });
 
