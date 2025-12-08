@@ -8,6 +8,7 @@
 const hasDom = typeof document !== "undefined";
 
 import { test as bunTest, describe, expect } from "bun:test";
+import { type Observable, of } from "@sylphx/lens-core";
 
 const test = hasDom ? bunTest : bunTest.skip;
 
@@ -15,14 +16,17 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { createLensNext, type DehydratedState, dehydrate, fetchQuery } from "./index.js";
 
-// Mock server for testing
+// Helper type
+type LensResult<T> = { data: T | null; error: Error | null };
+
+// Mock server for testing - returns Observable like real server
 const createMockServer = () => ({
-	execute: async ({ path, input }: { path: string; input?: unknown }) => {
+	execute: ({ path, input }: { path: string; input?: unknown }): Observable<LensResult<unknown>> => {
 		if (path === "user.get") {
-			return { data: { id: (input as { id: string }).id, name: "Test User" }, error: null };
+			return of({ data: { id: (input as { id: string }).id, name: "Test User" }, error: null });
 		}
 		if (path === "user.list") {
-			return { data: [{ id: "1", name: "User 1" }], error: null };
+			return of({ data: [{ id: "1", name: "User 1" }], error: null });
 		}
 		if (path === "observable") {
 			// Return an observable for SSE testing
@@ -37,7 +41,7 @@ const createMockServer = () => ({
 					setTimeout(() => handlers.complete(), 30);
 					return { unsubscribe: () => {} };
 				},
-			};
+			} as unknown as Observable<LensResult<unknown>>;
 		}
 		if (path === "observable.error") {
 			// Observable that errors
@@ -50,9 +54,9 @@ const createMockServer = () => ({
 					setTimeout(() => handlers.error(new Error("Stream error")), 10);
 					return { unsubscribe: () => {} };
 				},
-			};
+			} as unknown as Observable<LensResult<unknown>>;
 		}
-		return { data: null, error: new Error("Not found") };
+		return of({ data: null, error: new Error("Not found") });
 	},
 });
 

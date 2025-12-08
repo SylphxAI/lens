@@ -37,8 +37,20 @@
  * ```
  */
 
-import { firstValueFrom } from "@sylphx/lens-core";
+import { firstValueFrom, isObservable, type LensResult } from "@sylphx/lens-core";
 import type { LensServer } from "../server/create.js";
+
+/**
+ * Helper to resolve server.execute() result which may be Observable or Promise.
+ * This provides backwards compatibility for test mocks that return Promises.
+ */
+async function resolveExecuteResult<T>(result: unknown): Promise<LensResult<T>> {
+	if (isObservable<LensResult<T>>(result)) {
+		return firstValueFrom(result);
+	}
+	// Handle Promise or direct value (for backwards compatibility with test mocks)
+	return result as Promise<LensResult<T>>;
+}
 
 // =============================================================================
 // Server Client Proxy
@@ -75,7 +87,7 @@ export function createServerClientProxy(server: LensServer): unknown {
 			},
 			async apply(_, __, args) {
 				const input = args[0];
-				const result = await firstValueFrom(server.execute({ path, input }));
+				const result = await resolveExecuteResult(server.execute({ path, input }));
 
 				if (result.error) {
 					throw result.error;
@@ -113,7 +125,7 @@ export async function handleWebQuery(
 		const inputParam = url.searchParams.get("input");
 		const input = inputParam ? JSON.parse(inputParam) : undefined;
 
-		const result = await firstValueFrom(server.execute({ path, input }));
+		const result = await resolveExecuteResult(server.execute({ path, input }));
 
 		if (result.error) {
 			return Response.json({ error: result.error.message }, { status: 400 });
@@ -148,7 +160,7 @@ export async function handleWebMutation(
 		const body = (await request.json()) as { input?: unknown };
 		const input = body.input;
 
-		const result = await firstValueFrom(server.execute({ path, input }));
+		const result = await resolveExecuteResult(server.execute({ path, input }));
 
 		if (result.error) {
 			return Response.json({ error: result.error.message }, { status: 400 });

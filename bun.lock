@@ -273,6 +273,7 @@
       "version": "2.0.10",
       "dependencies": {
         "@sylphx/lens-client": "workspace:*",
+        "@sylphx/lens-core": "workspace:*",
         "@sylphx/lens-server": "workspace:*",
         "@sylphx/lens-solid": "workspace:*",
       },

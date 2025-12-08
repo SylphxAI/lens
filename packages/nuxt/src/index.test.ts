@@ -4,6 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { type Observable, of } from "@sylphx/lens-core";
 import { createLensNuxt } from "./index.js";
 
 // =============================================================================
@@ -26,22 +27,25 @@ afterEach(() => {
 	}
 });
 
-// Mock server for testing
+// Helper to create Observable from result
+type LensResult<T> = { data: T | null; error: Error | null };
+
+// Mock server for testing - returns Observable like real server
 const createMockServer = () => ({
-	execute: async ({ path, input }: { path: string; input?: unknown }) => {
+	execute: ({ path, input }: { path: string; input?: unknown }): Observable<LensResult<unknown>> => {
 		if (path === "user.get") {
-			return { data: { id: (input as { id: string }).id, name: "Test User" }, error: null };
+			return of({ data: { id: (input as { id: string }).id, name: "Test User" }, error: null });
 		}
 		if (path === "user.list") {
-			return { data: [{ id: "1", name: "User 1" }], error: null };
+			return of({ data: [{ id: "1", name: "User 1" }], error: null });
 		}
 		if (path === "user.create") {
-			return { data: { id: "new-id", name: (input as { name: string }).name }, error: null };
+			return of({ data: { id: "new-id", name: (input as { name: string }).name }, error: null });
 		}
 		if (path === "user.error") {
-			return { data: null, error: new Error("User error") };
+			return of({ data: null, error: new Error("User error") });
 		}
-		return { data: null, error: new Error("Not found") };
+		return of({ data: null, error: new Error("Not found") });
 	},
 });
 
