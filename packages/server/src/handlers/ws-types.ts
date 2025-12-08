@@ -41,6 +41,24 @@ export interface WSHandlerOptions {
 	 * Default: 10000
 	 */
 	maxConnections?: number;
+
+	/**
+	 * Rate limiting configuration.
+	 * Uses token bucket algorithm per client.
+	 */
+	rateLimit?: {
+		/**
+		 * Maximum messages per window.
+		 * Default: 100
+		 */
+		maxMessages?: number;
+
+		/**
+		 * Time window in milliseconds.
+		 * Default: 1000 (1 second)
+		 */
+		windowMs?: number;
+	};
 }
 
 /**

@@ -86,6 +86,42 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	const maxSubscriptionsPerClient = options.maxSubscriptionsPerClient ?? 100;
 	const maxConnections = options.maxConnections ?? 10000;
 
+	// Rate limiting configuration
+	const rateLimitMaxMessages = options.rateLimit?.maxMessages ?? 100;
+	const rateLimitWindowMs = options.rateLimit?.windowMs ?? 1000;
+
+	// Rate limit tracking per client (sliding window)
+	const clientMessageTimestamps = new Map<string, number[]>();
+
+	/**
+	 * Check if client is rate limited using sliding window algorithm.
+	 * Returns true if the message should be rejected.
+	 */
+	function isRateLimited(clientId: string): boolean {
+		const now = Date.now();
+		const windowStart = now - rateLimitWindowMs;
+
+		let timestamps = clientMessageTimestamps.get(clientId);
+		if (!timestamps) {
+			timestamps = [];
+			clientMessageTimestamps.set(clientId, timestamps);
+		}
+
+		// Remove expired timestamps (outside window)
+		while (timestamps.length > 0 && timestamps[0] < windowStart) {
+			timestamps.shift();
+		}
+
+		// Check if over limit
+		if (timestamps.length >= rateLimitMaxMessages) {
+			return true;
+		}
+
+		// Record this message
+		timestamps.push(now);
+		return false;
+	}
+
 	// Connection tracking
 	const connections = new Map<string, ClientConnection>();
 	const wsToConnection = new WeakMap<object, ClientConnection>();
@@ -143,6 +179,21 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					error: {
 						code: "MESSAGE_TOO_LARGE",
 						message: `Message exceeds ${maxMessageSize} byte limit`,
+					},
+				}),
+			);
+			return;
+		}
+
+		// Check rate limit
+		if (isRateLimited(conn.id)) {
+			logger.warn?.(`Rate limit exceeded for client ${conn.id}`);
+			conn.ws.send(
+				JSON.stringify({
+					type: "error",
+					error: {
+						code: "RATE_LIMITED",
+						message: `Rate limit exceeded: max ${rateLimitMaxMessages} messages per ${rateLimitWindowMs}ms`,
 					},
 				}),
 			);
@@ -594,6 +645,9 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 
 		// Remove connection
 		connections.delete(conn.id);
+
+		// Cleanup rate limit tracking
+		clientMessageTimestamps.delete(conn.id);
 
 		// Server handles removal (plugin hooks + state manager cleanup)
 		server.removeClient(conn.id, subscriptionCount);
