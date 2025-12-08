@@ -198,10 +198,14 @@ describe("handler - HTTP methods", () => {
 	});
 
 	test("handles GET requests with non-Error exception", async () => {
+		// Create Observable that throws a non-Error value
 		const server = {
-			execute: async () => {
-				throw "string error";
-			},
+			execute: (): Observable<never> => ({
+				subscribe(observer) {
+					observer.error?.("string error");
+					return { unsubscribe: () => {} };
+				},
+			}),
 		};
 		const lens = createLensSolidStart({ server: server as any });
 
@@ -265,10 +269,14 @@ describe("handler - HTTP methods", () => {
 	});
 
 	test("handles POST requests with non-Error exception", async () => {
+		// Create Observable that throws a non-Error value
 		const server = {
-			execute: async () => {
-				throw "string error";
-			},
+			execute: (): Observable<never> => ({
+				subscribe(observer) {
+					observer.error?.("string error");
+					return { unsubscribe: () => {} };
+				},
+			}),
 		};
 		const lens = createLensSolidStart({ server: server as any });
 
@@ -647,12 +655,12 @@ describe("handler - path processing", () => {
 
 	test("handles paths with leading slash", async () => {
 		const server = {
-			execute: async ({ path }: { path: string; input?: unknown }) => {
+			execute: ({ path }: { path: string; input?: unknown }) => {
 				// The path will be "/user.list" after basePath stripping
 				if (path === "/user.list" || path === "user.list") {
-					return { data: [{ id: "1", name: "User 1" }], error: null };
+					return of({ data: [{ id: "1", name: "User 1" }], error: null });
 				}
-				return { data: null, error: new Error("Not found") };
+				return of({ data: null, error: new Error("Not found") });
 			},
 		};
 		const lens = createLensSolidStart({ server: server as any });
@@ -696,11 +704,11 @@ describe("serverClient proxy", () => {
 
 	test("handles deeply nested paths", async () => {
 		const server = {
-			execute: async ({ path }: { path: string; input?: unknown }) => {
+			execute: ({ path }: { path: string; input?: unknown }) => {
 				if (path === "api.v1.user.get") {
-					return { data: { id: "deep" }, error: null };
+					return of({ data: { id: "deep" }, error: null });
 				}
-				return { data: null, error: new Error("Not found") };
+				return of({ data: null, error: new Error("Not found") });
 			},
 		};
 		const lens = createLensSolidStart({ server: server as any });

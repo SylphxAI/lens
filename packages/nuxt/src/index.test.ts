@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { type Observable, of, throwError } from "@sylphx/lens-core";
+import { fromPromise, type Observable, of, throwError } from "@sylphx/lens-core";
 import { createLensNuxt } from "./index.js";
 
 // =============================================================================
@@ -501,10 +501,14 @@ describe("useQuery", () => {
 		// @ts-expect-error - Deleting window for server environment
 		delete globalThis.window;
 
+		// Create Observable that throws a non-Error value
 		const server = {
-			execute: async () => {
-				throw "String error";
-			},
+			execute: (): Observable<never> => ({
+				subscribe(observer) {
+					observer.error?.("String error");
+					return { unsubscribe: () => {} };
+				},
+			}),
 		};
 		const lens = createLensNuxt({ server: server as any });
 
@@ -608,10 +612,7 @@ describe("useQuery", () => {
 		});
 
 		const server = {
-			execute: async () => {
-				await delayedPromise;
-				return { data: [{ id: "1", name: "User 1" }], error: null };
-			},
+			execute: () => fromPromise(delayedPromise.then(() => ({ data: [{ id: "1", name: "User 1" }], error: null }))),
 		};
 
 		const lens = createLensNuxt({ server: server as any });

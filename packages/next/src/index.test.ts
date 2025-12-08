@@ -231,10 +231,14 @@ describe("handler - error cases", () => {
 	});
 
 	test("handles POST request with non-Error exception", async () => {
+		// Create Observable that throws a non-Error value
 		const server = {
-			execute: async () => {
-				throw "String error";
-			},
+			execute: (): Observable<never> => ({
+				subscribe(observer) {
+					observer.error?.("String error");
+					return { unsubscribe: () => {} };
+				},
+			}),
 		};
 		const lens = createLensNext({ server: server as any });
 
