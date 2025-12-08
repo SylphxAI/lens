@@ -139,7 +139,24 @@ export type TypedClient<TRouter extends RouterDef> =
 function createQueryStoreFactory<TInput, TOutput>(
 	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
 ) {
+	// Cache stores by input key to prevent unnecessary re-creation
+	// when input object reference changes but content is the same
+	const storeCache = new Map<string, QueryStoreResult<TOutput>>();
+
 	return function createQuery(options?: QueryStoreOptions<TInput>): QueryStoreResult<TOutput> {
+		// Use JSON.stringify for stable key comparison
+		const cacheKey = JSON.stringify({
+			input: options?.input,
+			select: options?.select,
+			skip: options?.skip,
+		});
+
+		// Return cached store if input hasn't changed
+		const cached = storeCache.get(cacheKey);
+		if (cached) {
+			return cached;
+		}
+
 		const store = writable<QueryStoreValue<TOutput>>({
 			data: null,
 			loading: !options?.skip,
@@ -217,10 +234,15 @@ function createQueryStoreFactory<TInput, TOutput>(
 			};
 		};
 
-		return {
+		const result: QueryStoreResult<TOutput> = {
 			subscribe,
 			refetch,
 		};
+
+		// Cache the store for reuse
+		storeCache.set(cacheKey, result);
+
+		return result;
 	};
 }
 

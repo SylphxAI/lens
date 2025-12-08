@@ -33,7 +33,7 @@ import {
 	type TypedClientConfig,
 } from "@sylphx/lens-client";
 import type { MutationDef, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
-import { type Accessor, createSignal, onCleanup } from "solid-js";
+import { type Accessor, createEffect, createSignal, on, onCleanup } from "solid-js";
 
 // =============================================================================
 // Types
@@ -185,6 +185,23 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 		// Execute initial query
 		executeQuery();
 
+		// Watch for input/select changes using JSON.stringify for stable comparison
+		// This prevents re-fetching when object reference changes but content is the same
+		// Using on() with defer: true to skip initial run (already executed above)
+		createEffect(
+			on(
+				() => ({
+					inputKey: JSON.stringify(options?.input),
+					selectKey: JSON.stringify(options?.select),
+					skip: options?.skip,
+				}),
+				() => {
+					executeQuery();
+				},
+				{ defer: true },
+			),
+		);
+
 		onCleanup(() => {
 			if (unsubscribe) {
 				unsubscribe();
@@ -193,32 +210,7 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 		});
 
 		const refetch = () => {
-			if (unsubscribe) {
-				unsubscribe();
-				unsubscribe = null;
-			}
-			setLoading(true);
-			setError(null);
-			const endpoint = getEndpoint();
-			const query = endpoint({ input: options?.input, select: options?.select });
-			if (query) {
-				unsubscribe = query.subscribe((value) => {
-					setData(() => value);
-					setLoading(false);
-					setError(null);
-				});
-				query.then(
-					(value) => {
-						setData(() => value);
-						setLoading(false);
-					},
-					(err) => {
-						const queryError = err instanceof Error ? err : new Error(String(err));
-						setError(queryError);
-						setLoading(false);
-					},
-				);
-			}
+			executeQuery();
 		};
 
 		return { data, loading, error, refetch };

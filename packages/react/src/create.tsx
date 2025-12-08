@@ -165,12 +165,18 @@ function createUseQueryHook<TInput, TOutput>(
 	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
 ) {
 	return function useQuery(options?: QueryHookOptions<TInput>): QueryHookResult<TOutput> {
+		// Use JSON.stringify for stable dependency comparison
+		// This prevents re-fetching when input object reference changes but content is the same
+		const inputKey = JSON.stringify(options?.input);
+		const selectKey = JSON.stringify(options?.select);
+
 		// Get query result from base client
+		// biome-ignore lint/correctness/useExhaustiveDependencies: Using JSON.stringify keys (inputKey, selectKey) for stable comparison instead of object references
 		const query = useMemo(() => {
 			if (options?.skip) return null;
 			const endpoint = getEndpoint();
 			return endpoint({ input: options?.input, select: options?.select });
-		}, [options?.input, options?.select, options?.skip, getEndpoint]);
+		}, [inputKey, selectKey, options?.skip]);
 
 		// State management
 		const initialState: QueryState<TOutput> = {

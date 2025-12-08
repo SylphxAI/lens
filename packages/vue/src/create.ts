@@ -33,7 +33,7 @@ import {
 	type TypedClientConfig,
 } from "@sylphx/lens-client";
 import type { MutationDef, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
-import { onUnmounted, type Ref, ref, type ShallowRef, shallowRef, watchEffect } from "vue";
+import { onUnmounted, type Ref, ref, type ShallowRef, shallowRef, watch } from "vue";
 
 // =============================================================================
 // Types
@@ -137,7 +137,7 @@ function createUseQueryComposable<TInput, TOutput>(
 
 		let unsubscribe: (() => void) | null = null;
 
-		const stopWatch = watchEffect((onCleanup) => {
+		const executeQuery = () => {
 			if (unsubscribe) {
 				unsubscribe();
 				unsubscribe = null;
@@ -175,14 +175,23 @@ function createUseQueryComposable<TInput, TOutput>(
 					loading.value = false;
 				},
 			);
+		};
 
-			onCleanup(() => {
-				if (unsubscribe) {
-					unsubscribe();
-					unsubscribe = null;
-				}
-			});
-		});
+		// Initial execution
+		executeQuery();
+
+		// Watch for input/select changes using JSON.stringify for stable comparison
+		// This prevents re-fetching when object reference changes but content is the same
+		const stopWatch = watch(
+			() => ({
+				inputKey: JSON.stringify(options?.input),
+				selectKey: JSON.stringify(options?.select),
+				skip: typeof options?.skip === "object" ? options.skip.value : options?.skip,
+			}),
+			() => {
+				executeQuery();
+			},
+		);
 
 		onUnmounted(() => {
 			stopWatch();
@@ -193,30 +202,7 @@ function createUseQueryComposable<TInput, TOutput>(
 		});
 
 		const refetch = () => {
-			if (unsubscribe) {
-				unsubscribe();
-				unsubscribe = null;
-			}
-			loading.value = true;
-			const endpoint = getEndpoint();
-			const query = endpoint({ input: options?.input, select: options?.select });
-			if (query) {
-				unsubscribe = query.subscribe((value) => {
-					data.value = value;
-					loading.value = false;
-					error.value = null;
-				});
-				query.then(
-					(value) => {
-						data.value = value;
-						loading.value = false;
-					},
-					(err) => {
-						error.value = err instanceof Error ? err : new Error(String(err));
-						loading.value = false;
-					},
-				);
-			}
+			executeQuery();
 		};
 
 		return { data, loading, error, refetch };
