@@ -1,5 +1,11 @@
 # @sylphx/lens-svelte
 
+## 2.3.0 (2025-12-08)
+
+### ✨ Features
+
+- **hooks:** add debug callbacks for query subscription lifecycle ([4b34734](https://github.com/SylphxAI/lens/commit/4b34734002b2e99fd98f0099abc857ce06cd75c2))
+
 ## 2.2.4 (2025-12-08)
 
 ### 🐛 Bug Fixes
