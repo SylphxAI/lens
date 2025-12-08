@@ -1,5 +1,11 @@
 # @sylphx/lens-next
 
+## 2.2.4 (2025-12-08)
+
+### 🐛 Bug Fixes
+
+- **server:** handle both Observable and Promise in execute result ([832da5d](https://github.com/SylphxAI/lens/commit/832da5d31b87072924615ed3538e7bb8b0aaeb45))
+
 ## 2.2.3 (2025-12-08)
 
 ### 📦 Dependencies

@@ -1,5 +1,38 @@
 # @sylphx/lens-server
 
+## 2.4.0 (2025-12-08)
+
+### ✨ Features
+
+- **server:** add health check endpoint ([ab782fc](https://github.com/SylphxAI/lens/commit/ab782fca2d3c6fd6420de1aec63ad3bd70600359))
+- **server:** add structured logging module ([167c402](https://github.com/SylphxAI/lens/commit/167c402b02312ea044ca4e5fd0b4f2e60cfaef5c))
+- **server:** add WebSocket rate limiting ([dcb0466](https://github.com/SylphxAI/lens/commit/dcb0466a9e4a0db845cf876f0ecd631d3bc4f717))
+- **server:** add security headers and fix CORS defaults ([19ed558](https://github.com/SylphxAI/lens/commit/19ed558228b6bfb8273530dd109498c576d2c741))
+- **server:** add WebSocket security limits ([ae485fe](https://github.com/SylphxAI/lens/commit/ae485fe3d7c97d568693a39833472e90a08da3c0))
+- **server:** add backpressure to emit queue ([9efbe40](https://github.com/SylphxAI/lens/commit/9efbe40bb7dc2d0beb3af62742e4cd1ae4fb4101))
+- **server:** add error sanitization and JSON parsing error handling ([8f0021e](https://github.com/SylphxAI/lens/commit/8f0021eb56c740c4b07595212cce5b93bb50dec8))
+
+### 🐛 Bug Fixes
+
+- **server:** import LensResult from correct location ([df62f6d](https://github.com/SylphxAI/lens/commit/df62f6d16dfa04dde9890cc3be0f923c1ad876f9))
+- **server:** handle both Observable and Promise in execute result ([832da5d](https://github.com/SylphxAI/lens/commit/832da5d31b87072924615ed3538e7bb8b0aaeb45))
+- **server:** add explicit return type for isolatedDeclarations ([0b4781f](https://github.com/SylphxAI/lens/commit/0b4781f6d7536e5467bb7138ab01a861dd5997cb))
+- resolve biome lint errors ([8fbb748](https://github.com/SylphxAI/lens/commit/8fbb7487f3091a5ae26f1f7c13707bcc0eac9073))
+- **server:** fix exactOptionalPropertyTypes error in structured logger ([7cd6aeb](https://github.com/SylphxAI/lens/commit/7cd6aeb95657ce290f8a2187b7d008ec2fa1b146))
+- **server:** complete mutations immediately instead of staying open ([92ba01a](https://github.com/SylphxAI/lens/commit/92ba01a6755f7712bd8da01fc3919b2a28126f23))
+- **server:** pass context to DataLoader batch function via AsyncLocalStorage ([3e6deab](https://github.com/SylphxAI/lens/commit/3e6deabf862d712cf2816088277b26575bd2e0a1))
+
+### ⚡️ Performance
+
+- **server:** cache valuesEqual hashes for O(1) comparison ([9f291be](https://github.com/SylphxAI/lens/commit/9f291be86c7c876cd11f5da01240f84958b4a0c7))
+- **server:** replace O(n) emit queue with O(1) ring buffer ([01f702d](https://github.com/SylphxAI/lens/commit/01f702d4da8f8233b1077746bb3e7cce82b79e1b))
+
+### ✅ Tests
+
+- **server:** fix flaky timing assertion in logger test ([2e0f17e](https://github.com/SylphxAI/lens/commit/2e0f17e93bf3e579051b2b0fa3164546edc522ee))
+- **server:** add emit/observable behavior tests ([2bd151c](https://github.com/SylphxAI/lens/commit/2bd151c99ca46a6c326159839628f3db3f624d3c))
+- **server:** add comprehensive WebSocket handler tests ([b2cfd82](https://github.com/SylphxAI/lens/commit/b2cfd82c669fc35ce0ef2e4c07d87e60e73f2fe3))
+
 ## 2.3.2 (2025-12-08)
 
 ### 🐛 Bug Fixes
