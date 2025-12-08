@@ -230,8 +230,29 @@ class ClientImpl {
 		return `${type}-${path}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 	}
 
+	/** Cache for object input hashes to avoid repeated JSON.stringify */
+	private inputHashCache = new WeakMap<object, string>();
+
 	private makeQueryKey(path: string, input: unknown): string {
-		return `${path}:${JSON.stringify(input ?? null)}`;
+		// Fast path for common cases
+		if (input === undefined || input === null) {
+			return `${path}:null`;
+		}
+		if (typeof input !== "object") {
+			// Primitives are cheap to convert
+			return `${path}:${String(input)}`;
+		}
+
+		// For objects, use cached hash to avoid repeated JSON.stringify
+		const obj = input as object;
+		let hash = this.inputHashCache.get(obj);
+		if (!hash) {
+			// Generate unique hash for this object instance
+			// Fall back to JSON.stringify for content-based equality
+			hash = JSON.stringify(input);
+			this.inputHashCache.set(obj, hash);
+		}
+		return `${path}:${hash}`;
 	}
 
 	// =========================================================================
