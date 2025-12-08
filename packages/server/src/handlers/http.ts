@@ -159,15 +159,31 @@ export function createHTTPHandler(
 	};
 
 	// Build CORS headers
-	const corsHeaders: Record<string, string> = {
-		"Access-Control-Allow-Origin": cors?.origin
-			? Array.isArray(cors.origin)
-				? cors.origin.join(", ")
-				: cors.origin
-			: "*",
+	// In production, require explicit origin configuration for security
+	// In development, allow all origins for convenience
+	const allowedOrigin = cors?.origin
+		? Array.isArray(cors.origin)
+			? cors.origin.join(", ")
+			: cors.origin
+		: isDevelopment
+			? "*"
+			: ""; // No cross-origin allowed by default in production
+
+	// Base headers including security headers
+	const baseHeaders: Record<string, string> = {
+		"Content-Type": "application/json",
+		// Security headers
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options": "DENY",
+		// CORS headers
 		"Access-Control-Allow-Methods": cors?.methods?.join(", ") ?? "GET, POST, OPTIONS",
 		"Access-Control-Allow-Headers": cors?.headers?.join(", ") ?? "Content-Type, Authorization",
 	};
+
+	// Only add Access-Control-Allow-Origin if there's an allowed origin
+	if (allowedOrigin) {
+		baseHeaders["Access-Control-Allow-Origin"] = allowedOrigin;
+	}
 
 	const handler = async (request: Request): Promise<Response> => {
 		const url = new URL(request.url);
@@ -177,7 +193,7 @@ export function createHTTPHandler(
 		if (request.method === "OPTIONS") {
 			return new Response(null, {
 				status: 204,
-				headers: corsHeaders,
+				headers: baseHeaders,
 			});
 		}
 
@@ -187,7 +203,7 @@ export function createHTTPHandler(
 			return new Response(JSON.stringify(server.getMetadata()), {
 				headers: {
 					"Content-Type": "application/json",
-					...corsHeaders,
+					...baseHeaders,
 				},
 			});
 		}
@@ -207,7 +223,7 @@ export function createHTTPHandler(
 					status: 400,
 					headers: {
 						"Content-Type": "application/json",
-						...corsHeaders,
+						...baseHeaders,
 					},
 				});
 			}
@@ -220,7 +236,7 @@ export function createHTTPHandler(
 						status: 400,
 						headers: {
 							"Content-Type": "application/json",
-							...corsHeaders,
+							...baseHeaders,
 						},
 					});
 				}
@@ -237,7 +253,7 @@ export function createHTTPHandler(
 						status: 500,
 						headers: {
 							"Content-Type": "application/json",
-							...corsHeaders,
+							...baseHeaders,
 						},
 					});
 				}
@@ -245,7 +261,7 @@ export function createHTTPHandler(
 				return new Response(JSON.stringify({ data: result.data }), {
 					headers: {
 						"Content-Type": "application/json",
-						...corsHeaders,
+						...baseHeaders,
 					},
 				});
 			} catch (error) {
@@ -254,7 +270,7 @@ export function createHTTPHandler(
 					status: 500,
 					headers: {
 						"Content-Type": "application/json",
-						...corsHeaders,
+						...baseHeaders,
 					},
 				});
 			}
@@ -265,7 +281,7 @@ export function createHTTPHandler(
 			status: 404,
 			headers: {
 				"Content-Type": "application/json",
-				...corsHeaders,
+				...baseHeaders,
 			},
 		});
 	};
