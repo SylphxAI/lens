@@ -12,6 +12,21 @@ import type { LensServer } from "../server/create.js";
 // Types
 // =============================================================================
 
+/** Error sanitization options */
+export interface ErrorSanitizationOptions {
+	/**
+	 * Enable development mode - shows full error messages.
+	 * Default: false (production mode - sanitized errors only)
+	 */
+	development?: boolean;
+
+	/**
+	 * Custom error sanitizer function.
+	 * Return a safe error message to send to the client.
+	 */
+	sanitize?: (error: Error) => string;
+}
+
 export interface HTTPHandlerOptions {
 	/**
 	 * Path prefix for Lens endpoints.
@@ -29,13 +44,19 @@ export interface HTTPHandlerOptions {
 
 	/**
 	 * Custom CORS headers.
-	 * Default: Allow all origins
+	 * Default: Allow all origins in development, strict in production
 	 */
 	cors?: {
 		origin?: string | string[];
 		methods?: string[];
 		headers?: string[];
 	};
+
+	/**
+	 * Error sanitization options.
+	 * Controls what error information is exposed to clients.
+	 */
+	errors?: ErrorSanitizationOptions;
 }
 
 export interface HTTPHandler {
@@ -75,11 +96,67 @@ export interface HTTPHandler {
  * export default { fetch: handler }
  * ```
  */
+/**
+ * Default error sanitizer - removes sensitive information from errors.
+ * Safe error messages are preserved, internal details are hidden.
+ */
+function sanitizeError(error: Error, isDevelopment: boolean): string {
+	if (isDevelopment) {
+		return error.message;
+	}
+
+	const message = error.message;
+
+	// Known safe error patterns (validation errors, business logic errors)
+	const safePatterns = [
+		/^Invalid input:/,
+		/^Missing operation/,
+		/^Not found/,
+		/^Unauthorized/,
+		/^Forbidden/,
+		/^Bad request/,
+		/^Validation failed/,
+	];
+
+	if (safePatterns.some((pattern) => pattern.test(message))) {
+		return message;
+	}
+
+	// Check for sensitive patterns
+	const sensitivePatterns = [
+		/\/[^\s]+\.(ts|js|json)/, // file paths
+		/at\s+[^\s]+\s+\(/, // stack traces
+		/ENOENT|EACCES|ECONNREFUSED/, // system errors
+		/SELECT|INSERT|UPDATE|DELETE|FROM|WHERE/i, // SQL
+		/password|secret|token|key|auth/i, // credentials
+	];
+
+	if (sensitivePatterns.some((pattern) => pattern.test(message))) {
+		return "An internal error occurred";
+	}
+
+	// Allow short, simple messages through
+	if (message.length < 100 && !message.includes("\n")) {
+		return message;
+	}
+
+	return "An internal error occurred";
+}
+
 export function createHTTPHandler(
 	server: LensServer,
 	options: HTTPHandlerOptions = {},
 ): HTTPHandler {
-	const { pathPrefix = "", cors } = options;
+	const { pathPrefix = "", cors, errors } = options;
+	const isDevelopment = errors?.development ?? false;
+
+	// Error sanitization function
+	const sanitize = (error: Error): string => {
+		if (errors?.sanitize) {
+			return errors.sanitize(error);
+		}
+		return sanitizeError(error, isDevelopment);
+	};
 
 	// Build CORS headers
 	const corsHeaders: Record<string, string> = {
@@ -121,12 +198,21 @@ export function createHTTPHandler(
 			request.method === "POST" &&
 			(pathname === operationPath || pathname === `${pathPrefix}/`)
 		) {
+			// Parse JSON body with proper error handling
+			let body: { operation?: string; path?: string; input?: unknown };
 			try {
-				const body = (await request.json()) as {
-					operation?: string;
-					path?: string;
-					input?: unknown;
-				};
+				body = (await request.json()) as typeof body;
+			} catch {
+				return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
+					status: 400,
+					headers: {
+						"Content-Type": "application/json",
+						...corsHeaders,
+					},
+				});
+			}
+
+			try {
 
 				// Support both 'operation' and 'path' for backwards compatibility
 				const operationPath = body.operation ?? body.path;
@@ -148,7 +234,7 @@ export function createHTTPHandler(
 				);
 
 				if (result.error) {
-					return new Response(JSON.stringify({ error: result.error.message }), {
+					return new Response(JSON.stringify({ error: sanitize(result.error) }), {
 						status: 500,
 						headers: {
 							"Content-Type": "application/json",
@@ -164,7 +250,8 @@ export function createHTTPHandler(
 					},
 				});
 			} catch (error) {
-				return new Response(JSON.stringify({ error: String(error) }), {
+				const err = error instanceof Error ? error : new Error(String(error));
+				return new Response(JSON.stringify({ error: sanitize(err) }), {
 					status: 500,
 					headers: {
 						"Content-Type": "application/json",
