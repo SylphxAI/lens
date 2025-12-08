@@ -37,8 +37,9 @@
  * ```
  */
 
-import { firstValueFrom, isObservable, type LensResult } from "@sylphx/lens-core";
+import { firstValueFrom, isObservable } from "@sylphx/lens-core";
 import type { LensServer } from "../server/create.js";
+import type { LensResult } from "../server/types.js";
 
 /**
  * Helper to resolve server.execute() result which may be Observable or Promise.
