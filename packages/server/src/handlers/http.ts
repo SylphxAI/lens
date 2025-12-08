@@ -213,7 +213,6 @@ export function createHTTPHandler(
 			}
 
 			try {
-
 				// Support both 'operation' and 'path' for backwards compatibility
 				const operationPath = body.operation ?? body.path;
 				if (!operationPath) {

@@ -47,9 +47,9 @@ export type {
 
 /** Observer entry for subscription tracking */
 interface ObserverEntry {
-	next?: (data: unknown) => void;
-	error?: (err: Error) => void;
-	complete?: () => void;
+	next?: ((data: unknown) => void) | undefined;
+	error?: ((err: Error) => void) | undefined;
+	complete?: (() => void) | undefined;
 }
 
 /** Subscription state */

@@ -152,7 +152,7 @@ export type ClientSendFn = (message: unknown) => void;
 /** WebSocket interface for adapters */
 export interface WebSocketLike {
 	send(data: string): void;
-	close(): void;
+	close(code?: number, reason?: string): void;
 	onmessage?: ((event: { data: string }) => void) | null;
 	onclose?: (() => void) | null;
 	onerror?: ((error: unknown) => void) | null;

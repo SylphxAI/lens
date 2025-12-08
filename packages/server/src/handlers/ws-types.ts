@@ -20,6 +20,27 @@ export interface WSHandlerOptions {
 		warn?: (message: string, ...args: unknown[]) => void;
 		error?: (message: string, ...args: unknown[]) => void;
 	};
+
+	/**
+	 * Maximum message size in bytes.
+	 * Messages larger than this will be rejected.
+	 * Default: 1MB (1024 * 1024)
+	 */
+	maxMessageSize?: number;
+
+	/**
+	 * Maximum subscriptions per client.
+	 * Prevents resource exhaustion from malicious clients.
+	 * Default: 100
+	 */
+	maxSubscriptionsPerClient?: number;
+
+	/**
+	 * Maximum connections total.
+	 * Prevents server overload.
+	 * Default: 10000
+	 */
+	maxConnections?: number;
 }
 
 /**

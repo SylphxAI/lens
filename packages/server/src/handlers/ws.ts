@@ -81,6 +81,11 @@ export type { WSHandler, WSHandlerOptions } from "./ws-types.js";
 export function createWSHandler(server: LensServer, options: WSHandlerOptions = {}): WSHandler {
 	const { logger = {} } = options;
 
+	// Security limits with sensible defaults
+	const maxMessageSize = options.maxMessageSize ?? 1024 * 1024; // 1MB
+	const maxSubscriptionsPerClient = options.maxSubscriptionsPerClient ?? 100;
+	const maxConnections = options.maxConnections ?? 10000;
+
 	// Connection tracking
 	const connections = new Map<string, ClientConnection>();
 	const wsToConnection = new WeakMap<object, ClientConnection>();
@@ -88,6 +93,13 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 
 	// Handle new WebSocket connection
 	async function handleConnection(ws: WebSocketLike): Promise<void> {
+		// Check connection limit
+		if (connections.size >= maxConnections) {
+			logger.warn?.(`Connection limit reached (${maxConnections}), rejecting new connection`);
+			ws.close(1013, "Server at capacity");
+			return;
+		}
+
 		const clientId = `client_${++connectionCounter}`;
 
 		const conn: ClientConnection = {
@@ -122,6 +134,21 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 
 	// Handle incoming message
 	function handleMessage(conn: ClientConnection, data: string): void {
+		// Check message size limit
+		if (data.length > maxMessageSize) {
+			logger.warn?.(`Message too large (${data.length} bytes > ${maxMessageSize}), rejecting`);
+			conn.ws.send(
+				JSON.stringify({
+					type: "error",
+					error: {
+						code: "MESSAGE_TOO_LARGE",
+						message: `Message exceeds ${maxMessageSize} byte limit`,
+					},
+				}),
+			);
+			return;
+		}
+
 		try {
 			const message = JSON.parse(data) as ClientMessage;
 
@@ -174,6 +201,24 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle subscribe
 	async function handleSubscribe(conn: ClientConnection, message: SubscribeMessage): Promise<void> {
 		const { id, operation, input, fields } = message;
+
+		// Check subscription limit (skip if replacing existing subscription)
+		if (!conn.subscriptions.has(id) && conn.subscriptions.size >= maxSubscriptionsPerClient) {
+			logger.warn?.(
+				`Subscription limit reached for client ${conn.id} (${maxSubscriptionsPerClient}), rejecting`,
+			);
+			conn.ws.send(
+				JSON.stringify({
+					type: "error",
+					id,
+					error: {
+						code: "SUBSCRIPTION_LIMIT",
+						message: `Maximum ${maxSubscriptionsPerClient} subscriptions per client`,
+					},
+				}),
+			);
+			return;
+		}
 
 		// Execute query first to get data
 		let result: { data?: unknown; error?: Error };
