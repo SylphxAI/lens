@@ -175,6 +175,23 @@ export const prettyOutput: LogOutput = {
 // =============================================================================
 
 /**
+ * Structured logger interface
+ */
+export interface StructuredLogger {
+	debug: (message: string, context?: Record<string, unknown>) => void;
+	info: (message: string, context?: Record<string, unknown>) => void;
+	warn: (message: string, context?: Record<string, unknown>) => void;
+	error: (message: string, context?: Record<string, unknown>) => void;
+	fatal: (message: string, context?: Record<string, unknown>) => void;
+	child: (childContext: Record<string, unknown>) => StructuredLogger;
+	request: (requestId: string, message: string, context?: Record<string, unknown>) => void;
+	startOperation: (
+		operation: string,
+		context?: Record<string, unknown>,
+	) => (result?: { error?: Error; data?: unknown }) => void;
+}
+
+/**
  * Create a structured logger instance.
  *
  * @example
@@ -188,7 +205,7 @@ export const prettyOutput: LogOutput = {
  * logger.error('Request failed', { requestId: 'abc', error: err });
  * ```
  */
-export function createStructuredLogger(options: StructuredLoggerOptions = {}) {
+export function createStructuredLogger(options: StructuredLoggerOptions = {}): StructuredLogger {
 	const {
 		service = "lens",
 		level: minLevel = "info",
@@ -294,11 +311,6 @@ export function createStructuredLogger(options: StructuredLoggerOptions = {}) {
 		},
 	};
 }
-
-/**
- * Structured logger type
- */
-export type StructuredLogger = ReturnType<typeof createStructuredLogger>;
 
 /**
  * Adapter to make structured logger compatible with basic logger interface.
