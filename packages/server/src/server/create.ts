@@ -92,6 +92,54 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
 	return value != null && typeof value === "object" && Symbol.asyncIterator in value;
 }
 
+/**
+ * Ring buffer with O(1) enqueue/dequeue operations.
+ * Used for emit queue to avoid O(n) Array.shift() performance issues.
+ */
+class RingBuffer<T> {
+	private buffer: (T | null)[];
+	private head = 0; // Points to first element to dequeue
+	private tail = 0; // Points to where to enqueue next
+	private count = 0;
+
+	constructor(private capacity: number) {
+		this.buffer = new Array(capacity).fill(null);
+	}
+
+	get size(): number {
+		return this.count;
+	}
+
+	get isEmpty(): boolean {
+		return this.count === 0;
+	}
+
+	/** Enqueue item. If at capacity, drops oldest item (returns true if dropped). */
+	enqueue(item: T): boolean {
+		let dropped = false;
+		if (this.count >= this.capacity) {
+			// Drop oldest (backpressure)
+			this.head = (this.head + 1) % this.capacity;
+			this.count--;
+			dropped = true;
+		}
+		this.buffer[this.tail] = item;
+		this.tail = (this.tail + 1) % this.capacity;
+		this.count++;
+		return dropped;
+	}
+
+	/** Dequeue and return item, or null if empty. */
+	dequeue(): T | null {
+		if (this.count === 0) return null;
+		const item = this.buffer[this.head];
+		this.buffer[this.head] = null; // Allow GC
+		this.head = (this.head + 1) % this.capacity;
+		this.count--;
+		return item;
+	}
+}
+
 // =============================================================================
 // Server Implementation
 // =============================================================================
@@ -302,15 +350,15 @@ class LensServerImpl<
 							// Emit commands are queued and processed through processQueryResult
 							// to ensure field resolvers run on every emit
 							let emitProcessing = false;
-							const emitQueue: EmitCommand[] = [];
 							const MAX_EMIT_QUEUE_SIZE = 100; // Backpressure: prevent memory bloat
+							const emitQueue = new RingBuffer<EmitCommand>(MAX_EMIT_QUEUE_SIZE);
 
 							const processEmitQueue = async () => {
 								if (emitProcessing || cancelled) return;
 								emitProcessing = true;
 
-								while (emitQueue.length > 0 && !cancelled) {
-									const command = emitQueue.shift()!;
+								let command: EmitCommand | null;
+								while ((command = emitQueue.dequeue()) !== null && !cancelled) {
 									currentState = this.applyEmitCommand(command, currentState);
 
 									// Process through field resolvers (unlike before where we bypassed this)
@@ -348,13 +396,9 @@ class LensServerImpl<
 							const emitHandler = (command: EmitCommand) => {
 								if (cancelled) return;
 
-								// Backpressure: if queue is full, drop oldest events to prevent memory bloat
-								// For live queries, latest state is most important
-								while (emitQueue.length >= MAX_EMIT_QUEUE_SIZE) {
-									emitQueue.shift();
-								}
-
-								emitQueue.push(command);
+								// Enqueue command - RingBuffer handles backpressure automatically
+								// (drops oldest if at capacity, which is correct for live queries)
+								emitQueue.enqueue(command);
 								// Fire async processing (don't await - emit should be sync from caller's perspective)
 								processEmitQueue().catch((err) => {
 									if (!cancelled) {

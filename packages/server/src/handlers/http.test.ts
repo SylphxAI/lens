@@ -139,12 +139,12 @@ describe("createHTTPHandler", () => {
 		expect(data.data.id).toBe("456");
 	});
 
-	it("handles CORS preflight", async () => {
+	it("handles CORS preflight in development mode", async () => {
 		const app = createApp({
 			queries: { getUser },
 			mutations: { createUser },
 		});
-		const handler = createHTTPHandler(app);
+		const handler = createHTTPHandler(app, { errors: { development: true } });
 
 		const request = new Request("http://localhost/", {
 			method: "OPTIONS",
@@ -153,6 +153,39 @@ describe("createHTTPHandler", () => {
 		const response = await handler(request);
 		expect(response.status).toBe(204);
 		expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+	});
+
+	it("does not allow CORS by default in production mode", async () => {
+		const app = createApp({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPHandler(app); // Production mode is default
+
+		const request = new Request("http://localhost/", {
+			method: "OPTIONS",
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(204);
+		// No Access-Control-Allow-Origin header in production without explicit config
+		expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+	});
+
+	it("allows CORS with explicit origin configuration", async () => {
+		const app = createApp({
+			queries: { getUser },
+			mutations: { createUser },
+		});
+		const handler = createHTTPHandler(app, { cors: { origin: "https://example.com" } });
+
+		const request = new Request("http://localhost/", {
+			method: "OPTIONS",
+		});
+
+		const response = await handler(request);
+		expect(response.status).toBe(204);
+		expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://example.com");
 	});
 
 	it("returns 404 for unknown paths", async () => {
