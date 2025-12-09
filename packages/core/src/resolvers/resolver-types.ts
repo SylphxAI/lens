@@ -327,6 +327,21 @@ export interface FieldBuilder<
 	/** Date field */
 	date(): ScalarFieldBuilder<Date, InferParent<TEntity["fields"]>, TContext>;
 
+	/**
+	 * JSON/object field with custom type T.
+	 * Use for JSON fields that need .resolve() or .subscribe().
+	 *
+	 * @example
+	 * ```typescript
+	 * resolver(Session, (f) => ({
+	 *   status: f.json<SessionStatus>().subscribe(({ ctx }) => {
+	 *     ctx.emit({ isActive: true, text: "Working..." });
+	 *   }),
+	 * }));
+	 * ```
+	 */
+	json<T = unknown>(): ScalarFieldBuilder<T, InferParent<TEntity["fields"]>, TContext>;
+
 	// Relation type builders
 
 	/**

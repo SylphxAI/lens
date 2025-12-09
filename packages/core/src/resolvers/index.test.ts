@@ -755,3 +755,53 @@ describe("getFieldMode()", () => {
 		expect(userResolver.getFieldMode("livePosts")).toBe("subscribe");
 	});
 });
+
+// =============================================================================
+// Test: f.json<T>() typed JSON field builder
+// =============================================================================
+
+describe("f.json<T>()", () => {
+	interface SessionStatus {
+		isActive: boolean;
+		text: string;
+	}
+
+	it("supports .resolve() with typed JSON", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			sessionStatus: f.json<SessionStatus>().resolve(() => ({
+				isActive: true,
+				text: "Working",
+			})),
+		}));
+
+		expect(userResolver.getFieldMode("sessionStatus")).toBe("resolve");
+	});
+
+	it("supports .subscribe() with typed JSON", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			liveStatus: f.json<SessionStatus>().subscribe(({ ctx }) => {
+				ctx.emit({ isActive: true, text: "Online" });
+			}),
+		}));
+
+		expect(userResolver.getFieldMode("liveStatus")).toBe("subscribe");
+		expect(userResolver.isSubscription("liveStatus")).toBe(true);
+	});
+
+	it("supports .args() with typed JSON", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			statusWithArgs: f
+				.json<SessionStatus>()
+				.args(z.object({ detailed: z.boolean() }))
+				.resolve(({ args }) => ({
+					isActive: true,
+					text: args.detailed ? "Working on task" : "Working",
+				})),
+		}));
+
+		expect(userResolver.getFieldMode("statusWithArgs")).toBe("resolve");
+	});
+});

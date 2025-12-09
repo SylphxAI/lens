@@ -351,6 +351,19 @@ function createFieldBuilder<
 			return createScalarFieldBuilder<Date, Parent, TContext>();
 		},
 
+		/**
+		 * Create a JSON/object field builder with custom type T.
+		 * Use for JSON fields that need .resolve() or .subscribe().
+		 *
+		 * @example
+		 * status: f.json<SessionStatus>().subscribe(({ ctx }) => {
+		 *   ctx.emit({ isActive: true, text: "Working..." });
+		 * }),
+		 */
+		json<T = unknown>(): ScalarFieldBuilder<T, Parent, TContext> {
+			return createScalarFieldBuilder<T, Parent, TContext>();
+		},
+
 		one<Target extends EntityDef<string, EntityDefinition>>(
 			_target: Target,
 		): RelationFieldBuilder<InferParent<Target["fields"]>, Parent, TContext> {
