@@ -79,41 +79,135 @@ export type InferReturnType<R extends ReturnSpec> =
 // =============================================================================
 
 /**
- * Lens-provided context extensions.
- * These are automatically injected by the server into the user's context.
+ * Lens-provided context extensions for emit-based subscriptions.
+ * Used when resolver returns void and uses emit() to push updates.
  */
-export interface LensContextExtensions<TOutput = unknown> {
+export interface EmitContextExtensions<TOutput = unknown> {
 	/**
 	 * Emit state updates to subscribed clients.
-	 * Only available in subscription context.
+	 * Only available in subscription context (return void).
 	 */
 	emit: Emit<TOutput>;
 
 	/**
 	 * Register cleanup function called when client unsubscribes.
 	 * Returns a function to manually remove the cleanup.
-	 * Only available in subscription context.
 	 */
 	onCleanup: (fn: () => void) => () => void;
 }
 
 /**
- * Full context type combining user context with Lens extensions.
- * This is what resolvers receive as `ctx`.
+ * Lens-provided context extensions for generator-based subscriptions.
+ * Used when resolver is an async generator (yield).
+ */
+export interface GeneratorContextExtensions {
+	/**
+	 * Register cleanup function called when client unsubscribes.
+	 * Returns a function to manually remove the cleanup.
+	 */
+	onCleanup: (fn: () => void) => () => void;
+}
+
+/**
+ * @deprecated Use specific context types instead.
+ * Legacy context extensions - kept for backwards compatibility.
+ */
+export interface LensContextExtensions<TOutput = unknown> {
+	emit: Emit<TOutput>;
+	onCleanup: (fn: () => void) => () => void;
+}
+
+/**
+ * Context for query resolvers (return value).
+ * No emit or onCleanup - queries are one-shot.
+ */
+export type QueryContext<TContext> = TContext;
+
+/**
+ * Context for emit-based subscription resolvers (return void).
+ * Has emit and onCleanup.
+ */
+export type EmitSubscriptionContext<TContext, TOutput = unknown> = TContext &
+	EmitContextExtensions<TOutput>;
+
+/**
+ * Context for generator-based subscription resolvers (yield).
+ * Has onCleanup but no emit (yield IS the emit).
+ */
+export type GeneratorSubscriptionContext<TContext> = TContext & GeneratorContextExtensions;
+
+/**
+ * @deprecated Use QueryContext, EmitSubscriptionContext, or GeneratorSubscriptionContext.
  */
 export type LensContext<TContext, TOutput = unknown> = TContext & LensContextExtensions<TOutput>;
 
+// =============================================================================
+// Resolver Context Types
+// =============================================================================
+
 /**
- * Resolver context - passed directly to resolver function (tRPC style)
+ * Resolver context for queries (return value).
+ * ctx has NO emit/onCleanup.
  */
-export interface ResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
+export interface QueryResolverContext<TInput = unknown, TContext = unknown> {
 	/** Parsed and validated input */
 	input: TInput;
-	/** Context containing user-defined values plus Lens extensions */
+	/** User context (no Lens extensions for queries) */
+	ctx: QueryContext<TContext>;
+}
+
+/**
+ * Resolver context for emit-based subscriptions (return void).
+ * ctx has emit and onCleanup.
+ */
+export interface EmitResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
+	/** Parsed and validated input */
+	input: TInput;
+	/** Context with emit and onCleanup */
+	ctx: EmitSubscriptionContext<TContext, TOutput>;
+}
+
+/**
+ * Resolver context for generator-based subscriptions (yield).
+ * ctx has onCleanup but no emit.
+ */
+export interface GeneratorResolverContext<TInput = unknown, TContext = unknown> {
+	/** Parsed and validated input */
+	input: TInput;
+	/** Context with onCleanup only */
+	ctx: GeneratorSubscriptionContext<TContext>;
+}
+
+/**
+ * @deprecated Use QueryResolverContext, EmitResolverContext, or GeneratorResolverContext.
+ */
+export interface ResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
+	input: TInput;
 	ctx: LensContext<TContext, TOutput>;
 }
 
-/** Resolver function type - can return sync, async, or generator */
+// =============================================================================
+// Resolver Function Types
+// =============================================================================
+
+/** Query resolver - returns value, no emit/onCleanup */
+export type QueryResolverFn<TInput, TOutput, TContext = unknown> = (
+	ctx: QueryResolverContext<TInput, TContext>,
+) => TOutput | Promise<TOutput>;
+
+/** Emit-based subscription resolver - returns void, uses emit */
+export type EmitResolverFn<TInput, TOutput, TContext = unknown> = (
+	ctx: EmitResolverContext<TInput, TOutput, TContext>,
+) => void | Promise<void>;
+
+/** Generator-based subscription resolver - yields values */
+export type GeneratorResolverFn<TInput, TOutput, TContext = unknown> = (
+	ctx: GeneratorResolverContext<TInput, TContext>,
+) => AsyncGenerator<TOutput>;
+
+/**
+ * @deprecated Use QueryResolverFn, EmitResolverFn, or GeneratorResolverFn.
+ */
 export type ResolverFn<TInput, TOutput, TContext = unknown> = (
 	ctx: ResolverContext<TInput, TOutput, TContext>,
 ) => TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;

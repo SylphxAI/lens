@@ -28,14 +28,29 @@
 // =============================================================================
 
 export type {
+	EmitContextExtensions,
+	EmitResolverContext,
+	EmitResolverFn,
+	EmitSubscriptionContext,
+	GeneratorContextExtensions,
+	GeneratorResolverContext,
+	GeneratorResolverFn,
+	GeneratorSubscriptionContext,
 	InferReturnType,
+	/** @deprecated Use QueryContext, EmitSubscriptionContext, or GeneratorSubscriptionContext */
 	LensContext,
+	/** @deprecated */
 	LensContextExtensions,
 	OptimisticCallback,
 	OptimisticContext,
 	OptimisticDSL,
 	OptimisticSugar,
+	QueryContext,
+	QueryResolverContext,
+	QueryResolverFn,
+	/** @deprecated Use QueryResolverContext, EmitResolverContext, or GeneratorResolverContext */
 	ResolverContext,
+	/** @deprecated Use QueryResolverFn, EmitResolverFn, or GeneratorResolverFn */
 	ResolverFn,
 	ReturnSpec,
 	ZodLikeSchema,
