@@ -952,7 +952,21 @@ class LensServerImpl<
 						emit: createFieldEmit!(currentPath),
 						onCleanup: onCleanup!,
 					};
-					result[field] = await resolverDef.resolveField(field, obj, args, extendedCtx);
+
+					// Check if field is a subscription (uses emit pattern)
+					if (resolverDef.isSubscription(field)) {
+						// Subscription fields use emit pattern - don't await completion
+						// The resolver runs in background, pushing values via emit()
+						// Set initial value to null, emit() will update it
+						result[field] = null;
+						// Start resolver without awaiting (fire and forget)
+						resolverDef.resolveField(field, obj, args, extendedCtx).catch(() => {
+							// Subscription errors are handled via emit, ignore here
+						});
+					} else {
+						// Regular resolved field - await the result
+						result[field] = await resolverDef.resolveField(field, obj, args, extendedCtx);
+					}
 				} catch {
 					result[field] = null;
 				}
