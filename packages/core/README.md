@@ -10,10 +10,10 @@ bun add @sylphx/lens-core
 
 ## Usage
 
-### Entity Definition (Function-based API)
+### Model Definition (New API)
 
 ```typescript
-import { entity, lens, router } from "@sylphx/lens-core";
+import { model, lens, router, list, nullable } from "@sylphx/lens-core";
 import { z } from "zod";
 
 interface AppContext {
@@ -21,8 +21,8 @@ interface AppContext {
   user: User | null;
 }
 
-// Define entities with inline resolvers
-const User = entity<AppContext>("User").define((t) => ({
+// Define models with inline resolvers
+const User = model<AppContext>("User", (t) => ({
   id: t.id(),
   name: t.string(),
   email: t.string(),
@@ -43,7 +43,7 @@ const User = entity<AppContext>("User").define((t) => ({
     }),
 }));
 
-const Post = entity<AppContext>("Post").define((t) => ({
+const Post = model<AppContext>("Post", (t) => ({
   id: t.id(),
   title: t.string(),
   content: t.string(),
@@ -52,19 +52,36 @@ const Post = entity<AppContext>("Post").define((t) => ({
     ctx.db.users.get(parent.authorId)!
   ),
 }));
+
+// Pure type model (no id) - still has resolvers
+const Stats = model<AppContext>("Stats", (t) => ({
+  totalUsers: t.int().resolve(({ ctx }) => ctx.db.users.count()),
+  averageAge: t.float().resolve(({ ctx }) => ctx.db.users.averageAge()),
+}));
 ```
 
 ### Operations
 
 ```typescript
 // Create typed builders
-const { query, mutation, plugins } = lens<AppContext>();
+const { query, mutation } = lens<AppContext>();
 
-// Query
+// Query with model return type
 const getUser = query()
   .input(z.object({ id: z.string() }))
   .returns(User)
   .resolve(({ input, ctx }) => ctx.db.users.get(input.id)!);
+
+// Query with nullable return
+const findUser = query()
+  .input(z.object({ email: z.string() }))
+  .returns(nullable(User))  // User | null
+  .resolve(({ input, ctx }) => ctx.db.users.findByEmail(input.email));
+
+// Query with list return
+const listUsers = query()
+  .returns(list(User))  // User[]
+  .resolve(({ ctx }) => ctx.db.users.findMany());
 
 // Live Query (initial + updates)
 const watchUser = query()
@@ -85,6 +102,8 @@ const updateUser = mutation()
 const appRouter = router({
   user: {
     get: getUser,
+    find: findUser,
+    list: listUsers,
     watch: watchUser,
     update: updateUser,
   },
@@ -120,25 +139,38 @@ const sendMessage = mutation()
 
 ## API Summary
 
-### Entity Definition
+### Model Definition
 
 | Pattern | Example |
 |---------|---------|
-| Basic | `entity("Name", (t) => ({ ... }))` |
-| Typed Context | `entity<Ctx>("Name").define((t) => ({ ... }))` |
+| Basic | `model("Name", (t) => ({ ... }))` |
+| Typed Context | `model<Ctx>("Name", (t) => ({ ... }))` |
+| Inline | `.returns(model("Result", (t) => ({ ... })))` |
+
+### Return Type Wrappers
+
+| Pattern | Example | Result Type |
+|---------|---------|-------------|
+| Model | `.returns(User)` | `User` |
+| Nullable | `.returns(nullable(User))` | `User \| null` |
+| List | `.returns(list(User))` | `User[]` |
+| Nullable List | `.returns(nullable(list(User)))` | `User[] \| null` |
 
 ### Type Builder (`t`)
 
 | Method | Description |
 |--------|-------------|
-| `t.id()` | ID field |
+| `t.id()` | ID field (makes model normalizable) |
 | `t.string()` | String field |
 | `t.int()` | Integer field |
+| `t.float()` | Float field |
 | `t.boolean()` | Boolean field |
 | `t.date()` | Date field |
 | `t.enum([...])` | Enum field |
 | `t.one(() => E)` | Singular relation |
 | `t.many(() => E)` | Collection relation |
+| `.optional()` | Make field optional |
+| `.args(schema)` | Add field arguments |
 | `.resolve(fn)` | Field resolver |
 | `.subscribe(fn)` | Live updates (Publisher pattern) |
 
@@ -150,6 +182,16 @@ const sendMessage = mutation()
 | `.resolve().subscribe()` | Live query (initial + updates) |
 | `.optimistic("merge")` | Simple optimistic update |
 | `.optimistic(({ input }) => [...])` | Reify DSL optimistic |
+
+## Migration from entity()
+
+```typescript
+// Old (deprecated)
+const User = entity<AppContext>("User").define((t) => ({ ... }));
+
+// New
+const User = model<AppContext>("User", (t) => ({ ... }));
+```
 
 ## License
 

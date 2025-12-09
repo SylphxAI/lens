@@ -9,29 +9,48 @@ import type { Pipeline, StepBuilder } from "../optimistic/reify.js";
 import { isPipeline } from "../optimistic/reify.js";
 import type { EntityDef } from "../schema/define.js";
 import type { InferScalar, ScalarFields } from "../schema/infer.js";
+import type { ModelDef } from "../schema/model.js";
 import type { EntityDefinition } from "../schema/types.js";
+import type { ListWrapper, NullableWrapper } from "../schema/wrappers.js";
 import type { Prettify } from "../utils/types.js";
 
 // =============================================================================
 // Schema Types
 // =============================================================================
 
-/** Zod-like schema interface (minimal subset we need) */
+/**
+ * Zod-like schema interface (minimal subset we need)
+ * @deprecated Use model() instead of Zod for .returns()
+ */
 export interface ZodLikeSchema<T = unknown> {
 	parse: (data: unknown) => T;
 	safeParse: (data: unknown) => { success: true; data: T } | { success: false; error: unknown };
 	_output: T;
 }
 
+/** Any model-like definition (EntityDef or ModelDef) */
+type AnyModelDef = EntityDef<string, EntityDefinition> | ModelDef<string, EntityDefinition>;
+
 /**
- * Return type specification
- * - EntityDef: For entity-aware returns (enables normalization, caching)
- * - [EntityDef]: Array of entities
- * - ZodLikeSchema: For simple typed returns (no entity features)
- * - Record: Multiple named returns
+ * Return type specification (new unified API)
+ * - ModelDef: Model definition (recommended)
+ * - EntityDef: Entity definition (legacy, still supported)
+ * - nullable(Model): Nullable model
+ * - list(Model): Array of models
+ * - nullable(list(Model)): Nullable array
+ *
+ * @deprecated patterns:
+ * - [EntityDef]: Use list(Model) instead
+ * - ZodLikeSchema: Use model() instead
+ * - Record: Use model() with inline fields instead
  */
 export type ReturnSpec =
-	| EntityDef<string, EntityDefinition>
+	// New API (preferred)
+	| AnyModelDef
+	| NullableWrapper<AnyModelDef>
+	| ListWrapper<AnyModelDef>
+	| NullableWrapper<ListWrapper<AnyModelDef>>
+	// Legacy API (deprecated but supported)
 	| [EntityDef<string, EntityDefinition>]
 	| ZodLikeSchema<unknown>
 	| Record<string, EntityDef<string, EntityDefinition> | [EntityDef<string, EntityDefinition>]>;
@@ -44,11 +63,11 @@ export type ReturnSpec =
 type IsOptional<F> = F extends { _optional: true } ? true : false;
 
 /**
- * Infer entity type from entity definition fields.
+ * Infer entity/model type from definition fields.
  * Only infers scalar fields (relations require schema context).
  * Handles optional fields properly (makes them optional properties).
  */
-type InferEntityFromFields<F extends EntityDefinition> = Prettify<
+type InferModelFromFields<F extends EntityDefinition> = Prettify<
 	{
 		[K in ScalarFields<F> as IsOptional<F[K]> extends true ? never : K]: InferScalar<F[K]>;
 	} & {
@@ -56,23 +75,60 @@ type InferEntityFromFields<F extends EntityDefinition> = Prettify<
 	}
 >;
 
-/** Infer TypeScript type from return spec */
+/** @deprecated Use InferModelFromFields */
+type InferEntityFromFields<F extends EntityDefinition> = InferModelFromFields<F>;
+
+/**
+ * Infer TypeScript type from return spec.
+ * Handles both new (model, nullable, list) and legacy ([Entity], Zod) APIs.
+ */
 export type InferReturnType<R extends ReturnSpec> =
-	R extends ZodLikeSchema<infer T>
-		? T
-		: R extends EntityDef<string, infer F>
-			? InferEntityFromFields<F>
-			: R extends [EntityDef<string, infer F>]
-				? InferEntityFromFields<F>[]
-				: R extends Record<string, unknown>
-					? {
-							[K in keyof R]: R[K] extends [EntityDef<string, infer F>]
-								? InferEntityFromFields<F>[]
-								: R[K] extends EntityDef<string, infer F2>
-									? InferEntityFromFields<F2>
-									: unknown;
-						}
-					: never;
+	// Nullable wrapper
+	R extends NullableWrapper<infer Inner>
+		? Inner extends ListWrapper<infer Model>
+			? Model extends AnyModelDef
+				? Model extends EntityDef<string, infer F>
+					? InferModelFromFields<F>[] | null
+					: Model extends ModelDef<string, infer F>
+						? InferModelFromFields<F>[] | null
+						: never
+				: never
+			: Inner extends AnyModelDef
+				? Inner extends EntityDef<string, infer F>
+					? InferModelFromFields<F> | null
+					: Inner extends ModelDef<string, infer F>
+						? InferModelFromFields<F> | null
+						: never
+				: never
+		: // List wrapper
+			R extends ListWrapper<infer Model>
+			? Model extends EntityDef<string, infer F>
+				? InferModelFromFields<F>[]
+				: Model extends ModelDef<string, infer F>
+					? InferModelFromFields<F>[]
+					: never
+			: // ModelDef (new)
+				R extends ModelDef<string, infer F>
+				? InferModelFromFields<F>
+				: // EntityDef (legacy)
+					R extends EntityDef<string, infer F>
+					? InferModelFromFields<F>
+					: // Legacy: [EntityDef] array syntax
+						R extends [EntityDef<string, infer F>]
+						? InferModelFromFields<F>[]
+						: // Legacy: ZodLikeSchema
+							R extends ZodLikeSchema<infer T>
+							? T
+							: // Legacy: Record multi-return
+								R extends Record<string, unknown>
+								? {
+										[K in keyof R]: R[K] extends [EntityDef<string, infer F>]
+											? InferModelFromFields<F>[]
+											: R[K] extends EntityDef<string, infer F2>
+												? InferModelFromFields<F2>
+												: unknown;
+									}
+								: never;
 
 // =============================================================================
 // Context Types

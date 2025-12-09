@@ -73,25 +73,79 @@ export {
 } from "./schema/create.js";
 
 // =============================================================================
-// Entity & Schema Definition (Primary API)
+// Model Definition (Primary API - New)
 // =============================================================================
 
 export {
-	// Context-aware entity factory
+	// Model factory
+	type ContextualModelBuilder,
+	type InferModelType,
+	isModelDef,
+	isNormalizableModel,
+	model,
+	type ModelBuilder,
+	ModelBuilderClass,
+	type ModelDef,
+	type ModelFactory,
+	MODEL_SYMBOL,
+} from "./schema/model.js";
+
+// =============================================================================
+// Return Type Wrappers
+// =============================================================================
+
+export {
+	// Wrappers
+	list,
+	nullable,
+	// Type guards
+	isListWrapper,
+	isNullableWrapper,
+	// Types
+	type ListWrapper,
+	type NullableWrapper,
+	// Utility types
+	type IsList,
+	type IsNullable,
+	type UnwrapModel,
+	// Symbols
+	LIST_SYMBOL,
+	NULLABLE_SYMBOL,
+} from "./schema/wrappers.js";
+
+// =============================================================================
+// Model Collection Utilities
+// =============================================================================
+
+export {
+	collectModelsFromRouter,
+	collectModelsFromOperations,
+	mergeModelCollections,
+	type CollectedModels,
+} from "./schema/collect.js";
+
+// =============================================================================
+// Entity & Schema Definition (Legacy - use model() instead)
+// =============================================================================
+
+export {
+	/** @deprecated Use ContextualModelBuilder instead */
 	type ContextualEntityBuilder,
 	// Schema creation
 	createSchema,
-	// Entity definition
+	/** @deprecated Use model() instead */
 	defineEntity,
+	/** @deprecated Use ModelBuilder instead */
 	type EntityBuilder,
-	// Entity builder class (for typed context)
+	/** @deprecated Use ModelBuilderClass instead */
 	EntityBuilder_,
 	type EntityDef,
+	/** @deprecated Use model() instead */
 	entity,
 	isEntityDef,
-	/** @deprecated Use `entity<TContext>('Name').define(...)` instead */
+	/** @deprecated Use model<TContext>() instead */
 	type TypedEntityFactory,
-	/** @deprecated Use `entity<TContext>('Name').define(...)` instead */
+	/** @deprecated Use model<TContext>() instead */
 	typedEntity,
 } from "./schema/define.js";
 

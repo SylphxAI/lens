@@ -158,8 +158,8 @@ Client automatically:
 
 **Server**:
 ```typescript
-// entities/user.ts - Use function-based API with inline resolvers
-export const User = entity<AppContext>('User').define((t) => ({
+// models/user.ts - Use model() with inline resolvers
+export const User = model<AppContext>('User', (t) => ({
   id: t.id(),
   name: t.string(),
   email: t.string(),

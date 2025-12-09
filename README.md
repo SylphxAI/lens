@@ -294,19 +294,19 @@ The server automatically selects optimal transfer strategies:
 
 ---
 
-## Entity & Field Resolution
+## Model Definition & Field Resolution
 
-Lens uses **inline resolvers** - define entities with their field resolution in one place.
+Lens uses **inline resolvers** - define models with their field resolution in one place.
 
-### Define Entities with Inline Resolvers ✅ Recommended
+### Define Models with Inline Resolvers ✅ Recommended
 
-Use the **function-based API** `entity("Name", (t) => ({ ... }))` for inline resolvers:
+Use the `model("Name", (t) => ({ ... }))` function for type-safe definitions with inline resolvers:
 
 ```typescript
-import { entity } from '@sylphx/lens-core'
+import { model } from '@sylphx/lens-core'
 
-// User entity with inline field resolvers
-const User = entity<AppContext>("User").define((t) => ({
+// User model with inline field resolvers
+const User = model<AppContext>("User", (t) => ({
   // Scalar fields
   id: t.id(),
   name: t.string(),
@@ -350,7 +350,7 @@ const User = entity<AppContext>("User").define((t) => ({
     }),
 }))
 
-const Post = entity<AppContext>("Post").define((t) => ({
+const Post = model<AppContext>("Post", (t) => ({
   id: t.id(),
   title: t.string(),
   content: t.string(),
@@ -373,12 +373,19 @@ const Post = entity<AppContext>("Post").define((t) => ({
 
 ### Register with Server
 
-Entities with inline resolvers are **auto-extracted** - no need for `resolvers` array:
+Models are **auto-tracked** from router return types - no need for explicit `entities` config:
 
 ```typescript
+// New: Models auto-collected from .returns()
+const app = createApp({
+  router: appRouter,  // Models extracted from query/mutation return types
+  context: () => ({ db }),
+})
+
+// Or explicitly (optional, for additional models not in returns)
 const app = createApp({
   router: appRouter,
-  entities: { User, Post },  // Inline resolvers auto-extracted
+  entities: { User, Post },  // Optional: explicit models
   context: () => ({ db }),
 })
 ```
@@ -411,7 +418,7 @@ const app = createApp({
 ({ parent, args, ctx }: { parent: TParent; args: TArgs; ctx: TContext }) => TResult | Promise<TResult>
 ```
 
-### Type Builder API (Inline Resolvers)
+### Type Builder API (Model Fields)
 
 | Method | Description | Example |
 |--------|-------------|---------|

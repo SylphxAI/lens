@@ -16,6 +16,8 @@
  */
 
 import {
+	collectModelsFromOperations,
+	collectModelsFromRouter,
 	type ContextValue,
 	createEmit,
 	createResolverFromEntity,
@@ -27,8 +29,10 @@ import {
 	hasInlineResolvers,
 	type InferRouterContext,
 	isEntityDef,
+	isModelDef,
 	isMutationDef,
 	isQueryDef,
+	mergeModelCollections,
 	type Observable,
 	type ResolverDef,
 	type RouterDef,
@@ -192,14 +196,32 @@ class LensServerImpl<
 		this.queries = queries as Q;
 		this.mutations = mutations as M;
 
-		// Build entities map: explicit config + auto-extracted from resolvers
-		const entities: EntitiesMap = { ...(config.entities ?? {}) };
+		// Build entities map (priority: explicit config > router > resolvers)
+		// Auto-track models from router return types (new behavior)
+		const autoCollected = config.router
+			? collectModelsFromRouter(config.router)
+			: collectModelsFromOperations(queries, mutations);
+
+		// Merge: explicit entities override auto-collected
+		const entitiesFromConfig = config.entities ?? {};
+		const mergedModels = mergeModelCollections(autoCollected, entitiesFromConfig);
+
+		// Also extract from explicit resolvers (legacy)
 		if (config.resolvers) {
 			for (const resolver of config.resolvers) {
 				const entityName = resolver.entity._name;
-				if (entityName && !entities[entityName]) {
-					entities[entityName] = resolver.entity;
+				if (entityName && !mergedModels.has(entityName)) {
+					mergedModels.set(entityName, resolver.entity);
 				}
+			}
+		}
+
+		// Convert Map to Record for entities (supports both EntityDef and ModelDef)
+		const entities: EntitiesMap = {};
+		for (const [name, model] of mergedModels) {
+			// Both ModelDef and EntityDef work as EntitiesMap values
+			if (isEntityDef(model) || isModelDef(model)) {
+				entities[name] = model as EntityDef<string, any>;
 			}
 		}
 		this.entities = entities;
@@ -278,12 +300,13 @@ class LensServerImpl<
 			}
 		}
 
-		// 2. Auto-convert entities with inline resolvers (if not already in map)
+		// 2. Auto-convert entities/models with inline resolvers (if not already in map)
 		for (const [name, entity] of Object.entries(entities)) {
-			if (!isEntityDef(entity)) continue;
+			// Support both EntityDef and ModelDef
+			if (!isEntityDef(entity) && !isModelDef(entity)) continue;
 			if (resolverMap.has(name)) continue; // Explicit resolver takes priority
 
-			// Check if entity has inline resolvers
+			// Check if entity/model has inline resolvers
 			if (hasInlineResolvers(entity)) {
 				const resolver = createResolverFromEntity(entity);
 				resolverMap.set(name, resolver);

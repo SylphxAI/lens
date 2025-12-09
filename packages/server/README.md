@@ -14,7 +14,7 @@ bun add @sylphx/lens-server
 
 ```typescript
 import { createApp, createHandler } from "@sylphx/lens-server";
-import { entity, lens, router } from "@sylphx/lens-core";
+import { model, lens, router, list, nullable } from "@sylphx/lens-core";
 import { z } from "zod";
 
 // Define context type
@@ -23,14 +23,20 @@ interface AppContext {
   user: User | null;
 }
 
-// Define entities with inline resolvers
-const User = entity<AppContext>("User").define((t) => ({
+// Define models with inline resolvers
+const User = model<AppContext>("User", (t) => ({
   id: t.id(),
   name: t.string(),
   email: t.string(),
   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
     ctx.db.posts.filter(p => p.authorId === parent.id)
   ),
+}));
+
+const Post = model<AppContext>("Post", (t) => ({
+  id: t.id(),
+  title: t.string(),
+  authorId: t.string(),
 }));
 
 // Create typed builders
@@ -44,6 +50,15 @@ const appRouter = router({
       .returns(User)
       .resolve(({ input, ctx }) => ctx.db.users.get(input.id)!),
 
+    find: query()
+      .input(z.object({ email: z.string() }))
+      .returns(nullable(User))  // User | null
+      .resolve(({ input, ctx }) => ctx.db.users.findByEmail(input.email)),
+
+    list: query()
+      .returns(list(User))  // User[]
+      .resolve(({ ctx }) => ctx.db.users.findMany()),
+
     update: mutation()
       .input(z.object({ id: z.string(), name: z.string() }))
       .returns(User)
@@ -51,10 +66,9 @@ const appRouter = router({
   },
 });
 
-// Create server
+// Create server - models auto-tracked from router!
 const app = createApp({
-  router: appRouter,
-  entities: { User },  // Inline resolvers auto-extracted
+  router: appRouter,  // Models extracted from .returns()
   context: () => ({
     db: database,
     user: getCurrentUser(),
@@ -70,7 +84,7 @@ Bun.serve({ port: 3000, fetch: handler });
 
 ```typescript
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
-import { lens, router } from "@sylphx/lens-core";
+import { model, lens, router } from "@sylphx/lens-core";
 import { entity as e, temp, now } from "@sylphx/reify";
 
 // Enable optimistic plugin
@@ -104,7 +118,6 @@ const appRouter = router({
 
 const app = createApp({
   router: appRouter,
-  entities: { User, Message },
   plugins,  // Include optimistic plugin
   context: () => ({ ... }),
 });
@@ -160,12 +173,41 @@ createApp({
   // Required (at least one)
   router: RouterDef,           // Namespaced operations
 
-  // Optional
-  entities: EntitiesMap,       // Entity definitions (inline resolvers auto-extracted)
+  // Optional (models auto-tracked from router!)
+  entities: EntitiesMap,       // Explicit models (optional, for overrides)
   plugins: ServerPlugin[],     // Server plugins (optimistic, clientState, etc.)
   context: () => TContext,     // Context factory
   logger: LensLogger,          // Logging (default: silent)
   version: string,             // Server version (default: "1.0.0")
+});
+```
+
+## Auto-tracking Models
+
+Models are automatically collected from router return types:
+
+```typescript
+// These models are auto-tracked:
+const appRouter = router({
+  user: {
+    get: query().returns(User).resolve(...),     // User tracked
+    list: query().returns(list(User)).resolve(...), // User tracked
+    find: query().returns(nullable(User)).resolve(...), // User tracked
+  },
+  post: {
+    get: query().returns(Post).resolve(...),     // Post tracked
+  },
+});
+
+// No need to pass entities explicitly
+const app = createApp({
+  router: appRouter,  // User and Post auto-collected
+});
+
+// Or override/add explicit models
+const app = createApp({
+  router: appRouter,
+  entities: { User, Post, ExtraModel },  // Explicit takes priority
 });
 ```
 

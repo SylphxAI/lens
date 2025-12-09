@@ -216,19 +216,39 @@ function createEntityDef<Name extends string, Fields extends EntityDefinition>(
 	} as EntityDef<Name, Fields>;
 }
 
-/** Simplified alias for defineEntity */
+/**
+ * Simplified alias for defineEntity.
+ *
+ * @deprecated Use `model()` instead for a cleaner API:
+ * ```typescript
+ * // Old (deprecated)
+ * const User = entity<AppContext>("User").define((t) => ({ ... }));
+ *
+ * // New (recommended)
+ * const User = model<AppContext>("User", (t) => ({ ... }));
+ * ```
+ */
 export const entity: typeof defineEntity & {
 	/**
 	 * Create an entity with typed context using builder pattern.
 	 *
+	 * @deprecated Use `model<Context>("Name", (t) => ...)` instead
+	 *
 	 * @example
 	 * ```typescript
+	 * // Old (deprecated)
 	 * const User = entity<MyContext>('User').define((t) => ({
 	 *   id: t.id(),
 	 *   posts: t.many(() => Post).resolve(({ ctx }) => {
 	 *     // ctx is typed as MyContext!
 	 *     return ctx.db.posts.findMany();
 	 *   }),
+	 * }));
+	 *
+	 * // New (recommended)
+	 * const User = model<MyContext>("User", (t) => ({
+	 *   id: t.id(),
+	 *   posts: t.many(() => Post).resolve(({ ctx }) => ctx.db.posts.findMany()),
 	 * }));
 	 * ```
 	 */
