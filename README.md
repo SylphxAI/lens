@@ -127,26 +127,29 @@ When a client subscribes to a query, the server:
 
 ## Resolver Patterns
 
-Lens supports three ways to produce data in resolvers. **All patterns support live subscriptions.**
+Lens supports three ways to produce data in resolvers. Each pattern uses a **type-safe API** that enforces correct context access.
 
-### 1. Single Return (Standard)
+### 1. Query: Single Return (`.resolve()`)
 
-Most common pattern - returns a value once:
+Most common pattern - returns a value once. Context has **no** `emit` or `onCleanup`:
 
 ```typescript
 const getUser = query()
   .input(z.object({ id: z.string() }))
   .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
+  //         ^ ctx has NO emit, NO onCleanup
 ```
 
-### 2. Push Updates with `emit`
+### 2. Subscription: Push Updates with `emit` (`.subscribe()`)
 
-For fine-grained control over when updates are sent:
+For real-time updates. Context has **both** `emit` and `onCleanup`:
 
 ```typescript
 const watchUser = query()
   .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .subscribe(({ input, ctx }) => {
+  //          ^ ctx HAS emit AND onCleanup
+
     // Subscribe to external data source
     const unsubscribe = db.user.onChange(input.id, (user) => {
       ctx.emit(user)  // Push update to subscribed clients
@@ -155,36 +158,45 @@ const watchUser = query()
     // Cleanup when client disconnects
     ctx.onCleanup(unsubscribe)
 
-    // Return initial data
-    return db.user.find(input.id)
+    // Initial emit (optional)
+    db.user.find(input.id).then(ctx.emit)
   })
 ```
 
-### 3. Streaming with `yield`
+### 3. Subscription: Streaming with `yield` (`.subscribe()`)
 
-For streaming multiple values (pagination, feeds, AI responses):
+For streaming multiple values (pagination, feeds, AI responses). Context has `onCleanup` but **no** `emit` (yield IS the emit):
 
 ```typescript
 const streamMessages = query()
-  .resolve(async function* ({ ctx }) {
+  .subscribe(async function* ({ ctx }) {
+  //          ^ ctx has onCleanup, but NO emit (use yield instead)
     for await (const message of ctx.ai.stream()) {
       yield message  // Stream each value to client
     }
   })
 ```
 
+### Type-Safe Context Summary
+
+| Method | Return Type | `ctx.emit` | `ctx.onCleanup` |
+|--------|-------------|------------|-----------------|
+| `.resolve()` | `T \| Promise<T>` | ❌ | ❌ |
+| `.subscribe()` (emit) | `void \| Promise<void>` | ✅ | ✅ |
+| `.subscribe()` (yield) | `AsyncGenerator<T>` | ❌ | ✅ |
+
 ---
 
 ## Emit API
 
-The `ctx.emit` method provides type-safe methods for pushing state updates to subscribed clients. The available methods depend on your output type.
+The `ctx.emit` method provides type-safe methods for pushing state updates to subscribed clients. **Only available in `.subscribe()` resolvers**, not in `.resolve()`. The available methods depend on your output type.
 
 ### Object Outputs
 
 For single entity or multi-entity object outputs (`.returns(User)` or `.returns({ user: User, posts: [Post] })`):
 
 ```typescript
-resolve(({ input, ctx }) => {
+.subscribe(({ input, ctx }) => {
   // Full data update (merge mode)
   ctx.emit({ title: "Hello", content: "World" })
 
@@ -208,8 +220,6 @@ resolve(({ input, ctx }) => {
     { field: "title", strategy: "value", data: "New" },
     { field: "content", strategy: "delta", data: [{ position: 0, insert: "!" }] },
   ])
-
-  return initialData
 })
 ```
 
@@ -218,7 +228,7 @@ resolve(({ input, ctx }) => {
 For array outputs (`.returns([User])`):
 
 ```typescript
-resolve(({ input, ctx }) => {
+.subscribe(({ input, ctx }) => {
   // Replace entire array
   ctx.emit([user1, user2])
   ctx.emit.replace([user1, user2])
@@ -239,8 +249,6 @@ resolve(({ input, ctx }) => {
   // Merge partial data into items
   ctx.emit.merge(0, { name: "Updated" })            // Merge at index
   ctx.emit.mergeById("user-123", { name: "Updated" }) // Merge by id
-
-  return initialUsers
 })
 ```
 
@@ -249,8 +257,11 @@ resolve(({ input, ctx }) => {
 ```typescript
 const chat = query()
   .input(z.object({ prompt: z.string() }))
-  .resolve(async ({ input, ctx }) => {
+  .subscribe(({ input, ctx }) => {
     const stream = ctx.ai.stream(input.prompt)
+
+    // Emit initial empty state
+    ctx.emit({ content: "" })
 
     stream.on("token", (token) => {
       // Efficiently append to content field
@@ -258,8 +269,6 @@ const chat = query()
     })
 
     ctx.onCleanup(() => stream.close())
-
-    return { content: "" }  // Initial empty state
   })
 ```
 
@@ -1264,7 +1273,13 @@ export const getUser = typedQuery()
 ```typescript
 // Server: Single query serves both initial load AND live updates
 const getDashboard = query()
-  .resolve(({ ctx }) => {
+  .subscribe(({ ctx }) => {
+    // Emit initial state
+    ctx.emit({
+      metrics: ctx.metrics.getCurrent(),
+      alerts: ctx.alerts.getCurrent(),
+    })
+
     // Subscribe to multiple data sources
     const unsubMetrics = ctx.metrics.onChange((metrics) => {
       ctx.emit.set("metrics", metrics)
@@ -1277,12 +1292,6 @@ const getDashboard = query()
       unsubMetrics()
       unsubAlerts()
     })
-
-    // Return initial state
-    return {
-      metrics: ctx.metrics.getCurrent(),
-      alerts: ctx.alerts.getCurrent(),
-    }
   })
 
 // Client: Subscribe once, receive all updates
@@ -1328,8 +1337,11 @@ client.chat({ messages }).subscribe((response) => {
 // Server: Multiple users editing same document
 const getDocument = query()
   .input(z.object({ docId: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .subscribe(({ input, ctx }) => {
     const docRef = ctx.docs.get(input.docId)
+
+    // Emit initial state
+    docRef.get().then(ctx.emit)
 
     // Listen for changes from ANY user
     const unsub = docRef.onSnapshot((doc) => {
@@ -1337,7 +1349,6 @@ const getDocument = query()
     })
 
     ctx.onCleanup(unsub)
-    return docRef.get()
   })
 
 const updateDocument = mutation()
@@ -1365,19 +1376,19 @@ await client.document.update({ docId: "123", content: newContent })
 // Server: Return page, but also push new items
 const getPosts = query()
   .input(z.object({ cursor: z.string().optional(), limit: z.number() }))
-  .resolve(({ input, ctx }) => {
+  .subscribe(({ input, ctx }) => {
+    // Emit initial paginated results
+    ctx.posts.findMany({
+      cursor: input.cursor,
+      take: input.limit,
+    }).then(ctx.emit)
+
     // Listen for new posts
     const unsub = ctx.posts.onNew((newPost) => {
       ctx.emit.unshift(newPost)  // Add to front of array
     })
 
     ctx.onCleanup(unsub)
-
-    // Return paginated results
-    return ctx.posts.findMany({
-      cursor: input.cursor,
-      take: input.limit,
-    })
   })
 
 // Client: Load page AND receive new posts in real-time
@@ -1394,16 +1405,18 @@ client.posts.get({ limit: 20 }).subscribe((posts) => {
 // Server: Track active users
 const getPresence = query()
   .input(z.object({ roomId: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .subscribe(({ input, ctx }) => {
     const room = ctx.presence.join(input.roomId, ctx.user)
 
+    // Emit initial state
+    ctx.emit(room.getUsers())
+
+    // Listen for user join/leave
     room.onUpdate((users) => {
       ctx.emit(users)
     })
 
     ctx.onCleanup(() => room.leave())
-
-    return room.getUsers()
   })
 
 // Client: See who's online in real-time
@@ -1435,12 +1448,12 @@ client.user.get({ id }).subscribe(...)  // Live
 
 ### "How do I do streaming like Server-Sent Events?"
 
-Use `yield` in an async generator:
+Use `yield` in an async generator with `.subscribe()`:
 
 ```typescript
 // Server
 const streamData = query()
-  .resolve(async function* ({ ctx }) {
+  .subscribe(async function* ({ ctx }) {
     for await (const item of ctx.dataStream) {
       yield item  // Each yield sends to client
     }
@@ -1454,12 +1467,15 @@ client.data.stream().subscribe((item) => {
 
 ### "What if my data comes from an external source (WebSocket, webhook, etc.)?"
 
-Use `ctx.emit` to push updates whenever you want:
+Use `ctx.emit` in a `.subscribe()` resolver to push updates whenever you want:
 
 ```typescript
 const watchPrices = query()
   .input(z.object({ symbol: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .subscribe(({ input, ctx }) => {
+    // Emit initial state
+    ctx.emit({ price: 0, symbol: input.symbol })
+
     // Connect to external WebSocket
     const ws = new WebSocket(`wss://prices.api/${input.symbol}`)
 
@@ -1468,8 +1484,6 @@ const watchPrices = query()
     }
 
     ctx.onCleanup(() => ws.close())
-
-    return { price: 0, symbol: input.symbol }
   })
 ```
 
@@ -1480,11 +1494,16 @@ Two ways:
 **1. Automatic (via shared data source):**
 ```typescript
 // Query subscribes to database changes
-const getUser = query().resolve(({ input, ctx }) => {
-  const unsub = ctx.db.user.onChange(input.id, ctx.emit)
-  ctx.onCleanup(unsub)
-  return ctx.db.user.find(input.id)
-})
+const getUser = query()
+  .input(z.object({ id: z.string() }))
+  .subscribe(({ input, ctx }) => {
+    // Emit initial state
+    ctx.db.user.find(input.id).then(ctx.emit)
+
+    // Listen for changes
+    const unsub = ctx.db.user.onChange(input.id, ctx.emit)
+    ctx.onCleanup(unsub)
+  })
 
 // Mutation updates database
 const updateUser = mutation().resolve(({ input, ctx }) => {
@@ -1554,14 +1573,16 @@ const unsubscribe = client.data.get().subscribe(callback)
 unsubscribe()  // Stops receiving updates
 
 // Server: ctx.onCleanup is called when client disconnects
-resolve(({ ctx }) => {
+.subscribe(({ ctx }) => {
+  // Emit initial state
+  ctx.emit(initialData)
+
+  // Push updates periodically
   const interval = setInterval(() => ctx.emit(getData()), 1000)
 
   ctx.onCleanup(() => {
     clearInterval(interval)  // Called when client unsubscribes
   })
-
-  return initialData
 })
 ```
 
