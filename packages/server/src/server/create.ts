@@ -33,7 +33,7 @@ import {
 	type RouterDef,
 	valuesEqual,
 } from "@sylphx/lens-core";
-import { createContext, runWithContext, tryUseContext } from "../context/index.js";
+import { createContext, runWithContext } from "../context/index.js";
 import {
 	createPluginManager,
 	type PluginManager,
@@ -961,35 +961,60 @@ class LensServerImpl<
 					} else {
 						// Use DataLoader for batching
 						const loaderKey = `${typeName}.${field}`;
-						const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field, context ?? ({} as TContext));
+						const loader = this.getOrCreateLoaderForField(
+							loaderKey,
+							resolverDef,
+							field,
+							context ?? ({} as TContext),
+						);
 						result[field] = await loader.load(obj);
 					}
 
 					// Phase 2: Set up subscription (fire-and-forget)
-					const subscribeCtx = {
-						...(context ?? {}),
-						emit: createFieldEmit!(currentPath),
-						onCleanup: onCleanup!,
-					};
-					resolverDef.subscribeField(field, obj, args, subscribeCtx).catch(() => {
-						// Subscription errors are handled via emit, ignore here
-					});
+					// Publisher pattern: get publisher function and call with callbacks
+					const publisher = resolverDef.subscribeField(field, obj, args, context ?? {});
+					if (publisher && createFieldEmit && onCleanup) {
+						try {
+							const fieldEmit = createFieldEmit(currentPath);
+							if (fieldEmit) {
+								publisher({
+									emit: fieldEmit,
+									onCleanup: (fn) => {
+										onCleanup(fn);
+										return fn;
+									},
+								});
+							}
+						} catch {
+							// Subscription errors are handled via emit, ignore here
+						}
+					}
 				} catch {
 					result[field] = null;
 				}
 			} else if (fieldMode === "subscribe") {
-				// SUBSCRIBE MODE (legacy): Fire-and-forget
-				// Resolver handles both initial value (via emit) and updates
+				// SUBSCRIBE MODE (legacy): Fire-and-forget via Publisher
+				// Publisher handles both initial value (via emit) and updates
 				try {
-					const extendedCtx = {
-						...(context ?? {}),
-						emit: createFieldEmit!(currentPath),
-						onCleanup: onCleanup!,
-					};
 					result[field] = null;
-					resolverDef.resolveField(field, obj, args, extendedCtx).catch(() => {
-						// Subscription errors are handled via emit, ignore here
-					});
+					// Get publisher and call with callbacks
+					const publisher = resolverDef.subscribeField(field, obj, args, context ?? {});
+					if (publisher && createFieldEmit && onCleanup) {
+						try {
+							const fieldEmit = createFieldEmit(currentPath);
+							if (fieldEmit) {
+								publisher({
+									emit: fieldEmit,
+									onCleanup: (fn) => {
+										onCleanup(fn);
+										return fn;
+									},
+								});
+							}
+						} catch {
+							// Subscription errors are handled via emit, ignore here
+						}
+					}
 				} catch {
 					result[field] = null;
 				}
@@ -1002,7 +1027,12 @@ class LensServerImpl<
 					} else {
 						// Use DataLoader for batching
 						const loaderKey = `${typeName}.${field}`;
-						const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field, context ?? ({} as TContext));
+						const loader = this.getOrCreateLoaderForField(
+							loaderKey,
+							resolverDef,
+							field,
+							context ?? ({} as TContext),
+						);
 						result[field] = await loader.load(obj);
 					}
 				} catch {

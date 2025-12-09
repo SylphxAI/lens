@@ -868,12 +868,12 @@ describe("field resolvers", () => {
 					// Initial resolution (batchable, no emit/onCleanup)
 					return ctx.db.posts.filter((p) => p.authorId === parent.id);
 				})
-				.subscribe(({ ctx }) => {
-					// Subscription setup (has emit/onCleanup)
-					resolverReceivedOnCleanup = ctx.onCleanup !== undefined;
+				.subscribe(() => ({ onCleanup }) => {
+					// Publisher pattern: emit/onCleanup come from callback, not ctx
+					resolverReceivedOnCleanup = true;
 
 					// Register cleanup
-					ctx.onCleanup(() => {
+					onCleanup(() => {
 						cleanupCalled = true;
 					});
 				}),
@@ -957,13 +957,12 @@ describe("field resolvers", () => {
 					// Initial resolution (batchable, no emit)
 					return ctx.db.posts.filter((p) => p.authorId === parent.id);
 				})
-				.subscribe(({ ctx }) => {
-					// Subscription setup (has emit/onCleanup)
-					// Capture the field emit for later use
-					capturedFieldEmit = ctx.emit;
+				.subscribe(() => ({ emit, onCleanup }) => {
+					// Publisher pattern: emit/onCleanup come from callback
+					capturedFieldEmit = emit;
 
 					// Register cleanup
-					ctx.onCleanup(() => {
+					onCleanup(() => {
 						capturedFieldEmit = undefined;
 					});
 				}),
@@ -1128,12 +1127,12 @@ describe("field resolvers", () => {
 					resolveCallCount++;
 					return ctx.db.posts.filter((p) => p.authorId === parent.id);
 				})
-				.subscribe(({ ctx }) => {
-					// Phase 2: Subscription setup (has emit/onCleanup)
+				.subscribe(() => ({ emit, onCleanup }) => {
+					// Phase 2: Publisher pattern - emit/onCleanup from callback
 					subscribeCallCount++;
-					capturedFieldEmit = ctx.emit;
+					capturedFieldEmit = emit;
 
-					ctx.onCleanup(() => {
+					onCleanup(() => {
 						capturedFieldEmit = undefined;
 					});
 				}),

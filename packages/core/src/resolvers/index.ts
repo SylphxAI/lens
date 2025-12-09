@@ -61,9 +61,9 @@ import type {
 	FieldResolverContext,
 	FieldSubscribeFn,
 	FieldSubscribeFnNoArgs,
-	FieldSubscriptionContext,
 	InferParent,
 	LiveField,
+	Publisher,
 	RelationFieldBuilder,
 	RelationFieldBuilderWithArgs,
 	ResolvedField,
@@ -97,12 +97,14 @@ export type {
 	FieldSubscribeFn,
 	FieldSubscribeFnNoArgs,
 	FieldSubscribeParams,
+	/** @deprecated Use Publisher pattern */
 	FieldSubscriptionContext,
 	InferParent,
 	InferResolverOutput,
 	InferResolverSelected,
 	LiveField,
 	OnCleanup,
+	Publisher,
 	RelationFieldBuilder,
 	RelationFieldBuilderWithArgs,
 	ResolvedField,
@@ -113,6 +115,7 @@ export type {
 	ScalarFieldBuilder,
 	ScalarFieldBuilderWithArgs,
 	SubscribedField,
+	SubscriptionCallbacks,
 } from "./resolver-types.js";
 
 // =============================================================================
@@ -140,7 +143,7 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
 				_resolver: resolver,
-				// Chainable subscribe - creates LiveField
+				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
 					subscribeFn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
 				): LiveField<T, TArgs, TContext> {
@@ -153,8 +156,8 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 						_subscriber: subscribeFn as (params: {
 							parent: unknown;
 							args: TArgs;
-							ctx: FieldSubscriptionContext<TContext, T>;
-						}) => void | Promise<void>,
+							ctx: TContext;
+						}) => Publisher<T>,
 					};
 				},
 			};
@@ -168,11 +171,7 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_mode: "subscribe",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
-				_resolver: fn as (params: {
-					parent: unknown;
-					args: TArgs;
-					ctx: FieldSubscriptionContext<TContext, T>;
-				}) => void | Promise<void>,
+				_resolver: fn as (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>,
 			};
 		},
 		nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -214,7 +213,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 				_returnType: undefined as T,
 				_argsSchema: null,
 				_resolver: resolver,
-				// Chainable subscribe - creates LiveField
+				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
 					subscribeFn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
 				): LiveField<T, Record<string, never>, TContext> {
@@ -230,7 +229,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 						}: {
 							parent: unknown;
 							args: Record<string, never>;
-							ctx: FieldSubscriptionContext<TContext, T>;
+							ctx: TContext;
 						}) => subscribeFn({ parent: parent as TParent, ctx }),
 					};
 				},
@@ -246,7 +245,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
-				ctx: FieldSubscriptionContext<TContext, T>;
+				ctx: TContext;
 			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
@@ -294,8 +293,8 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 						_subscriber: subscribeFn as (params: {
 							parent: unknown;
 							args: TArgs;
-							ctx: FieldSubscriptionContext<TContext, T>;
-						}) => void | Promise<void>,
+							ctx: TContext;
+						}) => Publisher<T>,
 					};
 				},
 			};
@@ -309,11 +308,7 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_mode: "subscribe",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
-				_resolver: fn as (params: {
-					parent: unknown;
-					args: TArgs;
-					ctx: FieldSubscriptionContext<TContext, T>;
-				}) => void | Promise<void>,
+				_resolver: fn as (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>,
 			};
 		},
 		nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -369,7 +364,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 						}: {
 							parent: unknown;
 							args: Record<string, never>;
-							ctx: FieldSubscriptionContext<TContext, T>;
+							ctx: TContext;
 						}) => subscribeFn({ parent: parent as TParent, ctx }),
 					};
 				},
@@ -385,7 +380,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
-				ctx: FieldSubscriptionContext<TContext, T>;
+				ctx: TContext;
 			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
@@ -557,12 +552,12 @@ class ResolverDefImpl<
 		return resolvedField._resolver({ parent, args: parsedArgs, ctx });
 	}
 
-	async subscribeField<K extends keyof TFields>(
+	subscribeField<K extends keyof TFields>(
 		name: K,
 		parent: InferParent<TEntity["fields"]>,
 		args: Record<string, unknown>,
-		ctx: FieldSubscriptionContext<TContext, unknown>,
-	): Promise<void> {
+		ctx: TContext,
+	): Publisher<unknown> | null {
 		const field = this.fields[name];
 		if (!field) {
 			throw new Error(`Field "${String(name)}" not found in resolver`);
@@ -570,29 +565,36 @@ class ResolverDefImpl<
 
 		if (field._kind === "exposed") {
 			// Exposed fields don't have subscriptions
-			return;
+			return null;
 		}
 
 		const mode = (field as { _mode?: "resolve" | "subscribe" | "live" })._mode;
-		if (mode !== "live") {
-			// Only "live" mode has separate subscriber
-			// "subscribe" mode uses _resolver for both initial and subscription
-			return;
+
+		if (mode === "subscribe") {
+			// "subscribe" mode: _resolver returns Publisher
+			const subscribedField = field as SubscribedField<unknown, unknown, TContext>;
+			let parsedArgs: Record<string, unknown> = args;
+			if (subscribedField._argsSchema) {
+				parsedArgs = subscribedField._argsSchema.parse(args) as Record<string, unknown>;
+			}
+			return subscribedField._resolver({ parent, args: parsedArgs, ctx });
 		}
 
-		// LiveField has _subscriber
-		const liveField = field as LiveField<unknown, unknown, TContext>;
-		if (!liveField._subscriber) {
-			return;
+		if (mode === "live") {
+			// "live" mode: _subscriber returns Publisher
+			const liveField = field as LiveField<unknown, unknown, TContext>;
+			if (!liveField._subscriber) {
+				return null;
+			}
+			let parsedArgs: Record<string, unknown> = args;
+			if (liveField._argsSchema) {
+				parsedArgs = liveField._argsSchema.parse(args) as Record<string, unknown>;
+			}
+			return liveField._subscriber({ parent, args: parsedArgs, ctx });
 		}
 
-		// Parse and validate args if schema exists
-		let parsedArgs: Record<string, unknown> = args;
-		if (liveField._argsSchema) {
-			parsedArgs = liveField._argsSchema.parse(args) as Record<string, unknown>;
-		}
-
-		await liveField._subscriber({ parent, args: parsedArgs, ctx });
+		// "resolve" mode has no subscription
+		return null;
 	}
 
 	async resolveAll(
@@ -830,21 +832,19 @@ export function createResolverFromEntity<
 				},
 			};
 		} else if (ft._resolutionMode === "subscribe" && ft._subscriptionResolver) {
-			// Subscription field - wrap the inline subscription resolver
+			// Subscription field - wrap the inline subscription resolver with Publisher pattern
 			fields[fieldName] = {
 				_kind: "resolved" as const,
 				_mode: "subscribe" as const,
 				_returnType: undefined,
 				_argsSchema: null,
-				_resolver: ({
-					parent,
-					ctx,
-				}: {
-					parent: unknown;
-					ctx: FieldSubscriptionContext<TContext, unknown>;
-				}) => {
-					// Inline subscriptions use { parent, ctx, emit, onCleanup } format
-					return ft._subscriptionResolver!({ parent, ctx });
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: TContext }): Publisher<unknown> => {
+					// Return a Publisher that wraps the legacy inline subscription
+					return ({ emit, onCleanup }) => {
+						// Legacy inline subscriptions expect emit/onCleanup on ctx
+						const legacyCtx = { ...ctx, emit, onCleanup };
+						ft._subscriptionResolver!({ parent, ctx: legacyCtx });
+					};
 				},
 			};
 		} else {

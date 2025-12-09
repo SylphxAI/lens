@@ -23,6 +23,35 @@ export type OnCleanup = (fn: () => void) => () => void;
 export type FieldEmit<T> = (value: T) => void;
 
 // =============================================================================
+// Publisher Pattern Types
+// =============================================================================
+
+/**
+ * Subscription callbacks passed to publisher function.
+ * Keeps user context clean - emit/onCleanup are NOT on ctx.
+ */
+export interface SubscriptionCallbacks<T> {
+	/** Emit a new value for this field */
+	emit: FieldEmit<T>;
+	/** Register cleanup function called when subscription ends */
+	onCleanup: OnCleanup;
+}
+
+/**
+ * Publisher function returned from subscribe.
+ * Receives subscription callbacks separately from user context.
+ *
+ * @example
+ * ```typescript
+ * .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+ *   ctx.db.onChange(parent.id, (v) => emit(v));
+ *   onCleanup(() => ctx.db.unsubscribe(parent.id));
+ * })
+ * ```
+ */
+export type Publisher<T> = (callbacks: SubscriptionCallbacks<T>) => void;
+
+// =============================================================================
 // Type-Safe Context Types
 // =============================================================================
 
@@ -33,6 +62,7 @@ export type FieldEmit<T> = (value: T) => void;
 export type FieldQueryContext<TContext> = TContext;
 
 /**
+ * @deprecated Use Publisher pattern instead. emit/onCleanup should be in publisher callback.
  * Context for field resolvers that emit updates (has emit and onCleanup).
  * Used with .subscribe() - can push updates over time.
  */
@@ -44,7 +74,7 @@ export type FieldSubscriptionContext<TContext, TResult = unknown> = TContext & {
 };
 
 /**
- * @deprecated Use FieldQueryContext or FieldSubscriptionContext
+ * @deprecated Use FieldQueryContext or Publisher pattern
  * Extended context with live query capabilities.
  * User context is extended with emit and onCleanup.
  */
@@ -67,12 +97,13 @@ export type FieldResolveParams<TParent, TArgs, TContext> = {
 };
 
 /**
- * Field resolver params for .subscribe() - has emit and onCleanup.
+ * Field resolver params for .subscribe() - pure context, no emit/onCleanup.
+ * Returns a Publisher that receives subscription callbacks.
  */
-export type FieldSubscribeParams<TParent, TArgs, TContext, TResult = unknown> = {
+export type FieldSubscribeParams<TParent, TArgs, TContext> = {
 	parent: TParent;
 	args: TArgs;
-	ctx: FieldSubscriptionContext<TContext, TResult>;
+	ctx: TContext;
 };
 
 /**
@@ -83,11 +114,20 @@ export type FieldResolveFn<TParent, TArgs, TContext, TResult> = (
 ) => TResult | Promise<TResult>;
 
 /**
- * Field resolver function for .subscribe() - uses emit, returns void.
+ * Field resolver function for .subscribe() - returns Publisher.
+ * Publisher pattern keeps emit/onCleanup separate from user context.
+ *
+ * @example
+ * ```typescript
+ * .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+ *   ctx.db.onChange(parent.id, (v) => emit(v));
+ *   onCleanup(() => ctx.db.unsubscribe(parent.id));
+ * })
+ * ```
  */
 export type FieldSubscribeFn<TParent, TArgs, TContext, TResult> = (
-	params: FieldSubscribeParams<TParent, TArgs, TContext, TResult>,
-) => void | Promise<void>;
+	params: FieldSubscribeParams<TParent, TArgs, TContext>,
+) => Publisher<TResult>;
 
 /** Field resolver function without args for .resolve() */
 export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
@@ -95,11 +135,11 @@ export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
 	ctx: FieldQueryContext<TContext>;
 }) => TResult | Promise<TResult>;
 
-/** Field resolver function without args for .subscribe() */
+/** Field resolver function without args for .subscribe() - returns Publisher */
 export type FieldSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	parent: TParent;
-	ctx: FieldSubscriptionContext<TContext, TResult>;
-}) => void | Promise<void>;
+	ctx: TContext;
+}) => Publisher<TResult>;
 
 /**
  * @deprecated Use FieldResolveParams or FieldSubscribeParams
@@ -153,7 +193,7 @@ export interface ResolvedField<
 	}) => T | Promise<T>;
 }
 
-/** Subscribed field - uses emit to push updates */
+/** Subscribed field - returns Publisher for live updates */
 export interface SubscribedField<
 	T = unknown,
 	TArgs = Record<string, never>,
@@ -163,11 +203,7 @@ export interface SubscribedField<
 	readonly _mode: "subscribe";
 	readonly _returnType: T;
 	readonly _argsSchema: z.ZodType<TArgs> | null;
-	readonly _resolver: (params: {
-		parent: unknown;
-		args: TArgs;
-		ctx: FieldSubscriptionContext<TContext, T>;
-	}) => void | Promise<void>;
+	readonly _resolver: (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>;
 }
 
 /**
@@ -178,8 +214,9 @@ export interface SubscribedField<
  * ```typescript
  * status: f.string()
  *   .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
- *   .subscribe(({ parent, ctx, emit }) => {
+ *   .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
  *     ctx.statusService.watch(parent.id, (s) => emit(s));
+ *     onCleanup(() => ctx.statusService.unwatch(parent.id));
  *   })
  * ```
  */
@@ -198,12 +235,8 @@ export interface LiveField<
 		args: TArgs;
 		ctx: FieldQueryContext<TContext>;
 	}) => T | Promise<T>;
-	/** Subscriber for live updates (Phase 2 - fire-and-forget) */
-	readonly _subscriber: (params: {
-		parent: unknown;
-		args: TArgs;
-		ctx: FieldSubscriptionContext<TContext, T>;
-	}) => void | Promise<void>;
+	/** Subscriber for live updates (Phase 2 - returns Publisher) */
+	readonly _subscriber: (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>;
 }
 
 /** Field definition (exposed, resolved, subscribed, or live) */
@@ -245,9 +278,10 @@ export interface ResolvedFieldChainable<
 	 * The resolve function handles initial data (batchable),
 	 * the subscribe function sets up watchers for updates.
 	 */
-	subscribe(fn: TArgs extends Record<string, never>
-		? FieldSubscribeFnNoArgs<TParent, TContext, T>
-		: FieldSubscribeFn<TParent, TArgs, TContext, T>
+	subscribe(
+		fn: TArgs extends Record<string, never>
+			? FieldSubscribeFnNoArgs<TParent, TContext, T>
+			: FieldSubscribeFn<TParent, TArgs, TContext, T>,
 	): LiveField<T, TArgs, TContext>;
 }
 
@@ -295,7 +329,9 @@ export interface ScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
 	 * Define how to resolve this field with args (returns value).
 	 * Can optionally chain .subscribe() for live updates.
 	 */
-	resolve(fn: FieldResolveFn<TParent, TArgs, TContext, T>): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
+	resolve(
+		fn: FieldResolveFn<TParent, TArgs, TContext, T>,
+	): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
 
 	/**
 	 * Define how to subscribe to this field with args (uses emit).
@@ -342,7 +378,9 @@ export interface RelationFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
 	 * Define how to resolve this relation with args (returns value).
 	 * Can optionally chain .subscribe() for live updates.
 	 */
-	resolve(fn: FieldResolveFn<TParent, TArgs, TContext, T>): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
+	resolve(
+		fn: FieldResolveFn<TParent, TArgs, TContext, T>,
+	): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
 
 	/**
 	 * Define how to subscribe to this relation with args (uses emit).
@@ -525,16 +563,18 @@ export interface ResolverDef<
 	): Promise<unknown>;
 
 	/**
-	 * Set up subscription for a live field.
-	 * Only works for "live" mode fields.
-	 * For "subscribe" mode, use resolveField with emit/onCleanup in context.
+	 * Get the Publisher for a subscription/live field.
+	 * Returns a Publisher that receives { emit, onCleanup } callbacks.
+	 *
+	 * For "subscribe" mode: returns the field's publisher directly.
+	 * For "live" mode: returns the _subscriber's publisher.
 	 */
 	subscribeField<K extends keyof TFields>(
 		name: K,
 		parent: InferParent<TEntity["fields"]>,
 		args: Record<string, unknown>,
-		ctx: FieldSubscriptionContext<TContext, unknown>,
-	): Promise<void>;
+		ctx: TContext,
+	): Publisher<unknown> | null;
 
 	/** Resolve all fields for a parent with args per field */
 	resolveAll(
