@@ -1,5 +1,11 @@
 # @sylphx/lens-core
 
+## 2.6.1 (2025-12-09)
+
+### 🐛 Bug Fixes
+
+- **core,server:** Publisher emit now has full Emit<T> API ([ad7c823](https://github.com/SylphxAI/lens/commit/ad7c823990eff94b2f7459170755b68d0ded2881))
+
 ## 2.6.0 (2025-12-09)
 
 ### ✨ Features
