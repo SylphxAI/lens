@@ -1,5 +1,9 @@
 # @sylphx/lens-react
 
+## 2.4.4 (2025-12-09)
+
+No notable changes.
+
 ## 2.4.3 (2025-12-09)
 
 ### 📦 Dependencies

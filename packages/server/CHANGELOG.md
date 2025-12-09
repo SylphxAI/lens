@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.7.0 (2025-12-09)
+
+### ✨ Features
+
+- **server:** auto-convert entities with inline resolvers (ADR-001) ([4eac6b8](https://github.com/SylphxAI/lens/commit/4eac6b8dbcff9e7e96808cd2968cfc5404a3c737))
+
 ## 2.6.1 (2025-12-09)
 
 ### 📦 Dependencies
