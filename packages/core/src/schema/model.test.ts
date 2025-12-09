@@ -3,8 +3,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { model, isModelDef, isNormalizableModel, MODEL_SYMBOL } from "./model.js";
-import { t } from "./types.js";
+import { isModelDef, isNormalizableModel, MODEL_SYMBOL, model } from "./model.js";
 
 describe("model()", () => {
 	describe("basic definition", () => {

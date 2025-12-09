@@ -75,9 +75,6 @@ type InferModelFromFields<F extends EntityDefinition> = Prettify<
 	}
 >;
 
-/** @deprecated Use InferModelFromFields */
-type InferEntityFromFields<F extends EntityDefinition> = InferModelFromFields<F>;
-
 /**
  * Infer TypeScript type from return spec.
  * Handles both new (model, nullable, list) and legacy ([Entity], Zod) APIs.

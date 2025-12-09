@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "bun:test";
 import { model } from "./model.js";
-import { list, nullable, isListWrapper, isNullableWrapper, LIST_SYMBOL, NULLABLE_SYMBOL } from "./wrappers.js";
+import { isListWrapper, isNullableWrapper, LIST_SYMBOL, list, NULLABLE_SYMBOL, nullable } from "./wrappers.js";
 
 describe("wrappers", () => {
 	const User = model("User", (t) => ({

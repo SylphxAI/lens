@@ -82,12 +82,12 @@ export {
 	type InferModelType,
 	isModelDef,
 	isNormalizableModel,
-	model,
+	MODEL_SYMBOL,
 	type ModelBuilder,
 	ModelBuilderClass,
 	type ModelDef,
 	type ModelFactory,
-	MODEL_SYMBOL,
+	model,
 } from "./schema/model.js";
 
 // =============================================================================
@@ -95,22 +95,22 @@ export {
 // =============================================================================
 
 export {
-	// Wrappers
-	list,
-	nullable,
-	// Type guards
-	isListWrapper,
-	isNullableWrapper,
-	// Types
-	type ListWrapper,
-	type NullableWrapper,
 	// Utility types
 	type IsList,
 	type IsNullable,
-	type UnwrapModel,
+	// Type guards
+	isListWrapper,
+	isNullableWrapper,
 	// Symbols
 	LIST_SYMBOL,
+	// Types
+	type ListWrapper,
+	// Wrappers
+	list,
 	NULLABLE_SYMBOL,
+	type NullableWrapper,
+	nullable,
+	type UnwrapModel,
 } from "./schema/wrappers.js";
 
 // =============================================================================
@@ -118,10 +118,10 @@ export {
 // =============================================================================
 
 export {
-	collectModelsFromRouter,
-	collectModelsFromOperations,
-	mergeModelCollections,
 	type CollectedModels,
+	collectModelsFromOperations,
+	collectModelsFromRouter,
+	mergeModelCollections,
 } from "./schema/collect.js";
 
 // =============================================================================

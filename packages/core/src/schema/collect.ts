@@ -5,7 +5,11 @@
  * Used by server to auto-track models without explicit `entities` config.
  */
 
-import { isEntityDef, type EntityDef } from "./define.js";
+import { isMutationDef, type MutationDef } from "../operations/mutation.js";
+// Import operation types
+import { type AnyQueryDef, isQueryDef } from "../operations/query.js";
+import { flattenRouter, type RouterDef } from "../router/index.js";
+import { type EntityDef, isEntityDef } from "./define.js";
 import { isModelDef, type ModelDef } from "./model.js";
 import type { EntityDefinition } from "./types.js";
 import {
@@ -14,11 +18,6 @@ import {
 	type ListWrapper,
 	type NullableWrapper,
 } from "./wrappers.js";
-
-// Import operation types
-import { isQueryDef, type AnyQueryDef } from "../operations/query.js";
-import { isMutationDef, type MutationDef } from "../operations/mutation.js";
-import { isRouterDef, type RouterDef, flattenRouter } from "../router/index.js";
 
 /**
  * Any definition that could be a model (EntityDef or ModelDef)
