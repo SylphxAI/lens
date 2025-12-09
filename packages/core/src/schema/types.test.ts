@@ -439,3 +439,155 @@ describe("Optional Modifier", () => {
 		expect(field.isNullable()).toBe(true);
 	});
 });
+
+// =============================================================================
+// Resolution Methods (.resolve() / .subscribe())
+// =============================================================================
+
+describe("Field Resolution Methods", () => {
+	describe(".resolve()", () => {
+		test("attaches resolver to field", () => {
+			const resolver = ({ parent }: { parent: { firstName: string; lastName: string } }) =>
+				`${parent.firstName} ${parent.lastName}`;
+
+			const field = t.string().resolve(resolver);
+
+			expect(field.hasResolver()).toBe(true);
+			expect(field.hasSubscription()).toBe(false);
+			expect(field.getResolutionMode()).toBe("resolve");
+			expect(field._resolver).toBe(resolver);
+		});
+
+		test("resolver function can be called", () => {
+			const field = t.string().resolve(({ parent }: { parent: { name: string } }) => parent.name.toUpperCase());
+
+			const result = field._resolver!({ parent: { name: "alice" }, ctx: {} });
+			expect(result).toBe("ALICE");
+		});
+
+		test("resolver preserves original field type", () => {
+			const field = t.int().resolve(() => 42);
+			expect(field._type).toBe("int");
+		});
+
+		test("resolver works with async functions", async () => {
+			const field = t.string().resolve(async () => {
+				await new Promise((r) => setTimeout(r, 1));
+				return "async result";
+			});
+
+			const result = await field._resolver!({ parent: {}, ctx: {} });
+			expect(result).toBe("async result");
+		});
+
+		test("resolver can access context", () => {
+			interface TestContext {
+				userId: string;
+			}
+
+			const field = t.string().resolve<unknown, TestContext>(({ ctx }) => ctx.userId);
+
+			const result = field._resolver!({ parent: {}, ctx: { userId: "user-123" } });
+			expect(result).toBe("user-123");
+		});
+	});
+
+	describe(".subscribe()", () => {
+		test("attaches subscription resolver to field", () => {
+			const subscriptionFn = ({ emit }: { emit: (v: string) => void }) => {
+				emit("hello");
+			};
+
+			const field = t.string().subscribe(subscriptionFn);
+
+			expect(field.hasSubscription()).toBe(true);
+			expect(field.hasResolver()).toBe(false);
+			expect(field.getResolutionMode()).toBe("subscribe");
+			expect(field._subscriptionResolver).toBeDefined();
+		});
+
+		test("subscription resolver can emit values", () => {
+			const emitted: string[] = [];
+
+			const field = t.string().subscribe(({ emit }) => {
+				emit("value1");
+				emit("value2");
+			});
+
+			field._subscriptionResolver!({
+				parent: {},
+				ctx: {},
+				emit: (v) => emitted.push(v),
+			});
+
+			expect(emitted).toEqual(["value1", "value2"]);
+		});
+
+		test("subscription preserves original field type", () => {
+			const field = t.boolean().subscribe(({ emit }) => emit(true));
+			expect(field._type).toBe("boolean");
+		});
+
+		test("subscription can access parent and context", () => {
+			interface User {
+				id: string;
+			}
+			interface Ctx {
+				db: { getStatus: (id: string) => string };
+			}
+
+			const emitted: string[] = [];
+
+			const field = t.string().subscribe<User, Ctx>(({ parent, ctx, emit }) => {
+				emit(ctx.db.getStatus(parent.id));
+			});
+
+			field._subscriptionResolver!({
+				parent: { id: "user-1" },
+				ctx: { db: { getStatus: (id) => `status-${id}` } },
+				emit: (v) => emitted.push(v),
+			});
+
+			expect(emitted).toEqual(["status-user-1"]);
+		});
+	});
+
+	describe("default resolution mode", () => {
+		test("fields without .resolve() or .subscribe() are exposed", () => {
+			const field = t.string();
+			expect(field.getResolutionMode()).toBe("exposed");
+			expect(field.hasResolver()).toBe(false);
+			expect(field.hasSubscription()).toBe(false);
+		});
+
+		test("nullable fields without resolver are still exposed", () => {
+			const field = t.string().nullable();
+			expect(field.getResolutionMode()).toBe("exposed");
+		});
+
+		test("optional fields without resolver are still exposed", () => {
+			const field = t.string().optional();
+			expect(field.getResolutionMode()).toBe("exposed");
+		});
+	});
+
+	describe("chaining", () => {
+		test(".resolve() can be chained after .nullable()", () => {
+			const field = t.string()
+				.nullable()
+				.resolve(() => "computed");
+
+			expect(field.isNullable()).toBe(true);
+			expect(field.hasResolver()).toBe(true);
+		});
+
+		test(".subscribe() can be chained after .optional()", () => {
+			const field = t.string()
+				.optional()
+				.subscribe(({ emit }) => emit("streamed"));
+
+			expect(field.isOptional()).toBe(true);
+			expect(field.hasSubscription()).toBe(true);
+		});
+	});
+});

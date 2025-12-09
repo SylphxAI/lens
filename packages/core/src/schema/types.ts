@@ -16,6 +16,37 @@ type Brand<T, B> = T & { [__brand]: B };
 // Base Type Classes
 // =============================================================================
 
+// =============================================================================
+// Resolution Types (for unified entity definition)
+// =============================================================================
+
+/** Resolver context with parent data */
+export interface ResolverContext<Parent, TContext> {
+	parent: Parent;
+	ctx: TContext;
+}
+
+/** Subscription context with emit function */
+export interface SubscriptionContext<T, Parent, TContext> {
+	parent: Parent;
+	ctx: TContext;
+	emit: (value: T) => void;
+	onCleanup?: (fn: () => void) => void;
+}
+
+/** Resolver function type */
+export type ResolverFn<T, Parent, TContext> = (
+	context: ResolverContext<Parent, TContext>,
+) => T | Promise<T>;
+
+/** Subscription resolver function type */
+export type SubscriptionResolverFn<T, Parent, TContext> = (
+	context: SubscriptionContext<T, Parent, TContext>,
+) => void;
+
+/** Field resolution mode */
+export type FieldResolutionMode = "exposed" | "resolve" | "subscribe";
+
 /** Base class for all field types */
 export abstract class FieldType<T = unknown, SerializedT = T> {
 	abstract readonly _type: string;
@@ -24,6 +55,13 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 	readonly _nullable: boolean = false;
 	readonly _optional: boolean = false;
 	readonly _default?: T;
+
+	/** Resolution mode for this field */
+	readonly _resolutionMode: FieldResolutionMode = "exposed";
+	/** Resolver function (if _resolutionMode is 'resolve') */
+	readonly _resolver?: ResolverFn<T, unknown, unknown>;
+	/** Subscription resolver function (if _resolutionMode is 'subscribe') */
+	readonly _subscriptionResolver?: SubscriptionResolverFn<T, unknown, unknown>;
 
 	/** Make this field nullable (value can be null) */
 	nullable(): NullableType<this> {
@@ -85,6 +123,75 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 	 * Override this for custom validation logic
 	 */
 	validate?(value: unknown): boolean;
+
+	// =========================================================================
+	// Resolution Methods (for unified entity definition)
+	// =========================================================================
+
+	/**
+	 * Attach a resolver function to compute this field's value.
+	 * Use when the field value needs to be computed from parent data or context.
+	 *
+	 * @example
+	 * ```typescript
+	 * const User = entity("User", (t) => ({
+	 *   fullName: t.string().resolve(({ parent }) =>
+	 *     `${parent.firstName} ${parent.lastName}`
+	 *   ),
+	 * }));
+	 * ```
+	 */
+	resolve<Parent = unknown, TContext = unknown>(
+		fn: ResolverFn<T, Parent, TContext>,
+	): ResolvedFieldType<this, Parent, TContext> {
+		const clone = Object.create(this);
+		clone._resolutionMode = "resolve" as FieldResolutionMode;
+		clone._resolver = fn;
+		return clone as ResolvedFieldType<this, Parent, TContext>;
+	}
+
+	/**
+	 * Attach a subscription resolver to stream this field's value.
+	 * Use for real-time fields that push updates to clients.
+	 *
+	 * @example
+	 * ```typescript
+	 * const User = entity("User", (t) => ({
+	 *   status: t.json<SessionStatus>().subscribe(({ ctx }) => {
+	 *     ctx.emit({ isActive: true, text: "Online" });
+	 *   }),
+	 * }));
+	 * ```
+	 */
+	subscribe<Parent = unknown, TContext = unknown>(
+		fn: SubscriptionResolverFn<T, Parent, TContext>,
+	): SubscribedFieldType<this, Parent, TContext> {
+		const clone = Object.create(this);
+		clone._resolutionMode = "subscribe" as FieldResolutionMode;
+		clone._subscriptionResolver = fn;
+		return clone as SubscribedFieldType<this, Parent, TContext>;
+	}
+
+	/**
+	 * Check if this field has a resolver attached.
+	 */
+	hasResolver(): boolean {
+		return this._resolutionMode === "resolve" && this._resolver !== undefined;
+	}
+
+	/**
+	 * Check if this field has a subscription resolver attached.
+	 */
+	hasSubscription(): boolean {
+		return this._resolutionMode === "subscribe" && this._subscriptionResolver !== undefined;
+	}
+
+	/**
+	 * Get the resolution mode for this field.
+	 */
+	getResolutionMode(): FieldResolutionMode {
+		return this._resolutionMode;
+	}
 }
 
 /** Wrapper type for nullable fields */
@@ -102,6 +209,26 @@ export type OptionalType<T extends FieldType> = Omit<T, "_optional" | "_tsType">
 /** Wrapper type for fields with defaults */
 export type DefaultType<T extends FieldType, D> = T & {
 	_default: D;
+};
+
+/** Wrapper type for fields with resolver attached */
+export type ResolvedFieldType<
+	T extends FieldType,
+	_Parent = unknown,
+	_TContext = unknown,
+> = Omit<T, "_resolutionMode" | "_resolver"> & {
+	_resolutionMode: "resolve";
+	_resolver: ResolverFn<T["_tsType"], _Parent, _TContext>;
+};
+
+/** Wrapper type for fields with subscription resolver attached */
+export type SubscribedFieldType<
+	T extends FieldType,
+	_Parent = unknown,
+	_TContext = unknown,
+> = Omit<T, "_resolutionMode" | "_subscriptionResolver"> & {
+	_resolutionMode: "subscribe";
+	_subscriptionResolver: SubscriptionResolverFn<T["_tsType"], _Parent, _TContext>;
 };
 
 // =============================================================================
