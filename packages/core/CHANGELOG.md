@@ -1,5 +1,11 @@
 # @sylphx/lens-core
 
+## 2.7.0 (2025-12-09)
+
+### ✨ Features
+
+- **core:** add .resolve().subscribe() chain for operations ([c2d05c1](https://github.com/SylphxAI/lens/commit/c2d05c124b5ab8da4b3aa5e3080fbcdf2e86d308))
+
 ## 2.6.1 (2025-12-09)
 
 ### 🐛 Bug Fixes
