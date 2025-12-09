@@ -17,35 +17,92 @@ import type { EntityDefinition, FieldType } from "../schema/types.js";
 export type FieldResolverContext = Record<string, unknown>;
 
 /** Cleanup function registration */
-export type OnCleanup = (fn: () => void) => void;
+export type OnCleanup = (fn: () => void) => () => void;
 
 /** Emit function for field updates (generic version) */
 export type FieldEmit<T> = (value: T) => void;
+
+// =============================================================================
+// Type-Safe Context Types
+// =============================================================================
+
+/**
+ * Context for field resolvers that return a value (no emit/onCleanup).
+ * Used with .resolve() - returns value once.
+ */
+export type FieldQueryContext<TContext> = TContext;
+
+/**
+ * Context for field resolvers that emit updates (has emit and onCleanup).
+ * Used with .subscribe() - can push updates over time.
+ */
+export type FieldSubscriptionContext<TContext, TResult = unknown> = TContext & {
+	/** Emit a new value for this field */
+	emit: FieldEmit<TResult>;
+	/** Register cleanup function called when subscription ends */
+	onCleanup: OnCleanup;
+};
+
+/**
+ * @deprecated Use FieldQueryContext or FieldSubscriptionContext
+ * Extended context with live query capabilities.
+ * User context is extended with emit and onCleanup.
+ */
+export type FieldLiveContext<TContext, TResult = unknown> = TContext & {
+	emit: FieldEmit<TResult>;
+	onCleanup: OnCleanup;
+};
 
 // =============================================================================
 // Resolver Function Types
 // =============================================================================
 
 /**
- * Extended context with live query capabilities.
- * User context is extended with emit and onCleanup.
- *
- * - emit: Always defined. No-op when not in live query mode.
- * - onCleanup: Always defined. No-op when not in live query mode.
+ * Field resolver params for .resolve() - returns value, no emit/onCleanup.
  */
-export type FieldLiveContext<TContext, TResult = unknown> = TContext & {
-	/** Emit a new value for this field. No-op when not in live query mode. */
-	emit: FieldEmit<TResult>;
-	/** Register cleanup function. No-op when not in live query mode. */
-	onCleanup: OnCleanup;
+export type FieldResolveParams<TParent, TArgs, TContext> = {
+	parent: TParent;
+	args: TArgs;
+	ctx: FieldQueryContext<TContext>;
 };
 
 /**
- * Resolver function params (object style)
- *
- * Live query capabilities (ctx.emit, ctx.onCleanup) are optional:
- * - Available when called from a live subscription context
- * - Not available when called via DataLoader batching
+ * Field resolver params for .subscribe() - has emit and onCleanup.
+ */
+export type FieldSubscribeParams<TParent, TArgs, TContext, TResult = unknown> = {
+	parent: TParent;
+	args: TArgs;
+	ctx: FieldSubscriptionContext<TContext, TResult>;
+};
+
+/**
+ * Field resolver function for .resolve() - returns value.
+ */
+export type FieldResolveFn<TParent, TArgs, TContext, TResult> = (
+	params: FieldResolveParams<TParent, TArgs, TContext>,
+) => TResult | Promise<TResult>;
+
+/**
+ * Field resolver function for .subscribe() - uses emit, returns void.
+ */
+export type FieldSubscribeFn<TParent, TArgs, TContext, TResult> = (
+	params: FieldSubscribeParams<TParent, TArgs, TContext, TResult>,
+) => void | Promise<void>;
+
+/** Field resolver function without args for .resolve() */
+export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
+	parent: TParent;
+	ctx: FieldQueryContext<TContext>;
+}) => TResult | Promise<TResult>;
+
+/** Field resolver function without args for .subscribe() */
+export type FieldSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
+	parent: TParent;
+	ctx: FieldSubscriptionContext<TContext, TResult>;
+}) => void | Promise<void>;
+
+/**
+ * @deprecated Use FieldResolveParams or FieldSubscribeParams
  */
 export type FieldResolverParams<TParent, TArgs, TContext, TResult = unknown> = {
 	parent: TParent;
@@ -53,12 +110,16 @@ export type FieldResolverParams<TParent, TArgs, TContext, TResult = unknown> = {
 	ctx: FieldLiveContext<TContext, TResult>;
 };
 
-/** Resolver function signature (object style: { parent, args, ctx }) */
+/**
+ * @deprecated Use FieldResolveFn or FieldSubscribeFn
+ */
 export type FieldResolverFn<TParent, TArgs, TContext, TResult> = (
 	params: FieldResolverParams<TParent, TArgs, TContext, TResult>,
 ) => TResult | Promise<TResult>;
 
-/** Resolver function without args */
+/**
+ * @deprecated Use FieldResolveFnNoArgs or FieldSubscribeFnNoArgs
+ */
 export type FieldResolverFnNoArgs<TParent, TContext, TResult> = (params: {
 	parent: TParent;
 	ctx: FieldLiveContext<TContext, TResult>;
@@ -75,26 +136,45 @@ export interface ExposedField<T = unknown> {
 	readonly _type: T;
 }
 
-/** Resolved field - uses resolver function */
+/** Resolved field - uses resolver function (returns value) */
 export interface ResolvedField<
 	T = unknown,
 	TArgs = Record<string, never>,
 	TContext = FieldResolverContext,
 > {
 	readonly _kind: "resolved";
+	readonly _mode: "resolve";
 	readonly _returnType: T;
 	readonly _argsSchema: z.ZodType<TArgs> | null;
 	readonly _resolver: (params: {
 		parent: unknown;
 		args: TArgs;
-		ctx: FieldLiveContext<TContext, T>;
+		ctx: FieldQueryContext<TContext>;
 	}) => T | Promise<T>;
 }
 
-/** Field definition (exposed or resolved) */
+/** Subscribed field - uses emit to push updates */
+export interface SubscribedField<
+	T = unknown,
+	TArgs = Record<string, never>,
+	TContext = FieldResolverContext,
+> {
+	readonly _kind: "resolved";
+	readonly _mode: "subscribe";
+	readonly _returnType: T;
+	readonly _argsSchema: z.ZodType<TArgs> | null;
+	readonly _resolver: (params: {
+		parent: unknown;
+		args: TArgs;
+		ctx: FieldSubscriptionContext<TContext, T>;
+	}) => void | Promise<void>;
+}
+
+/** Field definition (exposed, resolved, or subscribed) */
 export type FieldDef<T = unknown, TArgs = unknown, TContext = FieldResolverContext> =
 	| ExposedField<T>
-	| ResolvedField<T, TArgs, TContext>;
+	| ResolvedField<T, TArgs, TContext>
+	| SubscribedField<T, TArgs, TContext>;
 
 // =============================================================================
 // Field Builder Types
@@ -107,10 +187,21 @@ export interface ScalarFieldBuilder<T, TParent, TContext> {
 		schema: z.ZodObject<TArgs>,
 	): ScalarFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext>;
 
-	/** Define how to resolve this field (no args) */
+	/**
+	 * Define how to resolve this field (returns value, no emit/onCleanup).
+	 * Use for computed fields that derive from parent data.
+	 */
 	resolve(
-		fn: FieldResolverFnNoArgs<TParent, TContext, T>,
+		fn: FieldResolveFnNoArgs<TParent, TContext, T>,
 	): ResolvedField<T, Record<string, never>, TContext>;
+
+	/**
+	 * Define how to subscribe to this field (uses emit, returns void).
+	 * Use for fields that push updates from external sources.
+	 */
+	subscribe(
+		fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
+	): SubscribedField<T, Record<string, never>, TContext>;
 
 	/** Make the field nullable */
 	nullable(): ScalarFieldBuilder<T | null, TParent, TContext>;
@@ -118,8 +209,15 @@ export interface ScalarFieldBuilder<T, TParent, TContext> {
 
 /** Scalar field builder with args already defined */
 export interface ScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
-	/** Define how to resolve this field with args */
-	resolve(fn: FieldResolverFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext>;
+	/**
+	 * Define how to resolve this field with args (returns value).
+	 */
+	resolve(fn: FieldResolveFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext>;
+
+	/**
+	 * Define how to subscribe to this field with args (uses emit).
+	 */
+	subscribe(fn: FieldSubscribeFn<TParent, TArgs, TContext, T>): SubscribedField<T, TArgs, TContext>;
 
 	/** Make the field nullable */
 	nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>;
@@ -132,10 +230,21 @@ export interface RelationFieldBuilder<T, TParent, TContext> {
 		schema: z.ZodObject<TArgs>,
 	): RelationFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext>;
 
-	/** Define how to resolve this relation (no args) */
+	/**
+	 * Define how to resolve this relation (returns value, no emit/onCleanup).
+	 * Use for relations that derive from parent data.
+	 */
 	resolve(
-		fn: FieldResolverFnNoArgs<TParent, TContext, T>,
+		fn: FieldResolveFnNoArgs<TParent, TContext, T>,
 	): ResolvedField<T, Record<string, never>, TContext>;
+
+	/**
+	 * Define how to subscribe to this relation (uses emit, returns void).
+	 * Use for relations that push updates from external sources.
+	 */
+	subscribe(
+		fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
+	): SubscribedField<T, Record<string, never>, TContext>;
 
 	/** Make the relation nullable */
 	nullable(): RelationFieldBuilder<T | null, TParent, TContext>;
@@ -143,8 +252,15 @@ export interface RelationFieldBuilder<T, TParent, TContext> {
 
 /** Relation field builder with args already defined */
 export interface RelationFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
-	/** Define how to resolve this relation with args */
-	resolve(fn: FieldResolverFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext>;
+	/**
+	 * Define how to resolve this relation with args (returns value).
+	 */
+	resolve(fn: FieldResolveFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext>;
+
+	/**
+	 * Define how to subscribe to this relation with args (uses emit).
+	 */
+	subscribe(fn: FieldSubscribeFn<TParent, TArgs, TContext, T>): SubscribedField<T, TArgs, TContext>;
 
 	/** Make the relation nullable */
 	nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>;

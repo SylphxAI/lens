@@ -55,9 +55,13 @@ import type {
 	FieldBuilder,
 	FieldDef,
 	FieldLiveContext,
+	FieldQueryContext,
 	FieldResolverContext,
-	FieldResolverFn,
-	FieldResolverFnNoArgs,
+	FieldResolveFn,
+	FieldResolveFnNoArgs,
+	FieldSubscribeFn,
+	FieldSubscribeFnNoArgs,
+	FieldSubscriptionContext,
 	InferParent,
 	RelationFieldBuilder,
 	RelationFieldBuilderWithArgs,
@@ -66,6 +70,7 @@ import type {
 	Resolvers,
 	ScalarFieldBuilder,
 	ScalarFieldBuilderWithArgs,
+	SubscribedField,
 } from "./resolver-types.js";
 
 // Re-export types for external use
@@ -74,11 +79,23 @@ export type {
 	FieldBuilder,
 	FieldDef,
 	FieldEmit,
+	/** @deprecated Use FieldQueryContext or FieldSubscriptionContext */
 	FieldLiveContext,
+	FieldQueryContext,
 	FieldResolverContext,
+	FieldResolveFn,
+	FieldResolveFnNoArgs,
+	/** @deprecated Use FieldResolveFn or FieldSubscribeFn */
 	FieldResolverFn,
+	/** @deprecated Use FieldResolveFnNoArgs or FieldSubscribeFnNoArgs */
 	FieldResolverFnNoArgs,
+	/** @deprecated Use FieldResolveParams or FieldSubscribeParams */
 	FieldResolverParams,
+	FieldResolveParams,
+	FieldSubscribeFn,
+	FieldSubscribeFnNoArgs,
+	FieldSubscribeParams,
+	FieldSubscriptionContext,
 	InferParent,
 	InferResolverOutput,
 	InferResolverSelected,
@@ -91,6 +108,7 @@ export type {
 	Resolvers,
 	ScalarFieldBuilder,
 	ScalarFieldBuilderWithArgs,
+	SubscribedField,
 } from "./resolver-types.js";
 
 // =============================================================================
@@ -102,16 +120,32 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 	argsSchema: z.ZodType<TArgs>,
 ): ScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
 	return {
-		resolve(fn: FieldResolverFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext> {
+		resolve(fn: FieldResolveFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext> {
 			return {
 				_kind: "resolved",
+				_mode: "resolve",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
 				_resolver: fn as (params: {
 					parent: unknown;
 					args: TArgs;
-					ctx: FieldLiveContext<TContext, T>;
+					ctx: FieldQueryContext<TContext>;
 				}) => T | Promise<T>,
+			};
+		},
+		subscribe(
+			fn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
+		): SubscribedField<T, TArgs, TContext> {
+			return {
+				_kind: "resolved",
+				_mode: "subscribe",
+				_returnType: undefined as T,
+				_argsSchema: argsSchema,
+				_resolver: fn as (params: {
+					parent: unknown;
+					args: TArgs;
+					ctx: FieldSubscriptionContext<TContext, T>;
+				}) => void | Promise<void>,
 			};
 		},
 		nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -135,19 +169,38 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 			);
 		},
 		resolve(
-			fn: FieldResolverFnNoArgs<TParent, TContext, T>,
+			fn: FieldResolveFnNoArgs<TParent, TContext, T>,
 		): ResolvedField<T, Record<string, never>, TContext> {
-			// Wrap the no-args function (ctx already contains emit/onCleanup)
 			const wrappedFn = ({
 				parent,
 				ctx,
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
-				ctx: FieldLiveContext<TContext, T>;
+				ctx: FieldQueryContext<TContext>;
 			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
+				_mode: "resolve",
+				_returnType: undefined as T,
+				_argsSchema: null,
+				_resolver: wrappedFn,
+			};
+		},
+		subscribe(
+			fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
+		): SubscribedField<T, Record<string, never>, TContext> {
+			const wrappedFn = ({
+				parent,
+				ctx,
+			}: {
+				parent: unknown;
+				args: Record<string, never>;
+				ctx: FieldSubscriptionContext<TContext, T>;
+			}) => fn({ parent: parent as TParent, ctx });
+			return {
+				_kind: "resolved",
+				_mode: "subscribe",
 				_returnType: undefined as T,
 				_argsSchema: null,
 				_resolver: wrappedFn,
@@ -164,16 +217,32 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 	argsSchema: z.ZodType<TArgs>,
 ): RelationFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
 	return {
-		resolve(fn: FieldResolverFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext> {
+		resolve(fn: FieldResolveFn<TParent, TArgs, TContext, T>): ResolvedField<T, TArgs, TContext> {
 			return {
 				_kind: "resolved",
+				_mode: "resolve",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
 				_resolver: fn as (params: {
 					parent: unknown;
 					args: TArgs;
-					ctx: FieldLiveContext<TContext, T>;
+					ctx: FieldQueryContext<TContext>;
 				}) => T | Promise<T>,
+			};
+		},
+		subscribe(
+			fn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
+		): SubscribedField<T, TArgs, TContext> {
+			return {
+				_kind: "resolved",
+				_mode: "subscribe",
+				_returnType: undefined as T,
+				_argsSchema: argsSchema,
+				_resolver: fn as (params: {
+					parent: unknown;
+					args: TArgs;
+					ctx: FieldSubscriptionContext<TContext, T>;
+				}) => void | Promise<void>,
 			};
 		},
 		nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -197,19 +266,38 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 			);
 		},
 		resolve(
-			fn: FieldResolverFnNoArgs<TParent, TContext, T>,
+			fn: FieldResolveFnNoArgs<TParent, TContext, T>,
 		): ResolvedField<T, Record<string, never>, TContext> {
-			// Wrap the no-args function (ctx already contains emit/onCleanup)
 			const wrappedFn = ({
 				parent,
 				ctx,
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
-				ctx: FieldLiveContext<TContext, T>;
+				ctx: FieldQueryContext<TContext>;
 			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
+				_mode: "resolve",
+				_returnType: undefined as T,
+				_argsSchema: null,
+				_resolver: wrappedFn,
+			};
+		},
+		subscribe(
+			fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
+		): SubscribedField<T, Record<string, never>, TContext> {
+			const wrappedFn = ({
+				parent,
+				ctx,
+			}: {
+				parent: unknown;
+				args: Record<string, never>;
+				ctx: FieldSubscriptionContext<TContext, T>;
+			}) => fn({ parent: parent as TParent, ctx });
+			return {
+				_kind: "resolved",
+				_mode: "subscribe",
 				_returnType: undefined as T,
 				_argsSchema: null,
 				_resolver: wrappedFn,
@@ -358,7 +446,7 @@ class ResolverDefImpl<
 		const liveCtx: FieldLiveContext<TContext, unknown> = {
 			...ctx,
 			emit: () => {}, // No-op: resolveAll doesn't support live queries
-			onCleanup: () => {}, // No-op: resolveAll doesn't support live queries
+			onCleanup: () => () => {}, // No-op: resolveAll doesn't support live queries
 		};
 
 		await Promise.all(
