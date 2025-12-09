@@ -1,5 +1,9 @@
 # @sylphx/lens-solid
 
+## 2.2.6 (2025-12-09)
+
+No notable changes.
+
 ## 2.2.5 (2025-12-09)
 
 ### 📦 Dependencies
