@@ -856,22 +856,27 @@ describe("field resolvers", () => {
 			posts: [{ id: "p1", title: "Post 1", authorId: "a1" }],
 		};
 
+		// Use .resolve().subscribe() to get onCleanup access
+		// Per ADR-002: .resolve() alone is pure/batchable, no emit/onCleanup
+		// .resolve().subscribe() gives initial value + subscription capabilities
 		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => {
-				// Track if onCleanup was received (via ctx)
-				resolverReceivedOnCleanup = ctx.onCleanup !== undefined;
+			posts: f
+				.many(Post)
+				.resolve(({ parent, ctx }) => {
+					// Initial resolution (batchable, no emit/onCleanup)
+					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+				})
+				.subscribe(({ parent, ctx }) => {
+					// Subscription setup (has emit/onCleanup)
+					resolverReceivedOnCleanup = ctx.onCleanup !== undefined;
 
-				// Register a cleanup if available
-				if (ctx.onCleanup) {
+					// Register cleanup
 					ctx.onCleanup(() => {
 						cleanupCalled = true;
 					});
-				}
-
-				return ctx.db.posts.filter((p) => p.authorId === parent.id);
-			}),
+				}),
 		}));
 
 		const getAuthor = query<{ db: typeof mockDb }>()
@@ -940,23 +945,28 @@ describe("field resolvers", () => {
 		// Track field emit
 		let capturedFieldEmit: ((value: unknown) => void) | undefined;
 
+		// Use .resolve().subscribe() to get emit access
+		// Per ADR-002: .resolve() alone is pure/batchable, no emit/onCleanup
+		// .resolve().subscribe() gives initial value + subscription capabilities
 		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
 			id: f.expose("id"),
 			name: f.expose("name"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => {
-				// Capture the field emit for later use
-				capturedFieldEmit = ctx.emit;
+			posts: f
+				.many(Post)
+				.resolve(({ parent, ctx }) => {
+					// Initial resolution (batchable, no emit)
+					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+				})
+				.subscribe(({ parent, ctx }) => {
+					// Subscription setup (has emit/onCleanup)
+					// Capture the field emit for later use
+					capturedFieldEmit = ctx.emit;
 
-				// Set up a mock subscription that will use field emit
-				if (ctx.emit && ctx.onCleanup) {
-					// Simulate subscription setup
+					// Register cleanup
 					ctx.onCleanup(() => {
 						capturedFieldEmit = undefined;
 					});
-				}
-
-				return ctx.db.posts.filter((p) => p.authorId === parent.id);
-			}),
+				}),
 		}));
 
 		const getAuthor = query<{ db: typeof mockDb }>()

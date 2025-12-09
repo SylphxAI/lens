@@ -552,6 +552,10 @@ class LensServerImpl<
 
 								let command = emitQueue.dequeue();
 								while (command !== null && !cancelled) {
+									// Clear DataLoader cache before re-processing
+									// This ensures field resolvers re-run with fresh data
+									this.clearLoaders();
+
 									currentState = this.applyEmitCommand(command, currentState);
 
 									// Process through field resolvers (unlike before where we bypassed this)
@@ -941,44 +945,69 @@ class LensServerImpl<
 				continue;
 			}
 
-			// Resolve the field
-			// NOTE: DataLoader batching is disabled because Lens is a live query library.
-			// All field resolvers need emit/onCleanup callbacks which are per-field/per-parent.
-			// DataLoader batches across parents, making it incompatible with live queries.
-			// TODO: Implement proper N+1 solution that works with live queries
-			// (e.g., batch at the data source level, not at the resolver level)
-			if (hasArgs || context) {
+			// Resolve the field based on mode
+			// ADR-002: Two-Phase Field Resolution
+			const fieldMode = resolverDef.getFieldMode(field);
+
+			if (fieldMode === "live") {
+				// LIVE MODE: Two-phase resolution
+				// Phase 1: Run resolver for initial value (batchable)
+				// Phase 2: Run subscriber for live updates (fire-and-forget)
 				try {
-					// Build extended context with emit and onCleanup
-					// Lens is a live query library - these are always available
+					// Phase 1: Get initial value (no emit/onCleanup needed)
+					if (hasArgs) {
+						// Direct resolution with args
+						result[field] = await resolverDef.resolveField(field, obj, args, context ?? {});
+					} else {
+						// Use DataLoader for batching
+						const loaderKey = `${typeName}.${field}`;
+						const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field, context ?? ({} as TContext));
+						result[field] = await loader.load(obj);
+					}
+
+					// Phase 2: Set up subscription (fire-and-forget)
+					const subscribeCtx = {
+						...(context ?? {}),
+						emit: createFieldEmit!(currentPath),
+						onCleanup: onCleanup!,
+					};
+					resolverDef.subscribeField(field, obj, args, subscribeCtx).catch(() => {
+						// Subscription errors are handled via emit, ignore here
+					});
+				} catch {
+					result[field] = null;
+				}
+			} else if (fieldMode === "subscribe") {
+				// SUBSCRIBE MODE (legacy): Fire-and-forget
+				// Resolver handles both initial value (via emit) and updates
+				try {
 					const extendedCtx = {
 						...(context ?? {}),
 						emit: createFieldEmit!(currentPath),
 						onCleanup: onCleanup!,
 					};
-
-					// Check if field is a subscription (uses emit pattern)
-					if (resolverDef.isSubscription(field)) {
-						// Subscription fields use emit pattern - don't await completion
-						// The resolver runs in background, pushing values via emit()
-						// Set initial value to null, emit() will update it
-						result[field] = null;
-						// Start resolver without awaiting (fire and forget)
-						resolverDef.resolveField(field, obj, args, extendedCtx).catch(() => {
-							// Subscription errors are handled via emit, ignore here
-						});
-					} else {
-						// Regular resolved field - await the result
-						result[field] = await resolverDef.resolveField(field, obj, args, extendedCtx);
-					}
+					result[field] = null;
+					resolverDef.resolveField(field, obj, args, extendedCtx).catch(() => {
+						// Subscription errors are handled via emit, ignore here
+					});
 				} catch {
 					result[field] = null;
 				}
 			} else {
-				// Use DataLoader for batching when no args (default case)
-				const loaderKey = `${typeName}.${field}`;
-				const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field);
-				result[field] = await loader.load(obj);
+				// RESOLVE MODE: One-shot resolution (batchable)
+				try {
+					if (hasArgs) {
+						// Direct resolution with args (no batching)
+						result[field] = await resolverDef.resolveField(field, obj, args, context ?? {});
+					} else {
+						// Use DataLoader for batching
+						const loaderKey = `${typeName}.${field}`;
+						const loader = this.getOrCreateLoaderForField(loaderKey, resolverDef, field, context ?? ({} as TContext));
+						result[field] = await loader.load(obj);
+					}
+				} catch {
+					result[field] = null;
+				}
 			}
 
 			// Recursively resolve nested fields
@@ -1045,12 +1074,13 @@ class LensServerImpl<
 		loaderKey: string,
 		resolverDef: ResolverDef<any, any, any>,
 		fieldName: string,
+		context: TContext,
 	): DataLoader<unknown, unknown> {
 		let loader = this.loaders.get(loaderKey);
 		if (!loader) {
+			// Capture context at loader creation time
+			// This ensures the batch function has access to request context
 			loader = new DataLoader(async (parents: unknown[]) => {
-				// Get context from AsyncLocalStorage - maintains request context in batched calls
-				const context = tryUseContext<TContext>() ?? ({} as TContext);
 				const results: unknown[] = [];
 				for (const parent of parents) {
 					try {
