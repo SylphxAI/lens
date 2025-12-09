@@ -118,6 +118,9 @@ export type {
 	SubscriptionCallbacks,
 } from "./resolver-types.js";
 
+// Re-export value (helper function)
+export { publisher } from "./resolver-types.js";
+
 // =============================================================================
 // Implementation
 // =============================================================================
