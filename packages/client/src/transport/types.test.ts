@@ -12,7 +12,15 @@ import type {
 	SubscriptionCapable,
 	Transport,
 } from "./types.js";
-import { isLegacyTransport, isMutationCapable, isQueryCapable, isSubscriptionCapable } from "./types.js";
+import {
+	getEffectiveOperationType,
+	hasAnySubscription,
+	isLegacyTransport,
+	isMutationCapable,
+	isQueryCapable,
+	isSubscriptionCapable,
+} from "./types.js";
+import type { EntitiesMetadata } from "./types.js";
 
 // =============================================================================
 // Mock Transports for Testing
@@ -205,5 +213,101 @@ describe("Transport Capability Types", () => {
 
 			expect(receivedData).toBe("subscription result");
 		});
+	});
+});
+
+// =============================================================================
+// Subscription Detection Helper Tests
+// =============================================================================
+
+describe("hasAnySubscription", () => {
+	const entities: EntitiesMetadata = {
+		User: {
+			id: "exposed",
+			name: "exposed",
+			email: "resolve",
+			status: "subscribe",
+		},
+		Post: {
+			id: "exposed",
+			title: "exposed",
+			content: "resolve",
+		},
+	};
+
+	it("returns false when entities is undefined", () => {
+		expect(hasAnySubscription(undefined, "User")).toBe(false);
+	});
+
+	it("returns false when entity not found", () => {
+		expect(hasAnySubscription(entities, "Unknown")).toBe(false);
+	});
+
+	it("returns true when selecting a subscribe field", () => {
+		expect(hasAnySubscription(entities, "User", { status: true })).toBe(true);
+	});
+
+	it("returns false when selecting only exposed/resolve fields", () => {
+		expect(hasAnySubscription(entities, "User", { id: true, name: true, email: true })).toBe(false);
+	});
+
+	it("returns true when checking all fields (no select) and entity has subscribe field", () => {
+		expect(hasAnySubscription(entities, "User")).toBe(true);
+	});
+
+	it("returns false when checking all fields and entity has no subscribe field", () => {
+		expect(hasAnySubscription(entities, "Post")).toBe(false);
+	});
+
+	it("handles nested selection with select property", () => {
+		const nestedSelect = {
+			name: true,
+			posts: { select: { title: true } },
+		};
+		// User doesn't have subscribe in selection, Post doesn't have subscribe
+		expect(hasAnySubscription(entities, "User", nestedSelect)).toBe(false);
+	});
+
+	it("prevents infinite recursion with circular references", () => {
+		const circularEntities: EntitiesMetadata = {
+			A: { b: "resolve" },
+			B: { a: "resolve" },
+		};
+		// Should not hang or throw
+		expect(hasAnySubscription(circularEntities, "A")).toBe(false);
+	});
+});
+
+describe("getEffectiveOperationType", () => {
+	const entities: EntitiesMetadata = {
+		User: {
+			id: "exposed",
+			name: "exposed",
+			status: "subscribe",
+		},
+	};
+
+	it("returns subscription if opType is already subscription", () => {
+		expect(getEffectiveOperationType("subscription", entities, "User")).toBe("subscription");
+	});
+
+	it("returns mutation if opType is mutation (even with subscribe fields)", () => {
+		expect(getEffectiveOperationType("mutation", entities, "User", { status: true })).toBe("mutation");
+	});
+
+	it("returns query if no subscribe fields selected", () => {
+		expect(getEffectiveOperationType("query", entities, "User", { id: true, name: true })).toBe("query");
+	});
+
+	it("returns subscription if query selects subscribe field", () => {
+		expect(getEffectiveOperationType("query", entities, "User", { status: true })).toBe("subscription");
+	});
+
+	it("returns query if returnEntityName is undefined", () => {
+		expect(getEffectiveOperationType("query", entities, undefined, { status: true })).toBe("query");
+	});
+
+	it("returns query if entities is undefined", () => {
+		expect(getEffectiveOperationType("query", undefined, "User", { status: true })).toBe("query");
 	});
 });
