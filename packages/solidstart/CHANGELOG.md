@@ -1,5 +1,12 @@
 # @sylphx/lens-solidstart
 
+## 2.0.16 (2025-12-09)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 2.4.0
+- Updated `@sylphx/lens-server` to 2.6.0
+
 ## 2.0.15
 
 ### Patch Changes

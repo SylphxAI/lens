@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.4.0 (2025-12-09)
+
+### ✨ Features
+
+- frontend-driven transport routing with entity metadata ([5130817](https://github.com/SylphxAI/lens/commit/5130817f85b99ec7753c0bf296003e09ca8c9ccd))
+
 ## 2.3.2
 
 ### Patch Changes
