@@ -146,12 +146,37 @@ const User = entity("User", (t) => ({
 - Wire field resolvers to execution engine via `createResolverFromEntity()`
 - Support mixed exposed/computed/subscription fields
 - `hasInlineResolvers()` helper for detection
+- **Server auto-converts entities** - No manual `createResolverFromEntity()` call needed
 - E2E tests
 
 ### Phase 5: Deprecation ✅
 - Mark `resolver()` as deprecated with @deprecated JSDoc
 - Document migration to unified entity definition
 - Legacy API still supported for backwards compatibility
+
+## Server Usage
+
+With unified entity definition, just pass entities to the server - no manual resolver conversion needed:
+
+```typescript
+// Define entity with inline resolvers
+const User = entity('User', (t) => ({
+  id: t.id(),
+  name: t.string(),
+  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+    ctx.db.posts.filter(p => p.authorId === parent.id)
+  ),
+}));
+
+// Server auto-detects and converts inline resolvers
+const server = createApp({
+  entities: { User, Post },  // ✅ Just pass entities
+  router,
+  // No `resolvers: [...]` needed!
+});
+```
+
+**Note**: Explicit `resolvers` array still works and takes priority over inline resolvers.
 
 ## Backwards Compatibility
 
