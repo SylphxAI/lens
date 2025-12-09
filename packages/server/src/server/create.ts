@@ -245,6 +245,106 @@ class LensServerImpl<
 	}
 
 	// =========================================================================
+	// Subscription Detection
+	// =========================================================================
+
+	/**
+	 * Check if any selected field (recursively) is a subscription.
+	 * Used to determine if SSE/WS transport is needed.
+	 *
+	 * @param entityName - The entity type name
+	 * @param select - Selection object (if undefined, checks ALL fields)
+	 * @param visited - Set of visited entity names (prevents infinite recursion)
+	 * @returns true if any selected field is a subscription
+	 */
+	hasAnySubscription(
+		entityName: string,
+		select?: SelectionObject,
+		visited: Set<string> = new Set(),
+	): boolean {
+		// Prevent infinite recursion on circular references
+		if (visited.has(entityName)) return false;
+		visited.add(entityName);
+
+		const resolver = this.resolverMap?.get(entityName);
+		if (!resolver) return false;
+
+		// Determine which fields to check
+		const fieldsToCheck = select ? Object.keys(select) : (resolver.getFieldNames() as string[]);
+
+		for (const fieldName of fieldsToCheck) {
+			// Skip if field doesn't exist in resolver
+			if (!resolver.hasField(fieldName)) continue;
+
+			// Check if this field is a subscription
+			if (resolver.isSubscription(fieldName)) {
+				return true;
+			}
+
+			// Get nested selection for this field
+			const fieldSelect = select?.[fieldName];
+			const nestedSelect =
+				typeof fieldSelect === "object" && fieldSelect !== null && "select" in fieldSelect
+					? (fieldSelect as { select?: SelectionObject }).select
+					: undefined;
+
+			// For relation fields, recursively check the target entity
+			// We need to determine the target entity from the resolver's field definition
+			// For now, we use the selection to guide us - if there's nested selection,
+			// we try to find a matching entity resolver
+			if (nestedSelect || (typeof fieldSelect === "object" && fieldSelect !== null)) {
+				// Try to find target entity by checking all resolvers
+				// In a real scenario, we'd have field metadata linking to target entity
+				for (const [targetEntityName] of this.resolverMap ?? []) {
+					if (targetEntityName === entityName) continue; // Skip self
+					if (this.hasAnySubscription(targetEntityName, nestedSelect, visited)) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check if an operation (and its return type's fields) requires streaming transport.
+	 *
+	 * Returns true if:
+	 * 1. Operation resolver is async generator (yields values)
+	 * 2. Operation resolver uses emit pattern
+	 * 3. Any selected field in the return type is a subscription
+	 *
+	 * @param path - Operation path
+	 * @param select - Selection object for return type fields
+	 */
+	requiresStreamingTransport(path: string, select?: SelectionObject): boolean {
+		const def = this.queries[path] ?? this.mutations[path];
+		if (!def) return false;
+
+		// Check 1: Operation-level subscription (async generator)
+		const resolverFn = def._resolve;
+		if (resolverFn) {
+			const fnName = resolverFn.constructor?.name;
+			if (fnName === "AsyncGeneratorFunction" || fnName === "GeneratorFunction") {
+				return true;
+			}
+		}
+
+		// Check 2 & 3: Field-level subscriptions
+		// Get the return entity type from operation metadata
+		const returnType = def._output;
+		if (returnType && typeof returnType === "object" && "_name" in returnType) {
+			const entityName = (returnType as { _name: string })._name;
+			if (this.hasAnySubscription(entityName, select)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// =========================================================================
 	// Core Methods
 	// =========================================================================
 

@@ -615,3 +615,143 @@ describe("toResolverMap()", () => {
 		expect(() => toResolverMap([badResolver])).toThrow("Resolver entity must have a name");
 	});
 });
+
+// =============================================================================
+// Test: Subscription Detection (.subscribe() vs .resolve())
+// =============================================================================
+
+describe("Subscription detection", () => {
+	it("isSubscription returns false for exposed fields", () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+		}));
+
+		expect(userResolver.isSubscription("id")).toBe(false);
+		expect(userResolver.isSubscription("name")).toBe(false);
+	});
+
+	it("isSubscription returns false for .resolve() fields", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
+			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
+		}));
+
+		expect(userResolver.isSubscription("id")).toBe(false);
+		expect(userResolver.isSubscription("avatar")).toBe(false);
+		expect(userResolver.isSubscription("posts")).toBe(false);
+	});
+
+	it("isSubscription returns true for .subscribe() fields", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			// Subscription field - uses emit pattern
+			status: f.string().subscribe(({ ctx }) => {
+				// Emit initial value
+				ctx.emit("online");
+				// Set up subscription
+				const interval = setInterval(() => ctx.emit("online"), 1000);
+				ctx.onCleanup(() => clearInterval(interval));
+			}),
+		}));
+
+		expect(userResolver.isSubscription("id")).toBe(false);
+		expect(userResolver.isSubscription("name")).toBe(false);
+		expect(userResolver.isSubscription("status")).toBe(true);
+	});
+
+	it("isSubscription returns true for relation .subscribe() fields", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			// Subscription relation - emits post updates
+			latestPosts: f.many(Post).subscribe(({ parent, ctx }) => {
+				const posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+				ctx.emit(posts);
+				// Would normally set up pub/sub here
+			}),
+		}));
+
+		expect(userResolver.isSubscription("latestPosts")).toBe(true);
+	});
+
+	it("isSubscription returns false for non-existent field", () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+		}));
+
+		expect(userResolver.isSubscription("nonexistent")).toBe(false);
+	});
+});
+
+// =============================================================================
+// Test: getFieldMode()
+// =============================================================================
+
+describe("getFieldMode()", () => {
+	it("returns 'exposed' for exposed fields", () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+		}));
+
+		expect(userResolver.getFieldMode("id")).toBe("exposed");
+		expect(userResolver.getFieldMode("name")).toBe("exposed");
+	});
+
+	it("returns 'resolve' for .resolve() fields", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
+			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
+		}));
+
+		expect(userResolver.getFieldMode("id")).toBe("exposed");
+		expect(userResolver.getFieldMode("avatar")).toBe("resolve");
+		expect(userResolver.getFieldMode("posts")).toBe("resolve");
+	});
+
+	it("returns 'subscribe' for .subscribe() fields", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			status: f.string().subscribe(({ ctx }) => {
+				ctx.emit("online");
+			}),
+			livePosts: f.many(Post).subscribe(({ ctx }) => {
+				ctx.emit([]);
+			}),
+		}));
+
+		expect(userResolver.getFieldMode("id")).toBe("exposed");
+		expect(userResolver.getFieldMode("status")).toBe("subscribe");
+		expect(userResolver.getFieldMode("livePosts")).toBe("subscribe");
+	});
+
+	it("returns null for non-existent field", () => {
+		const userResolver = resolver(User, (f) => ({
+			id: f.expose("id"),
+		}));
+
+		expect(userResolver.getFieldMode("nonexistent")).toBeNull();
+	});
+
+	it("works with fields that have args", () => {
+		const userResolver = resolver<MockContext>()(User, (f) => ({
+			id: f.expose("id"),
+			posts: f
+				.many(Post)
+				.args(z.object({ limit: z.number() }))
+				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
+			livePosts: f
+				.many(Post)
+				.args(z.object({ limit: z.number() }))
+				.subscribe(({ args, ctx }) => {
+					ctx.emit(ctx.db.posts.slice(0, args.limit));
+				}),
+		}));
+
+		expect(userResolver.getFieldMode("posts")).toBe("resolve");
+		expect(userResolver.getFieldMode("livePosts")).toBe("subscribe");
+	});
+});

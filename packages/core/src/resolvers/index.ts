@@ -56,9 +56,9 @@ import type {
 	FieldDef,
 	FieldLiveContext,
 	FieldQueryContext,
-	FieldResolverContext,
 	FieldResolveFn,
 	FieldResolveFnNoArgs,
+	FieldResolverContext,
 	FieldSubscribeFn,
 	FieldSubscribeFnNoArgs,
 	FieldSubscriptionContext,
@@ -82,16 +82,16 @@ export type {
 	/** @deprecated Use FieldQueryContext or FieldSubscriptionContext */
 	FieldLiveContext,
 	FieldQueryContext,
-	FieldResolverContext,
 	FieldResolveFn,
 	FieldResolveFnNoArgs,
+	FieldResolveParams,
+	FieldResolverContext,
 	/** @deprecated Use FieldResolveFn or FieldSubscribeFn */
 	FieldResolverFn,
 	/** @deprecated Use FieldResolveFnNoArgs or FieldSubscribeFnNoArgs */
 	FieldResolverFnNoArgs,
 	/** @deprecated Use FieldResolveParams or FieldSubscribeParams */
 	FieldResolverParams,
-	FieldResolveParams,
 	FieldSubscribeFn,
 	FieldSubscribeFnNoArgs,
 	FieldSubscribeParams,
@@ -388,6 +388,23 @@ class ResolverDefImpl<
 	isExposed(name: string): boolean {
 		const field = this.fields[name];
 		return field?._kind === "exposed";
+	}
+
+	isSubscription(name: string): boolean {
+		const field = this.fields[name];
+		if (!field || field._kind === "exposed") return false;
+		// Cast to get the mode - could be ResolvedField or SubscribedField
+		const mode = (field as { _mode?: "resolve" | "subscribe" })._mode;
+		return mode === "subscribe";
+	}
+
+	getFieldMode(name: string): "exposed" | "resolve" | "subscribe" | null {
+		const field = this.fields[name];
+		if (!field) return null;
+		if (field._kind === "exposed") return "exposed";
+		// Cast to get the mode - could be ResolvedField or SubscribedField
+		const mode = (field as { _mode?: "resolve" | "subscribe" })._mode;
+		return mode ?? "resolve";
 	}
 
 	getArgsSchema(name: string): z.ZodType | null {

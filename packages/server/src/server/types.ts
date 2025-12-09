@@ -262,6 +262,29 @@ export interface LensServer {
 	 * Get the plugin manager for direct hook access.
 	 */
 	getPluginManager(): PluginManager;
+
+	// =========================================================================
+	// Subscription Detection (Transport Selection)
+	// =========================================================================
+
+	/**
+	 * Check if any selected field (recursively) is a subscription.
+	 * Used by handlers to determine if SSE/WS transport is needed.
+	 *
+	 * @param entityName - The entity type name
+	 * @param select - Selection object (if undefined, checks ALL fields)
+	 * @returns true if any selected field is a subscription
+	 */
+	hasAnySubscription(entityName: string, select?: SelectionObject): boolean;
+
+	/**
+	 * Check if an operation requires streaming transport.
+	 * Returns true if operation uses async generator OR any selected field is subscription.
+	 *
+	 * @param path - Operation path
+	 * @param select - Selection object for return type fields
+	 */
+	requiresStreamingTransport(path: string, select?: SelectionObject): boolean;
 }
 
 // =============================================================================

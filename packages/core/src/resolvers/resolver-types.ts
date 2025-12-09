@@ -397,6 +397,12 @@ export interface ResolverDef<
 	/** Check if field is exposed (vs resolved) */
 	isExposed(name: string): boolean;
 
+	/** Check if field is a subscription (uses emit pattern) */
+	isSubscription(name: string): boolean;
+
+	/** Get the field mode: "exposed", "resolve", "subscribe", or null if not found */
+	getFieldMode(name: string): "exposed" | "resolve" | "subscribe" | null;
+
 	/** Get the args schema for a field (if any) */
 	getArgsSchema(name: string): z.ZodType | null;
 
