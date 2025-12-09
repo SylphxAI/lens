@@ -570,6 +570,81 @@ describe("typedEntity() - context-aware entity factory", () => {
 });
 
 // =============================================================================
+// Test: entity<Context>().define() - Builder Pattern API
+// =============================================================================
+
+describe("entity<Context>().define() - builder pattern", () => {
+	interface MyContext {
+		db: {
+			posts: Array<{ id: string; title: string; authorId: string }>;
+			users: Array<{ id: string; name: string }>;
+		};
+		currentUserId: string;
+	}
+
+	it("creates entity with typed context using builder pattern", () => {
+		const User = entity<MyContext>("User").define((t) => ({
+			id: t.id(),
+			name: t.string(),
+		}));
+
+		expect(User._name).toBe("User");
+		expect(User.fields.id._type).toBe("id");
+		expect(User.fields.name._type).toBe("string");
+	});
+
+	it("resolve() gets typed context", () => {
+		const Post = entity<MyContext>("Post").define((t) => ({
+			id: t.id(),
+			title: t.string(),
+		}));
+
+		const User = entity<MyContext>("User").define((t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t
+				.many(() => Post)
+				.resolve(({ parent, ctx }) => {
+					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+				}),
+		}));
+
+		expect(User.fields.posts._resolutionMode).toBe("resolve");
+		expect(User.fields.posts._resolver).toBeDefined();
+	});
+
+	it("subscribe() gets typed context", () => {
+		const User = entity<MyContext>("User").define((t) => ({
+			id: t.id(),
+			status: t.object<{ isActive: boolean }>().subscribe(({ ctx, emit }) => {
+				emit({ isActive: ctx.currentUserId !== "" });
+			}),
+		}));
+
+		expect(User.fields.status._resolutionMode).toBe("subscribe");
+	});
+
+	it("is equivalent to typedEntity() factory", () => {
+		// Builder pattern
+		const BuilderUser = entity<MyContext>("User").define((t) => ({
+			id: t.id(),
+			name: t.string(),
+		}));
+
+		// Curried factory (legacy)
+		const myEntity = typedEntity<MyContext>();
+		const FactoryUser = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		}));
+
+		expect(BuilderUser._name).toBe(FactoryUser._name);
+		expect(BuilderUser.fields.id._type).toBe(FactoryUser.fields.id._type);
+		expect(BuilderUser.fields.name._type).toBe(FactoryUser.fields.name._type);
+	});
+});
+
+// =============================================================================
 // Test: createTypeBuilder() - Low-level API
 // =============================================================================
 

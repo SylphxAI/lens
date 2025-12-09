@@ -84,10 +84,14 @@ export {
 	// Entity definition
 	defineEntity,
 	type EntityBuilder,
+	// Entity builder class (for typed context)
+	EntityBuilder_,
 	type EntityDef,
 	entity,
 	isEntityDef,
+	/** @deprecated Use `entity<TContext>('Name').define(...)` instead */
 	type TypedEntityFactory,
+	/** @deprecated Use `entity<TContext>('Name').define(...)` instead */
 	typedEntity,
 } from "./schema/define.js";
 

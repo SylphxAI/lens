@@ -181,6 +181,12 @@ export function defineEntity<Name extends string, Fields extends EntityDefinitio
 
 	const name = nameOrFields as Name;
 
+	// Builder pattern: entity<TContext>('Name') returns EntityBuilder_
+	// This is used when type parameter is provided for typed context
+	if (maybeFieldsOrBuilder === undefined) {
+		return new EntityBuilder_(name) as unknown as EntityDef<Name, Fields>;
+	}
+
 	// Overload 3: entity('Name', (t) => fields) - function-based
 	if (typeof maybeFieldsOrBuilder === "function") {
 		const builder = maybeFieldsOrBuilder as EntityBuilder<Fields>;
@@ -211,15 +217,57 @@ function createEntityDef<Name extends string, Fields extends EntityDefinition>(
 }
 
 /** Simplified alias for defineEntity */
-export const entity: typeof defineEntity = defineEntity;
+export const entity: typeof defineEntity & {
+	/**
+	 * Create an entity with typed context using builder pattern.
+	 *
+	 * @example
+	 * ```typescript
+	 * const User = entity<MyContext>('User').define((t) => ({
+	 *   id: t.id(),
+	 *   posts: t.many(() => Post).resolve(({ ctx }) => {
+	 *     // ctx is typed as MyContext!
+	 *     return ctx.db.posts.findMany();
+	 *   }),
+	 * }));
+	 * ```
+	 */
+	<TContext>(name: string): EntityBuilder_<TContext>;
+} = Object.assign(defineEntity, <TContext>(name: string) => new EntityBuilder_<TContext>(name));
 
 // =============================================================================
-// Context-Aware Entity Factory (Curried API)
+// Entity Builder (Typed Context)
+// =============================================================================
+
+/**
+ * Builder for creating entities with typed context.
+ * Use `entity<Context>('Name').define((t) => ...)` for typed resolvers.
+ */
+export class EntityBuilder_<TContext, Name extends string = string> {
+	constructor(private readonly _name: Name) {}
+
+	/**
+	 * Define entity fields with typed context.
+	 * The `t` builder provides typed context to resolve/subscribe methods.
+	 */
+	define<Fields extends EntityDefinition>(
+		builder: ContextualEntityBuilder<Fields, TContext>,
+	): EntityDef<Name, Fields> {
+		const contextualBuilder = createTypeBuilder<TContext>();
+		const fields = builder(contextualBuilder);
+		return createEntityDef(this._name, fields);
+	}
+}
+
+// =============================================================================
+// Context-Aware Entity Factory (Curried API) - Legacy
 // =============================================================================
 
 /**
  * Result of curried entity factory - a function that creates entities with typed context.
  * The `t` builder's resolve/subscribe methods will have TContext typed.
+ *
+ * @deprecated Use `entity<TContext>('Name').define((t) => ...)` instead
  */
 export type TypedEntityFactory<TContext> = <Name extends string, Fields extends EntityDefinition>(
 	name: Name,
@@ -229,6 +277,8 @@ export type TypedEntityFactory<TContext> = <Name extends string, Fields extends 
 /**
  * Create a typed entity factory with context type.
  * This is the curried form of entity() that provides typed context to resolvers.
+ *
+ * @deprecated Use `entity<TContext>('Name').define((t) => ...)` instead
  *
  * Use this when you want typed context in your resolve/subscribe functions
  * without having to specify the context type on every field.
