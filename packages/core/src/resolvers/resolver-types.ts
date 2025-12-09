@@ -51,22 +51,6 @@ export interface SubscriptionCallbacks<T> {
  */
 export type Publisher<T> = (callbacks: SubscriptionCallbacks<T>) => void;
 
-/**
- * Helper to create a type-safe publisher function.
- * Identity function that provides type inference.
- *
- * @example
- * ```typescript
- * .subscribe(({ parent, ctx }) => publisher<string>(({ emit, onCleanup }) => {
- *   ctx.db.onChange(parent.id, (v) => emit(v));
- *   onCleanup(() => ctx.db.unsubscribe(parent.id));
- * }))
- * ```
- */
-export function publisher<T>(fn: Publisher<T>): Publisher<T> {
-	return fn;
-}
-
 // =============================================================================
 // Type-Safe Context Types
 // =============================================================================

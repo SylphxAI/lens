@@ -255,16 +255,12 @@ export {
 	isResolvedField,
 	isResolverDef,
 	type OnCleanup,
-	// Publisher pattern helper
-	publisher,
-	type Publisher,
 	type ResolvedField,
 	type ResolverDef,
 	// Resolver array
 	type Resolvers,
 	// Main function (prefer lens() factory instead)
 	resolver,
-	type SubscriptionCallbacks,
 	toResolverMap,
 } from "./resolvers/index.js";
 
