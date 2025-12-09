@@ -19,6 +19,7 @@ import {
 	type ContextValue,
 	createEmit,
 	createResolverFromEntity,
+	type Emit,
 	type EmitCommand,
 	type EntityDef,
 	flattenRouter,
@@ -764,7 +765,7 @@ class LensServerImpl<
 
 	/**
 	 * Factory type for creating field-level emit handlers.
-	 * Each field gets its own emit that updates just that field path.
+	 * Each field gets its own emit with full Emit<T> API (.delta, .patch, .push, etc).
 	 */
 	private createFieldEmitFactory(
 		getCurrentState: () => unknown,
@@ -773,19 +774,29 @@ class LensServerImpl<
 		select: SelectionObject | undefined,
 		context: TContext | undefined,
 		onCleanup: ((fn: () => void) => void) | undefined,
-	): (fieldPath: string) => ((value: unknown) => void) | undefined {
+	): (fieldPath: string) => Emit<unknown> | undefined {
 		return (fieldPath: string) => {
 			if (!fieldPath) return undefined;
 
-			return (newValue: unknown) => {
-				// Get current state and update the field at the given path
-				const state = getCurrentState();
-				if (!state || typeof state !== "object") return;
+			// Determine if field value is an array (check current state)
+			const state = getCurrentState();
+			const currentFieldValue = state ? this.getFieldByPath(state, fieldPath) : undefined;
+			const isArray = Array.isArray(currentFieldValue);
 
+			// Create emit handler that applies commands to the field's value
+			const emitHandler = (command: EmitCommand) => {
+				const fullState = getCurrentState();
+				if (!fullState || typeof fullState !== "object") return;
+
+				// Get current field value and apply command to it
+				const fieldValue = this.getFieldByPath(fullState, fieldPath);
+				const newFieldValue = this.applyEmitCommand(command, fieldValue);
+
+				// Update state with new field value
 				const updatedState = this.setFieldByPath(
-					state as Record<string, unknown>,
+					fullState as Record<string, unknown>,
 					fieldPath,
-					newValue,
+					newFieldValue,
 				);
 				setCurrentState(updatedState);
 
@@ -816,7 +827,23 @@ class LensServerImpl<
 					}
 				})();
 			};
+
+			return createEmit<unknown>(emitHandler, isArray);
 		};
+	}
+
+	/**
+	 * Get a value at a nested path in an object.
+	 */
+	private getFieldByPath(obj: unknown, path: string): unknown {
+		if (!obj || typeof obj !== "object") return undefined;
+		const parts = path.split(".");
+		let current: unknown = obj;
+		for (const part of parts) {
+			if (!current || typeof current !== "object") return undefined;
+			current = (current as Record<string, unknown>)[part];
+		}
+		return current;
 	}
 
 	/**
@@ -850,7 +877,7 @@ class LensServerImpl<
 		select?: SelectionObject,
 		context?: TContext,
 		onCleanup?: (fn: () => void) => void,
-		createFieldEmit?: (fieldPath: string) => ((value: unknown) => void) | undefined,
+		createFieldEmit?: (fieldPath: string) => Emit<unknown> | undefined,
 	): Promise<T> {
 		if (!data) return data;
 
@@ -888,7 +915,7 @@ class LensServerImpl<
 		context?: TContext,
 		fieldPath = "",
 		onCleanup?: (fn: () => void) => void,
-		createFieldEmit?: (fieldPath: string) => ((value: unknown) => void) | undefined,
+		createFieldEmit?: (fieldPath: string) => Emit<unknown> | undefined,
 	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 

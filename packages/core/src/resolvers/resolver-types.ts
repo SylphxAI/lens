@@ -5,6 +5,7 @@
  */
 
 import type { z } from "zod";
+import type { Emit } from "../emit/index.js";
 import type { EntityDef } from "../schema/define.js";
 import type { InferScalar } from "../schema/infer.js";
 import type { EntityDefinition, FieldType } from "../schema/types.js";
@@ -29,10 +30,12 @@ export type FieldEmit<T> = (value: T) => void;
 /**
  * Subscription callbacks passed to publisher function.
  * Keeps user context clean - emit/onCleanup are NOT on ctx.
+ *
+ * emit has full Emit<T> API with .delta(), .patch(), .push(), etc.
  */
 export interface SubscriptionCallbacks<T> {
-	/** Emit a new value for this field */
-	emit: FieldEmit<T>;
+	/** Emit updates - full API with .delta(), .patch(), .push(), etc. */
+	emit: Emit<T>;
 	/** Register cleanup function called when subscription ends */
 	onCleanup: OnCleanup;
 }
