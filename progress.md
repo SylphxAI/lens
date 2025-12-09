@@ -98,6 +98,34 @@ const getUser = query()
   })
 ```
 
+### 6. Two-Phase Field Resolution (ADR-002)
+
+Separates initial data fetching from live update setup for optimal performance:
+
+```typescript
+resolver(User, (f) => ({
+  id: f.expose("id"),
+
+  // Resolve-only: batchable via DataLoader
+  posts: f.many(Post).resolve(({ parent, ctx }) =>
+    ctx.db.posts.find({ authorId: parent.id })
+  ),
+
+  // Live field: resolve (batchable) + subscribe (fire-and-forget)
+  status: f.string()
+    .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
+    .subscribe(({ parent, ctx }) => {
+      ctx.db.onStatusChange(parent.id, (status) => ctx.emit(status));
+      ctx.onCleanup(() => ctx.db.unsubscribe(parent.id));
+    }),
+}))
+```
+
+**Field Modes:**
+- `resolve` - One-shot, batchable via DataLoader (no emit/onCleanup)
+- `subscribe` - Legacy fire-and-forget (has emit/onCleanup, not batchable)
+- `live` - Best of both: resolve for initial (batchable) + subscribe for updates
+
 ## Recent Changes
 
 ### v1.2.0 (WIP)
@@ -107,6 +135,8 @@ const getUser = query()
 - **Updated resolver signature** - `(parent, args, ctx)` matches GraphQL
 - **Client field args** - `{ posts: { args: { first: 5 }, select: { title: true } } }`
 - **Removed relation()** - Relations now defined in resolver with `f.one()`/`f.many()`
+- **Two-phase field resolution** - `.resolve().subscribe()` pattern for batching + live updates (ADR-002)
+- **DataLoader integration** - Automatic batching for `.resolve()` and "live" mode fields
 
 ### v1.1.1
 
@@ -164,7 +194,7 @@ const getUser = query()
 ### Backlog
 
 - [ ] Align dependency versions across packages
-- [ ] DataLoader integration for batching
+- [x] DataLoader integration for batching (via two-phase resolution ADR-002)
 - [ ] Field-level authorization
 
 ### Known Issues
