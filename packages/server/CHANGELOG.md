@@ -1,5 +1,25 @@
 # @sylphx/lens-server
 
+## 2.8.0 (2025-12-09)
+
+### ✨ Features
+
+- **server:** implement two-phase field resolution with DataLoader ([74dd683](https://github.com/SylphxAI/lens/commit/74dd683b115788bd5e0ce3f4fbb388b2cbde7d61))
+- **core:** add two-phase field resolution with .resolve().subscribe() ([0f089c4](https://github.com/SylphxAI/lens/commit/0f089c413f2f4bcef6b0b6c7cdeb8bb96865e705))
+
+### ♻️ Refactoring
+
+- **core:** separate legacy .subscribe() from .resolve().subscribe() ([2ad15e5](https://github.com/SylphxAI/lens/commit/2ad15e59fd6930c300e2e74a3f4962232d0513a3))
+- **core:** use Publisher pattern for .subscribe() ([7418f54](https://github.com/SylphxAI/lens/commit/7418f54b1e047e5bd6c6cd65d09fb3eb0721a9a8))
+
+### 📚 Documentation
+
+- **server:** explain why DataLoader batching is disabled ([43b1181](https://github.com/SylphxAI/lens/commit/43b1181c754f67392b52f9da3f17cbe9673bc6e9))
+
+### ✅ Tests
+
+- **server:** add dedicated test for .resolve().subscribe() pattern ([4022851](https://github.com/SylphxAI/lens/commit/4022851a2a6beb5a0e2d733eed27c63b20cd08d8))
+
 ## 2.7.2 (2025-12-09)
 
 ### 🐛 Bug Fixes

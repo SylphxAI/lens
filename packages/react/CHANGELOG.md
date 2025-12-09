@@ -1,5 +1,11 @@
 # @sylphx/lens-react
 
+## 2.4.7 (2025-12-09)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.6.0
+
 ## 2.4.6 (2025-12-09)
 
 No notable changes.

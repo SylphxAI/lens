@@ -1,5 +1,21 @@
 # @sylphx/lens-core
 
+## 2.6.0 (2025-12-09)
+
+### ✨ Features
+
+- **core:** add publisher() helper function for type-safe subscriptions ([52d6904](https://github.com/SylphxAI/lens/commit/52d69042eeb33193f513c4b28260d66ba28dcff7))
+- **core:** add two-phase field resolution with .resolve().subscribe() ([0f089c4](https://github.com/SylphxAI/lens/commit/0f089c413f2f4bcef6b0b6c7cdeb8bb96865e705))
+
+### ♻️ Refactoring
+
+- **core:** separate legacy .subscribe() from .resolve().subscribe() ([2ad15e5](https://github.com/SylphxAI/lens/commit/2ad15e59fd6930c300e2e74a3f4962232d0513a3))
+- **core:** use Publisher pattern for .subscribe() ([7418f54](https://github.com/SylphxAI/lens/commit/7418f54b1e047e5bd6c6cd65d09fb3eb0721a9a8))
+
+### 💅 Styles
+
+- fix import order and method chaining formatting ([605327c](https://github.com/SylphxAI/lens/commit/605327c48569331b9d2b0c8768aaa2b5b97af19e))
+
 ## 2.5.0 (2025-12-09)
 
 ### ✨ Features

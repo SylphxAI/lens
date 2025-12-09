@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-signals",
-	"version": "1.0.5",
+	"version": "1.0.6",
 	"description": "Signals-based reactive store for Lens client",
 	"type": "module",
 	"main": "./dist/index.js",
