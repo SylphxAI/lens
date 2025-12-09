@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "bun:test";
 import type {
+	EntitiesMetadata,
 	FullTransport,
 	MutationCapable,
 	Operation,
@@ -20,7 +21,6 @@ import {
 	isQueryCapable,
 	isSubscriptionCapable,
 } from "./types.js";
-import type { EntitiesMetadata } from "./types.js";
 
 // =============================================================================
 // Mock Transports for Testing

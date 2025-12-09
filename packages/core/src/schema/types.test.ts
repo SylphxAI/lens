@@ -573,7 +573,8 @@ describe("Field Resolution Methods", () => {
 
 	describe("chaining", () => {
 		test(".resolve() can be chained after .nullable()", () => {
-			const field = t.string()
+			const field = t
+				.string()
 				.nullable()
 				.resolve(() => "computed");
 
@@ -582,7 +583,8 @@ describe("Field Resolution Methods", () => {
 		});
 
 		test(".subscribe() can be chained after .optional()", () => {
-			const field = t.string()
+			const field = t
+				.string()
 				.optional()
 				.subscribe(({ emit }) => emit("streamed"));
 
@@ -614,19 +616,23 @@ describe("Lazy Relations", () => {
 		});
 
 		test("supports .resolve()", () => {
-			const field = t.one(() => Profile).resolve(({ parent }: { parent: { profileId: string } }) => ({
-				id: parent.profileId,
-				bio: "Test bio",
-			}));
+			const field = t
+				.one(() => Profile)
+				.resolve(({ parent }: { parent: { profileId: string } }) => ({
+					id: parent.profileId,
+					bio: "Test bio",
+				}));
 
 			expect(field.hasResolver()).toBe(true);
 			expect(field.getResolutionMode()).toBe("resolve");
 		});
 
 		test("supports .subscribe()", () => {
-			const field = t.one(() => Profile).subscribe(({ emit }) => {
-				emit({ id: "1", bio: "Live bio" });
-			});
+			const field = t
+				.one(() => Profile)
+				.subscribe(({ emit }) => {
+					emit({ id: "1", bio: "Live bio" });
+				});
 
 			expect(field.hasSubscription()).toBe(true);
 			expect(field.getResolutionMode()).toBe("subscribe");
@@ -646,10 +652,12 @@ describe("Lazy Relations", () => {
 		});
 
 		test("supports .resolve()", () => {
-			const field = t.many(() => Post).resolve(() => [
-				{ id: "1", title: "First" },
-				{ id: "2", title: "Second" },
-			]);
+			const field = t
+				.many(() => Post)
+				.resolve(() => [
+					{ id: "1", title: "First" },
+					{ id: "2", title: "Second" },
+				]);
 
 			expect(field.hasResolver()).toBe(true);
 
@@ -660,9 +668,11 @@ describe("Lazy Relations", () => {
 		test("supports .subscribe()", () => {
 			const emitted: unknown[] = [];
 
-			const field = t.many(() => Post).subscribe(({ emit }) => {
-				emit([{ id: "1", title: "Live post" }]);
-			});
+			const field = t
+				.many(() => Post)
+				.subscribe(({ emit }) => {
+					emit([{ id: "1", title: "Live post" }]);
+				});
 
 			field._subscriptionResolver!({
 				parent: {},
