@@ -3,33 +3,46 @@
  *
  * Type-safe entity definitions for schema.
  *
- * @example
+ * @example Function-based API (recommended)
+ * ```typescript
+ * import { entity } from '@sylphx/lens-core';
+ *
+ * // Define entities with function-based API for lazy relations and inline resolvers
+ * const User = entity('User', (t) => ({
+ *   id: t.id(),
+ *   name: t.string(),
+ *   email: t.string(),
+ *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+ *     ctx.db.posts.filter(p => p.authorId === parent.id)
+ *   ),
+ * }));
+ *
+ * const Post = entity('Post', (t) => ({
+ *   id: t.id(),
+ *   title: t.string(),
+ *   author: t.one(() => User).resolve(({ parent, ctx }) =>
+ *     ctx.db.users.find(u => u.id === parent.authorId)
+ *   ),
+ * }));
+ * ```
+ *
+ * @example Object-based API (legacy)
  * ```typescript
  * import { entity, t } from '@sylphx/lens-core';
  *
- * // Define entities with scalar fields
  * const User = entity('User', {
  *   id: t.id(),
  *   name: t.string(),
  *   email: t.string(),
- *   avatarKey: t.string(),  // internal field
  * });
- *
- * const Post = entity('Post', {
- *   id: t.id(),
- *   title: t.string(),
- *   authorId: t.string(),  // FK to User
- * });
- *
- * // Field resolution is defined separately with resolver()
- * // See resolvers/index.ts for details
+ * // Field resolution defined separately with resolver()
  * ```
  */
 
 import type { EntityMarker } from "@sylphx/standard-entity";
 import { Schema } from "./create.js";
 import type { InferEntity } from "./infer.js";
-import type { EntityDefinition } from "./types.js";
+import { type EntityDefinition, t as typeBuilder } from "./types.js";
 
 // =============================================================================
 // Entity Definition Builder
@@ -37,6 +50,23 @@ import type { EntityDefinition } from "./types.js";
 
 /** Symbol to identify entity definitions */
 const ENTITY_SYMBOL: unique symbol = Symbol("lens:entity");
+
+/**
+ * Entity builder function type.
+ * Receives `t` type builder and returns field definitions.
+ *
+ * @example
+ * ```typescript
+ * const User = entity("User", (t) => ({
+ *   id: t.id(),
+ *   name: t.string(),
+ *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+ *     ctx.db.posts.filter(p => p.authorId === parent.id)
+ *   ),
+ * }));
+ * ```
+ */
+export type EntityBuilder<Fields extends EntityDefinition> = (t: typeof typeBuilder) => Fields;
 
 /**
  * Entity definition with name and fields.
@@ -69,40 +99,72 @@ export type InferEntityType<E extends EntityDef> =
 	E extends EntityDef<string, infer F> ? InferEntity<F> : never;
 
 /**
- * Define an entity with its scalar fields.
+ * Define an entity with its fields.
  *
- * Entity defines the internal/DB shape. Field resolution (including
- * relations) is defined separately with resolver().
+ * Supports two API styles:
+ * 1. **Object-based** (legacy): `entity('Name', { id: t.id(), ... })`
+ * 2. **Function-based** (new): `entity('Name', (t) => ({ id: t.id(), ... }))`
  *
- * @example
+ * The function-based API is recommended for new code as it:
+ * - Enables lazy relations for circular references: `t.many(() => Post)`
+ * - Supports inline resolvers: `t.string().resolve(({ parent }) => ...)`
+ * - Supports inline subscriptions: `t.json().subscribe(({ emit }) => ...)`
+ *
+ * @example Object-based (legacy)
  * ```typescript
  * const User = entity('User', {
  *   id: t.id(),
  *   name: t.string(),
- *   email: t.string(),
  * });
  * ```
+ *
+ * @example Function-based (recommended)
+ * ```typescript
+ * const User = entity('User', (t) => ({
+ *   id: t.id(),
+ *   name: t.string(),
+ *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+ *     ctx.db.posts.filter(p => p.authorId === parent.id)
+ *   ),
+ * }));
+ * ```
  */
+// Overload 1: entity({ fields }) - no name, object-based
 export function defineEntity<Fields extends EntityDefinition>(
 	fields: Fields,
 ): EntityDef<string, Fields>;
+// Overload 2: entity('Name', { fields }) - with name, object-based
 export function defineEntity<Name extends string, Fields extends EntityDefinition>(
 	name: Name,
 	fields: Fields,
 ): EntityDef<Name, Fields>;
+// Overload 3: entity('Name', (t) => fields) - with name, function-based
+export function defineEntity<Name extends string, Fields extends EntityDefinition>(
+	name: Name,
+	builder: EntityBuilder<Fields>,
+): EntityDef<Name, Fields>;
+// Implementation
 export function defineEntity<Name extends string, Fields extends EntityDefinition>(
 	nameOrFields: Name | Fields,
-	maybeFields?: Fields,
+	maybeFieldsOrBuilder?: Fields | EntityBuilder<Fields>,
 ): EntityDef<Name, Fields> | EntityDef<string, Fields> {
-	// Overload 1: entity({ fields }) - no name
-	if (typeof nameOrFields === "object" && maybeFields === undefined) {
+	// Overload 1: entity({ fields }) - no name, object-based
+	if (typeof nameOrFields === "object" && maybeFieldsOrBuilder === undefined) {
 		const fields = nameOrFields as Fields;
 		return createEntityDef(undefined, fields);
 	}
 
-	// Overload 2: entity('Name', { fields }) - with name
 	const name = nameOrFields as Name;
-	const fields = maybeFields as Fields;
+
+	// Overload 3: entity('Name', (t) => fields) - function-based
+	if (typeof maybeFieldsOrBuilder === "function") {
+		const builder = maybeFieldsOrBuilder as EntityBuilder<Fields>;
+		const fields = builder(typeBuilder);
+		return createEntityDef(name, fields);
+	}
+
+	// Overload 2: entity('Name', { fields }) - object-based
+	const fields = maybeFieldsOrBuilder as Fields;
 	return createEntityDef(name, fields);
 }
 

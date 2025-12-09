@@ -77,6 +77,7 @@ export {
 	createSchema,
 	// Entity definition
 	defineEntity,
+	type EntityBuilder,
 	type EntityDef,
 	entity,
 	isEntityDef,

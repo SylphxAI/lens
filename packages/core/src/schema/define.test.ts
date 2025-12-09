@@ -208,3 +208,211 @@ describe("Type inference with entity", () => {
 		expect(user.name).toBe("John");
 	});
 });
+
+// =============================================================================
+// Test: Function-based entity definition (Phase 3 - ADR-001)
+// =============================================================================
+
+describe("entity() - function-based API", () => {
+	it("creates an entity with function builder", () => {
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		}));
+
+		expect(User._name).toBe("User");
+		expect(User.fields.id._type).toBe("id");
+		expect(User.fields.name._type).toBe("string");
+		expect(User.fields.email._type).toBe("string");
+	});
+
+	it("supports all scalar types with function builder", () => {
+		const AllTypes = entity("AllTypes", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			age: t.int(),
+			score: t.float(),
+			active: t.boolean(),
+			createdAt: t.datetime(),
+			birthDate: t.date(),
+			balance: t.decimal(),
+			bigNumber: t.bigint(),
+			data: t.bytes(),
+			metadata: t.json(),
+			status: t.enum(["active", "inactive"]),
+		}));
+
+		expect(AllTypes.fields.id._type).toBe("id");
+		expect(AllTypes.fields.name._type).toBe("string");
+		expect(AllTypes.fields.age._type).toBe("int");
+		expect(AllTypes.fields.score._type).toBe("float");
+		expect(AllTypes.fields.active._type).toBe("boolean");
+		expect(AllTypes.fields.createdAt._type).toBe("datetime");
+		expect(AllTypes.fields.birthDate._type).toBe("date");
+		expect(AllTypes.fields.balance._type).toBe("decimal");
+		expect(AllTypes.fields.bigNumber._type).toBe("bigint");
+		expect(AllTypes.fields.data._type).toBe("bytes");
+		expect(AllTypes.fields.metadata._type).toBe("json");
+		expect(AllTypes.fields.status._type).toBe("enum");
+	});
+
+	it("supports nullable and optional modifiers", () => {
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			bio: t.string().nullable(),
+			nickname: t.string().optional(),
+		}));
+
+		expect(User.fields.bio._nullable).toBe(true);
+		expect(User.fields.nickname._optional).toBe(true);
+	});
+
+	it("supports lazy one-to-one relations", () => {
+		const Profile = entity("Profile", (t) => ({
+			id: t.id(),
+			bio: t.string(),
+		}));
+
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			profile: t.one(() => Profile),
+		}));
+
+		expect(User.fields.profile._type).toBe("lazyOne");
+		expect(User.fields.profile.getTarget()).toBe(Profile);
+	});
+
+	it("supports lazy one-to-many relations", () => {
+		const Post = entity("Post", (t) => ({
+			id: t.id(),
+			title: t.string(),
+		}));
+
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t.many(() => Post),
+		}));
+
+		expect(User.fields.posts._type).toBe("lazyMany");
+		expect(User.fields.posts.getTarget()).toBe(Post);
+	});
+
+	it("supports circular references with lazy evaluation", () => {
+		// This tests the actual circular reference use case
+		interface UserEntity {
+			fields: {
+				id: { _type: "id" };
+				name: { _type: "string" };
+				posts: { _type: "lazyMany" };
+			};
+		}
+
+		interface PostEntity {
+			fields: {
+				id: { _type: "id" };
+				title: { _type: "string" };
+				author: { _type: "lazyOne" };
+			};
+		}
+
+		// Define User first - Post is not yet defined
+		const User: UserEntity = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t.many(() => Post),
+		})) as unknown as UserEntity;
+
+		// Now define Post - User is already defined
+		const Post: PostEntity = entity("Post", (t) => ({
+			id: t.id(),
+			title: t.string(),
+			author: t.one(() => User),
+		})) as unknown as PostEntity;
+
+		// Verify lazy references work
+		expect(User.fields.posts._type).toBe("lazyMany");
+		expect(Post.fields.author._type).toBe("lazyOne");
+
+		// Verify the lazy refs resolve to correct entities
+		const userPostsField = User.fields.posts as unknown as { getTarget: () => PostEntity };
+		const postAuthorField = Post.fields.author as unknown as { getTarget: () => UserEntity };
+		expect(userPostsField.getTarget()).toBe(Post);
+		expect(postAuthorField.getTarget()).toBe(User);
+	});
+
+	it("supports inline resolvers", () => {
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			firstName: t.string(),
+			lastName: t.string(),
+			fullName: t.string().resolve(({ parent }) => `${parent.firstName} ${parent.lastName}`),
+		}));
+
+		expect(User.fields.fullName._resolutionMode).toBe("resolve");
+		expect(User.fields.fullName._resolver).toBeDefined();
+	});
+
+	it("supports inline subscriptions", () => {
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			status: t.json().subscribe(({ emit }) => {
+				emit({ isActive: true });
+			}),
+		}));
+
+		expect(User.fields.status._resolutionMode).toBe("subscribe");
+		expect(User.fields.status._subscriptionResolver).toBeDefined();
+	});
+
+	it("supports resolvers on lazy relations", () => {
+		interface DB {
+			posts: Array<{ id: string; title: string; authorId: string }>;
+		}
+
+		const Post = entity("Post", (t) => ({
+			id: t.id(),
+			title: t.string(),
+			authorId: t.string(),
+		}));
+
+		const User = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t
+				.many(() => Post)
+				.resolve(({ parent, ctx }) => {
+					const db = ctx as DB;
+					return db.posts.filter((p) => p.authorId === parent.id);
+				}),
+		}));
+
+		expect(User.fields.posts._type).toBe("lazyMany");
+		expect(User.fields.posts._resolutionMode).toBe("resolve");
+		expect(User.fields.posts._resolver).toBeDefined();
+	});
+
+	it("function-based and object-based entities are equivalent", () => {
+		const UserObject = entity("User", {
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		});
+
+		const UserFunction = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		}));
+
+		// Both should have same structure
+		expect(UserObject._name).toBe(UserFunction._name);
+		expect(UserObject.fields.id._type).toBe(UserFunction.fields.id._type);
+		expect(UserObject.fields.name._type).toBe(UserFunction.fields.name._type);
+		expect(UserObject.fields.email._type).toBe(UserFunction.fields.email._type);
+	});
+});
