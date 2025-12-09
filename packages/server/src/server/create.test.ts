@@ -127,8 +127,9 @@ describe("getMetadata", () => {
 		const metadata = server.getMetadata();
 
 		expect(metadata.version).toBe("1.2.3");
-		expect(metadata.operations.getUser).toEqual({ type: "query" });
-		expect(metadata.operations.getUsers).toEqual({ type: "query" });
+		expect(metadata.operations.getUser.type).toBe("query");
+		expect(metadata.operations.getUser.returnType).toBe("User"); // Now includes returnType
+		expect(metadata.operations.getUsers.type).toBe("query");
 		expect(metadata.operations.createUser.type).toBe("mutation");
 		expect(metadata.operations.updateUser.type).toBe("mutation");
 	});
@@ -175,7 +176,8 @@ describe("getMetadata", () => {
 		const metadata = server.getMetadata();
 
 		expect(metadata.operations.user).toBeDefined();
-		expect((metadata.operations.user as Record<string, unknown>).get).toEqual({ type: "query" });
+		expect((metadata.operations.user as Record<string, Record<string, unknown>>).get.type).toBe("query");
+		expect((metadata.operations.user as Record<string, Record<string, unknown>>).get.returnType).toBe("User");
 		expect((metadata.operations.user as Record<string, unknown>).create).toBeDefined();
 	});
 });

@@ -448,7 +448,8 @@ describe("E2E - Metadata", () => {
 		const metadata = server.getMetadata();
 
 		expect(metadata.version).toBe("2.0.0");
-		expect(metadata.operations.getUser).toEqual({ type: "query" });
+		expect(metadata.operations.getUser.type).toBe("query");
+		expect(metadata.operations.getUser.returnType).toBe("User"); // Now includes returnType
 		expect(metadata.operations.createUser.type).toBe("mutation");
 		// createUser should have auto-derived optimistic hint (with plugin)
 		expect(metadata.operations.createUser.optimistic).toBeDefined();

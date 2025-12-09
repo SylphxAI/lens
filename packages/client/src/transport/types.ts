@@ -88,6 +88,11 @@ export interface OperationMeta {
 	type: "query" | "mutation" | "subscription";
 	/** Optimistic update strategy (for mutations) */
 	optimistic?: OptimisticDSLType | unknown;
+	/**
+	 * Return entity type name (if operation returns an entity).
+	 * Used for field-level subscription detection.
+	 */
+	returnType?: string;
 }
 
 /**
@@ -98,6 +103,19 @@ export type OperationsMap = {
 	[key: string]: OperationMeta | OperationsMap;
 };
 
+/** Field mode for entity fields */
+export type FieldMode = "exposed" | "resolve" | "subscribe";
+
+/** Entity field metadata for client-side routing decisions */
+export interface EntityFieldMetadata {
+	[fieldName: string]: FieldMode;
+}
+
+/** All entities field metadata */
+export interface EntitiesMetadata {
+	[entityName: string]: EntityFieldMetadata;
+}
+
 /**
  * Server metadata returned from handshake.
  */
@@ -106,6 +124,11 @@ export interface Metadata {
 	version: string;
 	/** Operation metadata map (can be nested for namespaced routers) */
 	operations: OperationsMap;
+	/**
+	 * Entity field metadata for client-side transport routing.
+	 * Client uses this to determine if any selected field requires streaming transport.
+	 */
+	entities?: EntitiesMetadata;
 }
 
 // =============================================================================
@@ -282,4 +305,112 @@ export function isSubscriptionCapable(t: TransportBase): t is SubscriptionCapabl
  */
 export function isLegacyTransport(t: TransportBase): t is Transport {
 	return "execute" in t && typeof (t as Transport).execute === "function";
+}
+
+// =============================================================================
+// Subscription Detection Helpers
+// =============================================================================
+
+/** Selection object for field selection (matches server types) */
+interface SelectionObject {
+	[key: string]:
+		| boolean
+		| SelectionObject
+		| { select: SelectionObject }
+		| { input?: unknown; select?: SelectionObject };
+}
+
+/**
+ * Check if any selected field (recursively) is a subscription.
+ * Used by client to determine if streaming transport is needed.
+ *
+ * @param entities - Entity field metadata from server metadata
+ * @param entityName - The entity type name to check
+ * @param select - Selection object (if undefined, checks ALL fields)
+ * @param visited - Set of visited entity names (prevents infinite recursion)
+ * @returns true if any selected field is a subscription
+ */
+export function hasAnySubscription(
+	entities: EntitiesMetadata | undefined,
+	entityName: string,
+	select?: SelectionObject,
+	visited: Set<string> = new Set(),
+): boolean {
+	// No entities metadata - can't determine
+	if (!entities) return false;
+
+	// Prevent infinite recursion on circular references
+	if (visited.has(entityName)) return false;
+	visited.add(entityName);
+
+	const entityMetadata = entities[entityName];
+	if (!entityMetadata) return false;
+
+	// Determine which fields to check
+	const fieldsToCheck = select ? Object.keys(select) : Object.keys(entityMetadata);
+
+	for (const fieldName of fieldsToCheck) {
+		// Skip if field doesn't exist in entity metadata
+		const fieldMode = entityMetadata[fieldName];
+		if (!fieldMode) continue;
+
+		// Check if this field is a subscription
+		if (fieldMode === "subscribe") {
+			return true;
+		}
+
+		// Get nested selection for this field
+		const fieldSelect = select?.[fieldName];
+		const nestedSelect =
+			typeof fieldSelect === "object" && fieldSelect !== null && "select" in fieldSelect
+				? (fieldSelect as { select?: SelectionObject }).select
+				: undefined;
+
+		// For nested selections, recursively check all entities
+		// (since we don't know the target entity type from field metadata alone)
+		if (nestedSelect || (typeof fieldSelect === "object" && fieldSelect !== null)) {
+			for (const targetEntityName of Object.keys(entities)) {
+				if (targetEntityName === entityName) continue; // Skip self
+				if (hasAnySubscription(entities, targetEntityName, nestedSelect, visited)) {
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Determine the effective operation type based on operation metadata and field selection.
+ * Returns "subscription" if either:
+ * 1. Operation is declared as subscription (async generator)
+ * 2. Any selected field is a subscription field
+ *
+ * @param opType - Base operation type from metadata
+ * @param entities - Entity field metadata from server
+ * @param returnEntityName - Name of the entity type returned by operation
+ * @param select - Selection object for the operation
+ * @returns Effective operation type for routing
+ */
+export function getEffectiveOperationType(
+	opType: "query" | "mutation" | "subscription",
+	entities: EntitiesMetadata | undefined,
+	returnEntityName: string | undefined,
+	select?: SelectionObject,
+): "query" | "mutation" | "subscription" {
+	// Already a subscription - keep it
+	if (opType === "subscription") return "subscription";
+
+	// Mutations are always mutations
+	if (opType === "mutation") return "mutation";
+
+	// For queries, check if any selected field is a subscription
+	if (opType === "query" && returnEntityName && entities) {
+		if (hasAnySubscription(entities, returnEntityName, select)) {
+			return "subscription";
+		}
+	}
+
+	return opType;
 }

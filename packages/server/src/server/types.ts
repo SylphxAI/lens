@@ -64,6 +64,11 @@ export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
 export interface OperationMeta {
 	type: "query" | "mutation" | "subscription";
 	optimistic?: OptimisticDSL;
+	/**
+	 * Return entity type name (if operation returns an entity).
+	 * Used by client for field-level subscription detection.
+	 */
+	returnType?: string;
 }
 
 /** Nested operations structure for handshake */
@@ -118,10 +123,28 @@ export interface LensServerConfig<
 // Server Metadata
 // =============================================================================
 
+/** Field mode for entity fields */
+export type FieldMode = "exposed" | "resolve" | "subscribe";
+
+/** Entity field metadata for client-side routing decisions */
+export interface EntityFieldMetadata {
+	[fieldName: string]: FieldMode;
+}
+
+/** All entities field metadata */
+export interface EntitiesMetadata {
+	[entityName: string]: EntityFieldMetadata;
+}
+
 /** Server metadata for transport handshake */
 export interface ServerMetadata {
 	version: string;
 	operations: OperationsMap;
+	/**
+	 * Entity field metadata for client-side transport routing.
+	 * Client uses this to determine if any selected field requires streaming transport.
+	 */
+	entities: EntitiesMetadata;
 }
 
 // =============================================================================
@@ -264,12 +287,14 @@ export interface LensServer {
 	getPluginManager(): PluginManager;
 
 	// =========================================================================
-	// Subscription Detection (Transport Selection)
+	// Subscription Detection (Deprecated - Use client-side with entities metadata)
 	// =========================================================================
 
 	/**
 	 * Check if any selected field (recursively) is a subscription.
-	 * Used by handlers to determine if SSE/WS transport is needed.
+	 *
+	 * @deprecated Use client-side subscription detection with `getMetadata().entities` instead.
+	 * The client should use the entities metadata to determine transport routing.
 	 *
 	 * @param entityName - The entity type name
 	 * @param select - Selection object (if undefined, checks ALL fields)
@@ -279,7 +304,10 @@ export interface LensServer {
 
 	/**
 	 * Check if an operation requires streaming transport.
-	 * Returns true if operation uses async generator OR any selected field is subscription.
+	 *
+	 * @deprecated Use client-side transport detection with `getMetadata().entities` instead.
+	 * The client should determine transport based on operation type from metadata
+	 * and entity field modes.
 	 *
 	 * @param path - Operation path
 	 * @param select - Selection object for return type fields

@@ -47,6 +47,8 @@ import { applySelection, extractNestedInputs } from "./selection.js";
 import type {
 	ClientSendFn,
 	EntitiesMap,
+	EntitiesMetadata,
+	EntityFieldMetadata,
 	LensLogger,
 	LensOperation,
 	LensResult,
@@ -66,6 +68,8 @@ import type {
 export type {
 	ClientSendFn,
 	EntitiesMap,
+	EntitiesMetadata,
+	EntityFieldMetadata,
 	InferApi,
 	InferInput,
 	InferOutput,
@@ -245,12 +249,15 @@ class LensServerImpl<
 	}
 
 	// =========================================================================
-	// Subscription Detection
+	// Subscription Detection (Deprecated - Use client-side with entities metadata)
 	// =========================================================================
 
 	/**
 	 * Check if any selected field (recursively) is a subscription.
-	 * Used to determine if SSE/WS transport is needed.
+	 *
+	 * @deprecated Use client-side subscription detection with `getMetadata().entities` instead.
+	 * The client should use the entities metadata to determine transport routing.
+	 * This method remains for backwards compatibility but will be removed in a future version.
 	 *
 	 * @param entityName - The entity type name
 	 * @param select - Selection object (if undefined, checks ALL fields)
@@ -310,6 +317,10 @@ class LensServerImpl<
 	/**
 	 * Check if an operation (and its return type's fields) requires streaming transport.
 	 *
+	 * @deprecated Use client-side transport detection with `getMetadata().entities` instead.
+	 * The client should determine transport based on operation type from metadata
+	 * and entity field modes. This method remains for backwards compatibility.
+	 *
 	 * Returns true if:
 	 * 1. Operation resolver is async generator (yields values)
 	 * 2. Operation resolver uses emit pattern
@@ -352,7 +363,35 @@ class LensServerImpl<
 		return {
 			version: this.version,
 			operations: this.buildOperationsMap(),
+			entities: this.buildEntitiesMetadata(),
 		};
+	}
+
+	/**
+	 * Build entities metadata for client-side transport routing.
+	 * Maps each entity to its field modes (exposed/resolve/subscribe).
+	 */
+	private buildEntitiesMetadata(): EntitiesMetadata {
+		const result: EntitiesMetadata = {};
+
+		if (!this.resolverMap) return result;
+
+		for (const [entityName, resolver] of this.resolverMap) {
+			const fieldMetadata: EntityFieldMetadata = {};
+
+			for (const fieldName of resolver.getFieldNames()) {
+				const mode = resolver.getFieldMode(String(fieldName));
+				if (mode) {
+					fieldMetadata[String(fieldName)] = mode;
+				}
+			}
+
+			if (Object.keys(fieldMetadata).length > 0) {
+				result[entityName] = fieldMetadata;
+			}
+		}
+
+		return result;
 	}
 
 	/**
@@ -996,13 +1035,34 @@ class LensServerImpl<
 			current[parts[parts.length - 1]] = meta;
 		};
 
+		// Helper to extract return type name from output definition
+		const getReturnTypeName = (output: unknown): string | undefined => {
+			if (!output) return undefined;
+			// Handle array output: [EntityDef] → extract from first element
+			if (Array.isArray(output) && output.length > 0) {
+				const element = output[0];
+				if (element && typeof element === "object" && "_name" in element) {
+					return element._name as string;
+				}
+			}
+			// Handle direct entity output
+			if (typeof output === "object" && "_name" in output) {
+				return (output as { _name?: string })._name;
+			}
+			return undefined;
+		};
+
 		for (const [name, def] of Object.entries(this.queries)) {
 			// Auto-detect subscription: if resolver is AsyncGeneratorFunction → subscription
 			const isSubscription =
 				def._resolve?.constructor?.name === "AsyncGeneratorFunction" ||
 				def._resolve?.constructor?.name === "GeneratorFunction";
 			const opType = isSubscription ? "subscription" : "query";
+			const returnType = getReturnTypeName(def._output);
 			const meta: OperationMeta = { type: opType };
+			if (returnType) {
+				meta.returnType = returnType;
+			}
 			this.pluginManager.runEnhanceOperationMeta({
 				path: name,
 				type: opType,
@@ -1013,7 +1073,11 @@ class LensServerImpl<
 		}
 
 		for (const [name, def] of Object.entries(this.mutations)) {
+			const returnType = getReturnTypeName(def._output);
 			const meta: OperationMeta = { type: "mutation" };
+			if (returnType) {
+				meta.returnType = returnType;
+			}
 			this.pluginManager.runEnhanceOperationMeta({
 				path: name,
 				type: "mutation",

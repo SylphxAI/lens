@@ -9,7 +9,15 @@
 
 import type { RouterDef } from "@sylphx/lens-core";
 import type { Plugin } from "../transport/plugin.js";
-import type { Metadata, Observable, Operation, Result, Transport } from "../transport/types.js";
+import {
+	hasAnySubscription,
+	type Metadata,
+	type Observable,
+	type Operation,
+	type OperationMeta,
+	type Result,
+	type Transport,
+} from "../transport/types.js";
 import type {
 	ExtractRouter,
 	LensClientConfig,
@@ -59,6 +67,8 @@ interface SubscriptionState {
 	completed: boolean;
 	observers: Set<ObserverEntry>;
 	unsubscribe?: (() => void) | undefined;
+	/** Selection object for field-level subscription detection */
+	select?: SelectionObject;
 }
 
 // =============================================================================
@@ -204,7 +214,7 @@ class ClientImpl {
 	// Metadata Access
 	// =========================================================================
 
-	private getOperationMeta(path: string): Metadata["operations"][string] | undefined {
+	private getOperationMeta(path: string): OperationMeta | undefined {
 		if (!this.metadata) return undefined;
 
 		const parts = path.split(".");
@@ -216,10 +226,34 @@ class ClientImpl {
 		}
 
 		if (current && typeof current === "object" && "type" in current) {
-			return current as Metadata["operations"][string];
+			return current as OperationMeta;
 		}
 
 		return undefined;
+	}
+
+	/**
+	 * Check if an operation requires subscription transport.
+	 * Returns true if:
+	 * 1. Operation is declared as subscription (async generator)
+	 * 2. Any selected field in the return type is a subscription field
+	 *
+	 * @param path - Operation path
+	 * @param select - Selection object for the operation
+	 */
+	private requiresSubscription(path: string, select?: SelectionObject): boolean {
+		const meta = this.getOperationMeta(path);
+		if (!meta) return false;
+
+		// Already a subscription - yes
+		if (meta.type === "subscription") return true;
+
+		// For queries, check if any selected field is a subscription
+		if (meta.type === "query" && meta.returnType && this.metadata?.entities) {
+			return hasAnySubscription(this.metadata.entities, meta.returnType, select);
+		}
+
+		return false;
 	}
 
 	// =========================================================================
@@ -274,6 +308,7 @@ class ClientImpl {
 				error: null,
 				completed: false,
 				observers: new Set(),
+				...(select && { select }), // Store selection for field-level subscription detection
 			});
 		}
 		const sub = this.subscriptions.get(key)!;
@@ -413,8 +448,10 @@ class ClientImpl {
 
 		await this.ensureConnected();
 
-		const meta = this.getOperationMeta(path);
-		const isSubscription = meta?.type === "subscription";
+		// Check if this operation requires subscription transport:
+		// 1. Operation is declared as subscription (async generator)
+		// 2. Any selected field in the return type is a subscription field
+		const isSubscription = this.requiresSubscription(path, sub.select);
 
 		// For subscriptions: use Observable streaming (WS/SSE)
 		// For queries: use Promise path (HTTP) - subscribe() on query just gets 1 value
