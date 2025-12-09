@@ -1,5 +1,12 @@
 # @sylphx/lens-core
 
+## 2.5.0 (2025-12-09)
+
+### ✨ Features
+
+- **core:** add entity builder pattern for typed context ([f5183f3](https://github.com/SylphxAI/lens/commit/f5183f367ad9051de7e2b6a42d256a65c6b78ce8))
+- **core:** add typedEntity curried API for typed context ([dcac145](https://github.com/SylphxAI/lens/commit/dcac1452ae5bbb341c3bd3ab292139d68f04c9fa))
+
 ## 2.4.0 (2025-12-09)
 
 ### ✨ Features

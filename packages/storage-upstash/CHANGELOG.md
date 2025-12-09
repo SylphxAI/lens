@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.12 (2025-12-09)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.5.0
+
 ## 1.0.11 (2025-12-09)
 
 ### 📦 Dependencies

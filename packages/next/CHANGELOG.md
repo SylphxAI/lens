@@ -1,5 +1,11 @@
 # @sylphx/lens-next
 
+## 2.2.12 (2025-12-09)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.5.0
+
 ## 2.2.11 (2025-12-09)
 
 ### 📦 Dependencies
