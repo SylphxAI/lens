@@ -1,7 +1,7 @@
 # ADR-001: Unified Entity Definition
 
 ## Status
-Proposed
+Accepted (Implemented)
 
 ## Context
 
@@ -124,34 +124,34 @@ const User = entity("User", (t) => ({
 
 ## Implementation Plan
 
-### Phase 1: Add `.resolve()` / `.subscribe()` to FieldType
+### Phase 1: Add `.resolve()` / `.subscribe()` to FieldType ✅
 - Extend `FieldType` base class with resolution methods
 - Add `ResolvedFieldType<T>` wrapper type
 - Add `SubscribedFieldType<T>` wrapper type
 - Tests for new field type methods
 
-### Phase 2: Add Lazy Relations
+### Phase 2: Add Lazy Relations ✅
 - Add `t.many(() => Entity)` - returns `LazyManyType`
 - Add `t.one(() => Entity)` - returns `LazyOneType`
 - Support `.resolve()` and `.subscribe()` on lazy relations
 - Tests for circular reference handling
 
-### Phase 3: Function-based Entity Definition
+### Phase 3: Function-based Entity Definition ✅
 - Support `entity(name, (t) => fields)` signature
 - Keep `entity(name, fields)` for backwards compatibility
 - Extract resolver functions from field definitions
 - Tests for both API styles
 
-### Phase 4: Runtime Integration
-- Wire field resolvers to execution engine
+### Phase 4: Runtime Integration ✅
+- Wire field resolvers to execution engine via `createResolverFromEntity()`
 - Support mixed exposed/computed/subscription fields
-- DataLoader integration for relation batching
+- `hasInlineResolvers()` helper for detection
 - E2E tests
 
-### Phase 5: Deprecation
-- Mark `resolver()` as deprecated
-- Add migration guide
-- Codemod for automatic migration (optional)
+### Phase 5: Deprecation ✅
+- Mark `resolver()` as deprecated with @deprecated JSDoc
+- Document migration to unified entity definition
+- Legacy API still supported for backwards compatibility
 
 ## Backwards Compatibility
 

@@ -503,22 +503,36 @@ class ResolverDefImpl<
 /**
  * Define field resolvers for an entity.
  *
- * Two usage patterns:
+ * @deprecated Use unified entity definition with inline resolvers instead.
+ * Define resolvers directly in the entity using `.resolve()` and `.subscribe()`:
+ *
+ * ```typescript
+ * // NEW: Unified entity definition (recommended)
+ * const User = entity("User", (t) => ({
+ *   id: t.id(),
+ *   name: t.string(),
+ *   fullName: t.string().resolve(({ parent }) =>
+ *     `${parent.firstName} ${parent.lastName}`
+ *   ),
+ *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+ *     ctx.db.posts.filter(p => p.authorId === parent.id)
+ *   ),
+ * }));
+ *
+ * // Convert to resolver for server
+ * const userResolver = createResolverFromEntity(User);
+ * ```
+ *
+ * Legacy patterns (still supported but deprecated):
  * 1. Direct call (default context): `resolver(User, (f) => ({ ... }))`
  * 2. With custom context: `resolver<{ db: DB }>()(User, (f) => ({ ... }))`
  *
- * @example
+ * @example Legacy usage
  * ```typescript
- * // Default context
+ * // OLD: Separate resolver definition (deprecated)
  * const userResolver = resolver(User, (f) => ({
  *   id: f.expose('id'),
  *   name: f.expose('name'),
- * }));
- *
- * // Custom context (like mutation<{db: DB}>())
- * const userResolver = resolver<{ db: DB }>()(User, (f) => ({
- *   id: f.expose('id'),
- *   posts: f.many(Post).resolve(({ parent, args, ctx }) => ctx.db.posts...),
  * }));
  * ```
  */
