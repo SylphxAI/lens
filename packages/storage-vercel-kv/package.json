@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-storage-vercel-kv",
-	"version": "1.0.9",
+	"version": "1.0.10",
 	"description": "Vercel KV storage adapter for Lens opLog plugin",
 	"type": "module",
 	"main": "./dist/index.js",

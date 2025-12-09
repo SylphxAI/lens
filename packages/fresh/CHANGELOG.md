@@ -1,5 +1,9 @@
 # @sylphx/lens-fresh
 
+## 2.0.15 (2025-12-09)
+
+No notable changes.
+
 ## 2.0.14 (2025-12-09)
 
 ### 📦 Dependencies

@@ -1,5 +1,19 @@
 # @sylphx/lens-core
 
+## 2.4.0 (2025-12-09)
+
+### ✨ Features
+
+- **core:** add entity to resolver conversion (Phase 4) ([e3523d1](https://github.com/SylphxAI/lens/commit/e3523d11227501be3c4d14e50fde9cfec4dd1a40))
+- **core:** add function-based entity definition (Phase 3) ([46abe28](https://github.com/SylphxAI/lens/commit/46abe2876e5d40718110d1435393fb78fadfc027))
+- **core:** add lazy relations t.one() and t.many() (Phase 2) ([bcb9de5](https://github.com/SylphxAI/lens/commit/bcb9de52aa80953d8ad126b378fb2cec90cd9980))
+- **core:** add .resolve() and .subscribe() to FieldType (Phase 1) ([5f0fa39](https://github.com/SylphxAI/lens/commit/5f0fa399a8fc548d5e6b048f4c79634f06c91438))
+- **core:** add f.json<T>() typed JSON field builder ([a4166ca](https://github.com/SylphxAI/lens/commit/a4166ca43628134d6609b3921c2c325b5d36c464))
+
+### 📚 Documentation
+
+- mark resolver() as deprecated, complete ADR-001 (Phase 5) ([4ae1edd](https://github.com/SylphxAI/lens/commit/4ae1eddcb526da31a1f2333f41a0ff3b23deef5d))
+
 ## 2.3.0
 
 ### Minor Changes
