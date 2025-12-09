@@ -5,6 +5,7 @@
  */
 
 import type {
+	AnyQueryDef,
 	ContextValue,
 	EntityDef,
 	InferRouterContext,
@@ -51,7 +52,7 @@ export interface SelectionObject {
 export type EntitiesMap = Record<string, EntityDef<string, any>>;
 
 /** Queries map type */
-export type QueriesMap = Record<string, QueryDef<unknown, unknown>>;
+export type QueriesMap = Record<string, AnyQueryDef<unknown, unknown>>;
 
 /** Mutations map type */
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;

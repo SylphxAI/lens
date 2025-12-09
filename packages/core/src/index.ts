@@ -194,19 +194,24 @@ export {
 
 export {
 	type AnyProcedure,
+	// Query types (new)
+	type AnyQueryDef,
 	flattenRouter,
 	type InferRouterClient,
 	type InferRouterContext,
 	// Type guards
+	isLiveQueryDef,
 	isMutationDef,
 	isOperationDef,
 	isOptimisticDSL,
 	isQueryDef,
 	isRouterDef,
+	isSubscribedQueryDef,
 	isTempId,
 	// Context types
 	type LensContext,
 	type LensContextExtensions,
+	type LiveQueryDef,
 	// Types
 	type MutationDef,
 	type MutationResultType,
@@ -218,7 +223,10 @@ export {
 	type OptimisticDSL,
 	type OptimisticSugar,
 	operations,
+	type PublisherResolverFn,
 	type QueryDef,
+	type QueryDefChainable,
+	type QueryMode,
 	type QueryResultType,
 	query,
 	type ResolverContext,
@@ -228,6 +236,7 @@ export {
 	type RouterRoutes,
 	resetTempIdCounter,
 	router,
+	type SubscribedQueryDef,
 	tempId,
 	type ZodLikeSchema,
 } from "./operations/index.js";

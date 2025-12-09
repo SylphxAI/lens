@@ -62,8 +62,23 @@ export { isOptimisticDSL } from "./types.js";
 // Query
 // =============================================================================
 
-export type { QueryBuilder, QueryDef } from "./query.js";
-export { isQueryDef, QueryBuilderImpl, query } from "./query.js";
+export type {
+	AnyQueryDef,
+	LiveQueryDef,
+	PublisherResolverFn,
+	QueryBuilder,
+	QueryDef,
+	QueryDefChainable,
+	QueryMode,
+	SubscribedQueryDef,
+} from "./query.js";
+export {
+	isLiveQueryDef,
+	isQueryDef,
+	isSubscribedQueryDef,
+	QueryBuilderImpl,
+	query,
+} from "./query.js";
 
 // =============================================================================
 // Mutation

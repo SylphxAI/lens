@@ -20,7 +20,7 @@
  * ```
  */
 
-import type { MutationDef, QueryDef } from "../operations/index.js";
+import type { AnyQueryDef, MutationDef, QueryDef } from "../operations/index.js";
 import { isMutationDef, isQueryDef } from "../operations/index.js";
 import type { UnionToIntersection } from "../utils/types.js";
 
@@ -30,7 +30,7 @@ import type { UnionToIntersection } from "../utils/types.js";
 
 /** Any procedure (query or mutation) */
 export type AnyProcedure =
-	| QueryDef<unknown, unknown, unknown>
+	| AnyQueryDef<unknown, unknown, unknown>
 	| MutationDef<unknown, unknown, unknown>;
 
 /** Router routes - can contain procedures or nested routers */
