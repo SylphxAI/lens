@@ -1,7 +1,7 @@
 # ADR-002: Two-Phase Field Resolution
 
 ## Status
-Proposed
+Accepted (Implemented)
 
 ## Context
 
@@ -61,14 +61,18 @@ Introduce **two-phase field resolution** with chainable `.resolve().subscribe()`
 
 ```typescript
 // Phase 1: Initial data (batchable)
-// Phase 2: Live updates (optional)
+// Phase 2: Live updates (optional, Publisher pattern)
 
 status: f.string()
   .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))  // Initial
-  .subscribe(({ parent, ctx, emit }) => {                      // Updates
+  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {  // Updates (Publisher)
     ctx.statusService.watch(parent.id, (s) => emit(s));
+    onCleanup(() => ctx.statusService.unwatch(parent.id));
   })
 ```
+
+**Publisher Pattern**: The `.subscribe()` function returns a Publisher `({ emit, onCleanup }) => void`.
+This keeps emit/onCleanup separate from user context (ctx), making the API cleaner.
 
 ### Field Resolution Modes
 
@@ -119,6 +123,9 @@ Query arrives
 ### New Type: LiveField
 
 ```typescript
+/** Publisher pattern - receives emit/onCleanup callbacks */
+type Publisher<T> = (callbacks: { emit: (value: T) => void; onCleanup: (fn: () => void) => void }) => void;
+
 /** Field with both resolver (initial) and subscriber (updates) */
 interface LiveField<T, TArgs, TContext> {
   readonly _kind: "resolved";
@@ -126,7 +133,7 @@ interface LiveField<T, TArgs, TContext> {
   readonly _returnType: T;
   readonly _argsSchema: z.ZodType<TArgs> | null;
   readonly _resolver: (params: ResolveParams) => T | Promise<T>;
-  readonly _subscriber: (params: SubscribeParams) => void | Promise<void>;
+  readonly _subscriber: (params: { parent; args; ctx }) => Publisher<T>;  // Returns Publisher
 }
 ```
 
@@ -158,26 +165,29 @@ posts: f.many(Post).resolve(({ parent, ctx }) =>
   ctx.db.posts.findMany({ authorId: parent.id })
 )
 
-// 2. Subscribe only (legacy, no batch)
-status: f.string().subscribe(({ ctx, emit }) => {
+// 2. Subscribe only (legacy, returns Publisher)
+status: f.string().subscribe(({ ctx }) => ({ emit, onCleanup }) => {
   emit(getStatus());
   watch((s) => emit(s));
+  onCleanup(() => unwatch());
 })
 
 // 3. Resolve + Subscribe (NEW - can batch initial!)
 status: f.string()
   .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
-  .subscribe(({ parent, ctx, emit }) => {
+  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
     ctx.statusService.watch(parent.id, (s) => emit(s));
+    onCleanup(() => ctx.statusService.unwatch(parent.id));
   })
 
 // 4. Relation with live updates
 posts: f.many(Post)
   .resolve(({ parent, ctx }) => ctx.db.posts.findMany({ authorId: parent.id }))
-  .subscribe(({ parent, ctx, emit }) => {
-    ctx.db.posts.onChange(parent.id, () => {
+  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.db.posts.onChange(parent.id, () => {
       emit(ctx.db.posts.findMany({ authorId: parent.id }));
     });
+    onCleanup(unsub);
   })
 ```
 

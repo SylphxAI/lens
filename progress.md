@@ -111,20 +111,23 @@ resolver(User, (f) => ({
     ctx.db.posts.find({ authorId: parent.id })
   ),
 
-  // Live field: resolve (batchable) + subscribe (fire-and-forget)
+  // Live field: resolve (batchable) + subscribe (Publisher pattern)
   status: f.string()
     .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
-    .subscribe(({ parent, ctx }) => {
-      ctx.db.onStatusChange(parent.id, (status) => ctx.emit(status));
-      ctx.onCleanup(() => ctx.db.unsubscribe(parent.id));
+    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+      // Publisher pattern: emit/onCleanup from callback, not ctx
+      ctx.db.onStatusChange(parent.id, (status) => emit(status));
+      onCleanup(() => ctx.db.unsubscribe(parent.id));
     }),
 }))
 ```
 
 **Field Modes:**
 - `resolve` - One-shot, batchable via DataLoader (no emit/onCleanup)
-- `subscribe` - Legacy fire-and-forget (has emit/onCleanup, not batchable)
-- `live` - Best of both: resolve for initial (batchable) + subscribe for updates
+- `subscribe` - Returns Publisher for live updates
+- `live` - Best of both: resolve for initial (batchable) + subscribe (Publisher) for updates
+
+**Publisher Pattern:** `({ emit, onCleanup }) => void` - keeps user ctx clean
 
 ## Recent Changes
 
