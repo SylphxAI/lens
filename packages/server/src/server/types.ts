@@ -124,7 +124,7 @@ export interface LensServerConfig<
 // =============================================================================
 
 /** Field mode for entity fields */
-export type FieldMode = "exposed" | "resolve" | "subscribe";
+export type FieldMode = "exposed" | "resolve" | "subscribe" | "live";
 
 /** Entity field metadata for client-side routing decisions */
 export interface EntityFieldMetadata {

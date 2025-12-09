@@ -167,6 +167,10 @@ const getUser = query()
 - [ ] DataLoader integration for batching
 - [ ] Field-level authorization
 
+### Known Issues
+
+- [ ] **Circular resolver hang** - v2-complete tests hang when resolvers have circular references (User.posts → Post.author → User). Tests skipped temporarily. Root cause: `resolveEntityFields` recursive calls may need cycle detection. See `examples/v2-complete/server.test.ts`.
+
 ---
 
 ## Multi-Entity Optimistic DSL Design
