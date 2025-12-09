@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.7.2 (2025-12-09)
+
+### 🐛 Bug Fixes
+
+- **server:** handle subscription fields with fire-and-forget pattern ([6d59e99](https://github.com/SylphxAI/lens/commit/6d59e993536fa4f757233ff45e740ed75e4e72e6))
+
 ## 2.7.1 (2025-12-09)
 
 ### 📦 Dependencies
