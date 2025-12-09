@@ -1,5 +1,11 @@
 # @sylphx/lens-vue
 
+## 2.3.2 (2025-12-09)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 2.4.0
+
 ## 2.3.1
 
 ### Patch Changes
