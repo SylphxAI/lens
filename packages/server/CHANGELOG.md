@@ -1,5 +1,28 @@
 # @sylphx/lens-server
 
+## 2.5.0
+
+### Minor Changes
+
+- Add subscription detection for field resolvers
+
+  Core:
+
+  - Add `isSubscription(fieldName)` method to check if field uses emit pattern
+  - Add `getFieldMode(fieldName)` to return "exposed" | "resolve" | "subscribe" | null
+
+  Server:
+
+  - Add `hasAnySubscription(entityName, select?)` for recursive subscription field detection
+  - Add `requiresStreamingTransport(path, select?)` for automatic transport selection
+
+  This enables automatic HTTP → SSE/WS transport upgrade when any selected field uses the `.subscribe()` pattern for real-time updates.
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-core@2.3.0
+
 ## 2.4.1 (2025-12-08)
 
 ### ♻️ Refactoring
@@ -163,6 +186,7 @@ Fix: bypass deprecated 2.0.0 versions on npm registry.
 v2.0.0 - Unified release with breaking changes.
 
 Breaking changes:
+
 - `inProcess({ server })` renamed to `inProcess({ app })`
 - Signals extracted to `@sylphx/lens-signals`
 - Storage adapters moved to separate packages
@@ -329,11 +353,9 @@ No notable changes.
 
 Release patch version
 
-
 ## 1.11.1 (2025-12-02)
 
 Release patch version
-
 
 ## 1.11.0 (2025-12-02)
 
@@ -515,7 +537,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -558,7 +580,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -597,7 +619,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -636,7 +658,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -675,7 +697,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -714,7 +736,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -753,7 +775,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 
@@ -790,7 +812,7 @@ Release patch version
 
 - **core:** remove legacy createResolverRegistry API ([ea99640](https://github.com/SylphxAI/Lens/commit/ea9964068aa3d67efdafe18e0c1022a78e15bf97))
 - enable noUnusedVariables linter rule ([fd2026d](https://github.com/SylphxAI/Lens/commit/fd2026d394f3498b63f57e79a7d31b2aea89776e))
-- **server,client:** replace console.* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
+- **server,client:** replace console.\* with configurable logger ([7675a53](https://github.com/SylphxAI/Lens/commit/7675a532b24d024710d29c0dfdf8afd278e13891))
 - cleanup legacy code and incomplete implementations ([f2c574d](https://github.com/SylphxAI/Lens/commit/f2c574d91ac8cefb053c7d13e3d4cee6f888267b))
 - **core:** clean up API surface and remove legacy code ([e3da689](https://github.com/SylphxAI/Lens/commit/e3da68951566f72fbb3ef963200ff62e5cf4336f))
 

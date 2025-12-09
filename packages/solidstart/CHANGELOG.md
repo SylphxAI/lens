@@ -1,5 +1,15 @@
 # @sylphx/lens-solidstart
 
+## 2.0.15
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-core@2.3.0
+  - @sylphx/lens-server@2.5.0
+  - @sylphx/lens-client@2.3.2
+  - @sylphx/lens-solid@2.2.1
+
 ## 2.0.14 (2025-12-08)
 
 ### 📦 Dependencies
@@ -103,6 +113,7 @@ Fix: bypass deprecated 2.0.0 versions on npm registry.
 v2.0.0 - Unified release with breaking changes.
 
 Breaking changes:
+
 - `inProcess({ server })` renamed to `inProcess({ app })`
 - Signals extracted to `@sylphx/lens-signals`
 - Storage adapters moved to separate packages
@@ -143,11 +154,9 @@ No notable changes.
 
 Release patch version
 
-
 ## 1.2.29 (2025-12-02)
 
 Release patch version
-
 
 ## 1.2.28 (2025-12-02)
 

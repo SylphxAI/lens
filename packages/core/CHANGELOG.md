@@ -1,5 +1,23 @@
 # @sylphx/lens-core
 
+## 2.3.0
+
+### Minor Changes
+
+- Add subscription detection for field resolvers
+
+  Core:
+
+  - Add `isSubscription(fieldName)` method to check if field uses emit pattern
+  - Add `getFieldMode(fieldName)` to return "exposed" | "resolve" | "subscribe" | null
+
+  Server:
+
+  - Add `hasAnySubscription(entityName, select?)` for recursive subscription field detection
+  - Add `requiresStreamingTransport(path, select?)` for automatic transport selection
+
+  This enables automatic HTTP → SSE/WS transport upgrade when any selected field uses the `.subscribe()` pattern for real-time updates.
+
 ## 2.2.0 (2025-12-07)
 
 ### ✨ Features
@@ -77,6 +95,7 @@ Fix: bypass deprecated 2.0.0 versions on npm registry.
 v2.0.0 - Unified release with breaking changes.
 
 Breaking changes:
+
 - `inProcess({ server })` renamed to `inProcess({ app })`
 - Signals extracted to `@sylphx/lens-signals`
 - Storage adapters moved to separate packages
@@ -193,11 +212,9 @@ No notable changes.
 
 Release patch version
 
-
 ## 1.22.1 (2025-12-02)
 
 Release patch version
-
 
 ## 1.22.0 (2025-12-02)
 

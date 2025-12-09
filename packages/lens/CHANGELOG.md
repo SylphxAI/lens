@@ -1,5 +1,14 @@
 # @sylphx/lens
 
+## 2.0.13
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-core@2.3.0
+  - @sylphx/lens-server@2.5.0
+  - @sylphx/lens-client@2.3.2
+
 ## 2.0.12 (2025-12-08)
 
 ### 📦 Dependencies
@@ -98,6 +107,7 @@ Fix: bypass deprecated 2.0.0 versions on npm registry.
 v2.0.0 - Unified release with breaking changes.
 
 Breaking changes:
+
 - `inProcess({ server })` renamed to `inProcess({ app })`
 - Signals extracted to `@sylphx/lens-signals`
 - Storage adapters moved to separate packages
@@ -157,7 +167,6 @@ Release patch version
 ## 1.2.13 (2025-12-02)
 
 Release patch version
-
 
 ## 1.2.12 (2025-12-02)
 
@@ -265,7 +274,7 @@ Recovery release - bypass blocked version 1.1.0 on npm.
 - use bunup for all packages, remove tsc build:types ([ba31790](https://github.com/SylphxAI/Lens/commit/ba31790239233c1573e3bb2fe1626c1fadc8fae9))
 - **core:** add explicit type annotations for bunup CI ([a2cc776](https://github.com/SylphxAI/Lens/commit/a2cc77681155cf807659daefedf54ab0f3116910))
 - externalize framework dependencies using bunup ([7e49f16](https://github.com/SylphxAI/Lens/commit/7e49f16535088d05ddfdfefa3b85d234af74c76e))
-- **release:** resolve workspace:* dependencies before publishing ([7272d22](https://github.com/SylphxAI/Lens/commit/7272d229bc2e06baecd2a73fcefa5a46585d2e59))
+- **release:** resolve workspace:\* dependencies before publishing ([7272d22](https://github.com/SylphxAI/Lens/commit/7272d229bc2e06baecd2a73fcefa5a46585d2e59))
 
 ### 💅 Styles
 

@@ -1,5 +1,15 @@
 # @sylphx/lens-next
 
+## 2.2.8
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-core@2.3.0
+  - @sylphx/lens-server@2.5.0
+  - @sylphx/lens-client@2.3.2
+  - @sylphx/lens-react@2.4.1
+
 ## 2.2.7 (2025-12-08)
 
 ### 📦 Dependencies
@@ -111,12 +121,14 @@ feat: selector-based hooks API - client auto-injected from context
 BREAKING: Hooks now use selector callbacks to auto-inject client from LensProvider context.
 
 Before:
+
 ```tsx
 const client = useLensClient();
 const { data } = useQuery(client.user.get, { id: userId });
 ```
 
 After:
+
 ```tsx
 const { data } = useQuery((client) => client.user.get, { id: userId });
 ```
@@ -167,6 +179,7 @@ Fix: bypass deprecated 2.0.0 versions on npm registry.
 v2.0.0 - Unified release with breaking changes.
 
 Breaking changes:
+
 - `inProcess({ server })` renamed to `inProcess({ app })`
 - Signals extracted to `@sylphx/lens-signals`
 - Storage adapters moved to separate packages
@@ -207,11 +220,9 @@ No notable changes.
 
 Release patch version
 
-
 ## 1.2.20 (2025-12-02)
 
 Release patch version
-
 
 ## 1.2.19 (2025-12-02)
 
