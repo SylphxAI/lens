@@ -140,50 +140,56 @@ const getUser = query()
   //         ^ ctx has NO emit, NO onCleanup
 ```
 
-### 2. Subscription: Push Updates with `emit` (`.subscribe()`)
+### 2. Live Query: Initial + Updates (`.resolve().subscribe()`) ✅ Recommended
 
-For real-time updates. Context has **both** `emit` and `onCleanup`:
+For real-time updates with initial value. Uses **Publisher pattern** - emit/onCleanup are in the callback, not ctx:
 
 ```typescript
 const watchUser = query()
   .input(z.object({ id: z.string() }))
-  .subscribe(({ input, ctx }) => {
-  //          ^ ctx HAS emit AND onCleanup
-
-    // Subscribe to external data source
+  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))  // Initial value
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+    // Publisher callback - emit/onCleanup passed here, NOT in ctx
     const unsubscribe = db.user.onChange(input.id, (user) => {
-      ctx.emit(user)  // Push update to subscribed clients
+      emit(user)  // Push update to subscribed clients
     })
-
-    // Cleanup when client disconnects
-    ctx.onCleanup(unsubscribe)
-
-    // Initial emit (optional)
-    db.user.find(input.id).then(ctx.emit)
+    onCleanup(unsubscribe)
   })
 ```
 
-### 3. Subscription: Streaming with `yield` (`.subscribe()`)
+### 3. Streaming with `yield`
 
-For streaming multiple values (pagination, feeds, AI responses). Context has `onCleanup` but **no** `emit` (yield IS the emit):
+For streaming multiple values (pagination, feeds, AI responses):
 
 ```typescript
 const streamMessages = query()
-  .subscribe(async function* ({ ctx }) {
-  //          ^ ctx has onCleanup, but NO emit (use yield instead)
+  .resolve(async function* ({ ctx }) {
     for await (const message of ctx.ai.stream()) {
       yield message  // Stream each value to client
     }
   })
 ```
 
+### 4. Legacy Subscription (`.subscribe()` standalone) ⚠️ Deprecated
+
+> **⚠️ Deprecated:** Use `.resolve().subscribe()` instead for better performance.
+
+```typescript
+// ❌ DEPRECATED - ctx.emit pattern
+const watchUser = query()
+  .subscribe(({ input, ctx }) => {
+    ctx.emit(user)  // OLD pattern - emit on ctx
+    ctx.onCleanup(unsubscribe)
+  })
+```
+
 ### Type-Safe Context Summary
 
-| Method | Return Type | `ctx.emit` | `ctx.onCleanup` |
-|--------|-------------|------------|-----------------|
+| Method | Return Type | `emit` | `onCleanup` |
+|--------|-------------|--------|-------------|
 | `.resolve()` | `T \| Promise<T>` | ❌ | ❌ |
-| `.subscribe()` (emit) | `void \| Promise<void>` | ✅ | ✅ |
-| `.subscribe()` (yield) | `AsyncGenerator<T>` | ❌ | ✅ |
+| `.resolve().subscribe()` ✅ | Publisher callback | In callback | In callback |
+| `.subscribe()` ⚠️ deprecated | `void` | On `ctx` | On `ctx` |
 
 ---
 
@@ -290,98 +296,74 @@ The server automatically selects optimal transfer strategies:
 
 ## Entity & Field Resolution
 
-Lens follows GraphQL's design: **entities define shape**, **field resolvers define resolution with arguments**.
+Lens uses **inline resolvers** - define entities with their field resolution in one place.
 
-### 1. Define Entities (Scalar Fields Only)
+### Define Entities with Inline Resolvers ✅ Recommended
 
-Entities define the shape of your data with scalar fields. No relations here - this avoids TypeScript circular reference issues:
+Use the **function-based API** `entity("Name", (t) => ({ ... }))` for inline resolvers:
 
 ```typescript
-import { entity, t } from '@sylphx/lens-core'
+import { entity } from '@sylphx/lens-core'
 
-const User = entity("User", {
+// User entity with inline field resolvers
+const User = entity<AppContext>("User").define((t) => ({
+  // Scalar fields
   id: t.id(),
   name: t.string(),
   email: t.string(),
   role: t.enum(["user", "admin"]),
   createdAt: t.date(),
-})
 
-const Post = entity("Post", {
-  id: t.id(),
-  title: t.string(),
-  content: t.string(),
-  authorId: t.string(),  // FK to User (scalar, not relation)
-  published: t.boolean(),
-})
-```
-
-### 2. Define Field Resolvers (with Field Arguments)
-
-Use `lens()` to create typed resolver, query, and mutation builders:
-
-```typescript
-import { lens } from '@sylphx/lens-core'
-
-// Create typed builders with shared context
-const { resolver, query, mutation } = lens<AppContext>()
-
-// User resolver with field arguments (GraphQL-style)
-const userResolver = resolver(User, (f) => ({
-  // ===== Expose scalar fields from parent =====
-  id: f.expose("id"),
-  name: f.expose("name"),
-  email: f.expose("email"),
-  role: f.expose("role"),
-
-  // ===== Computed field (no args) =====
-  displayName: f.string().resolve(({ parent }) =>
+  // Computed field
+  displayName: t.string().resolve(({ parent }) =>
     `${parent.name} (${parent.role})`
   ),
 
-  // ===== Relation with field arguments =====
-  posts: f.many(Post)
+  // Relation with arguments (GraphQL-style)
+  posts: t.many(() => Post)
     .args(z.object({
       first: z.number().default(10),
-      after: z.string().optional(),
       published: z.boolean().optional(),
-      orderBy: z.enum(["createdAt", "title"]).default("createdAt"),
     }))
     .resolve(({ parent, args, ctx }) =>
       ctx.db.posts.findMany({
-        where: {
-          authorId: parent.id,
-          published: args.published,
-        },
+        where: { authorId: parent.id, published: args.published },
         take: args.first,
-        cursor: args.after,
-        orderBy: { [args.orderBy]: 'desc' },
       })
     ),
 
-  // ===== Computed field with arguments =====
-  postsCount: f.int()
+  // Computed with arguments
+  postsCount: t.int()
     .args(z.object({ published: z.boolean().optional() }))
     .resolve(({ parent, args, ctx }) =>
       ctx.db.posts.count({
         where: { authorId: parent.id, published: args.published },
       })
     ),
+
+  // Live field (real-time updates)
+  status: t.string()
+    .resolve(({ parent, ctx }) => ctx.getStatus(parent.id))
+    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+      const unsub = ctx.pubsub.on(`status:${parent.id}`, emit)
+      onCleanup(unsub)
+    }),
 }))
 
-const postResolver = resolver(Post, (f) => ({
-  id: f.expose("id"),
-  title: f.expose("title"),
-  content: f.expose("content"),
-  published: f.expose("published"),
+const Post = entity<AppContext>("Post").define((t) => ({
+  id: t.id(),
+  title: t.string(),
+  content: t.string(),
+  published: t.boolean(),
+  authorId: t.string(),
 
-  // belongsTo relation
-  author: f.one(User).resolve(({ parent, ctx }) =>
+  // Lazy relation (avoids circular reference)
+  author: t.one(() => User).resolve(({ parent, ctx }) =>
     ctx.db.users.find(parent.authorId)
   ),
 
   // Computed with arguments
-  excerpt: f.string()
+  excerpt: t.string()
     .args(z.object({ length: z.number().default(100) }))
     .resolve(({ parent, args }) =>
       parent.content.slice(0, args.length) + "..."
@@ -389,14 +371,36 @@ const postResolver = resolver(Post, (f) => ({
 }))
 ```
 
-### 3. Register with Server
+### Register with Server
+
+Entities with inline resolvers are **auto-extracted** - no need for `resolvers` array:
 
 ```typescript
 const app = createApp({
   router: appRouter,
-  entities: { User, Post },
-  resolvers: [userResolver, postResolver],  // Array of resolver values
+  entities: { User, Post },  // Inline resolvers auto-extracted
   context: () => ({ db }),
+})
+```
+
+### Legacy: Separate resolver() ⚠️ Deprecated
+
+> **⚠️ Deprecated:** Use inline resolvers in entity definitions instead.
+
+```typescript
+// ❌ DEPRECATED - separate resolver pattern
+import { lens } from '@sylphx/lens-core'
+const { resolver } = lens<AppContext>()
+
+const userResolver = resolver(User, (f) => ({
+  id: f.expose("id"),
+  posts: f.many(Post).resolve(...)
+}))
+
+// Need to pass resolvers array
+const app = createApp({
+  entities: { User },
+  resolvers: [userResolver],  // ❌ Not needed with inline resolvers
 })
 ```
 
@@ -407,18 +411,21 @@ const app = createApp({
 ({ parent, args, ctx }: { parent: TParent; args: TArgs; ctx: TContext }) => TResult | Promise<TResult>
 ```
 
-### Field Builder API
+### Type Builder API (Inline Resolvers)
 
 | Method | Description | Example |
 |--------|-------------|---------|
-| `f.expose(field)` | Expose scalar from parent | `f.expose("name")` |
-| `f.string()` | Computed string field | `f.string().resolve((p, args, ctx) => ...)` |
-| `f.int()` | Computed int field | `f.int().resolve(...)` |
-| `f.boolean()` | Computed boolean field | `f.boolean().resolve(...)` |
-| `f.one(Entity)` | Singular relation | `f.one(User).resolve(...)` |
-| `f.many(Entity)` | Collection relation | `f.many(Post).resolve(...)` |
+| `t.id()` | ID field | `id: t.id()` |
+| `t.string()` | String field | `name: t.string()` |
+| `t.int()` | Integer field | `age: t.int()` |
+| `t.boolean()` | Boolean field | `active: t.boolean()` |
+| `t.date()` | Date field | `createdAt: t.date()` |
+| `t.enum([...])` | Enum field | `role: t.enum(["user", "admin"])` |
+| `t.one(() => E)` | Singular relation | `author: t.one(() => User)` |
+| `t.many(() => E)` | Collection relation | `posts: t.many(() => Post)` |
 | `.args(schema)` | Add field arguments | `.args(z.object({ limit: z.number() }))` |
-| `.resolve(fn)` | Field resolver function | `.resolve((parent, args, ctx) => ...)` |
+| `.resolve(fn)` | Field resolver | `.resolve(({ parent, args, ctx }) => ...)` |
+| `.subscribe(fn)` | Live updates (Publisher) | `.subscribe(({ parent }) => ({ emit }) => ...)` |
 
 ### GraphQL Comparison
 
@@ -1273,22 +1280,20 @@ export const getUser = typedQuery()
 ```typescript
 // Server: Single query serves both initial load AND live updates
 const getDashboard = query()
-  .subscribe(({ ctx }) => {
-    // Emit initial state
-    ctx.emit({
-      metrics: ctx.metrics.getCurrent(),
-      alerts: ctx.alerts.getCurrent(),
-    })
-
-    // Subscribe to multiple data sources
+  .resolve(({ ctx }) => ({
+    metrics: ctx.metrics.getCurrent(),
+    alerts: ctx.alerts.getCurrent(),
+  }))
+  .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+    // Publisher pattern - emit/onCleanup in callback
     const unsubMetrics = ctx.metrics.onChange((metrics) => {
-      ctx.emit.set("metrics", metrics)
+      emit.set("metrics", metrics)
     })
     const unsubAlerts = ctx.alerts.onChange((alerts) => {
-      ctx.emit.set("alerts", alerts)
+      emit.set("alerts", alerts)
     })
 
-    ctx.onCleanup(() => {
+    onCleanup(() => {
       unsubMetrics()
       unsubAlerts()
     })
@@ -1305,7 +1310,7 @@ client.dashboard.get().subscribe((dashboard) => {
 ### AI Chat Streaming
 
 ```typescript
-// Server: Stream tokens as they arrive
+// Server: Stream tokens as they arrive (yield pattern)
 const chat = query()
   .input(z.object({ messages: z.array(MessageSchema) }))
   .resolve(async function* ({ input, ctx }) {
@@ -1337,18 +1342,16 @@ client.chat({ messages }).subscribe((response) => {
 // Server: Multiple users editing same document
 const getDocument = query()
   .input(z.object({ docId: z.string() }))
-  .subscribe(({ input, ctx }) => {
+  .resolve(({ input, ctx }) => ctx.docs.get(input.docId).get())
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
     const docRef = ctx.docs.get(input.docId)
-
-    // Emit initial state
-    docRef.get().then(ctx.emit)
 
     // Listen for changes from ANY user
     const unsub = docRef.onSnapshot((doc) => {
-      ctx.emit(doc.data())
+      emit(doc.data())
     })
 
-    ctx.onCleanup(unsub)
+    onCleanup(unsub)
   })
 
 const updateDocument = mutation()
@@ -1376,19 +1379,16 @@ await client.document.update({ docId: "123", content: newContent })
 // Server: Return page, but also push new items
 const getPosts = query()
   .input(z.object({ cursor: z.string().optional(), limit: z.number() }))
-  .subscribe(({ input, ctx }) => {
-    // Emit initial paginated results
-    ctx.posts.findMany({
-      cursor: input.cursor,
-      take: input.limit,
-    }).then(ctx.emit)
-
+  .resolve(({ input, ctx }) =>
+    ctx.posts.findMany({ cursor: input.cursor, take: input.limit })
+  )
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
     // Listen for new posts
     const unsub = ctx.posts.onNew((newPost) => {
-      ctx.emit.unshift(newPost)  // Add to front of array
+      emit.unshift(newPost)  // Add to front of array
     })
 
-    ctx.onCleanup(unsub)
+    onCleanup(unsub)
   })
 
 // Client: Load page AND receive new posts in real-time
@@ -1405,18 +1405,19 @@ client.posts.get({ limit: 20 }).subscribe((posts) => {
 // Server: Track active users
 const getPresence = query()
   .input(z.object({ roomId: z.string() }))
-  .subscribe(({ input, ctx }) => {
+  .resolve(({ input, ctx }) => {
     const room = ctx.presence.join(input.roomId, ctx.user)
-
-    // Emit initial state
-    ctx.emit(room.getUsers())
+    return room.getUsers()
+  })
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+    const room = ctx.presence.get(input.roomId)
 
     // Listen for user join/leave
     room.onUpdate((users) => {
-      ctx.emit(users)
+      emit(users)
     })
 
-    ctx.onCleanup(() => room.leave())
+    onCleanup(() => room.leave())
   })
 
 // Client: See who's online in real-time
@@ -1448,12 +1449,12 @@ client.user.get({ id }).subscribe(...)  // Live
 
 ### "How do I do streaming like Server-Sent Events?"
 
-Use `yield` in an async generator with `.subscribe()`:
+Use `yield` in an async generator with `.resolve()`:
 
 ```typescript
 // Server
 const streamData = query()
-  .subscribe(async function* ({ ctx }) {
+  .resolve(async function* ({ ctx }) {
     for await (const item of ctx.dataStream) {
       yield item  // Each yield sends to client
     }
@@ -1467,23 +1468,21 @@ client.data.stream().subscribe((item) => {
 
 ### "What if my data comes from an external source (WebSocket, webhook, etc.)?"
 
-Use `ctx.emit` in a `.subscribe()` resolver to push updates whenever you want:
+Use `.resolve().subscribe()` with the Publisher pattern:
 
 ```typescript
 const watchPrices = query()
   .input(z.object({ symbol: z.string() }))
-  .subscribe(({ input, ctx }) => {
-    // Emit initial state
-    ctx.emit({ price: 0, symbol: input.symbol })
-
+  .resolve(({ input }) => ({ price: 0, symbol: input.symbol }))  // Initial value
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
     // Connect to external WebSocket
     const ws = new WebSocket(`wss://prices.api/${input.symbol}`)
 
     ws.onmessage = (event) => {
-      ctx.emit(JSON.parse(event.data))  // Push to Lens clients
+      emit(JSON.parse(event.data))  // Push to Lens clients
     }
 
-    ctx.onCleanup(() => ws.close())
+    onCleanup(() => ws.close())
   })
 ```
 
@@ -1496,13 +1495,11 @@ Two ways:
 // Query subscribes to database changes
 const getUser = query()
   .input(z.object({ id: z.string() }))
-  .subscribe(({ input, ctx }) => {
-    // Emit initial state
-    ctx.db.user.find(input.id).then(ctx.emit)
-
+  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
     // Listen for changes
-    const unsub = ctx.db.user.onChange(input.id, ctx.emit)
-    ctx.onCleanup(unsub)
+    const unsub = ctx.db.user.onChange(input.id, emit)
+    onCleanup(unsub)
   })
 
 // Mutation updates database
@@ -1572,15 +1569,13 @@ const unsubscribe = client.data.get().subscribe(callback)
 // Later...
 unsubscribe()  // Stops receiving updates
 
-// Server: ctx.onCleanup is called when client disconnects
-.subscribe(({ ctx }) => {
-  // Emit initial state
-  ctx.emit(initialData)
-
+// Server: onCleanup is called when client disconnects
+.resolve(() => initialData)
+.subscribe(({ ctx }) => ({ emit, onCleanup }) => {
   // Push updates periodically
-  const interval = setInterval(() => ctx.emit(getData()), 1000)
+  const interval = setInterval(() => emit(getData()), 1000)
 
-  ctx.onCleanup(() => {
+  onCleanup(() => {
     clearInterval(interval)  // Called when client unsubscribes
   })
 })

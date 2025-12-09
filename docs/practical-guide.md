@@ -71,25 +71,20 @@ const getUser = query()
 
 After a client subscribes, if User:123 is updated anywhere (mutation, other query), Lens automatically pushes changes to subscribed clients.
 
-### Advanced Pattern: Emit (Push Updates)
+### Live Query Pattern: resolve + subscribe (Push Updates)
 
-When you need to listen to external data sources:
+When you need to listen to external data sources, use `.resolve().subscribe()` with the **Publisher pattern**:
 
 ```typescript
 const watchUser = query()
   .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => {
-    // Listen to external changes
+  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))  // Initial value
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+    // Publisher callback - emit/onCleanup passed here, NOT in ctx
     const unsubscribe = ctx.db.user.onChange(input.id, (updated) => {
-      // Push update
-      ctx.emit({ name: updated.name, lastSeen: new Date() })
+      emit({ name: updated.name, lastSeen: new Date() })  // Push update
     })
-
-    // Cleanup when client disconnects
-    ctx.onCleanup(unsubscribe)
-
-    // Return initial data
-    return ctx.db.user.find(input.id)
+    onCleanup(unsubscribe)  // Cleanup when client disconnects
   })
 ```
 
@@ -163,16 +158,18 @@ Client automatically:
 
 **Server**:
 ```typescript
-// entities/user.ts
-export const User = entity('User', {
+// entities/user.ts - Use function-based API with inline resolvers
+export const User = entity<AppContext>('User').define((t) => ({
   id: t.id(),
   name: t.string(),
   email: t.string(),
   avatar: t.string().optional(),
   bio: t.string().optional(),
-})
+}))
 
 // routers/user.ts
+const { query, mutation } = lens<AppContext>()
+
 export const userRouter = router({
   get: query()
     .input(z.object({ id: z.string() }))
@@ -235,25 +232,24 @@ function UserProfile({ userId }: { userId: string }) {
 **Server**:
 ```typescript
 const getDashboard = query()
-  .resolve(({ ctx }) => {
-    // Subscribe to multiple data sources
+  .resolve(({ ctx }) => ({
+    metrics: ctx.metrics.getCurrent(),
+    alerts: ctx.alerts.getCurrent(),
+  }))
+  .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+    // Publisher pattern - emit/onCleanup in callback
     const unsubMetrics = ctx.metrics.onChange((m) => {
-      ctx.emit.set('metrics', m)
+      emit.set('metrics', m)
     })
 
     const unsubAlerts = ctx.alerts.onChange((a) => {
-      ctx.emit.set('alerts', a)
+      emit.set('alerts', a)
     })
 
-    ctx.onCleanup(() => {
+    onCleanup(() => {
       unsubMetrics()
       unsubAlerts()
     })
-
-    return {
-      metrics: ctx.metrics.getCurrent(),
-      alerts: ctx.alerts.getCurrent(),
-    }
   })
 ```
 
@@ -336,16 +332,16 @@ function ChatBox() {
 ```typescript
 const getDocument = query()
   .input(z.object({ docId: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .resolve(({ input, ctx }) => ctx.docs.get(input.docId).getData())
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
     const doc = ctx.docs.get(input.docId)
 
     // Listen to all users' edits
     const unsub = doc.onUpdate((data) => {
-      ctx.emit(data)
+      emit(data)
     })
 
-    ctx.onCleanup(unsub)
-    return doc.getData()
+    onCleanup(unsub)
   })
 
 const updateDocument = mutation()
@@ -372,19 +368,20 @@ const getPosts = query()
     limit: z.number().default(20)
   }))
   .returns([Post])
-  .resolve(({ input, ctx }) => {
-    // Listen for new posts
-    const unsub = ctx.posts.onNew((newPost) => {
-      ctx.emit.unshift(newPost)  // Add to front
-    })
-
-    ctx.onCleanup(unsub)
-
-    return ctx.db.posts.findMany({
+  .resolve(({ input, ctx }) =>
+    ctx.db.posts.findMany({
       cursor: input.cursor,
       take: input.limit,
       orderBy: { createdAt: 'desc' },
     })
+  )
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+    // Listen for new posts
+    const unsub = ctx.posts.onNew((newPost) => {
+      emit.unshift(newPost)  // Add to front
+    })
+
+    onCleanup(unsub)
   })
 ```
 
@@ -492,27 +489,29 @@ const getUser = query()
 
 ```typescript
 const watchUser = query()
-  .resolve(({ input, ctx }) => {
+  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
+  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
     // Subscribe to external resources
-    const unsub1 = ctx.db.onChange(...)
-    const unsub2 = ctx.ws.subscribe(...)
+    const unsub1 = ctx.db.onChange(input.id, emit)
+    const unsub2 = ctx.ws.subscribe(input.id, emit)
 
     // Always cleanup!
-    ctx.onCleanup(() => {
+    onCleanup(() => {
       unsub1()
       unsub2()
     })
-
-    return initialData
   })
 ```
 
-### 6. Handle N+1 with Field Resolvers
+### 6. Handle N+1 with Inline Resolvers
 
 ```typescript
-const userResolver = resolver(User, (f) => ({
-  // Use DataLoader pattern
-  posts: f.many(Post)
+// Use inline resolvers in entity definition
+const User = entity<AppContext>('User').define((t) => ({
+  id: t.id(),
+  name: t.string(),
+  // Use DataLoader pattern in inline resolver
+  posts: t.many(() => Post)
     .args(z.object({ first: z.number().default(10) }))
     .resolve(({ parent, args, ctx }) => {
       // ctx.loaders is a fresh DataLoader per request
@@ -530,8 +529,9 @@ const userResolver = resolver(User, (f) => ({
 
 | What You Write | What Lens Handles |
 |----------------|-------------------|
-| `query().resolve(...)` | Track all subscribers |
-| `ctx.emit({ name })` | Compute diff, select transfer strategy, push only needed |
+| `.resolve()` | One-shot query, track subscribers |
+| `.resolve().subscribe()` | Initial value + live updates (Publisher pattern) |
+| `emit({ name })` | Compute diff, select transfer strategy, push only needed |
 | `client.user.get().subscribe()` | WebSocket connection, reconnect, message parsing |
 | `.select({ name: true })` | Only push name changes |
 | `.optimistic('merge')` | Optimistic update, confirm/rollback |
