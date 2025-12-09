@@ -942,8 +942,12 @@ class LensServerImpl<
 			}
 
 			// Resolve the field
+			// NOTE: DataLoader batching is disabled because Lens is a live query library.
+			// All field resolvers need emit/onCleanup callbacks which are per-field/per-parent.
+			// DataLoader batches across parents, making it incompatible with live queries.
+			// TODO: Implement proper N+1 solution that works with live queries
+			// (e.g., batch at the data source level, not at the resolver level)
 			if (hasArgs || context) {
-				// Direct resolution when we have args or context (skip DataLoader)
 				try {
 					// Build extended context with emit and onCleanup
 					// Lens is a live query library - these are always available
