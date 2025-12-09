@@ -868,7 +868,7 @@ describe("field resolvers", () => {
 					// Initial resolution (batchable, no emit/onCleanup)
 					return ctx.db.posts.filter((p) => p.authorId === parent.id);
 				})
-				.subscribe(({ parent, ctx }) => {
+				.subscribe(({ ctx }) => {
 					// Subscription setup (has emit/onCleanup)
 					resolverReceivedOnCleanup = ctx.onCleanup !== undefined;
 
@@ -957,7 +957,7 @@ describe("field resolvers", () => {
 					// Initial resolution (batchable, no emit)
 					return ctx.db.posts.filter((p) => p.authorId === parent.id);
 				})
-				.subscribe(({ parent, ctx }) => {
+				.subscribe(({ ctx }) => {
 					// Subscription setup (has emit/onCleanup)
 					// Capture the field emit for later use
 					capturedFieldEmit = ctx.emit;
@@ -1084,6 +1084,123 @@ describe("field resolvers", () => {
 		capturedEmit!({ id: "1", name: "Changed" });
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(results.length).toBe(2); // Still 2
+
+		subscription.unsubscribe();
+	});
+
+	it(".resolve().subscribe() pattern enables batching with live updates", async () => {
+		// ADR-002: Two-Phase Field Resolution
+		// .resolve() handles initial data (batchable)
+		// .subscribe() handles live updates (fire-and-forget)
+
+		const Author = entity("Author", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		const Post = entity("Post", {
+			id: t.id(),
+			title: t.string(),
+			authorId: t.string(),
+		});
+
+		const mockDb = {
+			authors: [{ id: "a1", name: "Alice" }],
+			posts: [
+				{ id: "p1", title: "Post 1", authorId: "a1" },
+				{ id: "p2", title: "Post 2", authorId: "a1" },
+			],
+		};
+
+		// Track calls and captured emit
+		let resolveCallCount = 0;
+		let subscribeCallCount = 0;
+		let capturedFieldEmit: ((value: unknown) => void) | undefined;
+
+		// Use .resolve().subscribe() pattern
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			posts: f
+				.many(Post)
+				.resolve(({ parent, ctx }) => {
+					// Phase 1: Initial resolution (batchable, no emit/onCleanup)
+					resolveCallCount++;
+					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+				})
+				.subscribe(({ ctx }) => {
+					// Phase 2: Subscription setup (has emit/onCleanup)
+					subscribeCallCount++;
+					capturedFieldEmit = ctx.emit;
+
+					ctx.onCleanup(() => {
+						capturedFieldEmit = undefined;
+					});
+				}),
+		}));
+
+		const getAuthor = query<{ db: typeof mockDb }>()
+			.input(z.object({ id: z.string() }))
+			.returns(Author)
+			.resolve(({ input, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === input.id);
+				if (!author) throw new Error("Author not found");
+				return author;
+			});
+
+		const server = createApp({
+			entities: { Author, Post },
+			queries: { getAuthor },
+			resolvers: [authorResolver],
+			context: () => ({ db: mockDb }),
+		});
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "getAuthor",
+				input: {
+					id: "a1",
+					$select: {
+						id: true,
+						name: true,
+						posts: { select: { id: true, title: true } },
+					},
+				},
+			})
+			.subscribe({
+				next: (result) => {
+					results.push(result);
+				},
+			});
+
+		// Wait for initial result
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		// Verify initial resolution
+		expect(results.length).toBe(1);
+		expect(resolveCallCount).toBe(1); // Resolver called once
+		expect(subscribeCallCount).toBe(1); // Subscriber called once
+		expect(capturedFieldEmit).toBeDefined(); // Emit captured from subscribe phase
+
+		const initialResult = results[0] as { data: { posts: { id: string }[] } };
+		expect(initialResult.data.posts).toHaveLength(2);
+
+		// Use field emit to push update (from subscribe phase)
+		const updatedPosts = [
+			{ id: "p1", title: "Updated 1", authorId: "a1" },
+			{ id: "p2", title: "Updated 2", authorId: "a1" },
+			{ id: "p3", title: "New Post", authorId: "a1" },
+		];
+		capturedFieldEmit!(updatedPosts);
+
+		// Wait for update
+		await new Promise((resolve) => setTimeout(resolve, 50));
+
+		expect(results.length).toBe(2);
+		const updatedResult = results[1] as { data: { posts: { id: string; title: string }[] } };
+		expect(updatedResult.data.posts).toHaveLength(3);
+		expect(updatedResult.data.posts[2].title).toBe("New Post");
 
 		subscription.unsubscribe();
 	});
