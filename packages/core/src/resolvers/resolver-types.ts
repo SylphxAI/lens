@@ -114,18 +114,36 @@ export type FieldResolveFn<TParent, TArgs, TContext, TResult> = (
 ) => TResult | Promise<TResult>;
 
 /**
- * Field resolver function for .subscribe() - returns Publisher.
- * Publisher pattern keeps emit/onCleanup separate from user context.
+ * @deprecated Use .resolve().subscribe() instead.
+ * Legacy field subscription function - receives ctx with emit/onCleanup.
  *
  * @example
  * ```typescript
- * .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+ * .subscribe(({ parent, ctx }) => {
+ *   ctx.emit(getInitial());
+ *   ctx.onCleanup(() => cleanup());
+ * })
+ * ```
+ */
+export type FieldSubscribeFn<TParent, TArgs, TContext, TResult> = (
+	params: FieldSubscribeParams<TParent, TArgs, TContext> & {
+		ctx: FieldSubscriptionContext<TContext, TResult>;
+	},
+) => void | Promise<void>;
+
+/**
+ * Live field subscriber function - returns Publisher.
+ * Used with .resolve().subscribe() pattern.
+ *
+ * @example
+ * ```typescript
+ * .resolve().subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
  *   ctx.db.onChange(parent.id, (v) => emit(v));
  *   onCleanup(() => ctx.db.unsubscribe(parent.id));
  * })
  * ```
  */
-export type FieldSubscribeFn<TParent, TArgs, TContext, TResult> = (
+export type FieldLiveSubscribeFn<TParent, TArgs, TContext, TResult> = (
 	params: FieldSubscribeParams<TParent, TArgs, TContext>,
 ) => Publisher<TResult>;
 
@@ -135,8 +153,17 @@ export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
 	ctx: FieldQueryContext<TContext>;
 }) => TResult | Promise<TResult>;
 
-/** Field resolver function without args for .subscribe() - returns Publisher */
+/**
+ * @deprecated Use .resolve().subscribe() instead.
+ * Legacy field subscription function without args - receives ctx with emit/onCleanup.
+ */
 export type FieldSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
+	parent: TParent;
+	ctx: FieldSubscriptionContext<TContext, TResult>;
+}) => void | Promise<void>;
+
+/** Live field subscriber function without args - returns Publisher */
+export type FieldLiveSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	parent: TParent;
 	ctx: TContext;
 }) => Publisher<TResult>;
@@ -193,7 +220,10 @@ export interface ResolvedField<
 	}) => T | Promise<T>;
 }
 
-/** Subscribed field - returns Publisher for live updates */
+/**
+ * @deprecated Prefer .resolve().subscribe() for better performance (batchable initial).
+ * Subscribed field - uses legacy ctx.emit pattern.
+ */
 export interface SubscribedField<
 	T = unknown,
 	TArgs = Record<string, never>,
@@ -203,7 +233,12 @@ export interface SubscribedField<
 	readonly _mode: "subscribe";
 	readonly _returnType: T;
 	readonly _argsSchema: z.ZodType<TArgs> | null;
-	readonly _resolver: (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>;
+	/** Legacy resolver - receives ctx with emit/onCleanup, returns void */
+	readonly _resolver: (params: {
+		parent: unknown;
+		args: TArgs;
+		ctx: FieldSubscriptionContext<TContext, T>;
+	}) => void | Promise<void>;
 }
 
 /**
@@ -276,12 +311,12 @@ export interface ResolvedFieldChainable<
 	/**
 	 * Add subscription for live updates after initial resolution.
 	 * The resolve function handles initial data (batchable),
-	 * the subscribe function sets up watchers for updates.
+	 * the subscribe function sets up watchers for updates (Publisher pattern).
 	 */
 	subscribe(
 		fn: TArgs extends Record<string, never>
-			? FieldSubscribeFnNoArgs<TParent, TContext, T>
-			: FieldSubscribeFn<TParent, TArgs, TContext, T>,
+			? FieldLiveSubscribeFnNoArgs<TParent, TContext, T>
+			: FieldLiveSubscribeFn<TParent, TArgs, TContext, T>,
 	): LiveField<T, TArgs, TContext>;
 }
 
@@ -563,11 +598,11 @@ export interface ResolverDef<
 	): Promise<unknown>;
 
 	/**
-	 * Get the Publisher for a subscription/live field.
+	 * Set up subscription for a live field.
 	 * Returns a Publisher that receives { emit, onCleanup } callbacks.
 	 *
-	 * For "subscribe" mode: returns the field's publisher directly.
-	 * For "live" mode: returns the _subscriber's publisher.
+	 * For "live" mode: returns the _subscriber's Publisher.
+	 * For "subscribe" mode (legacy): returns null (use subscribeFieldLegacy instead).
 	 */
 	subscribeField<K extends keyof TFields>(
 		name: K,
@@ -575,6 +610,17 @@ export interface ResolverDef<
 		args: Record<string, unknown>,
 		ctx: TContext,
 	): Publisher<unknown> | null;
+
+	/**
+	 * @deprecated Legacy subscription - calls resolver with ctx.emit/ctx.onCleanup.
+	 * For "subscribe" mode only.
+	 */
+	subscribeFieldLegacy<K extends keyof TFields>(
+		name: K,
+		parent: InferParent<TEntity["fields"]>,
+		args: Record<string, unknown>,
+		ctx: FieldSubscriptionContext<TContext, unknown>,
+	): void | Promise<void>;
 
 	/** Resolve all fields for a parent with args per field */
 	resolveAll(

@@ -993,23 +993,25 @@ class LensServerImpl<
 					result[field] = null;
 				}
 			} else if (fieldMode === "subscribe") {
-				// SUBSCRIBE MODE (legacy): Fire-and-forget via Publisher
-				// Publisher handles both initial value (via emit) and updates
+				// SUBSCRIBE MODE (legacy): Call resolver with ctx.emit/ctx.onCleanup
+				// Legacy mode - resolver handles both initial value and updates via ctx.emit
 				try {
 					result[field] = null;
-					// Get publisher and call with callbacks
-					const publisher = resolverDef.subscribeField(field, obj, args, context ?? {});
-					if (publisher && createFieldEmit && onCleanup) {
+					if (createFieldEmit && onCleanup) {
 						try {
 							const fieldEmit = createFieldEmit(currentPath);
 							if (fieldEmit) {
-								publisher({
+								// Build legacy ctx with emit/onCleanup
+								const legacyCtx = {
+									...(context ?? {}),
 									emit: fieldEmit,
-									onCleanup: (fn) => {
+									onCleanup: (fn: () => void) => {
 										onCleanup(fn);
 										return fn;
 									},
-								});
+								};
+								// Call legacy subscription method
+								resolverDef.subscribeFieldLegacy(field, obj, args, legacyCtx);
 							}
 						} catch {
 							// Subscription errors are handled via emit, ignore here

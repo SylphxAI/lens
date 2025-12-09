@@ -55,12 +55,15 @@ import type {
 	FieldBuilder,
 	FieldDef,
 	FieldLiveContext,
+	FieldLiveSubscribeFn,
+	FieldLiveSubscribeFnNoArgs,
 	FieldQueryContext,
 	FieldResolveFn,
 	FieldResolveFnNoArgs,
 	FieldResolverContext,
 	FieldSubscribeFn,
 	FieldSubscribeFnNoArgs,
+	FieldSubscriptionContext,
 	InferParent,
 	LiveField,
 	Publisher,
@@ -83,6 +86,10 @@ export type {
 	FieldEmit,
 	/** @deprecated Use FieldQueryContext or FieldSubscriptionContext */
 	FieldLiveContext,
+	/** Live field subscriber function - returns Publisher (for .resolve().subscribe()) */
+	FieldLiveSubscribeFn,
+	/** Live field subscriber function without args - returns Publisher */
+	FieldLiveSubscribeFnNoArgs,
 	FieldQueryContext,
 	FieldResolveFn,
 	FieldResolveFnNoArgs,
@@ -94,10 +101,12 @@ export type {
 	FieldResolverFnNoArgs,
 	/** @deprecated Use FieldResolveParams or FieldSubscribeParams */
 	FieldResolverParams,
+	/** @deprecated Use .resolve().subscribe() with FieldLiveSubscribeFn */
 	FieldSubscribeFn,
+	/** @deprecated Use .resolve().subscribe() with FieldLiveSubscribeFnNoArgs */
 	FieldSubscribeFnNoArgs,
 	FieldSubscribeParams,
-	/** @deprecated Use Publisher pattern */
+	/** @deprecated Use .resolve().subscribe() pattern */
 	FieldSubscriptionContext,
 	InferParent,
 	InferResolverOutput,
@@ -145,7 +154,7 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_resolver: resolver,
 				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
-					subscribeFn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
+					subscribeFn: FieldLiveSubscribeFn<TParent, TArgs, TContext, T>,
 				): LiveField<T, TArgs, TContext> {
 					return {
 						_kind: "resolved",
@@ -163,6 +172,7 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 			};
 			return resolvedField;
 		},
+		/** @deprecated Use .resolve().subscribe() for better performance */
 		subscribe(
 			fn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
 		): SubscribedField<T, TArgs, TContext> {
@@ -171,7 +181,11 @@ function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_mode: "subscribe",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
-				_resolver: fn as (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>,
+				_resolver: fn as (params: {
+					parent: unknown;
+					args: TArgs;
+					ctx: FieldSubscriptionContext<TContext, T>;
+				}) => void | Promise<void>,
 			};
 		},
 		nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -215,7 +229,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 				_resolver: resolver,
 				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
-					subscribeFn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
+					subscribeFn: FieldLiveSubscribeFnNoArgs<TParent, TContext, T>,
 				): LiveField<T, Record<string, never>, TContext> {
 					return {
 						_kind: "resolved",
@@ -236,6 +250,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 			};
 			return resolvedField;
 		},
+		/** @deprecated Use .resolve().subscribe() for better performance */
 		subscribe(
 			fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
 		): SubscribedField<T, Record<string, never>, TContext> {
@@ -245,7 +260,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
-				ctx: TContext;
+				ctx: FieldSubscriptionContext<TContext, T>;
 			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
@@ -281,8 +296,9 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
 				_resolver: resolver,
+				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
-					subscribeFn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
+					subscribeFn: FieldLiveSubscribeFn<TParent, TArgs, TContext, T>,
 				): LiveField<T, TArgs, TContext> {
 					return {
 						_kind: "resolved",
@@ -300,6 +316,7 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 			};
 			return resolvedField;
 		},
+		/** @deprecated Use .resolve().subscribe() for better performance */
 		subscribe(
 			fn: FieldSubscribeFn<TParent, TArgs, TContext, T>,
 		): SubscribedField<T, TArgs, TContext> {
@@ -308,7 +325,11 @@ function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
 				_mode: "subscribe",
 				_returnType: undefined as T,
 				_argsSchema: argsSchema,
-				_resolver: fn as (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>,
+				_resolver: fn as (params: {
+					parent: unknown;
+					args: TArgs;
+					ctx: FieldSubscriptionContext<TContext, T>;
+				}) => void | Promise<void>,
 			};
 		},
 		nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
@@ -349,8 +370,9 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 				_returnType: undefined as T,
 				_argsSchema: null,
 				_resolver: resolver,
+				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
-					subscribeFn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
+					subscribeFn: FieldLiveSubscribeFnNoArgs<TParent, TContext, T>,
 				): LiveField<T, Record<string, never>, TContext> {
 					return {
 						_kind: "resolved",
@@ -371,6 +393,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 			};
 			return resolvedField;
 		},
+		/** @deprecated Use .resolve().subscribe() for better performance */
 		subscribe(
 			fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
 		): SubscribedField<T, Record<string, never>, TContext> {
@@ -380,7 +403,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 			}: {
 				parent: unknown;
 				args: Record<string, never>;
-				ctx: TContext;
+				ctx: FieldSubscriptionContext<TContext, T>;
 			}) => fn({ parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
@@ -571,13 +594,9 @@ class ResolverDefImpl<
 		const mode = (field as { _mode?: "resolve" | "subscribe" | "live" })._mode;
 
 		if (mode === "subscribe") {
-			// "subscribe" mode: _resolver returns Publisher
-			const subscribedField = field as SubscribedField<unknown, unknown, TContext>;
-			let parsedArgs: Record<string, unknown> = args;
-			if (subscribedField._argsSchema) {
-				parsedArgs = subscribedField._argsSchema.parse(args) as Record<string, unknown>;
-			}
-			return subscribedField._resolver({ parent, args: parsedArgs, ctx });
+			// "subscribe" mode (legacy): use subscribeFieldLegacy instead
+			// Returns null here - server should check mode and call subscribeFieldLegacy
+			return null;
 		}
 
 		if (mode === "live") {
@@ -595,6 +614,36 @@ class ResolverDefImpl<
 
 		// "resolve" mode has no subscription
 		return null;
+	}
+
+	/**
+	 * @deprecated Legacy subscription - calls resolver with ctx.emit/ctx.onCleanup.
+	 * For "subscribe" mode only.
+	 */
+	subscribeFieldLegacy<K extends keyof TFields>(
+		name: K,
+		parent: InferParent<TEntity["fields"]>,
+		args: Record<string, unknown>,
+		ctx: FieldSubscriptionContext<TContext, unknown>,
+	): void | Promise<void> {
+		const field = this.fields[name];
+		if (!field) {
+			throw new Error(`Field "${String(name)}" not found in resolver`);
+		}
+
+		const mode = (field as { _mode?: "resolve" | "subscribe" | "live" })._mode;
+
+		if (mode !== "subscribe") {
+			// Not a legacy subscribe field
+			return;
+		}
+
+		const subscribedField = field as SubscribedField<unknown, unknown, TContext>;
+		let parsedArgs: Record<string, unknown> = args;
+		if (subscribedField._argsSchema) {
+			parsedArgs = subscribedField._argsSchema.parse(args) as Record<string, unknown>;
+		}
+		return subscribedField._resolver({ parent, args: parsedArgs, ctx });
 	}
 
 	async resolveAll(
@@ -832,19 +881,21 @@ export function createResolverFromEntity<
 				},
 			};
 		} else if (ft._resolutionMode === "subscribe" && ft._subscriptionResolver) {
-			// Subscription field - wrap the inline subscription resolver with Publisher pattern
+			// Subscription field - legacy mode with ctx.emit/ctx.onCleanup
 			fields[fieldName] = {
 				_kind: "resolved" as const,
 				_mode: "subscribe" as const,
 				_returnType: undefined,
 				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: TContext }): Publisher<unknown> => {
-					// Return a Publisher that wraps the legacy inline subscription
-					return ({ emit, onCleanup }) => {
-						// Legacy inline subscriptions expect emit/onCleanup on ctx
-						const legacyCtx = { ...ctx, emit, onCleanup };
-						ft._subscriptionResolver!({ parent, ctx: legacyCtx });
-					};
+				_resolver: ({
+					parent,
+					ctx,
+				}: {
+					parent: unknown;
+					ctx: FieldSubscriptionContext<TContext, unknown>;
+				}): void => {
+					// Legacy inline subscriptions expect emit/onCleanup on ctx
+					ft._subscriptionResolver!({ parent, ctx });
 				},
 			};
 		} else {
