@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.4.1 (2025-12-09)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.4.0
+
 ## 2.4.0 (2025-12-09)
 
 ### ✨ Features
