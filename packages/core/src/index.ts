@@ -13,9 +13,12 @@ export {
 	ArrayType,
 	BelongsToType,
 	BooleanType,
+	// Context-aware type builder
+	type ContextualField,
 	// Custom types
 	CustomType,
 	type CustomTypeDefinition,
+	createTypeBuilder,
 	DateTimeType,
 	DecimalType,
 	type DefaultType,
@@ -43,6 +46,7 @@ export {
 	type RelationBrand,
 	type SchemaDefinition,
 	StringType,
+	type TypeBuilder,
 	// Type builders
 	t,
 } from "./schema/types.js";
@@ -73,6 +77,8 @@ export {
 // =============================================================================
 
 export {
+	// Context-aware entity factory
+	type ContextualEntityBuilder,
 	// Schema creation
 	createSchema,
 	// Entity definition
@@ -81,6 +87,8 @@ export {
 	type EntityDef,
 	entity,
 	isEntityDef,
+	type TypedEntityFactory,
+	typedEntity,
 } from "./schema/define.js";
 
 // =============================================================================

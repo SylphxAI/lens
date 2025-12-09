@@ -42,7 +42,12 @@
 import type { EntityMarker } from "@sylphx/standard-entity";
 import { Schema } from "./create.js";
 import type { InferEntity } from "./infer.js";
-import { type EntityDefinition, t as typeBuilder } from "./types.js";
+import {
+	createTypeBuilder,
+	type EntityDefinition,
+	type TypeBuilder,
+	t as typeBuilder,
+} from "./types.js";
 
 // =============================================================================
 // Entity Definition Builder
@@ -67,6 +72,26 @@ const ENTITY_SYMBOL: unique symbol = Symbol("lens:entity");
  * ```
  */
 export type EntityBuilder<Fields extends EntityDefinition> = (t: typeof typeBuilder) => Fields;
+
+/**
+ * Context-aware entity builder function type.
+ * Receives a typed `t` builder where resolve/subscribe have typed context.
+ *
+ * @example
+ * ```typescript
+ * // With typed context
+ * const User = entity<MyContext>()("User", (t) => ({
+ *   id: t.id(),
+ *   posts: t.many(() => Post).resolve(({ ctx }) => {
+ *     // ctx is typed as MyContext!
+ *     return ctx.db.posts.findMany();
+ *   }),
+ * }));
+ * ```
+ */
+export type ContextualEntityBuilder<Fields extends EntityDefinition, TContext> = (
+	t: TypeBuilder<TContext>,
+) => Fields;
 
 /**
  * Entity definition with name and fields.
@@ -187,6 +212,65 @@ function createEntityDef<Name extends string, Fields extends EntityDefinition>(
 
 /** Simplified alias for defineEntity */
 export const entity: typeof defineEntity = defineEntity;
+
+// =============================================================================
+// Context-Aware Entity Factory (Curried API)
+// =============================================================================
+
+/**
+ * Result of curried entity factory - a function that creates entities with typed context.
+ * The `t` builder's resolve/subscribe methods will have TContext typed.
+ */
+export type TypedEntityFactory<TContext> = <Name extends string, Fields extends EntityDefinition>(
+	name: Name,
+	builder: ContextualEntityBuilder<Fields, TContext>,
+) => EntityDef<Name, Fields>;
+
+/**
+ * Create a typed entity factory with context type.
+ * This is the curried form of entity() that provides typed context to resolvers.
+ *
+ * Use this when you want typed context in your resolve/subscribe functions
+ * without having to specify the context type on every field.
+ *
+ * @example
+ * ```typescript
+ * interface MyContext {
+ *   db: Database;
+ *   user: User;
+ * }
+ *
+ * // Option 1: Curried factory (recommended for multiple entities)
+ * const typedEntity = entity<MyContext>();
+ *
+ * const User = typedEntity("User", (t) => ({
+ *   id: t.id(),
+ *   posts: t.many(() => Post).resolve(({ ctx }) => {
+ *     // ctx is typed as MyContext!
+ *     return ctx.db.posts.findMany();
+ *   }),
+ * }));
+ *
+ * // Option 2: Inline curried (for single entity)
+ * const Post = entity<MyContext>()("Post", (t) => ({
+ *   id: t.id(),
+ *   author: t.one(() => User).resolve(({ ctx }) => {
+ *     // ctx is typed as MyContext!
+ *     return ctx.db.users.findById(ctx.user.id);
+ *   }),
+ * }));
+ * ```
+ */
+export function typedEntity<TContext>(): TypedEntityFactory<TContext> {
+	return <Name extends string, Fields extends EntityDefinition>(
+		name: Name,
+		builder: ContextualEntityBuilder<Fields, TContext>,
+	): EntityDef<Name, Fields> => {
+		const contextualBuilder = createTypeBuilder<TContext>();
+		const fields = builder(contextualBuilder);
+		return createEntityDef(name, fields);
+	};
+}
 
 /** Check if value is an EntityDef */
 export function isEntityDef(value: unknown): value is EntityDef<string, EntityDefinition> {

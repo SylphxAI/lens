@@ -195,25 +195,25 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 }
 
 /** Wrapper type for nullable fields */
-export type NullableType<T extends FieldType> = Omit<T, "_nullable" | "_tsType"> & {
+export type NullableType<T extends FieldType<any, any>> = Omit<T, "_nullable" | "_tsType"> & {
 	_nullable: true;
 	_tsType: T["_tsType"] | null;
 };
 
 /** Wrapper type for optional fields (undefined, not included in response) */
-export type OptionalType<T extends FieldType> = Omit<T, "_optional" | "_tsType"> & {
+export type OptionalType<T extends FieldType<any, any>> = Omit<T, "_optional" | "_tsType"> & {
 	_tsType: T["_tsType"] | undefined;
 	_optional: true;
 };
 
 /** Wrapper type for fields with defaults */
-export type DefaultType<T extends FieldType, D> = T & {
+export type DefaultType<T extends FieldType<any, any>, D> = T & {
 	_default: D;
 };
 
 /** Wrapper type for fields with resolver attached */
 export type ResolvedFieldType<
-	T extends FieldType,
+	T extends FieldType<any, any>,
 	_Parent = unknown,
 	_TContext = unknown,
 > = Omit<T, "_resolutionMode" | "_resolver"> & {
@@ -223,7 +223,7 @@ export type ResolvedFieldType<
 
 /** Wrapper type for fields with subscription resolver attached */
 export type SubscribedFieldType<
-	T extends FieldType,
+	T extends FieldType<any, any>,
 	_Parent = unknown,
 	_TContext = unknown,
 > = Omit<T, "_resolutionMode" | "_subscriptionResolver"> & {
@@ -661,7 +661,9 @@ export class BelongsToType<Target extends string> extends FieldType<RelationBran
 // =============================================================================
 
 /** Type for entity reference - can be entity object or lazy function */
-export type EntityRef<T = unknown> = { fields: EntityDefinition; _name?: string } | (() => { fields: EntityDefinition; _name?: string });
+export type EntityRef<_T = unknown> =
+	| { fields: EntityDefinition; _name?: string }
+	| (() => { fields: EntityDefinition; _name?: string });
 
 /** Extract entity type from lazy or direct reference */
 export type InferEntityRef<R> = R extends () => infer E ? E : R;
@@ -816,9 +818,8 @@ export const t = {
 	 * }));
 	 * ```
 	 */
-	one: <Target, TargetData = unknown>(
-		targetRef: () => Target,
-	): LazyOneType<Target, TargetData> => new LazyOneType(targetRef),
+	one: <Target, TargetData = unknown>(targetRef: () => Target): LazyOneType<Target, TargetData> =>
+		new LazyOneType(targetRef),
 
 	/**
 	 * One-to-many relation with lazy reference.
@@ -833,9 +834,8 @@ export const t = {
 	 * }));
 	 * ```
 	 */
-	many: <Target, TargetData = unknown>(
-		targetRef: () => Target,
-	): LazyManyType<Target, TargetData> => new LazyManyType(targetRef),
+	many: <Target, TargetData = unknown>(targetRef: () => Target): LazyManyType<Target, TargetData> =>
+		new LazyManyType(targetRef),
 } as const;
 
 // =============================================================================
@@ -844,40 +844,40 @@ export const t = {
 
 /** Check if field is a relation type (legacy string-based) */
 export function isRelationType(
-	field: FieldType,
+	field: FieldType<any, any>,
 ): field is HasOneType<string> | HasManyType<string> | BelongsToType<string> {
 	return field._type === "hasOne" || field._type === "hasMany" || field._type === "belongsTo";
 }
 
 /** Check if field is a lazy relation type (new function-based) */
 export function isLazyRelationType(
-	field: FieldType,
+	field: FieldType<any, any>,
 ): field is LazyOneType<unknown> | LazyManyType<unknown> {
 	return field._type === "lazyOne" || field._type === "lazyMany";
 }
 
 /** Check if field is any kind of relation (legacy or lazy) */
-export function isAnyRelationType(field: FieldType): boolean {
+export function isAnyRelationType(field: FieldType<any, any>): boolean {
 	return isRelationType(field) || isLazyRelationType(field);
 }
 
 /** Check if field is a scalar type */
-export function isScalarType(field: FieldType): boolean {
+export function isScalarType(field: FieldType<any, any>): boolean {
 	return !isAnyRelationType(field);
 }
 
 /** Check if field is hasMany (array relation) */
-export function isHasManyType(field: FieldType): field is HasManyType<string> {
+export function isHasManyType(field: FieldType<any, any>): field is HasManyType<string> {
 	return field._type === "hasMany";
 }
 
 /** Check if field is lazyMany (lazy array relation) */
-export function isLazyManyType(field: FieldType): field is LazyManyType<unknown> {
+export function isLazyManyType(field: FieldType<any, any>): field is LazyManyType<unknown> {
 	return field._type === "lazyMany";
 }
 
 /** Check if field is lazyOne (lazy single relation) */
-export function isLazyOneType(field: FieldType): field is LazyOneType<unknown> {
+export function isLazyOneType(field: FieldType<any, any>): field is LazyOneType<unknown> {
 	return field._type === "lazyOne";
 }
 
@@ -893,3 +893,197 @@ export type EntityDefinition = Record<string, FieldDefinition>;
 
 /** Schema definition (collection of entities) */
 export type SchemaDefinition = Record<string, EntityDefinition>;
+
+// =============================================================================
+// Context-Aware Type Builder (for typed entity definitions)
+// =============================================================================
+
+/**
+ * Context-aware field wrapper that provides typed resolve/subscribe methods.
+ * This allows the context type to flow through from entity definition.
+ */
+export interface ContextualField<F, TContext> {
+	/** The underlying field type */
+	readonly field: F;
+
+	/**
+	 * Attach a resolver function with typed context.
+	 * Context type flows from entity<TContext>() definition.
+	 */
+	resolve<Parent = unknown>(
+		fn: ResolverFn<F extends FieldType<infer T, any> ? T : unknown, Parent, TContext>,
+	): F extends FieldType<any, any> ? ResolvedFieldType<F, Parent, TContext> : never;
+
+	/**
+	 * Attach a subscription resolver with typed context.
+	 * Context type flows from entity<TContext>() definition.
+	 */
+	subscribe<Parent = unknown>(
+		fn: SubscriptionResolverFn<F extends FieldType<infer T, any> ? T : unknown, Parent, TContext>,
+	): F extends FieldType<any, any> ? SubscribedFieldType<F, Parent, TContext> : never;
+
+	/** Make field nullable */
+	nullable(): F extends FieldType<any, any> ? ContextualField<NullableType<F>, TContext> : never;
+
+	/** Make field optional */
+	optional(): F extends FieldType<any, any> ? ContextualField<OptionalType<F>, TContext> : never;
+
+	/** Set default value */
+	default(
+		value: F extends FieldType<infer T, any> ? T : unknown,
+	): F extends FieldType<any, any>
+		? ContextualField<DefaultType<F, F extends FieldType<infer T, any> ? T : unknown>, TContext>
+		: never;
+}
+
+/**
+ * Create a contextual field wrapper that provides typed resolve/subscribe.
+ * @internal
+ */
+function createContextualField<F, TContext>(field: any): ContextualField<F, TContext> & F {
+	// Create proxy that wraps the field and adds contextual methods
+	// All type annotations removed inside wrapper - types are enforced at interface level
+	const wrapper: any = {
+		field,
+		resolve(fn: any) {
+			return field.resolve(fn);
+		},
+		subscribe(fn: any) {
+			return field.subscribe(fn);
+		},
+		nullable() {
+			return createContextualField(field.nullable());
+		},
+		optional() {
+			return createContextualField(field.optional());
+		},
+		default(value: any) {
+			return createContextualField(field.default(value));
+		},
+	};
+
+	// Return union of wrapper and field (field props accessible directly)
+	return Object.assign(Object.create(field), wrapper) as ContextualField<F, TContext> & F;
+}
+
+/**
+ * Context-aware type builder interface.
+ * All methods return contextual fields with typed resolve/subscribe.
+ */
+export interface TypeBuilder<TContext> {
+	/** Primary key (string UUID/CUID) */
+	id(): ContextualField<IdType, TContext> & IdType;
+	/** Text field */
+	string(): ContextualField<StringType, TContext> & StringType;
+	/** Integer number */
+	int(): ContextualField<IntType, TContext> & IntType;
+	/** Floating point number */
+	float(): ContextualField<FloatType, TContext> & FloatType;
+	/** Boolean value */
+	boolean(): ContextualField<BooleanType, TContext> & BooleanType;
+	/** Date/time value */
+	datetime(): ContextualField<DateTimeType, TContext> & DateTimeType;
+	/** Date only, no time */
+	date(): ContextualField<DateType, TContext> & DateType;
+	/** Decimal/currency value */
+	decimal(): ContextualField<DecimalType, TContext> & DecimalType;
+	/** BigInt value */
+	bigint(): ContextualField<BigIntType, TContext> & BigIntType;
+	/** Binary data */
+	bytes(): ContextualField<BytesType, TContext> & BytesType;
+	/** Arbitrary JSON data */
+	json<T = unknown>(): ContextualField<ObjectType<T>, TContext> & ObjectType<T>;
+	/** Enum with specific values */
+	enum<const V extends readonly string[]>(
+		values: V,
+	): ContextualField<EnumType<V>, TContext> & EnumType<V>;
+	/** Typed object/JSON */
+	object<T>(): ContextualField<ObjectType<T>, TContext> & ObjectType<T>;
+	/** Array of a type */
+	array<T>(itemType: FieldType<T>): ContextualField<ArrayType<T>, TContext> & ArrayType<T>;
+	/** Custom type */
+	custom<T, SerializedT = T>(
+		definition: CustomTypeDefinition<T, SerializedT>,
+	): ContextualField<CustomType<T, SerializedT>, TContext> & CustomType<T, SerializedT>;
+
+	// Legacy relations (string-based)
+	/** @deprecated Use t.one(() => Entity) instead */
+	hasOne<Target extends string>(
+		target: Target,
+	): ContextualField<HasOneType<Target>, TContext> & HasOneType<Target>;
+	/** @deprecated Use t.many(() => Entity) instead */
+	hasMany<Target extends string>(
+		target: Target,
+	): ContextualField<HasManyType<Target>, TContext> & HasManyType<Target>;
+	/** Many-to-one relation */
+	belongsTo<Target extends string>(
+		target: Target,
+	): ContextualField<BelongsToType<Target>, TContext> & BelongsToType<Target>;
+
+	// Lazy relations (function-based)
+	/** One-to-one relation with lazy reference */
+	one<Target, TargetData = unknown>(
+		targetRef: () => Target,
+	): ContextualField<LazyOneType<Target, TargetData>, TContext> & LazyOneType<Target, TargetData>;
+	/** One-to-many relation with lazy reference */
+	many<Target, TargetData = unknown>(
+		targetRef: () => Target,
+	): ContextualField<LazyManyType<Target, TargetData>, TContext> & LazyManyType<Target, TargetData>;
+}
+
+/**
+ * Create a context-aware type builder.
+ * Used by entity<TContext>() to provide typed resolve/subscribe methods.
+ *
+ * @example
+ * ```typescript
+ * const t = createTypeBuilder<MyContext>();
+ * const User = entity("User", (t) => ({
+ *   posts: t.many(() => Post).resolve(({ ctx }) => {
+ *     // ctx is typed as MyContext
+ *     return ctx.db.posts.findMany();
+ *   }),
+ * }));
+ * ```
+ */
+export function createTypeBuilder<TContext>(): TypeBuilder<TContext> {
+	return {
+		id: () => createContextualField<IdType, TContext>(new IdType() as any),
+		string: () => createContextualField<StringType, TContext>(new StringType() as any),
+		int: () => createContextualField<IntType, TContext>(new IntType() as any),
+		float: () => createContextualField<FloatType, TContext>(new FloatType() as any),
+		boolean: () => createContextualField<BooleanType, TContext>(new BooleanType() as any),
+		datetime: () => createContextualField<DateTimeType, TContext>(new DateTimeType() as any),
+		date: () => createContextualField<DateType, TContext>(new DateType() as any),
+		decimal: () => createContextualField<DecimalType, TContext>(new DecimalType() as any),
+		bigint: () => createContextualField<BigIntType, TContext>(new BigIntType() as any),
+		bytes: () => createContextualField<BytesType, TContext>(new BytesType() as any),
+		json: <T = unknown>() =>
+			createContextualField<ObjectType<T>, TContext>(new ObjectType<T>() as any),
+		enum: <const V extends readonly string[]>(values: V) =>
+			createContextualField<EnumType<V>, TContext>(new EnumType(values) as any),
+		object: <T>() => createContextualField<ObjectType<T>, TContext>(new ObjectType<T>() as any),
+		array: <T>(itemType: FieldType<T>) =>
+			createContextualField<ArrayType<T>, TContext>(new ArrayType(itemType) as any),
+		custom: <T, SerializedT = T>(definition: CustomTypeDefinition<T, SerializedT>) =>
+			createContextualField<CustomType<T, SerializedT>, TContext>(
+				new CustomType(definition) as any,
+			),
+		// Legacy relations
+		hasOne: <Target extends string>(target: Target) =>
+			createContextualField<HasOneType<Target>, TContext>(new HasOneType(target) as any),
+		hasMany: <Target extends string>(target: Target) =>
+			createContextualField<HasManyType<Target>, TContext>(new HasManyType(target) as any),
+		belongsTo: <Target extends string>(target: Target) =>
+			createContextualField<BelongsToType<Target>, TContext>(new BelongsToType(target) as any),
+		// Lazy relations
+		one: <Target, TargetData = unknown>(targetRef: () => Target) =>
+			createContextualField<LazyOneType<Target, TargetData>, TContext>(
+				new LazyOneType(targetRef) as any,
+			),
+		many: <Target, TargetData = unknown>(targetRef: () => Target) =>
+			createContextualField<LazyManyType<Target, TargetData>, TContext>(
+				new LazyManyType(targetRef) as any,
+			),
+	};
+}

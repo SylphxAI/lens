@@ -5,9 +5,9 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { createSchema, defineEntity, entity, isEntityDef } from "./define";
+import { createSchema, defineEntity, entity, isEntityDef, typedEntity } from "./define";
 import type { InferEntity } from "./infer";
-import { t } from "./types";
+import { createTypeBuilder, t } from "./types";
 
 // =============================================================================
 // Test: defineEntity
@@ -414,5 +414,212 @@ describe("entity() - function-based API", () => {
 		expect(UserObject.fields.id._type).toBe(UserFunction.fields.id._type);
 		expect(UserObject.fields.name._type).toBe(UserFunction.fields.name._type);
 		expect(UserObject.fields.email._type).toBe(UserFunction.fields.email._type);
+	});
+});
+
+// =============================================================================
+// Test: typedEntity() - Context-Aware Entity Factory
+// =============================================================================
+
+describe("typedEntity() - context-aware entity factory", () => {
+	interface MyContext {
+		db: {
+			posts: Array<{ id: string; title: string; authorId: string }>;
+			users: Array<{ id: string; name: string }>;
+		};
+		currentUserId: string;
+	}
+
+	it("creates entity factory with typed context", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const User = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		}));
+
+		expect(User._name).toBe("User");
+		expect(User.fields.id._type).toBe("id");
+		expect(User.fields.name._type).toBe("string");
+	});
+
+	it("resolve() gets typed context", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const Post = myEntity("Post", (t) => ({
+			id: t.id(),
+			title: t.string(),
+		}));
+
+		const User = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t
+				.many(() => Post)
+				.resolve(({ parent, ctx }) => {
+					// This test verifies the types work at runtime
+					// TypeScript ensures ctx.db.posts is typed as Array<...>
+					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+				}),
+		}));
+
+		expect(User.fields.posts._resolutionMode).toBe("resolve");
+		expect(User.fields.posts._resolver).toBeDefined();
+	});
+
+	it("subscribe() gets typed context", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const User = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			status: t.object<{ isActive: boolean }>().subscribe(({ ctx, emit }) => {
+				// ctx is typed as MyContext
+				emit({ isActive: ctx.currentUserId !== "" });
+			}),
+		}));
+
+		expect(User.fields.status._resolutionMode).toBe("subscribe");
+		expect(User.fields.status._subscriptionResolver).toBeDefined();
+	});
+
+	it("supports all field modifiers", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const User = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			bio: t.string().nullable(),
+			nickname: t.string().optional(),
+			role: t.string().default("user"),
+		}));
+
+		expect(User.fields.bio._nullable).toBe(true);
+		expect(User.fields.nickname._optional).toBe(true);
+		expect(User.fields.role._default).toBe("user");
+	});
+
+	it("supports all scalar types", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const AllTypes = myEntity("AllTypes", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			age: t.int(),
+			score: t.float(),
+			active: t.boolean(),
+			createdAt: t.datetime(),
+			birthDate: t.date(),
+			balance: t.decimal(),
+			bigNumber: t.bigint(),
+			data: t.bytes(),
+			status: t.enum(["active", "inactive"]),
+		}));
+
+		expect(AllTypes.fields.id._type).toBe("id");
+		expect(AllTypes.fields.name._type).toBe("string");
+		expect(AllTypes.fields.age._type).toBe("int");
+		expect(AllTypes.fields.score._type).toBe("float");
+		expect(AllTypes.fields.active._type).toBe("boolean");
+		expect(AllTypes.fields.createdAt._type).toBe("datetime");
+		expect(AllTypes.fields.birthDate._type).toBe("date");
+		expect(AllTypes.fields.balance._type).toBe("decimal");
+		expect(AllTypes.fields.bigNumber._type).toBe("bigint");
+		expect(AllTypes.fields.data._type).toBe("bytes");
+		expect(AllTypes.fields.status._type).toBe("enum");
+	});
+
+	it("supports lazy relations", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const Post = myEntity("Post", (t) => ({
+			id: t.id(),
+			title: t.string(),
+		}));
+
+		const User = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t.many(() => Post),
+		}));
+
+		expect(User.fields.posts._type).toBe("lazyMany");
+		expect(User.fields.posts.getTarget()).toBe(Post);
+	});
+
+	it("produces equivalent entities to non-typed factory", () => {
+		const myEntity = typedEntity<MyContext>();
+
+		const TypedUser = myEntity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		}));
+
+		const UntypedUser = entity("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		}));
+
+		expect(TypedUser._name).toBe(UntypedUser._name);
+		expect(TypedUser.fields.id._type).toBe(UntypedUser.fields.id._type);
+		expect(TypedUser.fields.name._type).toBe(UntypedUser.fields.name._type);
+		expect(TypedUser.fields.email._type).toBe(UntypedUser.fields.email._type);
+	});
+});
+
+// =============================================================================
+// Test: createTypeBuilder() - Low-level API
+// =============================================================================
+
+describe("createTypeBuilder() - context-aware type builder", () => {
+	interface TestContext {
+		userId: string;
+	}
+
+	it("creates type builder with typed context", () => {
+		const t = createTypeBuilder<TestContext>();
+
+		// Verify builder creates field types
+		expect(t.id()._type).toBe("id");
+		expect(t.string()._type).toBe("string");
+		expect(t.int()._type).toBe("int");
+	});
+
+	it("resolve() on contextual field gets typed context", () => {
+		const tb = createTypeBuilder<TestContext>();
+
+		// Build a field with resolve
+		const field = tb.string().resolve(({ ctx }) => {
+			// ctx is typed as TestContext
+			return ctx.userId;
+		});
+
+		expect(field._resolutionMode).toBe("resolve");
+		expect(field._resolver).toBeDefined();
+	});
+
+	it("subscribe() on contextual field gets typed context", () => {
+		const tb = createTypeBuilder<TestContext>();
+
+		const field = tb.object<{ active: boolean }>().subscribe(({ ctx, emit }) => {
+			emit({ active: ctx.userId !== "" });
+		});
+
+		expect(field._resolutionMode).toBe("subscribe");
+		expect(field._subscriptionResolver).toBeDefined();
+	});
+
+	it("modifiers chain correctly", () => {
+		const tb = createTypeBuilder<TestContext>();
+
+		const nullableField = tb.string().nullable();
+		const optionalField = tb.string().optional();
+		const defaultField = tb.string().default("test");
+
+		expect(nullableField._nullable).toBe(true);
+		expect(optionalField._optional).toBe(true);
+		expect(defaultField._default).toBe("test");
 	});
 });

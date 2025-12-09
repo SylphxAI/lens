@@ -122,6 +122,38 @@ const User = entity("User", (t) => ({
 }));
 ```
 
+### Typed Context with `typedEntity<TContext>()`
+
+For typed context in resolvers, use the curried `typedEntity<TContext>()` factory:
+
+```typescript
+interface MyContext {
+  db: Database;
+  user: User;
+}
+
+// Create typed entity factory (recommended for multiple entities)
+const myEntity = typedEntity<MyContext>();
+
+const User = myEntity("User", (t) => ({
+  id: t.id(),
+  name: t.string(),
+  posts: t.many(() => Post).resolve(({ parent, ctx }) => {
+    // ctx is typed as MyContext!
+    return ctx.db.posts.filter(p => p.authorId === parent.id);
+  }),
+}));
+
+// Or inline for single entity
+const Post = typedEntity<MyContext>()("Post", (t) => ({
+  id: t.id(),
+  author: t.one(() => User).resolve(({ ctx }) => {
+    // ctx is typed as MyContext!
+    return ctx.db.users.findById(ctx.user.id);
+  }),
+}));
+```
+
 ## Implementation Plan
 
 ### Phase 1: Add `.resolve()` / `.subscribe()` to FieldType ✅

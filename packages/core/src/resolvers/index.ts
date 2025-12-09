@@ -672,7 +672,8 @@ export function createResolverFromEntity<
 	const fields: Record<string, FieldDef<any, any, TContext>> = {};
 
 	for (const [fieldName, fieldType] of Object.entries(entity.fields)) {
-		const ft = fieldType as {
+		// Cast through unknown to avoid exactOptionalPropertyTypes issues
+		const ft = fieldType as unknown as {
 			_resolutionMode?: "exposed" | "resolve" | "subscribe";
 			_resolver?: (params: { parent: unknown; args: unknown; ctx: unknown }) => unknown;
 			_subscriptionResolver?: (params: { parent: unknown; ctx: unknown }) => void;
