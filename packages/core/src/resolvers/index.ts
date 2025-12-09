@@ -616,3 +616,122 @@ export function isResolverDef(value: unknown): value is ResolverDef {
 		"resolveField" in value
 	);
 }
+
+// =============================================================================
+// Entity to Resolver Conversion (Phase 4 - ADR-001)
+// =============================================================================
+
+/**
+ * Create a ResolverDef from an entity's inline field definitions.
+ *
+ * Extracts `.resolve()` and `.subscribe()` handlers from entity fields
+ * and creates a ResolverDef that can be used by the execution engine.
+ *
+ * Field resolution rules:
+ * - Fields without `.resolve()` or `.subscribe()` → exposed (passthrough from parent)
+ * - Fields with `.resolve(fn)` → computed field
+ * - Fields with `.subscribe(fn)` → subscription field
+ *
+ * @example
+ * ```typescript
+ * const User = entity("User", (t) => ({
+ *   id: t.id(),
+ *   name: t.string(),
+ *   fullName: t.string().resolve(({ parent }) =>
+ *     `${parent.firstName} ${parent.lastName}`
+ *   ),
+ * }));
+ *
+ * // Create resolver from entity
+ * const userResolver = createResolverFromEntity(User);
+ *
+ * // Use in server config
+ * const server = createLensServer({
+ *   resolvers: [userResolver],
+ * });
+ * ```
+ */
+export function createResolverFromEntity<
+	TEntity extends EntityDef<string, EntityDefinition>,
+	TContext = FieldResolverContext,
+>(entity: TEntity): ResolverDef<TEntity, Record<string, FieldDef<any, any, TContext>>, TContext> {
+	const fields: Record<string, FieldDef<any, any, TContext>> = {};
+
+	for (const [fieldName, fieldType] of Object.entries(entity.fields)) {
+		const ft = fieldType as {
+			_resolutionMode?: "exposed" | "resolve" | "subscribe";
+			_resolver?: (params: { parent: unknown; args: unknown; ctx: unknown }) => unknown;
+			_subscriptionResolver?: (params: { parent: unknown; ctx: unknown }) => void;
+		};
+
+		if (ft._resolutionMode === "resolve" && ft._resolver) {
+			// Computed field - wrap the inline resolver
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "resolve" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
+					// Inline resolvers use { parent, ctx } format (no args)
+					return ft._resolver!({ parent, args: {}, ctx });
+				},
+			};
+		} else if (ft._resolutionMode === "subscribe" && ft._subscriptionResolver) {
+			// Subscription field - wrap the inline subscription resolver
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "subscribe" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({
+					parent,
+					ctx,
+				}: {
+					parent: unknown;
+					ctx: FieldSubscriptionContext<TContext, unknown>;
+				}) => {
+					// Inline subscriptions use { parent, ctx, emit, onCleanup } format
+					return ft._subscriptionResolver!({ parent, ctx });
+				},
+			};
+		} else {
+			// Exposed field - passthrough from parent data
+			fields[fieldName] = {
+				_kind: "exposed" as const,
+				_fieldName: fieldName,
+				_type: undefined,
+			};
+		}
+	}
+
+	return new ResolverDefImpl(entity, fields) as ResolverDef<
+		TEntity,
+		Record<string, FieldDef<any, any, TContext>>,
+		TContext
+	>;
+}
+
+/**
+ * Check if an entity has any inline resolvers defined.
+ *
+ * @example
+ * ```typescript
+ * const User = entity("User", (t) => ({
+ *   id: t.id(),
+ *   fullName: t.string().resolve(({ parent }) => ...),
+ * }));
+ *
+ * hasInlineResolvers(User); // true
+ * ```
+ */
+export function hasInlineResolvers(entity: EntityDef<string, EntityDefinition>): boolean {
+	for (const fieldType of Object.values(entity.fields)) {
+		const ft = fieldType as {
+			_resolutionMode?: "exposed" | "resolve" | "subscribe";
+		};
+		if (ft._resolutionMode === "resolve" || ft._resolutionMode === "subscribe") {
+			return true;
+		}
+	}
+	return false;
+}

@@ -8,7 +8,15 @@ import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { entity } from "../schema/define.js";
 import { t } from "../schema/types.js";
-import { isExposedField, isResolvedField, isResolverDef, resolver, toResolverMap } from "./index.js";
+import {
+	createResolverFromEntity,
+	hasInlineResolvers,
+	isExposedField,
+	isResolvedField,
+	isResolverDef,
+	resolver,
+	toResolverMap,
+} from "./index.js";
 
 // =============================================================================
 // Test Fixtures
@@ -803,5 +811,237 @@ describe("f.json<T>()", () => {
 		}));
 
 		expect(userResolver.getFieldMode("statusWithArgs")).toBe("resolve");
+	});
+});
+
+// =============================================================================
+// Test: Entity to Resolver Conversion (Phase 4 - ADR-001)
+// =============================================================================
+
+describe("createResolverFromEntity()", () => {
+	it("creates resolver with all fields exposed for plain entity", () => {
+		const PlainUser = entity("PlainUser", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		}));
+
+		const resolverDef = createResolverFromEntity(PlainUser);
+
+		expect(resolverDef.entity._name).toBe("PlainUser");
+		expect(resolverDef.hasField("id")).toBe(true);
+		expect(resolverDef.hasField("name")).toBe(true);
+		expect(resolverDef.hasField("email")).toBe(true);
+		expect(resolverDef.isExposed("id")).toBe(true);
+		expect(resolverDef.isExposed("name")).toBe(true);
+		expect(resolverDef.isExposed("email")).toBe(true);
+	});
+
+	it("converts inline .resolve() to resolved field", () => {
+		const UserWithComputed = entity("UserWithComputed", (t) => ({
+			id: t.id(),
+			firstName: t.string(),
+			lastName: t.string(),
+			fullName: t.string().resolve(({ parent }) => `${parent.firstName} ${parent.lastName}`),
+		}));
+
+		const resolverDef = createResolverFromEntity(UserWithComputed);
+
+		expect(resolverDef.isExposed("id")).toBe(true);
+		expect(resolverDef.isExposed("firstName")).toBe(true);
+		expect(resolverDef.isExposed("lastName")).toBe(true);
+		expect(resolverDef.isExposed("fullName")).toBe(false);
+		expect(resolverDef.getFieldMode("fullName")).toBe("resolve");
+	});
+
+	it("converts inline .subscribe() to subscription field", () => {
+		const UserWithSubscription = entity("UserWithSubscription", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			status: t.json<{ isActive: boolean }>().subscribe(({ ctx }) => {
+				ctx.emit({ isActive: true });
+			}),
+		}));
+
+		const resolverDef = createResolverFromEntity(UserWithSubscription);
+
+		expect(resolverDef.isExposed("id")).toBe(true);
+		expect(resolverDef.isExposed("name")).toBe(true);
+		expect(resolverDef.isExposed("status")).toBe(false);
+		expect(resolverDef.getFieldMode("status")).toBe("subscribe");
+		expect(resolverDef.isSubscription("status")).toBe(true);
+	});
+
+	it("resolves exposed fields from parent data", async () => {
+		const PlainUser = entity("PlainUser", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		}));
+
+		const resolverDef = createResolverFromEntity(PlainUser);
+		const parent = { id: "1", name: "John" };
+
+		const id = await resolverDef.resolveField("id", parent, {}, {});
+		const name = await resolverDef.resolveField("name", parent, {}, {});
+
+		expect(id).toBe("1");
+		expect(name).toBe("John");
+	});
+
+	it("resolves inline .resolve() fields with parent context", async () => {
+		const UserWithComputed = entity("UserWithComputed", (t) => ({
+			id: t.id(),
+			firstName: t.string(),
+			lastName: t.string(),
+			fullName: t.string().resolve(({ parent }) => `${parent.firstName} ${parent.lastName}`),
+		}));
+
+		const resolverDef = createResolverFromEntity(UserWithComputed);
+		const parent = { id: "1", firstName: "John", lastName: "Doe" };
+
+		const fullName = await resolverDef.resolveField("fullName", parent, {}, {});
+
+		expect(fullName).toBe("John Doe");
+	});
+
+	it("resolves inline .resolve() fields with ctx context", async () => {
+		interface DB {
+			posts: Array<{ id: string; title: string; authorId: string }>;
+		}
+
+		const UserWithPosts = entity("UserWithPosts", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			posts: t
+				.many(() => Post)
+				.resolve(({ parent, ctx }) => {
+					const db = ctx as DB;
+					return db.posts.filter((p) => p.authorId === parent.id);
+				}),
+		}));
+
+		const resolverDef = createResolverFromEntity(UserWithPosts);
+		const parent = { id: "1", name: "John" };
+		const ctx = {
+			posts: [
+				{ id: "p1", title: "Hello", authorId: "1" },
+				{ id: "p2", title: "World", authorId: "2" },
+			],
+		};
+
+		const posts = await resolverDef.resolveField("posts", parent, {}, ctx);
+
+		expect(posts).toHaveLength(1);
+		expect((posts as any[])[0].title).toBe("Hello");
+	});
+
+	it("resolveAll returns all fields", async () => {
+		const UserWithComputed = entity("UserWithComputed", (t) => ({
+			id: t.id(),
+			firstName: t.string(),
+			lastName: t.string(),
+			fullName: t.string().resolve(({ parent }) => `${parent.firstName} ${parent.lastName}`),
+		}));
+
+		const resolverDef = createResolverFromEntity(UserWithComputed);
+		const parent = { id: "1", firstName: "Jane", lastName: "Smith" };
+
+		const result = await resolverDef.resolveAll(parent, {});
+
+		expect(result.id).toBe("1");
+		expect(result.firstName).toBe("Jane");
+		expect(result.lastName).toBe("Smith");
+		expect(result.fullName).toBe("Jane Smith");
+	});
+
+	it("produces same result as separate resolver()", async () => {
+		// Inline resolver style (unified)
+		const UserInline = entity("UserInline", (t) => ({
+			id: t.id(),
+			firstName: t.string(),
+			lastName: t.string(),
+			fullName: t.string().resolve(({ parent }) => `${parent.firstName} ${parent.lastName}`),
+		}));
+		const inlineResolverDef = createResolverFromEntity(UserInline);
+
+		// Separate resolver style (legacy)
+		const UserSeparate = entity("UserSeparate", {
+			id: t.id(),
+			firstName: t.string(),
+			lastName: t.string(),
+		});
+		const separateResolverDef = resolver(UserSeparate, (f) => ({
+			id: f.expose("id"),
+			firstName: f.expose("firstName"),
+			lastName: f.expose("lastName"),
+			fullName: f.string().resolve(({ parent }) => `${parent.firstName} ${parent.lastName}`),
+		}));
+
+		const parent = { id: "1", firstName: "John", lastName: "Doe" };
+
+		// Both should produce same results
+		const inlineResult = await inlineResolverDef.resolveAll(parent, {});
+		const separateResult = await separateResolverDef.resolveAll(parent, {});
+
+		expect(inlineResult.id).toBe(separateResult.id);
+		expect(inlineResult.firstName).toBe(separateResult.firstName);
+		expect(inlineResult.lastName).toBe(separateResult.lastName);
+		expect(inlineResult.fullName).toBe(separateResult.fullName);
+	});
+});
+
+describe("hasInlineResolvers()", () => {
+	it("returns false for entity without inline resolvers", () => {
+		const PlainUser = entity("PlainUser", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			email: t.string(),
+		}));
+
+		expect(hasInlineResolvers(PlainUser)).toBe(false);
+	});
+
+	it("returns true for entity with .resolve()", () => {
+		const UserWithResolve = entity("UserWithResolve", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			fullName: t.string().resolve(({ parent }) => parent.name),
+		}));
+
+		expect(hasInlineResolvers(UserWithResolve)).toBe(true);
+	});
+
+	it("returns true for entity with .subscribe()", () => {
+		const UserWithSubscribe = entity("UserWithSubscribe", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			status: t.json().subscribe(({ ctx }) => {
+				ctx.emit({ isActive: true });
+			}),
+		}));
+
+		expect(hasInlineResolvers(UserWithSubscribe)).toBe(true);
+	});
+
+	it("returns true for entity with both .resolve() and .subscribe()", () => {
+		const UserWithBoth = entity("UserWithBoth", (t) => ({
+			id: t.id(),
+			name: t.string(),
+			fullName: t.string().resolve(({ parent }) => parent.name),
+			status: t.json().subscribe(({ ctx }) => {
+				ctx.emit({ isActive: true });
+			}),
+		}));
+
+		expect(hasInlineResolvers(UserWithBoth)).toBe(true);
+	});
+
+	it("returns false for object-based entity definition", () => {
+		const ObjectUser = entity("ObjectUser", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		expect(hasInlineResolvers(ObjectUser)).toBe(false);
 	});
 });

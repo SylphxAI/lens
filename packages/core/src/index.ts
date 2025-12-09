@@ -225,6 +225,8 @@ export {
 // =============================================================================
 
 export {
+	// Entity to resolver conversion (unified entity definition)
+	createResolverFromEntity,
 	// Types
 	type ExposedField,
 	type FieldBuilder,
@@ -233,6 +235,7 @@ export {
 	type FieldLiveContext,
 	type FieldResolverContext,
 	type FieldResolverParams,
+	hasInlineResolvers,
 	type InferResolverOutput,
 	type InferResolverSelected,
 	// Type guards
