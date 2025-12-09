@@ -591,3 +591,114 @@ describe("Field Resolution Methods", () => {
 		});
 	});
 });
+
+// =============================================================================
+// Lazy Relations (t.one() / t.many())
+// =============================================================================
+
+describe("Lazy Relations", () => {
+	// Mock entity for testing
+	const Post = { _name: "Post", fields: { id: t.id(), title: t.string() } };
+	const Profile = { _name: "Profile", fields: { id: t.id(), bio: t.string() } };
+
+	describe("t.one()", () => {
+		test("creates LazyOneType", () => {
+			const field = t.one(() => Profile);
+			expect(field._type).toBe("lazyOne");
+			expect(field._relationKind).toBe("one");
+		});
+
+		test("getTarget() evaluates lazy reference", () => {
+			const field = t.one(() => Profile);
+			expect(field.getTarget()).toBe(Profile);
+		});
+
+		test("supports .resolve()", () => {
+			const field = t.one(() => Profile).resolve(({ parent }: { parent: { profileId: string } }) => ({
+				id: parent.profileId,
+				bio: "Test bio",
+			}));
+
+			expect(field.hasResolver()).toBe(true);
+			expect(field.getResolutionMode()).toBe("resolve");
+		});
+
+		test("supports .subscribe()", () => {
+			const field = t.one(() => Profile).subscribe(({ emit }) => {
+				emit({ id: "1", bio: "Live bio" });
+			});
+
+			expect(field.hasSubscription()).toBe(true);
+			expect(field.getResolutionMode()).toBe("subscribe");
+		});
+	});
+
+	describe("t.many()", () => {
+		test("creates LazyManyType", () => {
+			const field = t.many(() => Post);
+			expect(field._type).toBe("lazyMany");
+			expect(field._relationKind).toBe("many");
+		});
+
+		test("getTarget() evaluates lazy reference", () => {
+			const field = t.many(() => Post);
+			expect(field.getTarget()).toBe(Post);
+		});
+
+		test("supports .resolve()", () => {
+			const field = t.many(() => Post).resolve(() => [
+				{ id: "1", title: "First" },
+				{ id: "2", title: "Second" },
+			]);
+
+			expect(field.hasResolver()).toBe(true);
+
+			const result = field._resolver!({ parent: {}, ctx: {} });
+			expect(result).toHaveLength(2);
+		});
+
+		test("supports .subscribe()", () => {
+			const emitted: unknown[] = [];
+
+			const field = t.many(() => Post).subscribe(({ emit }) => {
+				emit([{ id: "1", title: "Live post" }]);
+			});
+
+			field._subscriptionResolver!({
+				parent: {},
+				ctx: {},
+				emit: (v) => emitted.push(v),
+			});
+
+			expect(emitted[0]).toEqual([{ id: "1", title: "Live post" }]);
+		});
+	});
+
+	describe("circular reference handling", () => {
+		test("lazy references allow circular definitions", () => {
+			// User references Post, Post references User
+			const User = {
+				_name: "User",
+				fields: {
+					id: t.id(),
+					posts: t.many(() => PostEntity),
+				},
+			};
+
+			const PostEntity = {
+				_name: "Post",
+				fields: {
+					id: t.id(),
+					author: t.one(() => User),
+				},
+			};
+
+			// Both should resolve correctly
+			const userPostsField = User.fields.posts;
+			const postAuthorField = PostEntity.fields.author;
+
+			expect(userPostsField.getTarget()).toBe(PostEntity);
+			expect(postAuthorField.getTarget()).toBe(User);
+		});
+	});
+});

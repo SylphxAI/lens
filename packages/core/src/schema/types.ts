@@ -657,6 +657,72 @@ export class BelongsToType<Target extends string> extends FieldType<RelationBran
 }
 
 // =============================================================================
+// Lazy Relation Types (for unified entity definition)
+// =============================================================================
+
+/** Type for entity reference - can be entity object or lazy function */
+export type EntityRef<T = unknown> = { fields: EntityDefinition; _name?: string } | (() => { fields: EntityDefinition; _name?: string });
+
+/** Extract entity type from lazy or direct reference */
+export type InferEntityRef<R> = R extends () => infer E ? E : R;
+
+/**
+ * Lazy one-to-one relation.
+ * Uses lazy evaluation to solve circular reference issues.
+ *
+ * @example
+ * ```typescript
+ * const User = entity("User", (t) => ({
+ *   profile: t.one(() => Profile).resolve(({ parent, ctx }) =>
+ *     ctx.db.profiles.find(p => p.userId === parent.id)
+ *   ),
+ * }));
+ * ```
+ */
+export class LazyOneType<Target, TargetData = unknown> extends FieldType<TargetData> {
+	readonly _type = "lazyOne" as const;
+	readonly _tsType!: TargetData;
+	readonly _relationKind = "one" as const;
+
+	constructor(public readonly targetRef: () => Target) {
+		super();
+	}
+
+	/** Get the target entity (evaluates lazy reference) */
+	getTarget(): Target {
+		return this.targetRef();
+	}
+}
+
+/**
+ * Lazy one-to-many relation.
+ * Uses lazy evaluation to solve circular reference issues.
+ *
+ * @example
+ * ```typescript
+ * const User = entity("User", (t) => ({
+ *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+ *     ctx.db.posts.filter(p => p.authorId === parent.id)
+ *   ),
+ * }));
+ * ```
+ */
+export class LazyManyType<Target, TargetData = unknown> extends FieldType<TargetData[]> {
+	readonly _type = "lazyMany" as const;
+	readonly _tsType!: TargetData[];
+	readonly _relationKind = "many" as const;
+
+	constructor(public readonly targetRef: () => Target) {
+		super();
+	}
+
+	/** Get the target entity (evaluates lazy reference) */
+	getTarget(): Target {
+		return this.targetRef();
+	}
+}
+
+// =============================================================================
 // Type Builders (t.*)
 // =============================================================================
 
@@ -724,37 +790,95 @@ export const t = {
 		definition: CustomTypeDefinition<T, SerializedT>,
 	): CustomType<T, SerializedT> => new CustomType(definition),
 
-	// Relations
+	// Relations (legacy - string-based)
 
-	/** One-to-one relation (owns) */
+	/** One-to-one relation (owns) @deprecated Use t.one(() => Entity) instead */
 	hasOne: <T extends string>(target: T): HasOneType<T> => new HasOneType(target),
 
-	/** One-to-many relation */
+	/** One-to-many relation @deprecated Use t.many(() => Entity) instead */
 	hasMany: <T extends string>(target: T): HasManyType<T> => new HasManyType(target),
 
 	/** Many-to-one relation (foreign key) */
 	belongsTo: <T extends string>(target: T): BelongsToType<T> => new BelongsToType(target),
+
+	// Lazy Relations (new - function-based for circular ref safety)
+
+	/**
+	 * One-to-one relation with lazy reference.
+	 * Use arrow function to solve circular reference issues.
+	 *
+	 * @example
+	 * ```typescript
+	 * const User = entity("User", (t) => ({
+	 *   profile: t.one(() => Profile).resolve(({ parent, ctx }) =>
+	 *     ctx.db.profiles.find(p => p.userId === parent.id)
+	 *   ),
+	 * }));
+	 * ```
+	 */
+	one: <Target, TargetData = unknown>(
+		targetRef: () => Target,
+	): LazyOneType<Target, TargetData> => new LazyOneType(targetRef),
+
+	/**
+	 * One-to-many relation with lazy reference.
+	 * Use arrow function to solve circular reference issues.
+	 *
+	 * @example
+	 * ```typescript
+	 * const User = entity("User", (t) => ({
+	 *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+	 *     ctx.db.posts.filter(p => p.authorId === parent.id)
+	 *   ),
+	 * }));
+	 * ```
+	 */
+	many: <Target, TargetData = unknown>(
+		targetRef: () => Target,
+	): LazyManyType<Target, TargetData> => new LazyManyType(targetRef),
 } as const;
 
 // =============================================================================
 // Type Guards
 // =============================================================================
 
-/** Check if field is a relation type */
+/** Check if field is a relation type (legacy string-based) */
 export function isRelationType(
 	field: FieldType,
 ): field is HasOneType<string> | HasManyType<string> | BelongsToType<string> {
 	return field._type === "hasOne" || field._type === "hasMany" || field._type === "belongsTo";
 }
 
+/** Check if field is a lazy relation type (new function-based) */
+export function isLazyRelationType(
+	field: FieldType,
+): field is LazyOneType<unknown> | LazyManyType<unknown> {
+	return field._type === "lazyOne" || field._type === "lazyMany";
+}
+
+/** Check if field is any kind of relation (legacy or lazy) */
+export function isAnyRelationType(field: FieldType): boolean {
+	return isRelationType(field) || isLazyRelationType(field);
+}
+
 /** Check if field is a scalar type */
 export function isScalarType(field: FieldType): boolean {
-	return !isRelationType(field);
+	return !isAnyRelationType(field);
 }
 
 /** Check if field is hasMany (array relation) */
 export function isHasManyType(field: FieldType): field is HasManyType<string> {
 	return field._type === "hasMany";
+}
+
+/** Check if field is lazyMany (lazy array relation) */
+export function isLazyManyType(field: FieldType): field is LazyManyType<unknown> {
+	return field._type === "lazyMany";
+}
+
+/** Check if field is lazyOne (lazy single relation) */
+export function isLazyOneType(field: FieldType): field is LazyOneType<unknown> {
+	return field._type === "lazyOne";
 }
 
 // =============================================================================
