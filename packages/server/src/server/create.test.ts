@@ -1477,3 +1477,125 @@ describe("Subscription detection", () => {
 		});
 	});
 });
+
+// =============================================================================
+// Unified Entity Definition (ADR-001) - Auto Resolver Conversion
+// =============================================================================
+
+describe("Unified Entity Definition", () => {
+	describe("auto-converts entities with inline resolvers", () => {
+		it("creates resolver from entity with inline .resolve()", async () => {
+			// Entity with inline resolver - no separate resolver() needed
+			const Product = entity("Product", (t) => ({
+				id: t.id(),
+				name: t.string(),
+				price: t.float(),
+				// Computed field with inline resolver
+				displayPrice: t.string().resolve(({ parent }) => `$${(parent as { price: number }).price.toFixed(2)}`),
+			}));
+
+			const getProduct = query()
+				.input(z.object({ id: z.string() }))
+				.returns(Product)
+				.resolve(({ input }) => ({
+					id: input.id,
+					name: "Test Product",
+					price: 19.99,
+				}));
+
+			// No resolvers array needed! Server auto-detects inline resolvers
+			const server = createApp({
+				entities: { Product },
+				queries: { getProduct },
+			});
+
+			const result = await firstValueFrom(
+				server.execute({
+					path: "getProduct",
+					input: { id: "prod-1", $select: { id: true, name: true, displayPrice: true } },
+				}),
+			);
+
+			expect(result.data).toEqual({
+				id: "prod-1",
+				name: "Test Product",
+				displayPrice: "$19.99",
+			});
+		});
+
+		it("explicit resolver takes priority over inline resolver", async () => {
+			// Entity with inline resolver
+			const Item = entity("Item", (t) => ({
+				id: t.id(),
+				label: t.string().resolve(() => "inline-label"),
+			}));
+
+			// Explicit resolver overrides inline
+			const itemResolver = resolver(Item, (f) => ({
+				id: f.expose("id"),
+				label: f.string().resolve(() => "explicit-label"),
+			}));
+
+			const getItem = query()
+				.input(z.object({ id: z.string() }))
+				.returns(Item)
+				.resolve(({ input }) => ({ id: input.id }));
+
+			const server = createApp({
+				entities: { Item },
+				queries: { getItem },
+				resolvers: [itemResolver], // Explicit resolver takes priority
+			});
+
+			const result = await firstValueFrom(
+				server.execute({
+					path: "getItem",
+					input: { id: "item-1", $select: { id: true, label: true } },
+				}),
+			);
+
+			expect(result.data).toEqual({
+				id: "item-1",
+				label: "explicit-label", // From explicit resolver, not inline
+			});
+		});
+
+		it("includes inline resolver fields in metadata", () => {
+			const Task = entity("Task", (t) => ({
+				id: t.id(),
+				title: t.string(),
+				status: t.string().subscribe(({ ctx }) => {
+					ctx.emit("pending");
+				}),
+			}));
+
+			const server = createApp({
+				entities: { Task },
+				queries: {},
+			});
+
+			const metadata = server.getMetadata();
+			expect(metadata.entities.Task).toBeDefined();
+			expect(metadata.entities.Task.id).toBe("exposed");
+			expect(metadata.entities.Task.title).toBe("exposed");
+			expect(metadata.entities.Task.status).toBe("subscribe");
+		});
+
+		it("skips entities without inline resolvers", () => {
+			// Plain entity without inline resolvers
+			const SimpleUser = entity("SimpleUser", {
+				id: t.id(),
+				name: t.string(),
+			});
+
+			const server = createApp({
+				entities: { SimpleUser },
+				queries: {},
+			});
+
+			const metadata = server.getMetadata();
+			// No resolver created for entities without inline resolvers
+			expect(metadata.entities.SimpleUser).toBeUndefined();
+		});
+	});
+});

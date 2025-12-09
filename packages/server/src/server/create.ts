@@ -18,10 +18,12 @@
 import {
 	type ContextValue,
 	createEmit,
+	createResolverFromEntity,
 	type EmitCommand,
 	type EntityDef,
 	flattenRouter,
 	hashValue,
+	hasInlineResolvers,
 	type InferRouterContext,
 	isEntityDef,
 	isMutationDef,
@@ -29,7 +31,6 @@ import {
 	type Observable,
 	type ResolverDef,
 	type RouterDef,
-	toResolverMap,
 	valuesEqual,
 } from "@sylphx/lens-core";
 import { createContext, runWithContext, tryUseContext } from "../context/index.js";
@@ -189,7 +190,6 @@ class LensServerImpl<
 
 		this.queries = queries as Q;
 		this.mutations = mutations as M;
-		this.resolverMap = config.resolvers ? toResolverMap(config.resolvers) : undefined;
 
 		// Build entities map: explicit config + auto-extracted from resolvers
 		const entities: EntitiesMap = { ...(config.entities ?? {}) };
@@ -202,6 +202,11 @@ class LensServerImpl<
 			}
 		}
 		this.entities = entities;
+
+		// Build resolver map: explicit resolvers + auto-converted from entities with inline resolvers
+		// Unified Entity Definition (ADR-001): entities can have inline .resolve()/.subscribe() methods
+		// These are automatically converted to resolvers, no need to call createResolverFromEntity() manually
+		this.resolverMap = this.buildResolverMap(config.resolvers, entities);
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
 		this.logger = config.logger ?? noopLogger;
@@ -246,6 +251,45 @@ class LensServerImpl<
 				throw new Error(`Invalid mutation definition: ${name}`);
 			}
 		}
+	}
+
+	/**
+	 * Build resolver map from explicit resolvers and entities with inline resolvers.
+	 *
+	 * Unified Entity Definition (ADR-001): Entities can have inline .resolve()/.subscribe() methods.
+	 * These are automatically converted to resolvers - no manual createResolverFromEntity() needed.
+	 *
+	 * Priority: explicit resolvers > auto-converted from entities
+	 */
+	private buildResolverMap(
+		explicitResolvers: import("@sylphx/lens-core").Resolvers | undefined,
+		entities: EntitiesMap,
+	): ResolverMap | undefined {
+		const resolverMap: ResolverMap = new Map();
+
+		// 1. Add explicit resolvers first (takes priority)
+		if (explicitResolvers) {
+			for (const resolver of explicitResolvers) {
+				const entityName = resolver.entity._name;
+				if (entityName) {
+					resolverMap.set(entityName, resolver);
+				}
+			}
+		}
+
+		// 2. Auto-convert entities with inline resolvers (if not already in map)
+		for (const [name, entity] of Object.entries(entities)) {
+			if (!isEntityDef(entity)) continue;
+			if (resolverMap.has(name)) continue; // Explicit resolver takes priority
+
+			// Check if entity has inline resolvers
+			if (hasInlineResolvers(entity)) {
+				const resolver = createResolverFromEntity(entity);
+				resolverMap.set(name, resolver);
+			}
+		}
+
+		return resolverMap.size > 0 ? resolverMap : undefined;
 	}
 
 	// =========================================================================
