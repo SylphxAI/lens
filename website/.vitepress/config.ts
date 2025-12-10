@@ -1,23 +1,127 @@
 import { defineConfig } from "vitepress";
 
+const SITE_URL = "https://lens.sylphx.com";
+const SITE_TITLE = "Lens";
+const SITE_DESCRIPTION =
+	"Type-safe, real-time API framework for TypeScript. GraphQL-like power with automatic live queries, incremental transfer, and full type inference. No codegen required.";
+
 export default defineConfig({
-	title: "Lens",
-	description: "Type-safe, real-time API framework for TypeScript",
+	title: SITE_TITLE,
+	description: SITE_DESCRIPTION,
+	lang: "en-US",
+	cleanUrls: true,
+	lastUpdated: true,
+
+	sitemap: {
+		hostname: SITE_URL,
+		transformItems: (items) => {
+			return items.map((item) => ({
+				...item,
+				changefreq: "weekly",
+				priority: item.url === "" ? 1.0 : item.url.includes("/guide/") ? 0.9 : 0.8,
+			}));
+		},
+	},
 
 	head: [
-		["link", { rel: "icon", href: "/logo.svg" }],
+		// Favicon & Icons
+		["link", { rel: "icon", href: "/logo.svg", type: "image/svg+xml" }],
+		["link", { rel: "icon", href: "/favicon.ico", sizes: "32x32" }],
+		["link", { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" }],
+		["link", { rel: "manifest", href: "/site.webmanifest" }],
+
+		// Theme & Mobile
 		["meta", { name: "theme-color", content: "#646cff" }],
-		["meta", { property: "og:type", content: "website" }],
-		["meta", { property: "og:title", content: "Lens" }],
+		["meta", { name: "viewport", content: "width=device-width, initial-scale=1.0" }],
+		["meta", { name: "mobile-web-app-capable", content: "yes" }],
+		["meta", { name: "apple-mobile-web-app-capable", content: "yes" }],
+		["meta", { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" }],
+
+		// SEO Meta
+		["meta", { name: "author", content: "Sylphx AI" }],
 		[
 			"meta",
-			{ property: "og:description", content: "Type-safe, real-time API framework for TypeScript" },
+			{
+				name: "keywords",
+				content:
+					"lens, typescript, api, real-time, live queries, websocket, type-safe, graphql, trpc, framework, react, vue, solid, svelte",
+			},
 		],
-		["meta", { property: "og:url", content: "https://lens.sylphx.com" }],
+		["meta", { name: "robots", content: "index, follow" }],
+		["meta", { name: "googlebot", content: "index, follow" }],
+		["link", { rel: "canonical", href: SITE_URL }],
+
+		// Open Graph
+		["meta", { property: "og:type", content: "website" }],
+		["meta", { property: "og:site_name", content: SITE_TITLE }],
+		["meta", { property: "og:title", content: SITE_TITLE }],
+		["meta", { property: "og:description", content: SITE_DESCRIPTION }],
+		["meta", { property: "og:url", content: SITE_URL }],
+		["meta", { property: "og:image", content: `${SITE_URL}/og-image.png` }],
+		["meta", { property: "og:image:width", content: "1200" }],
+		["meta", { property: "og:image:height", content: "630" }],
+		["meta", { property: "og:image:alt", content: "Lens - Type-safe, real-time API framework" }],
+		["meta", { property: "og:locale", content: "en_US" }],
+
+		// Twitter Card
+		["meta", { name: "twitter:card", content: "summary_large_image" }],
+		["meta", { name: "twitter:site", content: "@sylphxai" }],
+		["meta", { name: "twitter:creator", content: "@sylphxai" }],
+		["meta", { name: "twitter:title", content: SITE_TITLE }],
+		["meta", { name: "twitter:description", content: SITE_DESCRIPTION }],
+		["meta", { name: "twitter:image", content: `${SITE_URL}/og-image.png` }],
+		["meta", { name: "twitter:image:alt", content: "Lens - Type-safe, real-time API framework" }],
+
+		// JSON-LD Structured Data
+		[
+			"script",
+			{ type: "application/ld+json" },
+			JSON.stringify({
+				"@context": "https://schema.org",
+				"@type": "SoftwareApplication",
+				name: "Lens",
+				description: SITE_DESCRIPTION,
+				url: SITE_URL,
+				applicationCategory: "DeveloperApplication",
+				operatingSystem: "Cross-platform",
+				offers: {
+					"@type": "Offer",
+					price: "0",
+					priceCurrency: "USD",
+				},
+				author: {
+					"@type": "Organization",
+					name: "Sylphx AI",
+					url: "https://sylphx.com",
+				},
+				license: "https://opensource.org/licenses/MIT",
+				programmingLanguage: "TypeScript",
+				runtimePlatform: "Node.js",
+			}),
+		],
 	],
+
+	transformPageData(pageData) {
+		// Dynamic canonical URL per page
+		const canonicalUrl = `${SITE_URL}/${pageData.relativePath}`
+			.replace(/index\.md$/, "")
+			.replace(/\.md$/, "");
+
+		pageData.frontmatter.head ??= [];
+		pageData.frontmatter.head.push(["link", { rel: "canonical", href: canonicalUrl }]);
+
+		// Dynamic OG URL per page
+		pageData.frontmatter.head.push(["meta", { property: "og:url", content: canonicalUrl }]);
+
+		// Dynamic title for OG
+		const pageTitle = pageData.title ? `${pageData.title} | ${SITE_TITLE}` : SITE_TITLE;
+		pageData.frontmatter.head.push(["meta", { property: "og:title", content: pageTitle }]);
+		pageData.frontmatter.head.push(["meta", { name: "twitter:title", content: pageTitle }]);
+	},
 
 	themeConfig: {
 		logo: "/logo.svg",
+		siteTitle: "Lens",
 
 		nav: [
 			{ text: "Guide", link: "/guide/" },
@@ -140,20 +244,49 @@ export default defineConfig({
 			],
 		},
 
-		socialLinks: [{ icon: "github", link: "https://github.com/SylphxAI/Lens" }],
+		socialLinks: [
+			{ icon: "github", link: "https://github.com/SylphxAI/Lens" },
+			{ icon: "twitter", link: "https://twitter.com/sylphxai" },
+		],
 
 		search: {
 			provider: "local",
+			options: {
+				detailedView: true,
+			},
 		},
 
 		footer: {
 			message: "Released under the MIT License.",
-			copyright: "Copyright © 2024 Sylphx AI",
+			copyright: "Copyright © 2024-present Sylphx AI",
 		},
 
 		editLink: {
 			pattern: "https://github.com/SylphxAI/Lens/edit/main/website/:path",
 			text: "Edit this page on GitHub",
 		},
+
+		lastUpdated: {
+			text: "Last updated",
+			formatOptions: {
+				dateStyle: "medium",
+			},
+		},
+
+		outline: {
+			level: [2, 3],
+			label: "On this page",
+		},
+
+		docFooter: {
+			prev: "Previous",
+			next: "Next",
+		},
+
+		returnToTopLabel: "Return to top",
+		sidebarMenuLabel: "Menu",
+		darkModeSwitchLabel: "Theme",
+		lightModeSwitchTitle: "Switch to light theme",
+		darkModeSwitchTitle: "Switch to dark theme",
 	},
 });

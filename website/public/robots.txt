@@ -1,0 +1,11 @@
+# Robots.txt for Lens Documentation
+# https://lens.sylphx.com
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://lens.sylphx.com/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1

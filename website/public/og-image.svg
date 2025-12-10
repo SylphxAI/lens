@@ -1,0 +1,54 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#bd34fe"/>
+      <stop offset="100%" style="stop-color:#41d1ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Grid pattern -->
+  <g opacity="0.1">
+    <line x1="0" y1="0" x2="1200" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="1200" y1="0" x2="0" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="white" stroke-width="1"/>
+    <line x1="0" y1="315" x2="1200" y2="315" stroke="white" stroke-width="1"/>
+  </g>
+
+  <!-- Decorative circles -->
+  <circle cx="150" cy="150" r="200" fill="url(#accent)" opacity="0.1"/>
+  <circle cx="1050" cy="480" r="250" fill="url(#accent)" opacity="0.08"/>
+
+  <!-- Logo/Icon -->
+  <g transform="translate(540, 180)">
+    <circle cx="60" cy="60" r="50" fill="url(#accent)"/>
+    <path d="M40 60 L60 40 L80 60 L60 80 Z" fill="white"/>
+  </g>
+
+  <!-- Title -->
+  <text x="600" y="340" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="white">Lens</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="400" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#a0a0a0">Type-safe, real-time API framework</text>
+
+  <!-- Tags -->
+  <g transform="translate(600, 460)">
+    <rect x="-200" y="0" width="100" height="32" rx="16" fill="url(#accent)" opacity="0.2"/>
+    <text x="-150" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="white">TypeScript</text>
+
+    <rect x="-80" y="0" width="90" height="32" rx="16" fill="url(#accent)" opacity="0.2"/>
+    <text x="-35" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="white">Real-time</text>
+
+    <rect x="30" y="0" width="100" height="32" rx="16" fill="url(#accent)" opacity="0.2"/>
+    <text x="80" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="white">Type-safe</text>
+  </g>
+
+  <!-- Bottom branding -->
+  <text x="600" y="580" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" fill="#666">lens.sylphx.com</text>
+</svg>

@@ -1,0 +1,17 @@
+{
+	"name": "Lens Documentation",
+	"short_name": "Lens",
+	"description": "Type-safe, real-time API framework for TypeScript",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#ffffff",
+	"theme_color": "#646cff",
+	"icons": [
+		{
+			"src": "/logo.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any maskable"
+		}
+	]
+}
