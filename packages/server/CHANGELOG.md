@@ -1,5 +1,19 @@
 # @sylphx/lens-server
 
+## 2.10.0 (2025-12-10)
+
+### ✨ Features
+
+- **core:** add model() API with nullable/list wrappers ([281d6d4](https://github.com/SylphxAI/lens/commit/281d6d41142fd4c4c8a2af172158490f141e1870))
+
+### 🐛 Bug Fixes
+
+- **core:** remove unused imports and types ([853d870](https://github.com/SylphxAI/lens/commit/853d87035792aa9d3736ef9ae017e1987165449c))
+
+### 📚 Documentation
+
+- update API examples to use new patterns ([fd0c6df](https://github.com/SylphxAI/lens/commit/fd0c6df58ea104bfb6a0b479f4870f2a4757490d))
+
 ## 2.9.0 (2025-12-09)
 
 ### ✨ Features
