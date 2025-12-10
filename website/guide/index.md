@@ -4,12 +4,12 @@ Lens is a **GraphQL-like frontend-driven framework** with **automatic live queri
 
 ## Key Features
 
-- **🔄 Automatic Live Queries** - Any query can be subscribed to
-- **📡 Minimal Diff Updates** - Server only sends changed fields
-- **🎯 Field Selection** - Subscribe to specific fields only
-- **⚡ Optimistic Updates** - Instant UI feedback with automatic rollback
-- **🌐 Multi-Server Routing** - Route to different backends with full type safety
-- **🔌 Plugin System** - Extensible request/response processing
+- <Icon icon="lucide:refresh-cw" class="inline-icon" /> **Automatic Live Queries** - Any query can be subscribed to
+- <Icon icon="lucide:radio-tower" class="inline-icon" /> **Minimal Diff Updates** - Server only sends changed fields
+- <Icon icon="lucide:target" class="inline-icon" /> **Field Selection** - Subscribe to specific fields only
+- <Icon icon="lucide:zap" class="inline-icon" /> **Optimistic Updates** - Instant UI feedback with automatic rollback
+- <Icon icon="lucide:globe" class="inline-icon" /> **Multi-Server Routing** - Route to different backends with full type safety
+- <Icon icon="lucide:plug" class="inline-icon" /> **Plugin System** - Extensible request/response processing
 
 ## Mental Model
 

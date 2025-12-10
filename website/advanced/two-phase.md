@@ -192,9 +192,9 @@ const User = model<AppContext>('User', (t) => ({
 
 | Approach | Initial Load | Batching | Live Updates |
 |----------|--------------|----------|--------------|
-| Subscription-only | Slow | ❌ | ✅ |
-| Resolve-only | Fast | ✅ | ⚠️ Mixed |
-| Two-Phase | Fast | ✅ | ✅ Clean |
+| Subscription-only | Slow | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> |
+| Resolve-only | Fast | <Icon icon="lucide:check" class="inline-icon text-green" /> | <Icon icon="lucide:alert-triangle" class="inline-icon text-yellow" /> Mixed |
+| Two-Phase | Fast | <Icon icon="lucide:check" class="inline-icon text-green" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> Clean |
 
 ## When to Use Each Phase
 

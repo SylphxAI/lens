@@ -77,8 +77,8 @@ const getUser = query()
 const user = await client.user.get({ id: '123' })
 //    ^? User type inferred automatically
 
-user.name  // ✅ Autocomplete works
-user.foo   // ❌ TypeScript error
+user.name  // <Icon icon="lucide:check" class="inline-icon text-green" /> Autocomplete works
+user.foo   // <Icon icon="lucide:x" class="inline-icon text-red" /> TypeScript error
 ```
 
 ## Field Selection

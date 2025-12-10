@@ -1,0 +1,23 @@
+.inline-icon {
+	display: inline-block;
+	width: 1.2em;
+	height: 1.2em;
+	vertical-align: -0.15em;
+	color: var(--vp-c-brand-1);
+}
+
+.vp-doc .inline-icon {
+	margin-right: 0.25em;
+}
+
+.inline-icon.text-green {
+	color: #10b981;
+}
+
+.inline-icon.text-red {
+	color: #ef4444;
+}
+
+.inline-icon.text-yellow {
+	color: #f59e0b;
+}

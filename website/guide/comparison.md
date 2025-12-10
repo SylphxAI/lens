@@ -6,13 +6,13 @@ How does Lens compare to other API frameworks?
 
 | Feature | tRPC | GraphQL | REST | **Lens** |
 |---------|------|---------|------|----------|
-| Type Safety | ✅ | Codegen | ❌ | ✅ Native |
-| Code-first | ✅ | SDL | ✅ | ✅ |
-| Field Selection | ❌ | ✅ | ❌ | ✅ |
-| Field Arguments | ❌ | ✅ | ❌ | ✅ |
-| Live Subscriptions | ❌ | Separate | ❌ | ✅ Auto |
-| Incremental Updates | ❌ | ❌ | ❌ | ✅ Diff |
-| Streaming | ✅ | ❌ | ❌ | ✅ |
+| Type Safety | <Icon icon="lucide:check" class="inline-icon text-green" /> | Codegen | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> Native |
+| Code-first | <Icon icon="lucide:check" class="inline-icon text-green" /> | SDL | <Icon icon="lucide:check" class="inline-icon text-green" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> |
+| Field Selection | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> |
+| Field Arguments | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> |
+| Live Subscriptions | <Icon icon="lucide:x" class="inline-icon text-red" /> | Separate | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> Auto |
+| Incremental Updates | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> Diff |
+| Streaming | <Icon icon="lucide:check" class="inline-icon text-green" /> | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:x" class="inline-icon text-red" /> | <Icon icon="lucide:check" class="inline-icon text-green" /> |
 | Optimistic Updates | Manual | Manual | Manual | **Auto** |
 | Multi-Server | Manual | Federation | Manual | **Native** |
 

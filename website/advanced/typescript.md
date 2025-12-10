@@ -257,8 +257,8 @@ function getPost(id: PostId): Promise<Post> { ... }
 const userId = '123' as UserId
 const postId = '456' as PostId
 
-getUser(userId)  // ✅
-getUser(postId)  // ❌ Type error
+getUser(userId)  // <Icon icon="lucide:check" class="inline-icon text-green" />
+getUser(postId)  // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error
 ```
 
 ## Best Practices
@@ -288,20 +288,20 @@ const config = {
 ### 3. Avoid `any`
 
 ```typescript
-// ❌ Bad
+// <Icon icon="lucide:x" class="inline-icon text-red" /> Bad
 .resolve(({ input }: any) => ...)
 
-// ✅ Good
+// <Icon icon="lucide:check" class="inline-icon text-green" /> Good
 .resolve(({ input, ctx }) => ...)  // Types inferred
 ```
 
 ### 4. Use Generics Wisely
 
 ```typescript
-// ✅ Good: Generic where needed
+// <Icon icon="lucide:check" class="inline-icon text-green" /> Good: Generic where needed
 function createQuery<T>(model: ModelDef<T>) { ... }
 
-// ❌ Bad: Over-generic
+// <Icon icon="lucide:x" class="inline-icon text-red" /> Bad: Over-generic
 function createQuery<T, U, V, W>(...) { ... }
 ```
 

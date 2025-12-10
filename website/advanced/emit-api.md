@@ -142,16 +142,16 @@ emit.update(1, updatedMessage)
 // Field returns User
 status: t.string()
   .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-    emit('online')     // ✅ Valid
-    emit(123)          // ❌ Type error
-    emit.push('item')  // ❌ Type error (not an array)
+    emit('online')     // <Icon icon="lucide:check" class="inline-icon text-green" /> Valid
+    emit(123)          // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error
+    emit.push('item')  // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error (not an array)
   })
 
 // Field returns Message[]
 messages: t.many(() => Message)
   .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-    emit.push(message)   // ✅ Valid
-    emit('string')       // ❌ Type error
+    emit.push(message)   // <Icon icon="lucide:check" class="inline-icon text-green" /> Valid
+    emit('string')       // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error
   })
 ```
 
@@ -223,20 +223,20 @@ emit.merge({ field3: 'value3' })
 ### 1. Use Specific Methods
 
 ```typescript
-// ✅ Good: Specific method for arrays
+// <Icon icon="lucide:check" class="inline-icon text-green" /> Good: Specific method for arrays
 emit.push(newItem)
 
-// ❌ Bad: Full array replacement
+// <Icon icon="lucide:x" class="inline-icon text-red" /> Bad: Full array replacement
 emit([...currentItems, newItem])
 ```
 
 ### 2. Minimize Data Sent
 
 ```typescript
-// ✅ Good: Only changed fields
+// <Icon icon="lucide:check" class="inline-icon text-green" /> Good: Only changed fields
 emit.merge({ status: 'online' })
 
-// ❌ Bad: Full object when only status changed
+// <Icon icon="lucide:x" class="inline-icon text-red" /> Bad: Full object when only status changed
 emit({ id, name, email, status: 'online', ... })
 ```
 

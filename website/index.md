@@ -14,22 +14,28 @@ hero:
       link: https://github.com/SylphxAI/Lens
 
 features:
-  - icon: 🔄
+  - icon:
+      src: /icons/refresh.svg
     title: Automatic Live Queries
     details: Every query is automatically subscribable. Clients can subscribe to any query and receive updates when data changes.
-  - icon: 📡
+  - icon:
+      src: /icons/broadcast.svg
     title: Minimal Diff Updates
     details: Server computes and sends only the changed fields. Automatic transfer optimization with value, delta, and patch strategies.
-  - icon: 🎯
+  - icon:
+      src: /icons/target.svg
     title: Field Selection
     details: GraphQL-like field selection with field-level arguments. Subscribe to specific fields only.
-  - icon: ⚡
+  - icon:
+      src: /icons/bolt.svg
     title: Optimistic Updates
     details: Instant UI feedback with automatic rollback. Define optimistic behavior declaratively.
-  - icon: 🔌
+  - icon:
+      src: /icons/plug.svg
     title: Framework Agnostic
     details: Works with React, Vue, Solid, Svelte, and more. First-class Next.js, Nuxt, and SolidStart support.
-  - icon: 🛡️
+  - icon:
+      src: /icons/shield.svg
     title: Full Type Safety
     details: End-to-end TypeScript inference from server to client. No code generation required.
 ---
