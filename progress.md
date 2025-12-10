@@ -28,33 +28,35 @@ Selection sets              + Type-safe E2E (no codegen)
 
 ## Core Concepts
 
-### 1. Entity (Shape Definition)
+### 1. Model Definition
 
-Entities define scalar fields only. No relations - avoids circular references:
+Models define shape and inline resolvers in one place:
 
 ```typescript
-const User = entity("User", {
+const User = model<AppContext>("User", (t) => ({
   id: t.id(),
   name: t.string(),
   email: t.string(),
-})
+  // Computed field with resolver
+  displayName: t.string().resolve(({ parent }) => `${parent.name}`),
+  // Relation with lazy reference
+  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
+    ctx.db.posts.filter(p => p.authorId === parent.id)
+  ),
+}))
 ```
 
-### 2. Field Resolver (with Arguments)
+### 2. Field Resolvers (Inline)
 
 GraphQL-style field resolvers with field-level arguments:
 
 ```typescript
-resolver(User, (f) => ({
-  // Expose scalar
-  id: f.expose("id"),
-  name: f.expose("name"),
-
-  // Computed field
-  displayName: f.string().resolve((user) => `${user.name}`),
+const User = model<AppContext>("User", (t) => ({
+  id: t.id(),
+  name: t.string(),
 
   // Relation with field args
-  posts: f.many(Post)
+  posts: t.many(() => Post)
     .args(z.object({
       first: z.number().default(10),
       published: z.boolean().optional(),

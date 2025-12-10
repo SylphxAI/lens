@@ -8,7 +8,7 @@ app._types.router → inProcess({ app }) → TypedTransport → createClient() �
 
 ## What This Example Shows
 
-1. **Entity Type Inference**: How `.returns(Entity)` provides full type inference
+1. **Model Type Inference**: How `.returns(Model)` provides full type inference
 2. **Query Type Inference**: How query input/output types flow through the chain
 3. **Mutation Type Inference**: How mutation types work with optimistic updates
 4. **End-to-End Safety**: How the client automatically gets correct types from server
@@ -22,16 +22,16 @@ bun run examples/type-inference/demo.ts
 
 ## Key Patterns
 
-### 1. Define Entities with `entity()` and `t`
+### 1. Define Models with `model()` and `t`
 
 ```typescript
-const User = entity("User", {
+const User = model<AppContext>("User", (t) => ({
   id: t.id(),
   name: t.string(),
   email: t.string(),
   role: t.enum(["user", "admin"]),
   bio: t.string().optional(),
-});
+}));
 ```
 
 ### 2. Use `lens<Context>()` for Typed Builders
