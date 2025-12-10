@@ -9,4 +9,4 @@ jobs:
     uses: SylphxAI/.github/.github/workflows/release.yml@main
     secrets: inherit
     with:
-      prebuild: "bun run build"
+      build: "bun run build"
