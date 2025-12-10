@@ -1,0 +1,50 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Lens",
+  "description": "Type-safe, real-time API framework for TypeScript with live queries, incremental updates via JSON Patch, and serverless-first architecture using HTTP + SSE",
+  "branch": "main",
+  "folders": [
+    "website",
+    "packages/core",
+    "packages/server",
+    "packages/client",
+    "packages/react",
+    "packages/vue",
+    "packages/solid",
+    "packages/svelte",
+    "packages/next",
+    "packages/nuxt",
+    "examples"
+  ],
+  "excludeFolders": [
+    "node_modules",
+    "**/node_modules",
+    "**/dist",
+    "**/coverage",
+    "**/.turbo",
+    ".changeset",
+    ".github",
+    ".vscode",
+    "website/.vitepress/dist",
+    "website/.vitepress/cache",
+    "**/integration-tests"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "LICENSE.md",
+    "bun.lock",
+    "turbo.json",
+    "biome.json"
+  ],
+  "rules": [
+    "Lens uses HTTP for queries/mutations and SSE for real-time subscriptions - NOT WebSocket by default",
+    "Always use .subscribe() for real-time updates, not polling",
+    "Models are defined with model() and operations with query()/mutation() - similar to tRPC but with field selection",
+    "Use emit.invalidate() or emit.update() to trigger live query updates on the server",
+    "Field selection uses GraphQL-like syntax: { select: { fieldName: true, nested: { select: {...} } } }",
+    "For serverless deployment, use createHandler() for HTTP and streaming responses for SSE",
+    "Lens is serverless-first - prefer HTTP+SSE transport over WebSocket for better cold start handling",
+    "JSON Patch is used automatically for incremental updates - no manual diff computation needed",
+    "Use @sylphx/lens-server for server, @sylphx/lens-client for client, @sylphx/lens-react etc for framework bindings"
+  ]
+}

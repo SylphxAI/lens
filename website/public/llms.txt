@@ -1,0 +1,93 @@
+# Lens
+
+> Type-safe, real-time API framework for TypeScript with live queries, incremental updates, and serverless-first architecture.
+
+Lens combines the type safety of tRPC with GraphQL-like field selection and automatic real-time updates. It uses HTTP + SSE (not WebSocket) for serverless compatibility.
+
+## Documentation
+
+- [Getting Started](https://lens.sylphx.com/guide/): Introduction and overview
+- [Installation](https://lens.sylphx.com/guide/installation): Package installation guide
+- [Quick Start](https://lens.sylphx.com/guide/quick-start): Basic server and client setup
+- [Core Concepts](https://lens.sylphx.com/guide/concepts): Live queries, incremental transfer, type inference
+- [Comparison](https://lens.sylphx.com/guide/comparison): vs tRPC, GraphQL, REST, Upstash, Supabase, Firebase
+
+## Server
+
+- [Server Overview](https://lens.sylphx.com/server/): Server setup and configuration
+- [Models](https://lens.sylphx.com/server/models): Define data models with model()
+- [Operations](https://lens.sylphx.com/server/operations): Queries and mutations
+- [Router](https://lens.sylphx.com/server/router): Organize operations with router()
+- [Resolvers](https://lens.sylphx.com/server/resolvers): Field resolution and computed fields
+- [Live Queries](https://lens.sylphx.com/server/live-queries): Real-time updates with emit API
+- [Context](https://lens.sylphx.com/server/context): Request context and middleware
+- [Plugins](https://lens.sylphx.com/server/plugins): Server plugins (opLog, optimistic)
+
+## Client
+
+- [Client Overview](https://lens.sylphx.com/client/): Client setup
+- [Transports](https://lens.sylphx.com/client/transports): HTTP, WebSocket, Direct, Route
+- [Field Selection](https://lens.sylphx.com/client/selection): GraphQL-like field selection
+- [Subscriptions](https://lens.sylphx.com/client/subscriptions): Real-time subscriptions
+- [Optimistic Updates](https://lens.sylphx.com/client/optimistic): Optimistic UI updates
+- [Plugins](https://lens.sylphx.com/client/plugins): Client plugins (auth, retry, cache)
+
+## Framework Integrations
+
+- [React](https://lens.sylphx.com/frameworks/react): React hooks (useLensQuery, useLensMutation)
+- [Vue](https://lens.sylphx.com/frameworks/vue): Vue composables
+- [Solid](https://lens.sylphx.com/frameworks/solid): SolidJS integration
+- [Svelte](https://lens.sylphx.com/frameworks/svelte): Svelte stores
+- [Next.js](https://lens.sylphx.com/frameworks/next): Next.js App Router
+- [Nuxt](https://lens.sylphx.com/frameworks/nuxt): Nuxt integration
+
+## Advanced
+
+- [Architecture](https://lens.sylphx.com/advanced/architecture): Internal architecture deep dive
+- [Two-Phase Resolution](https://lens.sylphx.com/advanced/two-phase): How field resolution works
+- [Emit API](https://lens.sylphx.com/advanced/emit-api): Full emit methods reference
+- [TypeScript Patterns](https://lens.sylphx.com/advanced/typescript): Type inference patterns
+
+## API Reference
+
+- [Server API](https://lens.sylphx.com/api/server): createApp, createHandler, createWSHandler
+- [Client API](https://lens.sylphx.com/api/client): createClient, transports, QueryResult
+- [Core Types](https://lens.sylphx.com/api/core): Type definitions
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| @sylphx/lens-core | Core types and utilities |
+| @sylphx/lens-server | Server implementation |
+| @sylphx/lens-client | Client implementation |
+| @sylphx/lens-react | React bindings |
+| @sylphx/lens-vue | Vue bindings |
+| @sylphx/lens-solid | SolidJS bindings |
+| @sylphx/lens-svelte | Svelte bindings |
+| @sylphx/lens-next | Next.js integration |
+| @sylphx/lens-nuxt | Nuxt integration |
+
+## Key Concepts
+
+### Live Queries
+Same query serves both one-time and real-time access. Client chooses via .subscribe():
+```typescript
+await client.user.get({ id })           // One-time
+client.user.get({ id }).subscribe(...)  // Real-time
+```
+
+### Incremental Updates
+Lens uses JSON Patch for efficient updates - only changed data is sent:
+```typescript
+// Initial: { users: [...50 users] } (1.2KB)
+// Update: [{ "op": "replace", "path": "/users/0/name", "value": "Alice" }] (47B)
+```
+
+### Serverless-First
+HTTP + SSE architecture works on Vercel, Cloudflare Workers, AWS Lambda without persistent connections.
+
+## Optional
+
+- [Examples](https://lens.sylphx.com/examples/basic): Code examples
+- [GitHub Repository](https://github.com/SylphxAI/lens): Source code
