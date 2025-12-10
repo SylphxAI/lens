@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.10.1 (2025-12-10)
+
+### 🐛 Bug Fixes
+
+- **server:** call _subscriber for operation-level LiveQueryDef ([4a96fe8](https://github.com/SylphxAI/lens/commit/4a96fe8410724ad017e5bf215255b3f7095150b1))
+
 ## 2.10.0 (2025-12-10)
 
 ### ✨ Features
