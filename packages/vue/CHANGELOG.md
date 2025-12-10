@@ -1,5 +1,11 @@
 # @sylphx/lens-vue
 
+## 2.3.10 (2025-12-10)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.8.0
+
 ## 2.3.9 (2025-12-09)
 
 ### 📦 Dependencies
