@@ -1725,3 +1725,379 @@ describe("Unified Entity Definition", () => {
 		});
 	});
 });
+
+// =============================================================================
+// Operation-Level .resolve().subscribe() Tests (LiveQueryDef)
+// =============================================================================
+
+describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
+	it("calls _subscriber after initial resolve for live updates", async () => {
+		let subscriberCalled = false;
+		let capturedEmit: ((value: unknown) => void) | undefined;
+		let capturedOnCleanup: ((fn: () => void) => void) | undefined;
+
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(({ input: _input }) => ({ emit, onCleanup }) => {
+				subscriberCalled = true;
+				capturedEmit = emit;
+				capturedOnCleanup = onCleanup;
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for initial result and subscriber setup
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results.length).toBe(1);
+		expect((results[0] as { data: { name: string } }).data.name).toBe("Initial");
+		expect(subscriberCalled).toBe(true);
+		expect(capturedEmit).toBeDefined();
+		expect(capturedOnCleanup).toBeDefined();
+
+		subscription.unsubscribe();
+	});
+
+	it("emits updates from subscriber emit function", async () => {
+		let capturedEmit: ((value: { id: string; name: string }) => void) | undefined;
+
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit;
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for initial result
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(1);
+		expect((results[0] as { data: { name: string } }).data.name).toBe("Initial");
+
+		// Emit update via subscriber
+		capturedEmit!({ id: "1", name: "Updated" });
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results.length).toBe(2);
+		expect((results[1] as { data: { name: string } }).data.name).toBe("Updated");
+
+		// Emit another update
+		capturedEmit!({ id: "1", name: "Updated Again" });
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results.length).toBe(3);
+		expect((results[2] as { data: { name: string } }).data.name).toBe("Updated Again");
+
+		subscription.unsubscribe();
+	});
+
+	it("calls onCleanup when subscription is unsubscribed", async () => {
+		let cleanupCalled = false;
+
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(() => ({ onCleanup }) => {
+				onCleanup(() => {
+					cleanupCalled = true;
+				});
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "1" },
+			})
+			.subscribe({});
+
+		// Wait for subscription setup
+		await new Promise((r) => setTimeout(r, 50));
+		expect(cleanupCalled).toBe(false);
+
+		// Unsubscribe
+		subscription.unsubscribe();
+
+		// Cleanup should be called
+		expect(cleanupCalled).toBe(true);
+	});
+
+	it("passes input and context to subscriber", async () => {
+		interface TestContext {
+			userId: string;
+		}
+
+		let receivedInput: { id: string } | undefined;
+		let receivedCtx: TestContext | undefined;
+
+		const liveUser = query<TestContext>()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(({ input, ctx }) => ({ emit: _emit }) => {
+				receivedInput = input;
+				receivedCtx = ctx;
+			});
+
+		const server = createApp({
+			queries: { liveUser },
+			context: () => ({ userId: "ctx-user-123" }),
+		});
+
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "input-123" },
+			})
+			.subscribe({});
+
+		// Wait for subscription setup
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(receivedInput).toEqual({ id: "input-123" });
+		expect(receivedCtx).toEqual({ userId: "ctx-user-123" });
+
+		subscription.unsubscribe();
+	});
+
+	it("handles subscriber errors gracefully", async () => {
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(() => () => {
+				throw new Error("Subscriber error");
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const results: unknown[] = [];
+		const errors: Error[] = [];
+
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => {
+					if (result.error) {
+						errors.push(result.error);
+					} else {
+						results.push(result);
+					}
+				},
+			});
+
+		// Wait for execution
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Initial result should be delivered
+		expect(results.length).toBe(1);
+		// Error from subscriber should be reported
+		expect(errors.length).toBe(1);
+		expect(errors[0].message).toBe("Subscriber error");
+
+		subscription.unsubscribe();
+	});
+
+	it("works with router-based operations", async () => {
+		let capturedEmit: ((value: { id: string; count: number }) => void) | undefined;
+
+		const liveCounter = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, count: 0 }))
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit;
+			});
+
+		const appRouter = router({
+			counter: router({
+				live: liveCounter,
+			}),
+		});
+
+		const server = createApp({ router: appRouter });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "counter.live",
+				input: { id: "c1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for initial result
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(1);
+		expect((results[0] as { data: { count: number } }).data.count).toBe(0);
+
+		// Emit updates
+		capturedEmit!({ id: "c1", count: 1 });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(2);
+		expect((results[1] as { data: { count: number } }).data.count).toBe(1);
+
+		capturedEmit!({ id: "c1", count: 5 });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(3);
+		expect((results[2] as { data: { count: number } }).data.count).toBe(5);
+
+		subscription.unsubscribe();
+	});
+
+	it("supports emit.merge for partial updates", async () => {
+		type EmitFn = ((value: unknown) => void) & { merge: (partial: unknown) => void };
+		let capturedEmit: EmitFn | undefined;
+
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial", status: "offline" }))
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit as EmitFn;
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for initial result
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(1);
+		const initial = (results[0] as { data: { name: string; status: string } }).data;
+		expect(initial.name).toBe("Initial");
+		expect(initial.status).toBe("offline");
+
+		// Use merge for partial update
+		capturedEmit!.merge({ status: "online" });
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results.length).toBe(2);
+		const updated = (results[1] as { data: { name: string; status: string } }).data;
+		expect(updated.name).toBe("Initial"); // Preserved
+		expect(updated.status).toBe("online"); // Updated
+
+		subscription.unsubscribe();
+	});
+
+	it("deduplicates identical emit values", async () => {
+		let capturedEmit: ((value: { id: string; name: string }) => void) | undefined;
+
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit;
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "liveUser",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for initial result
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(1);
+
+		// Emit same value multiple times
+		capturedEmit!({ id: "1", name: "Initial" });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(1); // Should be deduplicated
+
+		// Emit different value
+		capturedEmit!({ id: "1", name: "Changed" });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(2);
+
+		// Emit same changed value again
+		capturedEmit!({ id: "1", name: "Changed" });
+		await new Promise((r) => setTimeout(r, 50));
+		expect(results.length).toBe(2); // Should be deduplicated
+
+		subscription.unsubscribe();
+	});
+
+	it("multiple subscriptions each get their own subscriber instance", async () => {
+		let subscriberCallCount = 0;
+		const emits: Array<(value: { id: string; name: string }) => void> = [];
+
+		const liveUser = query()
+			.input(z.object({ id: z.string() }))
+			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.subscribe(() => ({ emit }) => {
+				subscriberCallCount++;
+				emits.push(emit);
+			});
+
+		const server = createApp({ queries: { liveUser } });
+
+		const results1: unknown[] = [];
+		const results2: unknown[] = [];
+
+		const sub1 = server.execute({ path: "liveUser", input: { id: "1" } }).subscribe({ next: (r) => results1.push(r) });
+
+		const sub2 = server.execute({ path: "liveUser", input: { id: "2" } }).subscribe({ next: (r) => results2.push(r) });
+
+		// Wait for both subscriptions
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(subscriberCallCount).toBe(2);
+		expect(emits.length).toBe(2);
+		expect(results1.length).toBe(1);
+		expect(results2.length).toBe(1);
+
+		// Each emit only affects its subscription
+		emits[0]({ id: "1", name: "Updated 1" });
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results1.length).toBe(2);
+		expect(results2.length).toBe(1); // Unchanged
+
+		emits[1]({ id: "2", name: "Updated 2" });
+		await new Promise((r) => setTimeout(r, 50));
+
+		expect(results1.length).toBe(2); // Unchanged
+		expect(results2.length).toBe(2);
+
+		sub1.unsubscribe();
+		sub2.unsubscribe();
+	});
+});

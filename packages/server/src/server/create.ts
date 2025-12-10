@@ -29,9 +29,11 @@ import {
 	hasInlineResolvers,
 	type InferRouterContext,
 	isEntityDef,
+	isLiveQueryDef,
 	isModelDef,
 	isMutationDef,
 	isQueryDef,
+	type LiveQueryDef,
 	mergeModelCollections,
 	type Observable,
 	type ResolverDef,
@@ -690,6 +692,31 @@ class LensServerImpl<
 										)
 									: value;
 								emitIfChanged(processed);
+
+								// LiveQueryDef: Call _subscriber for live updates (Publisher pattern)
+								// ADR-002: .resolve().subscribe() pattern for operation-level live queries
+								if (isQuery && isLiveQueryDef(def) && !cancelled) {
+									const liveQuery = def as LiveQueryDef<unknown, unknown, TContext>;
+									if (liveQuery._subscriber) {
+										try {
+											// Get publisher function from subscriber
+											const publisher = liveQuery._subscriber({
+												input: cleanInput as never, // Type-safe at runtime via input validation
+												ctx: context as TContext,
+											});
+											// Call publisher with emit/onCleanup callbacks
+											if (publisher) {
+												publisher({ emit, onCleanup });
+											}
+										} catch (err) {
+											if (!cancelled) {
+												observer.next?.({
+													error: err instanceof Error ? err : new Error(String(err)),
+												});
+											}
+										}
+									}
+								}
 
 								// Mutations complete immediately - they're truly one-shot
 								// Queries stay open for potential emit calls from field resolvers
