@@ -860,6 +860,14 @@ export function createResolverFromEntity<
 >(entity: TEntity): ResolverDef<TEntity, Record<string, FieldDef<any, any, TContext>>, TContext> {
 	const fields: Record<string, FieldDef<any, any, TContext>> = {};
 
+	// Get model-level resolvers/subscribers if present (new API)
+	const model = entity as {
+		_fieldResolvers?: Record<string, (params: { source: unknown; parent: unknown; args: unknown; ctx: unknown }) => unknown>;
+		_fieldSubscribers?: Record<string, (params: { source: unknown; parent: unknown; args: unknown; ctx: unknown }) => Publisher<unknown>>;
+	};
+	const modelResolvers = model._fieldResolvers ?? {};
+	const modelSubscribers = model._fieldSubscribers ?? {};
+
 	for (const [fieldName, fieldType] of Object.entries(entity.fields)) {
 		// Cast through unknown to avoid exactOptionalPropertyTypes issues
 		const ft = fieldType as unknown as {
@@ -868,8 +876,49 @@ export function createResolverFromEntity<
 			_subscriptionResolver?: (params: { parent: unknown; ctx: unknown }) => void;
 		};
 
-		if (ft._resolutionMode === "resolve" && ft._resolver) {
-			// Computed field - wrap the inline resolver
+		// Check for model-level resolver/subscriber for this field (new API)
+		const modelResolver = modelResolvers[fieldName];
+		const modelSubscriber = modelSubscribers[fieldName];
+
+		if (modelResolver && modelSubscriber) {
+			// LIVE MODE: Both resolver and subscriber from model chain
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "live" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
+					return modelResolver({ source: parent, parent, args: {}, ctx });
+				},
+				_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
+					return modelSubscriber({ source: parent, parent, args: {}, ctx });
+				},
+			};
+		} else if (modelResolver) {
+			// RESOLVE MODE: Only resolver from model chain
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "resolve" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
+					return modelResolver({ source: parent, parent, args: {}, ctx });
+				},
+			};
+		} else if (modelSubscriber) {
+			// SUBSCRIBE MODE: Only subscriber from model chain (uses Publisher pattern)
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "subscribe" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
+					// Return the publisher factory
+					return modelSubscriber({ source: parent, parent, args: {}, ctx });
+				},
+			};
+		} else if (ft._resolutionMode === "resolve" && ft._resolver) {
+			// Computed field - wrap the inline resolver (legacy API)
 			fields[fieldName] = {
 				_kind: "resolved" as const,
 				_mode: "resolve" as const,
@@ -918,17 +967,41 @@ export function createResolverFromEntity<
 /**
  * Check if an entity has any inline resolvers defined.
  *
+ * Checks for:
+ * - Field-level resolvers: `t.string().resolve(...)` or `t.string().subscribe(...)`
+ * - Model-level resolvers: `.resolve({...})` or `.subscribe({...})` chained on model
+ *
  * @example
  * ```typescript
+ * // Field-level
  * const User = entity("User", (t) => ({
  *   id: t.id(),
  *   fullName: t.string().resolve(({ parent }) => ...),
  * }));
  *
+ * // Model-level
+ * const Session = model("Session", (t) => ({ ... }))
+ *   .resolve({ title: ({ source }) => ... })
+ *   .subscribe({ title: ({ source }) => ... });
+ *
  * hasInlineResolvers(User); // true
+ * hasInlineResolvers(Session); // true
  * ```
  */
 export function hasInlineResolvers(entity: EntityDef<string, EntityDefinition>): boolean {
+	// Check for model-level resolvers/subscribers (new API)
+	const model = entity as {
+		_fieldResolvers?: Record<string, unknown>;
+		_fieldSubscribers?: Record<string, unknown>;
+	};
+	if (model._fieldResolvers && Object.keys(model._fieldResolvers).length > 0) {
+		return true;
+	}
+	if (model._fieldSubscribers && Object.keys(model._fieldSubscribers).length > 0) {
+		return true;
+	}
+
+	// Check for field-level resolvers/subscribers (legacy API)
 	for (const fieldType of Object.values(entity.fields)) {
 		const ft = fieldType as {
 			_resolutionMode?: "exposed" | "resolve" | "subscribe";

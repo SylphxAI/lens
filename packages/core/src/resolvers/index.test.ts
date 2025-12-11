@@ -7,6 +7,7 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { entity } from "../schema/define.js";
+import { model } from "../schema/model.js";
 import { t } from "../schema/types.js";
 import {
 	createResolverFromEntity,
@@ -1043,5 +1044,123 @@ describe("hasInlineResolvers()", () => {
 		});
 
 		expect(hasInlineResolvers(ObjectUser)).toBe(false);
+	});
+
+	it("returns true for model with .resolve() chain", () => {
+		const UserWithResolve = model("UserWithResolve", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		})).resolve({
+			name: ({ source }) => (source as { name: string }).name.toUpperCase(),
+		});
+
+		expect(hasInlineResolvers(UserWithResolve)).toBe(true);
+	});
+
+	it("returns true for model with .subscribe() chain", () => {
+		const UserWithSubscribe = model("UserWithSubscribe", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		})).subscribe({
+			name: () =>
+				({ emit }) => {
+					emit("test");
+				},
+		});
+
+		expect(hasInlineResolvers(UserWithSubscribe)).toBe(true);
+	});
+
+	it("returns true for model with .resolve().subscribe() chain", () => {
+		const UserWithBoth = model("UserWithBoth", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		}))
+			.resolve({
+				name: ({ source }) => (source as { name: string }).name,
+			})
+			.subscribe({
+				name: () =>
+					({ emit }) => {
+						emit("test");
+					},
+			});
+
+		expect(hasInlineResolvers(UserWithBoth)).toBe(true);
+	});
+});
+
+describe("createResolverFromEntity() with model chain methods", () => {
+	it("handles model with .resolve() chain", async () => {
+		const User = model("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		})).resolve({
+			name: ({ source }) => (source as { name: string }).name.toUpperCase(),
+		});
+
+		const resolverDef = createResolverFromEntity(User);
+
+		expect(resolverDef.getFieldMode("id")).toBe("exposed");
+		expect(resolverDef.getFieldMode("name")).toBe("resolve");
+
+		const result = await resolverDef.resolveField("name", { id: "1", name: "john" }, {}, {});
+		expect(result).toBe("JOHN");
+	});
+
+	it("handles model with .resolve().subscribe() chain (live mode)", () => {
+		const User = model("User", (t) => ({
+			id: t.id(),
+			name: t.string(),
+		}))
+			.resolve({
+				name: ({ source }) => (source as { name: string }).name,
+			})
+			.subscribe({
+				name: () =>
+					({ emit }) => {
+						emit("test");
+					},
+			});
+
+		const resolverDef = createResolverFromEntity(User);
+
+		expect(resolverDef.getFieldMode("id")).toBe("exposed");
+		expect(resolverDef.getFieldMode("name")).toBe("live");
+	});
+
+	it("resolver and subscriber are both callable", async () => {
+		let subscriberCalled = false;
+
+		const User = model("User", (t) => ({
+			id: t.id(),
+			balance: t.string(),
+		}))
+			.resolve({
+				balance: ({ source }) => `$${(source as { balance: number }).balance}`,
+			})
+			.subscribe({
+				balance: () =>
+					({ emit }) => {
+						subscriberCalled = true;
+						emit("$100");
+					},
+			});
+
+		const resolverDef = createResolverFromEntity(User);
+
+		// Test resolver
+		const resolved = await resolverDef.resolveField("balance", { id: "1", balance: 50 }, {}, {});
+		expect(resolved).toBe("$50");
+
+		// Test subscriber via subscribeField (returns publisher for "live" mode)
+		const parent = { id: "1", balance: 50 };
+		const publisher = resolverDef.subscribeField("balance", parent, {}, {});
+		expect(publisher).not.toBeNull();
+		expect(typeof publisher).toBe("function");
+
+		// Execute publisher
+		publisher!({ emit: () => {}, onCleanup: () => {} });
+		expect(subscriberCalled).toBe(true);
 	});
 });
