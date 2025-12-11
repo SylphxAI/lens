@@ -1,5 +1,11 @@
 # @sylphx/lens-core
 
+## 2.11.2 (2025-12-11)
+
+### 🐛 Bug Fixes
+
+- **core:** support model-level .resolve().subscribe() in resolver conversion ([39c3d93](https://github.com/SylphxAI/lens/commit/39c3d93845d707ad8531ae5693614bf23e663a6f))
+
 ## 2.11.1 (2025-12-11)
 
 ### 🐛 Bug Fixes
