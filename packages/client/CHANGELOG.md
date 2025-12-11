@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.5.2 (2025-12-11)
+
+### 🐛 Bug Fixes
+
+- **core:** remove Node.js-only code for browser compatibility ([c3a258f](https://github.com/SylphxAI/lens/commit/c3a258f42cd75116b4128efb3a8f6d3bed2cdd3e))
+
 ## 2.5.1 (2025-12-11)
 
 ### 🐛 Bug Fixes
