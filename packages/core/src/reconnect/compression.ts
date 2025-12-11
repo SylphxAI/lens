@@ -47,12 +47,6 @@ export function isCompressionSupported(): boolean {
 	return typeof CompressionStream !== "undefined" && typeof DecompressionStream !== "undefined";
 }
 
-/**
- * Check if we're in a Node.js environment with zlib.
- */
-function isNodeEnvironment(): boolean {
-	return typeof process !== "undefined" && process.versions?.node !== undefined;
-}
 
 // =============================================================================
 // Compression Functions
@@ -83,8 +77,8 @@ export async function compressIfNeeded<T>(
 		return data;
 	}
 
-	// Check if compression is supported
-	if (!isCompressionSupported() && !isNodeEnvironment()) {
+	// Check if compression is supported (Web Streams API)
+	if (!isCompressionSupported()) {
 		return data;
 	}
 
@@ -137,20 +131,16 @@ export async function decompressIfNeeded<T>(payload: T | CompressedPayload): Pro
 
 /**
  * Compress string to base64-encoded compressed data.
+ * Uses Web Streams API (CompressionStream) - supported in modern browsers and Node.js 18+.
  */
 async function compress(data: string, algorithm: CompressionAlgorithm): Promise<string> {
 	if (algorithm === "none") {
 		return btoa(data);
 	}
 
-	// Use Web Streams API if available
+	// Use Web Streams API (supported in browsers and Node.js 18+)
 	if (isCompressionSupported()) {
 		return compressWithStreams(data, algorithm);
-	}
-
-	// Fall back to Node.js zlib if available
-	if (isNodeEnvironment()) {
-		return compressWithZlib(data, algorithm);
 	}
 
 	// No compression available, return base64 encoded
@@ -159,20 +149,16 @@ async function compress(data: string, algorithm: CompressionAlgorithm): Promise<
 
 /**
  * Decompress base64-encoded compressed data to string.
+ * Uses Web Streams API (DecompressionStream) - supported in modern browsers and Node.js 18+.
  */
 async function decompress(data: string, algorithm: CompressionAlgorithm): Promise<string> {
 	if (algorithm === "none") {
 		return atob(data);
 	}
 
-	// Use Web Streams API if available
+	// Use Web Streams API (supported in browsers and Node.js 18+)
 	if (isCompressionSupported()) {
 		return decompressWithStreams(data, algorithm);
-	}
-
-	// Fall back to Node.js zlib if available
-	if (isNodeEnvironment()) {
-		return decompressWithZlib(data, algorithm);
 	}
 
 	// No decompression available, assume base64 encoded
@@ -256,42 +242,6 @@ async function decompressWithStreams(
 	// Convert to string
 	const decoder = new TextDecoder();
 	return decoder.decode(decompressedBytes);
-}
-
-// =============================================================================
-// Node.js zlib Implementation
-// =============================================================================
-
-/**
- * Compress using Node.js zlib.
- */
-async function compressWithZlib(data: string, algorithm: CompressionAlgorithm): Promise<string> {
-	// Dynamic import to avoid bundling issues
-	const zlib = await import("node:zlib");
-	const { promisify } = await import("node:util");
-
-	const compressFn = algorithm === "gzip" ? promisify(zlib.gzip) : promisify(zlib.deflate);
-
-	const inputBuffer = Buffer.from(data, "utf-8");
-	const compressedBuffer = await compressFn(inputBuffer);
-
-	return compressedBuffer.toString("base64");
-}
-
-/**
- * Decompress using Node.js zlib.
- */
-async function decompressWithZlib(data: string, algorithm: CompressionAlgorithm): Promise<string> {
-	// Dynamic import to avoid bundling issues
-	const zlib = await import("node:zlib");
-	const { promisify } = await import("node:util");
-
-	const decompressFn = algorithm === "gzip" ? promisify(zlib.gunzip) : promisify(zlib.inflate);
-
-	const compressedBuffer = Buffer.from(data, "base64");
-	const decompressedBuffer = await decompressFn(compressedBuffer);
-
-	return decompressedBuffer.toString("utf-8");
 }
 
 // =============================================================================
