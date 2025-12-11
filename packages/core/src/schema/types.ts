@@ -582,7 +582,7 @@ export class ScalarType<T, SerializedT = T> extends FieldType<T, SerializedT> {
 /** @deprecated Use ScalarType instead */
 export type CustomType<T, SerializedT = T> = ScalarType<T, SerializedT>;
 /** @deprecated Use ScalarType instead */
-export const CustomType = ScalarType;
+export const CustomType: typeof ScalarType = ScalarType;
 
 /**
  * @deprecated Use `custom()` directly instead. This function is just an identity function.
