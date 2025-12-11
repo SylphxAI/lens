@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 
 // Re-exports from core
-import { defineType, entity, mutation, query, resolver, t } from "./index.js";
+import { entity, mutation, query, resolver, scalar, t } from "./index.js";
 
 describe("@sylphx/lens", () => {
 	describe("core re-exports", () => {
@@ -42,9 +42,9 @@ describe("@sylphx/lens", () => {
 			expect(typeof resolver).toBe("function");
 		});
 
-		test("defineType helper exists", () => {
-			expect(defineType).toBeDefined();
-			expect(typeof defineType).toBe("function");
+		test("scalar helper exists", () => {
+			expect(scalar).toBeDefined();
+			expect(typeof scalar).toBe("function");
 		});
 	});
 

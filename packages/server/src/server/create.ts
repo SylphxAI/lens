@@ -16,6 +16,7 @@
  */
 
 import {
+	applyUpdate,
 	type ContextValue,
 	collectModelsFromOperations,
 	collectModelsFromRouter,
@@ -763,20 +764,29 @@ class LensServerImpl<
 				}
 				return command.data;
 
-			case "field":
+			case "field": {
+				// Empty field = scalar root value (e.g., emit.delta on a string field)
+				if (command.field === "") {
+					return applyUpdate(state, command.update);
+				}
+				// Named field - apply update to that field
 				if (state && typeof state === "object") {
+					const currentValue = (state as Record<string, unknown>)[command.field];
+					const newValue = applyUpdate(currentValue, command.update);
 					return {
 						...(state as Record<string, unknown>),
-						[command.field]: command.update.data,
+						[command.field]: newValue,
 					};
 				}
-				return { [command.field]: command.update.data };
+				return { [command.field]: applyUpdate(undefined, command.update) };
+			}
 
 			case "batch":
 				if (state && typeof state === "object") {
 					const result = { ...(state as Record<string, unknown>) };
 					for (const update of command.updates) {
-						result[update.field] = update.update.data;
+						const currentValue = result[update.field];
+						result[update.field] = applyUpdate(currentValue, update.update);
 					}
 					return result;
 				}
@@ -825,23 +835,47 @@ class LensServerImpl<
 		select: SelectionObject | undefined,
 		context: TContext | undefined,
 		onCleanup: ((fn: () => void) => void) | undefined,
-	): (fieldPath: string) => Emit<unknown> | undefined {
-		return (fieldPath: string) => {
+	): (fieldPath: string, resolvedValue?: unknown) => Emit<unknown> | undefined {
+		return (fieldPath: string, resolvedValue?: unknown) => {
 			if (!fieldPath) return undefined;
 
-			// Determine if field value is an array (check current state)
+			// Determine output type from resolved value (if provided) or current field value
 			const state = getCurrentState();
-			const currentFieldValue = state ? this.getFieldByPath(state, fieldPath) : undefined;
-			const isArray = Array.isArray(currentFieldValue);
+			const currentFieldValue =
+				resolvedValue !== undefined
+					? resolvedValue
+					: state
+						? this.getFieldByPath(state, fieldPath)
+						: undefined;
+
+			// Determine emit type: array, scalar, or object
+			let outputType: "array" | "object" | "scalar" = "object";
+			if (Array.isArray(currentFieldValue)) {
+				outputType = "array";
+			} else if (
+				currentFieldValue === null ||
+				typeof currentFieldValue === "string" ||
+				typeof currentFieldValue === "number" ||
+				typeof currentFieldValue === "boolean"
+			) {
+				outputType = "scalar";
+			}
+
+			// Track field value locally (for fields not yet in fullState)
+			let localFieldValue = resolvedValue;
 
 			// Create emit handler that applies commands to the field's value
 			const emitHandler = (command: EmitCommand) => {
 				const fullState = getCurrentState();
 				if (!fullState || typeof fullState !== "object") return;
 
-				// Get current field value and apply command to it
-				const fieldValue = this.getFieldByPath(fullState, fieldPath);
+				// Get current field value from state, or use local value if not in state yet
+				const stateFieldValue = this.getFieldByPath(fullState, fieldPath);
+				const fieldValue = stateFieldValue !== undefined ? stateFieldValue : localFieldValue;
 				const newFieldValue = this.applyEmitCommand(command, fieldValue);
+
+				// Update local tracking
+				localFieldValue = newFieldValue;
 
 				// Update state with new field value
 				const updatedState = this.setFieldByPath(
@@ -879,7 +913,7 @@ class LensServerImpl<
 				})();
 			};
 
-			return createEmit<unknown>(emitHandler, isArray);
+			return createEmit<unknown>(emitHandler, outputType);
 		};
 	}
 
@@ -928,7 +962,7 @@ class LensServerImpl<
 		select?: SelectionObject,
 		context?: TContext,
 		onCleanup?: (fn: () => void) => void,
-		createFieldEmit?: (fieldPath: string) => Emit<unknown> | undefined,
+		createFieldEmit?: (fieldPath: string, resolvedValue?: unknown) => Emit<unknown> | undefined,
 	): Promise<T> {
 		if (!data) return data;
 
@@ -966,7 +1000,7 @@ class LensServerImpl<
 		context?: TContext,
 		fieldPath = "",
 		onCleanup?: (fn: () => void) => void,
-		createFieldEmit?: (fieldPath: string) => Emit<unknown> | undefined,
+		createFieldEmit?: (fieldPath: string, resolvedValue?: unknown) => Emit<unknown> | undefined,
 	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 
@@ -1053,7 +1087,8 @@ class LensServerImpl<
 					const publisher = resolverDef.subscribeField(field, obj, args, context ?? {});
 					if (publisher && createFieldEmit && onCleanup) {
 						try {
-							const fieldEmit = createFieldEmit(currentPath);
+							// Pass resolved value to determine correct emit type (array/object/scalar)
+							const fieldEmit = createFieldEmit(currentPath, result[field]);
 							if (fieldEmit) {
 								publisher({
 									emit: fieldEmit,

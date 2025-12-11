@@ -396,11 +396,13 @@ export {
 	createEmit,
 	createEmitArray,
 	createEmitObject,
+	createEmitScalar,
 	// Types
 	type Emit,
 	type EmitArray,
 	type EmitCommand,
 	type EmitObject,
+	type EmitScalar,
 	type FieldUpdate,
 	type InternalFieldUpdate,
 } from "./emit/index.js";

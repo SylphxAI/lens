@@ -2101,3 +2101,135 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 		sub2.unsubscribe();
 	});
 });
+
+// =============================================================================
+// Scalar Field Subscription Tests (EmitScalar)
+// =============================================================================
+
+describe("scalar field subscription with emit.delta()", () => {
+	it("provides emit.delta() for string field subscriptions", async () => {
+		// UserWithBio - bio field is not provided by query, resolved by field resolver
+		const UserWithBio = entity("UserWithBio", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		let capturedEmit: {
+			(value: unknown): void;
+			delta?: (operations: { position: number; insert: string }[]) => void;
+		} | null = null;
+
+		const userResolver = resolver(UserWithBio, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			// bio is a computed field with resolve + subscribe
+			bio: f
+				.string()
+				.resolve(() => "Initial bio")
+				.subscribe((_params) => ({ emit, onCleanup }) => {
+					capturedEmit = emit as typeof capturedEmit;
+					onCleanup(() => {});
+				}),
+		}));
+
+		const server = createApp({
+			entities: { UserWithBio },
+			queries: {
+				getUserWithBio: query()
+					.input(z.object({ id: z.string() }))
+					.returns(UserWithBio)
+					.resolve(({ input }) => ({ id: input.id, name: "Alice" })),
+			},
+			resolvers: [userResolver],
+		});
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "getUserWithBio",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for subscription setup
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Initial result
+		expect(results.length).toBe(1);
+		expect((results[0] as { data: { bio: string } }).data.bio).toBe("Initial bio");
+
+		// Check that emit has delta method (EmitScalar)
+		expect(capturedEmit).toBeDefined();
+		expect(typeof capturedEmit?.delta).toBe("function");
+
+		subscription.unsubscribe();
+	});
+
+	it("emit.delta() appends text to string field", async () => {
+		// UserWithContent - content field resolved by field resolver
+		const UserWithContent = entity("UserWithContent", {
+			id: t.id(),
+			name: t.string(),
+		});
+
+		let capturedEmit: {
+			(value: unknown): void;
+			delta?: (operations: { position: number; insert: string }[]) => void;
+		} | null = null;
+
+		const userResolver = resolver(UserWithContent, (f) => ({
+			id: f.expose("id"),
+			name: f.expose("name"),
+			// content is a computed field with resolve + subscribe
+			content: f
+				.string()
+				.resolve(() => "Hello")
+				.subscribe((_params) => ({ emit, onCleanup }) => {
+					capturedEmit = emit as typeof capturedEmit;
+					onCleanup(() => {});
+				}),
+		}));
+
+		const server = createApp({
+			entities: { UserWithContent },
+			queries: {
+				getUserWithContent: query()
+					.input(z.object({ id: z.string() }))
+					.returns(UserWithContent)
+					.resolve(({ input }) => ({ id: input.id, name: "Alice" })),
+			},
+			resolvers: [userResolver],
+		});
+
+		const results: unknown[] = [];
+		const subscription = server
+			.execute({
+				path: "getUserWithContent",
+				input: { id: "1" },
+			})
+			.subscribe({
+				next: (result) => results.push(result),
+			});
+
+		// Wait for subscription setup
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Initial result
+		expect(results.length).toBe(1);
+		expect((results[0] as { data: { content: string } }).data.content).toBe("Hello");
+
+		// Use emit.delta() to append text
+		capturedEmit?.delta?.([{ position: Infinity, insert: " World" }]);
+
+		// Wait for update
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Should have received update with delta applied
+		expect(results.length).toBe(2);
+		expect((results[1] as { data: { content: string } }).data.content).toBe("Hello World");
+
+		subscription.unsubscribe();
+	});
+});

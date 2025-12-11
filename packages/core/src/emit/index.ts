@@ -192,6 +192,49 @@ export interface EmitArray<T extends readonly unknown[]> {
 }
 
 // =============================================================================
+// EmitScalar Interface (for scalar outputs like string, number)
+// =============================================================================
+
+/**
+ * Emit API for scalar outputs (string, number, boolean, etc).
+ * Provides value replacement and delta operations for strings.
+ *
+ * @typeParam T - Scalar type
+ *
+ * @example
+ * ```typescript
+ * // String field with delta support
+ * .subscribe({
+ *   content: ({ source }) => ({ emit }) => {
+ *     emit("full replacement")
+ *     emit.delta([{ position: Infinity, insert: " appended" }])
+ *   }
+ * })
+ *
+ * // Number field
+ * .subscribe({
+ *   count: ({ source }) => ({ emit }) => {
+ *     emit(42)
+ *   }
+ * })
+ * ```
+ */
+export interface EmitScalar<T> {
+	/**
+	 * Replace entire value
+	 */
+	(value: T): void;
+
+	/**
+	 * Apply delta operations (only for string values).
+	 * @example
+	 * emit.delta([{ position: 0, insert: "Hello " }])
+	 * emit.delta([{ position: Infinity, insert: " World" }])
+	 */
+	delta: T extends string ? (operations: DeltaOperation[]) => void : never;
+}
+
+// =============================================================================
 // Unified Emit Type
 // =============================================================================
 
@@ -200,12 +243,13 @@ export interface EmitArray<T extends readonly unknown[]> {
  *
  * - If T is an array → EmitArray<T>
  * - If T is an object → EmitObject<T>
+ * - If T is a scalar → EmitScalar<T>
  */
 export type Emit<T> = T extends readonly unknown[]
 	? EmitArray<T>
 	: T extends object
 		? EmitObject<T>
-		: never;
+		: EmitScalar<T>;
 
 // =============================================================================
 // Field Update Types
@@ -368,15 +412,44 @@ export function createEmitArray<T extends readonly unknown[]>(
 }
 
 /**
- * Create appropriate Emit instance based on whether output is array or object.
+ * Create an EmitScalar instance for scalar outputs (string, number, etc).
+ */
+export function createEmitScalar<T>(handler: (command: EmitCommand) => void): EmitScalar<T> {
+	const emit = ((value: T) => {
+		handler({ type: "full", data: value, replace: true });
+	}) as EmitScalar<T>;
+
+	// Add delta method for string types
+	(emit as any).delta = (operations: DeltaOperation[]) => {
+		handler({
+			type: "field",
+			field: "", // Empty field = root value
+			update: { strategy: "delta", data: operations },
+		});
+	};
+
+	return emit;
+}
+
+/**
+ * Create appropriate Emit instance based on output type.
  *
  * @param handler - Function to handle emit commands
- * @param isArray - Whether the output type is an array
- * @returns Emit instance (EmitArray or EmitObject)
+ * @param outputType - "array" | "object" | "scalar" or boolean (true = array, false = object) for backwards compatibility
+ * @returns Emit instance (EmitArray, EmitObject, or EmitScalar)
  */
-export function createEmit<T>(handler: (command: EmitCommand) => void, isArray = false): Emit<T> {
-	if (isArray) {
+export function createEmit<T>(
+	handler: (command: EmitCommand) => void,
+	outputType: "array" | "object" | "scalar" | boolean = "object",
+): Emit<T> {
+	// Backwards compatibility: boolean true = array, false = object
+	const type = typeof outputType === "boolean" ? (outputType ? "array" : "object") : outputType;
+
+	if (type === "array") {
 		return createEmitArray<T & readonly unknown[]>(handler) as Emit<T>;
+	}
+	if (type === "scalar") {
+		return createEmitScalar<T>(handler) as Emit<T>;
 	}
 	return createEmitObject<T & object>(handler) as Emit<T>;
 }
