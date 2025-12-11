@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 2.11.0 (2025-12-11)
+
+### ✨ Features
+
+- **core:** add model chain methods .resolve() and .subscribe() (#77) ([0c00a19](https://github.com/SylphxAI/lens/commit/0c00a19704c09601af4e9ab6927fdef99417b449))
+
 ## 2.10.1 (2025-12-10)
 
 ### 🐛 Bug Fixes
