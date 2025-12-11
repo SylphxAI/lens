@@ -276,6 +276,39 @@ describe("hasAnySubscription", () => {
 		// Should not hang or throw
 		expect(hasAnySubscription(circularEntities, "A")).toBe(false);
 	});
+
+	it("returns true when selecting a 'live' mode field", () => {
+		const entitiesWithLive: EntitiesMetadata = {
+			User: {
+				id: "exposed",
+				name: "exposed",
+				balance: "live", // .resolve().subscribe() field
+			},
+		};
+		expect(hasAnySubscription(entitiesWithLive, "User", { balance: true })).toBe(true);
+	});
+
+	it("returns true when checking all fields and entity has 'live' field", () => {
+		const entitiesWithLive: EntitiesMetadata = {
+			User: {
+				id: "exposed",
+				name: "exposed",
+				balance: "live",
+			},
+		};
+		expect(hasAnySubscription(entitiesWithLive, "User")).toBe(true);
+	});
+
+	it("returns false when selecting only non-live fields from entity with live field", () => {
+		const entitiesWithLive: EntitiesMetadata = {
+			User: {
+				id: "exposed",
+				name: "exposed",
+				balance: "live",
+			},
+		};
+		expect(hasAnySubscription(entitiesWithLive, "User", { id: true, name: true })).toBe(false);
+	});
 });
 
 describe("getEffectiveOperationType", () => {
@@ -309,5 +342,27 @@ describe("getEffectiveOperationType", () => {
 
 	it("returns query if entities is undefined", () => {
 		expect(getEffectiveOperationType("query", undefined, "User", { status: true })).toBe("query");
+	});
+
+	it("returns subscription if query selects 'live' mode field", () => {
+		const entitiesWithLive: EntitiesMetadata = {
+			User: {
+				id: "exposed",
+				name: "exposed",
+				balance: "live",
+			},
+		};
+		expect(getEffectiveOperationType("query", entitiesWithLive, "User", { balance: true })).toBe("subscription");
+	});
+
+	it("returns query if query selects only non-live fields from entity with live field", () => {
+		const entitiesWithLive: EntitiesMetadata = {
+			User: {
+				id: "exposed",
+				name: "exposed",
+				balance: "live",
+			},
+		};
+		expect(getEffectiveOperationType("query", entitiesWithLive, "User", { id: true, name: true })).toBe("query");
 	});
 });

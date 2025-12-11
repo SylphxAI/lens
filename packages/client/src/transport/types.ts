@@ -104,7 +104,7 @@ export type OperationsMap = {
 };
 
 /** Field mode for entity fields */
-export type FieldMode = "exposed" | "resolve" | "subscribe";
+export type FieldMode = "exposed" | "resolve" | "subscribe" | "live";
 
 /** Entity field metadata for client-side routing decisions */
 export interface EntityFieldMetadata {
@@ -354,8 +354,8 @@ export function hasAnySubscription(
 		const fieldMode = entityMetadata[fieldName];
 		if (!fieldMode) continue;
 
-		// Check if this field is a subscription
-		if (fieldMode === "subscribe") {
+		// Check if this field is a subscription (either pure subscribe or live mode)
+		if (fieldMode === "subscribe" || fieldMode === "live") {
 			return true;
 		}
 
