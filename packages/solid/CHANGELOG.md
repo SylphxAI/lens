@@ -1,5 +1,12 @@
 # @sylphx/lens-solid
 
+## 2.3.1 (2025-12-11)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 2.5.1
+- Updated `@sylphx/lens-core` to 2.11.0
+
 ## 2.3.0 (2025-12-11)
 
 Add model chain methods .resolve() and .subscribe()
