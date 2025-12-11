@@ -90,6 +90,22 @@ export {
 	model,
 } from "./schema/model.js";
 
+export {
+	// Model resolver types
+	type FieldResolverMap,
+	type FieldSubscriberMap,
+	hasFieldResolvers,
+	hasFieldSubscribers,
+	type InferModelSource,
+	type ModelDefChainable,
+	type ModelDefComplete,
+	type ModelDefWithResolvers,
+	type ModelDefWithSubscribers,
+	type ModelFieldResolver,
+	type ModelFieldSubscriber,
+	type ScalarFieldsOnly,
+} from "./schema/model-resolvers.js";
+
 // =============================================================================
 // Return Type Wrappers
 // =============================================================================

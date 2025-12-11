@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from "bun:test";
 import { isModelDef, isNormalizableModel, MODEL_SYMBOL, model } from "./model.js";
+import { hasFieldResolvers, hasFieldSubscribers } from "./model-resolvers.js";
 
 describe("model()", () => {
 	describe("basic definition", () => {
@@ -141,6 +142,225 @@ describe("model()", () => {
 			// StandardEntity marker
 			expect("~entity" in User).toBe(true);
 			expect((User as any)["~entity"].name).toBe("User");
+		});
+	});
+
+	describe(".resolve() chain method", () => {
+		interface AppContext {
+			db: { posts: { filter: (fn: (p: { authorId: string }) => boolean) => unknown[] } };
+		}
+
+		it("adds field resolvers via .resolve()", () => {
+			const Post = model("Post", (t) => ({
+				id: t.id(),
+				title: t.string(),
+			}));
+
+			const User = model<AppContext>("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+				posts: t.many(() => Post),
+			})).resolve({
+				posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
+			});
+
+			expect(User._name).toBe("User");
+			expect(hasFieldResolvers(User)).toBe(true);
+			expect(User._fieldResolvers).toBeDefined();
+			expect(User._fieldResolvers.posts).toBeDefined();
+		});
+
+		it("source and parent both work", () => {
+			const User = model("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+			})).resolve({
+				// Both source and parent should be available
+				name: ({ source, parent }) => {
+					expect(source).toBe(parent);
+					return source.name;
+				},
+			});
+
+			expect(hasFieldResolvers(User)).toBe(true);
+		});
+	});
+
+	describe(".subscribe() chain method", () => {
+		interface AppContext {
+			events: { on: (event: string, cb: (value: unknown) => void) => () => void };
+		}
+
+		it("adds field subscribers via .subscribe()", () => {
+			const User = model<AppContext>("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+			})).subscribe({
+				name:
+					({ source, ctx }) =>
+					({ emit, onCleanup }) => {
+						const unsub = ctx.events.on(`user:${source.id}:name`, emit);
+						onCleanup(unsub);
+					},
+			});
+
+			expect(User._name).toBe("User");
+			expect(hasFieldSubscribers(User)).toBe(true);
+			expect(User._fieldSubscribers).toBeDefined();
+			expect(User._fieldSubscribers.name).toBeDefined();
+		});
+	});
+
+	describe(".resolve().subscribe() chain", () => {
+		interface AppContext {
+			db: { posts: { filter: (fn: (p: { authorId: string }) => boolean) => unknown[] } };
+			events: { on: (event: string, cb: (value: unknown) => void) => () => void };
+		}
+
+		it("supports chaining .resolve() then .subscribe()", () => {
+			const Post = model("Post", (t) => ({
+				id: t.id(),
+				title: t.string(),
+			}));
+
+			const User = model<AppContext>("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+				posts: t.many(() => Post),
+			}))
+				.resolve({
+					posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
+				})
+				.subscribe({
+					name:
+						({ source, ctx }) =>
+						({ emit, onCleanup }) => {
+							const unsub = ctx.events.on(`user:${source.id}:name`, emit);
+							onCleanup(unsub);
+						},
+				});
+
+			expect(User._name).toBe("User");
+			expect(hasFieldResolvers(User)).toBe(true);
+			expect(hasFieldSubscribers(User)).toBe(true);
+			expect(User._fieldResolvers.posts).toBeDefined();
+			expect(User._fieldSubscribers.name).toBeDefined();
+		});
+
+		it("supports chaining .subscribe() then .resolve()", () => {
+			const Post = model("Post", (t) => ({
+				id: t.id(),
+				title: t.string(),
+			}));
+
+			const User = model<AppContext>("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+				posts: t.many(() => Post),
+			}))
+				.subscribe({
+					name:
+						({ source, ctx }) =>
+						({ emit, onCleanup }) => {
+							const unsub = ctx.events.on(`user:${source.id}:name`, emit);
+							onCleanup(unsub);
+						},
+				})
+				.resolve({
+					posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
+				});
+
+			expect(User._name).toBe("User");
+			expect(hasFieldResolvers(User)).toBe(true);
+			expect(hasFieldSubscribers(User)).toBe(true);
+		});
+	});
+
+	describe("type safety", () => {
+		it("correctly infers source type from scalar fields", () => {
+			// This is a compile-time test - if this compiles, source types are inferred
+			const User = model("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+				age: t.int(),
+			})).resolve({
+				// source should be inferred as { id: string; name: string; age: number }
+				name: ({ source }) => {
+					// These should compile - accessing scalar fields
+					const _id: string = source.id;
+					const _name: string = source.name;
+					const _age: number = source.age;
+					return `${_id}:${_name}:${_age}`;
+				},
+			});
+
+			expect(User._name).toBe("User");
+		});
+
+		it("resolver return type is checked against field type", () => {
+			// This test verifies the type system catches return type mismatches
+			// The resolver for 'name' (StringType) should return string
+			const User = model("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+			})).resolve({
+				// Return type should be string - this compiles because we return string
+				name: ({ source }) => source.name.toUpperCase(),
+			});
+
+			expect(hasFieldResolvers(User)).toBe(true);
+		});
+
+		it("subscriber return type is checked against field type", () => {
+			interface AppContext {
+				events: { on: (event: string, cb: (value: string) => void) => () => void };
+			}
+
+			const User = model<AppContext>("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+			})).subscribe({
+				// Subscriber for string field should emit strings
+				name:
+					({ source, ctx }) =>
+					({ emit, onCleanup }) => {
+						// emit should accept string (the field type)
+						const unsub = ctx.events.on(`user:${source.id}:name`, emit);
+						onCleanup(unsub);
+					},
+			});
+
+			expect(hasFieldSubscribers(User)).toBe(true);
+		});
+
+		it("relation resolver infers return type from target model", () => {
+			// Define Post model
+			const Post = model("Post", (t) => ({
+				id: t.id(),
+				title: t.string(),
+				content: t.string(),
+			}));
+
+			// User with posts relation
+			const User = model("User", (t) => ({
+				id: t.id(),
+				name: t.string(),
+				posts: t.many(() => Post),
+			})).resolve({
+				// Return type should be inferred as Array<{ id: string; title: string; content: string }>
+				posts: ({ source }) => {
+					// Use source to verify type inference
+					void source.id;
+					// This should compile - we return the correct shape
+					return [
+						{ id: "1", title: "Hello", content: "World" },
+						{ id: "2", title: "Foo", content: "Bar" },
+					];
+				},
+			});
+
+			expect(hasFieldResolvers(User)).toBe(true);
+			expect(User._fieldResolvers.posts).toBeDefined();
 		});
 	});
 });

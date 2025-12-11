@@ -32,6 +32,14 @@
 
 import type { EntityMarker } from "@sylphx/standard-entity";
 import type { InferEntity } from "./infer.js";
+import type {
+	FieldResolverMap,
+	FieldSubscriberMap,
+	ModelDefChainable,
+	ModelDefComplete,
+	ModelDefWithResolvers,
+	ModelDefWithSubscribers,
+} from "./model-resolvers.js";
 import {
 	createTypeBuilder,
 	type EntityDefinition,
@@ -112,8 +120,16 @@ export type InferModelType<M extends ModelDef> =
  * const User = model<AppContext>("User", (t) => ({
  *   id: t.id(),
  *   name: t.string(),
- *   posts: t.many(() => Post).resolve(({ ctx }) => ctx.db.posts.findMany()),
- * }));
+ *   posts: t.many(() => Post),
+ * }))
+ * .resolve({
+ *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
+ * })
+ * .subscribe({
+ *   name: ({ source, ctx }) => ({ emit, onCleanup }) => {
+ *     ctx.events.on(`user:${source.id}:name`, emit)
+ *   }
+ * });
  *
  * // Without context (simple cases)
  * const SimpleUser = model("SimpleUser", (t) => ({
@@ -127,7 +143,7 @@ export function model<TContext = unknown>(name: string): ModelBuilderClass<TCont
 export function model<Name extends string, Fields extends EntityDefinition>(
 	name: Name,
 	builder: ModelBuilder<Fields>,
-): ModelDef<Name, Fields>;
+): ModelDefChainable<Name, Fields, unknown>;
 export function model<
 	TContext = unknown,
 	Name extends string = string,
@@ -135,7 +151,10 @@ export function model<
 >(
 	nameOrNothing?: Name,
 	maybeBuilder?: ModelBuilder<Fields>,
-): ModelFactory<TContext> | ModelBuilderClass<TContext> | ModelDef<Name, Fields> {
+):
+	| ModelFactory<TContext>
+	| ModelBuilderClass<TContext>
+	| ModelDefChainable<Name, Fields, TContext> {
 	// model<Context>() - returns factory
 	if (nameOrNothing === undefined) {
 		return createModelFactory<TContext>();
@@ -148,7 +167,7 @@ export function model<
 
 	// model("Name", (t) => fields) - direct definition without context
 	const fields = maybeBuilder(typeBuilder);
-	return createModelDef(nameOrNothing, fields);
+	return createModelDefChainable<Name, Fields, TContext>(nameOrNothing, fields);
 }
 
 // =============================================================================
@@ -161,16 +180,16 @@ export function model<
 export type ModelFactory<TContext> = <Name extends string, Fields extends EntityDefinition>(
 	name: Name,
 	builder: ContextualModelBuilder<Fields, TContext>,
-) => ModelDef<Name, Fields>;
+) => ModelDefChainable<Name, Fields, TContext>;
 
 function createModelFactory<TContext>(): ModelFactory<TContext> {
 	return <Name extends string, Fields extends EntityDefinition>(
 		name: Name,
 		builder: ContextualModelBuilder<Fields, TContext>,
-	): ModelDef<Name, Fields> => {
+	): ModelDefChainable<Name, Fields, TContext> => {
 		const contextualBuilder = createTypeBuilder<TContext>();
 		const fields = builder(contextualBuilder);
-		return createModelDef(name, fields);
+		return createModelDefChainable<Name, Fields, TContext>(name, fields);
 	};
 }
 
@@ -191,10 +210,10 @@ export class ModelBuilderClass<TContext, Name extends string = string> {
 	 */
 	define<Fields extends EntityDefinition>(
 		builder: ContextualModelBuilder<Fields, TContext>,
-	): ModelDef<Name, Fields> {
+	): ModelDefChainable<Name, Fields, TContext> {
 		const contextualBuilder = createTypeBuilder<TContext>();
 		const fields = builder(contextualBuilder);
-		return createModelDef(this._name, fields);
+		return createModelDefChainable<Name, Fields, TContext>(this._name, fields);
 	}
 }
 
@@ -202,14 +221,17 @@ export class ModelBuilderClass<TContext, Name extends string = string> {
 // Internal Helper
 // =============================================================================
 
-function createModelDef<Name extends string, Fields extends EntityDefinition>(
+/**
+ * Create a model definition with chain methods for field resolvers/subscribers.
+ */
+function createModelDefChainable<Name extends string, Fields extends EntityDefinition, TContext>(
 	name: Name,
 	fields: Fields,
-): ModelDef<Name, Fields> {
+): ModelDefChainable<Name, Fields, TContext> {
 	// Check if model has an id field
 	const hasId = "id" in fields;
 
-	return {
+	const modelDef = {
 		[MODEL_SYMBOL]: true,
 		_name: name,
 		fields,
@@ -219,7 +241,57 @@ function createModelDef<Name extends string, Fields extends EntityDefinition>(
 			name: name,
 			type: undefined as unknown, // Phantom type - not used at runtime
 		},
-	} as ModelDef<Name, Fields>;
+
+		/**
+		 * Define field resolvers for this model.
+		 * Source type is automatically inferred from scalar fields.
+		 */
+		resolve<R extends FieldResolverMap<Fields, TContext>>(
+			this: ModelDefChainable<Name, Fields, TContext>,
+			resolvers: R,
+		): ModelDefWithResolvers<Name, Fields, R, TContext> {
+			const result = {
+				...this,
+				_fieldResolvers: resolvers,
+				subscribe<S extends FieldSubscriberMap<Fields, TContext>>(
+					subscribers: S,
+				): ModelDefComplete<Name, Fields, R, S, TContext> {
+					return {
+						...this,
+						_fieldResolvers: resolvers,
+						_fieldSubscribers: subscribers,
+					} as ModelDefComplete<Name, Fields, R, S, TContext>;
+				},
+			};
+			return result as ModelDefWithResolvers<Name, Fields, R, TContext>;
+		},
+
+		/**
+		 * Define field subscribers without resolvers.
+		 * Useful for purely live fields.
+		 */
+		subscribe<S extends FieldSubscriberMap<Fields, TContext>>(
+			this: ModelDefChainable<Name, Fields, TContext>,
+			subscribers: S,
+		): ModelDefWithSubscribers<Name, Fields, S, TContext> {
+			const result = {
+				...this,
+				_fieldSubscribers: subscribers,
+				resolve<R extends FieldResolverMap<Fields, TContext>>(
+					resolvers: R,
+				): ModelDefComplete<Name, Fields, R, S, TContext> {
+					return {
+						...this,
+						_fieldResolvers: resolvers,
+						_fieldSubscribers: subscribers,
+					} as ModelDefComplete<Name, Fields, R, S, TContext>;
+				},
+			};
+			return result as ModelDefWithSubscribers<Name, Fields, S, TContext>;
+		},
+	};
+
+	return modelDef as ModelDefChainable<Name, Fields, TContext>;
 }
 
 // =============================================================================

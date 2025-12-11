@@ -218,7 +218,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: FieldQueryContext<TContext>;
-			}) => fn({ parent: parent as TParent, ctx });
+			}) => fn({ source: parent as TParent, parent: parent as TParent, ctx });
 
 			// Return ResolvedField with chainable .subscribe()
 			const resolvedField: ResolvedFieldChainable<T, Record<string, never>, TParent, TContext> = {
@@ -244,7 +244,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 							parent: unknown;
 							args: Record<string, never>;
 							ctx: TContext;
-						}) => subscribeFn({ parent: parent as TParent, ctx }),
+						}) => subscribeFn({ source: parent as TParent, parent: parent as TParent, ctx }),
 					};
 				},
 			};
@@ -261,7 +261,7 @@ function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: FieldSubscriptionContext<TContext, T>;
-			}) => fn({ parent: parent as TParent, ctx });
+			}) => fn({ source: parent as TParent, parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
 				_mode: "subscribe",
@@ -362,7 +362,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: FieldQueryContext<TContext>;
-			}) => fn({ parent: parent as TParent, ctx });
+			}) => fn({ source: parent as TParent, parent: parent as TParent, ctx });
 
 			const resolvedField: ResolvedFieldChainable<T, Record<string, never>, TParent, TContext> = {
 				_kind: "resolved",
@@ -387,7 +387,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 							parent: unknown;
 							args: Record<string, never>;
 							ctx: TContext;
-						}) => subscribeFn({ parent: parent as TParent, ctx }),
+						}) => subscribeFn({ source: parent as TParent, parent: parent as TParent, ctx }),
 					};
 				},
 			};
@@ -404,7 +404,7 @@ function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilde
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: FieldSubscriptionContext<TContext, T>;
-			}) => fn({ parent: parent as TParent, ctx });
+			}) => fn({ source: parent as TParent, parent: parent as TParent, ctx });
 			return {
 				_kind: "resolved",
 				_mode: "subscribe",
