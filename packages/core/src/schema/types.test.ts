@@ -7,7 +7,6 @@ import {
 	ArrayType,
 	BelongsToType,
 	BooleanType,
-	CustomType,
 	DateTimeType,
 	defineType,
 	EnumType,
@@ -20,6 +19,7 @@ import {
 	isRelationType,
 	isScalarType,
 	ObjectType,
+	ScalarType,
 	StringType,
 	t,
 } from "./types";
@@ -378,10 +378,10 @@ describe("Custom Type", () => {
 			typeof (v as Point).lng === "number",
 	});
 
-	test("t.custom() creates CustomType", () => {
+	test("t.custom() creates ScalarType", () => {
 		const point = t.custom(PointType);
-		expect(point).toBeInstanceOf(CustomType);
-		expect(point._type).toBe("custom");
+		expect(point).toBeInstanceOf(ScalarType);
+		expect(point._type).toBe("scalar");
 	});
 
 	test("serialize with custom type", () => {
@@ -409,7 +409,7 @@ describe("Custom Type", () => {
 	test("serialize throws on validation failure", () => {
 		const point = t.custom(PointType);
 		expect(() => point.serialize({ lat: "bad" } as unknown as Point)).toThrow(
-			"Validation failed for custom type: Point",
+			"Validation failed for scalar type: Point",
 		);
 	});
 

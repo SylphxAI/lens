@@ -15,14 +15,13 @@ export {
 	BooleanType,
 	// Context-aware type builder
 	type ContextualField,
-	// Custom types
+	// Custom scalar types (deprecated aliases)
 	CustomType,
 	type CustomTypeDefinition,
 	createTypeBuilder,
 	DateTimeType,
 	DecimalType,
 	type DefaultType,
-	defineType,
 	type EntityDefinition,
 	EnumType,
 	// Definition types
@@ -44,8 +43,12 @@ export {
 	type NullableType,
 	ObjectType,
 	type RelationBrand,
+	// Custom scalar types (new names)
+	ScalarType,
+	type ScalarTypeDefinition,
 	type SchemaDefinition,
 	StringType,
+	TimestampType,
 	type TypeBuilder,
 	// Type builders
 	t,
@@ -88,7 +91,47 @@ export {
 	type ModelDef,
 	type ModelFactory,
 	model,
+	type PlainFieldDefinition,
 } from "./schema/model.js";
+
+// =============================================================================
+// Field Type Builders (New API - no t. prefix)
+// =============================================================================
+
+export {
+	// Scalar field builders
+	bigint,
+	boolean,
+	bytes,
+	datetime,
+	decimal,
+	enumType,
+	// Field definition type
+	type FieldDef as FieldDefinitionType,
+	float,
+	// Type inference
+	type InferFieldDefType,
+	id,
+	int,
+	// Type guards
+	isListFieldDef,
+	isNullableFieldDef,
+	json,
+	// Internal (for advanced use)
+	LIST_FIELD_SYMBOL,
+	// List/Nullable field types
+	type ListFieldDef,
+	// Field wrappers
+	list as listField,
+	NULLABLE_FIELD_SYMBOL,
+	type NullableFieldDef,
+	nullable as nullableField,
+	object,
+	processFieldDef,
+	scalar,
+	string,
+	timestamp,
+} from "./schema/fields.js";
 
 export {
 	// Model resolver types
