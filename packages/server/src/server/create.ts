@@ -657,7 +657,7 @@ class LensServerImpl<
 								: undefined;
 
 							const lensContext = { ...context, emit, onCleanup };
-							const result = resolver({ input: cleanInput, ctx: lensContext });
+							const result = resolver({ args: cleanInput, input: cleanInput, ctx: lensContext });
 
 							if (isAsyncIterable(result)) {
 								// Streaming: emit each yielded value
@@ -701,7 +701,8 @@ class LensServerImpl<
 										try {
 											// Get publisher function from subscriber
 											const publisher = liveQuery._subscriber({
-												input: cleanInput as never, // Type-safe at runtime via input validation
+												args: cleanInput as never, // Preferred parameter name
+												input: cleanInput as never, // Deprecated alias for backwards compatibility
 												ctx: context as TContext,
 											});
 											// Call publisher with emit/onCleanup callbacks
