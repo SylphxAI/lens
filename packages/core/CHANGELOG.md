@@ -1,5 +1,25 @@
 # @sylphx/lens-core
 
+## 2.10.0 (2025-12-11)
+
+Add model chain methods .resolve() and .subscribe()
+
+Add plain object model API and scalar type builder
+
+- New API: `model('User', { id: id(), name: string(), ... })`
+- Add `scalar()` for custom scalar types
+- Add standalone field builders: `id()`, `string()`, `int()`, etc.
+- Add `list()` and `nullable()` wrappers for field definitions
+- Rename `CustomType` → `ScalarType`
+
+### ✨ Features
+
+- **core:** add plain object model API and scalar type builder (#80) ([1a7b1e9](https://github.com/SylphxAI/lens/commit/1a7b1e9fa134c1a7ffaae96d05d907b5dbbd20b8))
+
+### 🐛 Bug Fixes
+
+- **core:** add explicit type annotation for isolatedDeclarations ([3dc915c](https://github.com/SylphxAI/lens/commit/3dc915c998603a25c6366ff216b30aff870e6c54))
+
 ## 2.9.0 (2025-12-11)
 
 ### ✨ Features
