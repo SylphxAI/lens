@@ -1,5 +1,18 @@
 # @sylphx/lens-vue
 
+## 2.4.0 (2025-12-11)
+
+Add model chain methods .resolve() and .subscribe()
+
+Add plain object model API and scalar type builder
+
+- New API: `model('User', { id: id(), name: string(), ... })`
+- Add `scalar()` for custom scalar types
+- Add standalone field builders: `id()`, `string()`, `int()`, etc.
+- Add `list()` and `nullable()` wrappers for field definitions
+- Rename `CustomType` → `ScalarType`
+
+
 ## 2.3.12 (2025-12-11)
 
 ### 📦 Dependencies
