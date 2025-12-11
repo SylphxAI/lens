@@ -301,6 +301,19 @@ export class DateTimeType extends FieldType<Date, string> {
 	}
 }
 
+/** Timestamp field type (Unix timestamp in milliseconds) */
+export class TimestampType extends FieldType<number> {
+	readonly _type = "timestamp" as const;
+	readonly _tsType!: number;
+
+	/**
+	 * Validate timestamp is a valid Unix timestamp (milliseconds)
+	 */
+	validate(value: unknown): boolean {
+		return typeof value === "number" && !Number.isNaN(value) && Number.isFinite(value);
+	}
+}
+
 /** Decimal field type (serialized as string for precision) */
 export class DecimalType extends FieldType<number, string> {
 	readonly _type = "decimal" as const;
@@ -505,22 +518,16 @@ export class ArrayType<T> extends FieldType<T[]> {
 }
 
 // =============================================================================
-// Custom Types
+// Custom Scalar Types
 // =============================================================================
 
 /**
- * Custom type definition interface
- * Used with defineType() to create reusable type definitions
+ * Scalar type definition interface.
+ * Used with `scalar()` to create custom scalar types.
  */
-export interface CustomTypeDefinition<T, SerializedT = T> {
+export interface ScalarTypeDefinition<T, SerializedT = T> {
 	/** Type name (for debugging/introspection) */
 	name: string;
-
-	/** Base type for runtime validation (e.g., 'object', 'string') */
-	baseType?: string;
-
-	/** TypeScript type (runtime value, not used - only for type inference) */
-	type?: T;
 
 	/** Serialize value for transport (T → SerializedT) */
 	serialize: (value: T) => SerializedT;
@@ -532,37 +539,33 @@ export interface CustomTypeDefinition<T, SerializedT = T> {
 	validate?: (value: unknown) => boolean;
 }
 
+/** @deprecated Use ScalarTypeDefinition instead */
+export type CustomTypeDefinition<T, SerializedT = T> = ScalarTypeDefinition<T, SerializedT>;
+
 /**
- * Custom field type with user-defined serialization
- * Created via defineType() for reusability
+ * Custom scalar type with user-defined serialization.
  *
  * @example
  * ```typescript
- * const PointType = defineType({
- *   name: 'Point',
- *   serialize: (p: Point) => ({ lat: p.lat, lng: p.lng }),
- *   deserialize: (data) => new Point(data.lat, data.lng),
+ * const User = model('User', {
+ *   location: scalar<Point>('Point', {
+ *     serialize: (p) => ({ lat: p.lat, lng: p.lng }),
+ *     deserialize: (data) => new Point(data.lat, data.lng),
+ *   }),
  * })
- *
- * // Reuse across entities
- * const schema = {
- *   Store: { location: t.custom(PointType) },
- *   Event: { location: t.custom(PointType) },
- * }
  * ```
  */
-export class CustomType<T, SerializedT = T> extends FieldType<T, SerializedT> {
-	readonly _type = "custom" as const;
+export class ScalarType<T, SerializedT = T> extends FieldType<T, SerializedT> {
+	readonly _type = "scalar" as const;
 	readonly _tsType!: T;
 
-	constructor(public readonly definition: CustomTypeDefinition<T, SerializedT>) {
+	constructor(public readonly definition: ScalarTypeDefinition<T, SerializedT>) {
 		super();
 	}
 
 	serialize(value: T): SerializedT {
-		// Run validation if provided
 		if (this.definition.validate && !this.definition.validate(value)) {
-			throw new Error(`Validation failed for custom type: ${this.definition.name}`);
+			throw new Error(`Validation failed for scalar type: ${this.definition.name}`);
 		}
 		return this.definition.serialize(value);
 	}
@@ -576,30 +579,14 @@ export class CustomType<T, SerializedT = T> extends FieldType<T, SerializedT> {
 	}
 }
 
+/** @deprecated Use ScalarType instead */
+export type CustomType<T, SerializedT = T> = ScalarType<T, SerializedT>;
+/** @deprecated Use ScalarType instead */
+export const CustomType = ScalarType;
+
 /**
- * Define a reusable custom type
- *
- * **Why this pattern?**
- * 1. Reusability - define once, use in multiple entities
- * 2. Type Safety - TypeScript infers correct types
- * 3. Type Libraries - create shareable packages
- * 4. Consistency - same serialization logic everywhere
- *
- * @example
- * ```typescript
- * // Define custom Point type
- * const PointType = defineType({
- *   name: 'Point',
- *   serialize: (p: Point) => ({ lat: p.lat, lng: p.lng }),
- *   deserialize: (data) => new Point(data.lat, data.lng),
- *   validate: (v) => v instanceof Point,
- * })
- *
- * // Use in schema
- * const Store = {
- *   location: t.custom(PointType),  // ✅ Reusable!
- * }
- * ```
+ * @deprecated Use `custom()` directly instead. This function is just an identity function.
+ * @internal
  */
 export function defineType<T, SerializedT = T>(
 	definition: CustomTypeDefinition<T, SerializedT>,
@@ -762,6 +749,9 @@ export const t = {
 
 	/** Date/time value (auto-serialized as ISO string) */
 	datetime: (): DateTimeType => new DateTimeType(),
+
+	/** Timestamp (Unix timestamp in milliseconds) */
+	timestamp: (): TimestampType => new TimestampType(),
 
 	/** Date only, no time (serialized as YYYY-MM-DD) */
 	date: (): DateType => new DateType(),
@@ -983,6 +973,8 @@ export interface TypeBuilder<TContext> {
 	boolean(): ContextualField<BooleanType, TContext> & BooleanType;
 	/** Date/time value */
 	datetime(): ContextualField<DateTimeType, TContext> & DateTimeType;
+	/** Timestamp (Unix timestamp in milliseconds) */
+	timestamp(): ContextualField<TimestampType, TContext> & TimestampType;
 	/** Date only, no time */
 	date(): ContextualField<DateType, TContext> & DateType;
 	/** Decimal/currency value */
@@ -1054,6 +1046,7 @@ export function createTypeBuilder<TContext>(): TypeBuilder<TContext> {
 		float: () => createContextualField<FloatType, TContext>(new FloatType() as any),
 		boolean: () => createContextualField<BooleanType, TContext>(new BooleanType() as any),
 		datetime: () => createContextualField<DateTimeType, TContext>(new DateTimeType() as any),
+		timestamp: () => createContextualField<TimestampType, TContext>(new TimestampType() as any),
 		date: () => createContextualField<DateType, TContext>(new DateType() as any),
 		decimal: () => createContextualField<DecimalType, TContext>(new DecimalType() as any),
 		bigint: () => createContextualField<BigIntType, TContext>(new BigIntType() as any),
