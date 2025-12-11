@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.5.1 (2025-12-11)
+
+### 🐛 Bug Fixes
+
+- **client:** detect 'live' mode fields for subscription routing ([d0d7624](https://github.com/SylphxAI/lens/commit/d0d762452a775602951fc7b7ef40307adc9b810f))
+
 ## 2.5.0 (2025-12-11)
 
 Add model chain methods .resolve() and .subscribe()

@@ -1,5 +1,11 @@
 # @sylphx/lens-preact
 
+## 2.1.1 (2025-12-11)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 2.5.1
+
 ## 2.1.0 (2025-12-11)
 
 Add model chain methods .resolve() and .subscribe()

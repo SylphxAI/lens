@@ -1,5 +1,11 @@
 # @sylphx/lens
 
+## 2.2.0 (2025-12-11)
+
+### ✨ Features
+
+- **emit:** add EmitScalar interface with delta support for string fields ([73a57ff](https://github.com/SylphxAI/lens/commit/73a57ff5bb694ac39c300e029f167df6911567d6))
+
 ## 2.1.0 (2025-12-11)
 
 Add model chain methods .resolve() and .subscribe()
