@@ -1,5 +1,17 @@
 # @sylphx/lens-nuxt
 
+## 2.2.4
+
+### Patch Changes
+
+- Updated dependencies [7a4be48]
+- Updated dependencies [01a1e83]
+- Updated dependencies
+  - @sylphx/lens-server@2.14.0
+  - @sylphx/lens-client@2.6.0
+  - @sylphx/lens-core@2.12.0
+  - @sylphx/lens-vue@2.4.4
+
 ## 2.2.3 (2025-12-11)
 
 ### 📦 Dependencies
@@ -33,7 +45,6 @@ Add plain object model API and scalar type builder
 - Add standalone field builders: `id()`, `string()`, `int()`, etc.
 - Add `list()` and `nullable()` wrappers for field definitions
 - Rename `CustomType` → `ScalarType`
-
 
 ## 2.1.19 (2025-12-11)
 

@@ -1,5 +1,35 @@
 # @sylphx/lens-client
 
+## 2.6.0
+
+### Minor Changes
+
+- 01a1e83: feat: frontend-driven transport routing with entity metadata
+
+  Server changes:
+
+  - Add entity field metadata (FieldMode: exposed/resolve/subscribe) to getMetadata()
+  - Add returnType to OperationMeta for client-side entity identification
+  - Deprecate hasAnySubscription/requiresStreamingTransport (now client-side)
+
+  Client changes:
+
+  - Add hasAnySubscription() helper using entity metadata from server
+  - Add getEffectiveOperationType() for determining actual operation type
+  - Client now routes queries with subscription fields to streaming transport
+
+- Migrate to stateless Message wire protocol format
+
+  - Implement discriminated union Message type: `{ $: "snapshot" | "error" | "ops", ... }`
+  - Add type guards: `isSnapshot()`, `isError()`, `isOps()`
+  - Remove stateful EmitCommand processing from client
+  - Enable serverless compatibility with pure function architecture
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-core@2.12.0
+
 ## 2.5.3 (2025-12-11)
 
 ### 📦 Dependencies
@@ -29,7 +59,6 @@ Add plain object model API and scalar type builder
 - Add standalone field builders: `id()`, `string()`, `int()`, etc.
 - Add `list()` and `nullable()` wrappers for field definitions
 - Rename `CustomType` → `ScalarType`
-
 
 ## 2.4.10 (2025-12-11)
 

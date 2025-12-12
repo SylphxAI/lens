@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies
+  - @sylphx/lens-core@2.12.0
+
 ## 1.1.3 (2025-12-11)
 
 ### 📦 Dependencies
@@ -29,7 +36,6 @@ Add plain object model API and scalar type builder
 - Add standalone field builders: `id()`, `string()`, `int()`, etc.
 - Add `list()` and `nullable()` wrappers for field definitions
 - Rename `CustomType` → `ScalarType`
-
 
 ## 1.0.10 (2025-12-11)
 

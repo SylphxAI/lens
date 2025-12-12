@@ -1,5 +1,16 @@
 # @sylphx/lens-core
 
+## 2.12.0
+
+### Minor Changes
+
+- Migrate to stateless Message wire protocol format
+
+  - Implement discriminated union Message type: `{ $: "snapshot" | "error" | "ops", ... }`
+  - Add type guards: `isSnapshot()`, `isError()`, `isOps()`
+  - Remove stateful EmitCommand processing from client
+  - Enable serverless compatibility with pure function architecture
+
 ## 2.11.2 (2025-12-11)
 
 ### 🐛 Bug Fixes

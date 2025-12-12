@@ -1,5 +1,40 @@
 # @sylphx/lens-server
 
+## 2.14.0
+
+### Minor Changes
+
+- 01a1e83: feat: frontend-driven transport routing with entity metadata
+
+  Server changes:
+
+  - Add entity field metadata (FieldMode: exposed/resolve/subscribe) to getMetadata()
+  - Add returnType to OperationMeta for client-side entity identification
+  - Deprecate hasAnySubscription/requiresStreamingTransport (now client-side)
+
+  Client changes:
+
+  - Add hasAnySubscription() helper using entity metadata from server
+  - Add getEffectiveOperationType() for determining actual operation type
+  - Client now routes queries with subscription fields to streaming transport
+
+- Migrate to stateless Message wire protocol format
+
+  - Implement discriminated union Message type: `{ $: "snapshot" | "error" | "ops", ... }`
+  - Add type guards: `isSnapshot()`, `isError()`, `isOps()`
+  - Remove stateful EmitCommand processing from client
+  - Enable serverless compatibility with pure function architecture
+
+### Patch Changes
+
+- 7a4be48: fix: call \_subscriber for operation-level LiveQueryDef
+
+  Previously, query().resolve().subscribe() defined \_subscriber but the server never called it.
+  Only field-level .resolve().subscribe() worked. Now operation-level live queries work correctly.
+
+- Updated dependencies
+  - @sylphx/lens-core@2.12.0
+
 ## 2.13.2 (2025-12-11)
 
 ### 📦 Dependencies
@@ -30,7 +65,6 @@ Add plain object model API and scalar type builder
 - Add `list()` and `nullable()` wrappers for field definitions
 - Rename `CustomType` → `ScalarType`
 
-
 ## 2.11.0 (2025-12-11)
 
 ### ✨ Features
@@ -41,7 +75,7 @@ Add plain object model API and scalar type builder
 
 ### 🐛 Bug Fixes
 
-- **server:** call _subscriber for operation-level LiveQueryDef ([4a96fe8](https://github.com/SylphxAI/lens/commit/4a96fe8410724ad017e5bf215255b3f7095150b1))
+- **server:** call \_subscriber for operation-level LiveQueryDef ([4a96fe8](https://github.com/SylphxAI/lens/commit/4a96fe8410724ad017e5bf215255b3f7095150b1))
 
 ## 2.10.0 (2025-12-10)
 

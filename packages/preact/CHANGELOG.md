@@ -1,5 +1,13 @@
 # @sylphx/lens-preact
 
+## 2.1.4
+
+### Patch Changes
+
+- Updated dependencies [01a1e83]
+- Updated dependencies
+  - @sylphx/lens-client@2.6.0
+
 ## 2.1.3 (2025-12-11)
 
 No notable changes.
@@ -27,7 +35,6 @@ Add plain object model API and scalar type builder
 - Add standalone field builders: `id()`, `string()`, `int()`, etc.
 - Add `list()` and `nullable()` wrappers for field definitions
 - Rename `CustomType` → `ScalarType`
-
 
 ## 2.0.22 (2025-12-11)
 

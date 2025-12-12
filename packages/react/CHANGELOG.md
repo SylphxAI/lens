@@ -1,5 +1,14 @@
 # @sylphx/lens-react
 
+## 2.5.4
+
+### Patch Changes
+
+- Updated dependencies [01a1e83]
+- Updated dependencies
+  - @sylphx/lens-client@2.6.0
+  - @sylphx/lens-core@2.12.0
+
 ## 2.5.3 (2025-12-11)
 
 ### 📦 Dependencies
@@ -30,7 +39,6 @@ Add plain object model API and scalar type builder
 - Add standalone field builders: `id()`, `string()`, `int()`, etc.
 - Add `list()` and `nullable()` wrappers for field definitions
 - Rename `CustomType` → `ScalarType`
-
 
 ## 2.4.12 (2025-12-11)
 
