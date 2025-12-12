@@ -5,6 +5,7 @@
  * Unlike middleware chains, plugin order doesn't matter (mostly).
  */
 
+import { isError, isSnapshot } from "@sylphx/lens-core";
 import type { Operation, Result } from "./types.js";
 
 // =============================================================================
@@ -113,9 +114,9 @@ export function logger(options: LoggerPluginOptions = {}): Plugin {
 
 		afterResponse(result, op) {
 			if (enabled) {
-				if (result.error) {
+				if (isError(result)) {
 					log("error", `← [${op.type}] ${op.path} ERROR:`, result.error);
-				} else {
+				} else if (isSnapshot(result)) {
 					log(level, `← [${op.type}] ${op.path}`, result.data);
 				}
 			}
@@ -273,7 +274,7 @@ export function cache(options: CachePluginOptions = {}): Plugin {
 			}
 
 			// Don't cache errors
-			if (result.error) {
+			if (isError(result)) {
 				return result;
 			}
 

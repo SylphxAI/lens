@@ -151,7 +151,7 @@ describe("inProcess transport", () => {
 
 		it("handles server errors", async () => {
 			const app = createMockApp({
-				execute: async () => ({ error: new Error("Database error") }),
+				execute: async () => ({ $: "error", error: "Database error" }),
 			});
 			const transport = inProcess({ app });
 
@@ -161,8 +161,10 @@ describe("inProcess transport", () => {
 				type: "query",
 			})) as Result;
 
-			expect(result.error).toBeInstanceOf(Error);
-			expect(result.error?.message).toBe("Database error");
+			expect(result.$).toBe("error");
+			if (result.$ === "error") {
+				expect(result.error).toBe("Database error");
+			}
 		});
 
 		it("handles server throwing", async () => {
@@ -187,9 +189,9 @@ describe("inProcess transport", () => {
 		it("works with multiple operations", async () => {
 			const app = createMockApp({
 				execute: async (op) => {
-					if (op.path === "user.get") return { data: { name: "John" } };
-					if (op.path === "post.create") return { data: { id: "post-1" } };
-					return { error: new Error("Unknown path") };
+					if (op.path === "user.get") return { $: "snapshot", data: { name: "John" } };
+					if (op.path === "post.create") return { $: "snapshot", data: { id: "post-1" } };
+					return { $: "error", error: "Unknown path" };
 				},
 			});
 			const transport = inProcess({ app });
@@ -199,8 +201,8 @@ describe("inProcess transport", () => {
 				transport.execute({ id: "2", path: "post.create", type: "mutation", input: {} }),
 			]);
 
-			expect((user as Result).data).toEqual({ name: "John" });
-			expect((post as Result).data).toEqual({ id: "post-1" });
+			expect((user as Result).$ === "snapshot" ? (user as Result).data : null).toEqual({ name: "John" });
+			expect((post as Result).$ === "snapshot" ? (post as Result).data : null).toEqual({ id: "post-1" });
 		});
 	});
 });

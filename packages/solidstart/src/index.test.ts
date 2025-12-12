@@ -655,9 +655,9 @@ describe("handler - path processing", () => {
 			execute: ({ path }: { path: string; input?: unknown }) => {
 				// The path will be "/user.list" after basePath stripping
 				if (path === "/user.list" || path === "user.list") {
-					return of({ data: [{ id: "1", name: "User 1" }], error: null });
+					return of({ $: "snapshot", data: [{ id: "1", name: "User 1" }] } as Message);
 				}
-				return of({ data: null, error: new Error("Not found") });
+				return of({ $: "error", error: "Not found" } as Message);
 			},
 		};
 		const lens = createLensSolidStart({ server: server as any });

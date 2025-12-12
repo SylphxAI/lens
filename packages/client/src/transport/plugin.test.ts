@@ -44,7 +44,7 @@ describe("logger plugin", () => {
 		const logFn = mock(() => {});
 		const plugin = logger({ logger: logFn });
 		const op = createOperation();
-		const result: Result = { data: { name: "John" } };
+		const result: Result = { $: "snapshot", data: { name: "John" } };
 
 		plugin.afterResponse!(result, op);
 
@@ -55,11 +55,11 @@ describe("logger plugin", () => {
 		const logFn = mock(() => {});
 		const plugin = logger({ logger: logFn });
 		const op = createOperation();
-		const result: Result = { error: new Error("Not found") };
+		const result: Result = { $: "error", error: "Not found" };
 
 		plugin.afterResponse!(result, op);
 
-		expect(logFn).toHaveBeenCalledWith("error", "← [query] user.get ERROR:", expect.any(Error));
+		expect(logFn).toHaveBeenCalledWith("error", "← [query] user.get ERROR:", "Not found");
 	});
 
 	it("respects level option", () => {
@@ -78,7 +78,7 @@ describe("logger plugin", () => {
 		const op = createOperation();
 
 		plugin.beforeRequest!(op);
-		plugin.afterResponse!({ data: {} }, op);
+		plugin.afterResponse!({ $: "snapshot", data: {} }, op);
 
 		expect(logFn).not.toHaveBeenCalled();
 	});
@@ -95,7 +95,7 @@ describe("logger plugin", () => {
 	it("returns result unchanged from afterResponse", () => {
 		const plugin = logger();
 		const op = createOperation();
-		const result: Result = { data: { test: true } };
+		const result: Result = { $: "snapshot", data: { test: true } };
 
 		const returned = plugin.afterResponse!(result, op);
 
@@ -301,7 +301,7 @@ describe("cache plugin", () => {
 	it("caches query responses", () => {
 		const plugin = cache({ ttl: 60000 });
 		const op = createOperation();
-		const result: Result = { data: { name: "John" } };
+		const result: Result = { $: "snapshot", data: { name: "John" } };
 
 		// First request - no cache
 		const before1 = plugin.beforeRequest!(op) as Operation;
@@ -318,7 +318,7 @@ describe("cache plugin", () => {
 	it("respects TTL", async () => {
 		const plugin = cache({ ttl: 30 }); // 30ms TTL
 		const op = createOperation();
-		const result: Result = { data: { cached: true } };
+		const result: Result = { $: "snapshot", data: { cached: true } };
 
 		plugin.afterResponse!(result, op);
 
@@ -338,7 +338,7 @@ describe("cache plugin", () => {
 	it("does not cache mutations by default", () => {
 		const plugin = cache();
 		const op = createOperation({ type: "mutation" });
-		const result: Result = { data: { id: "new" } };
+		const result: Result = { $: "snapshot", data: { id: "new" } };
 
 		plugin.afterResponse!(result, op);
 
@@ -349,7 +349,7 @@ describe("cache plugin", () => {
 	it("can cache mutations when queriesOnly is false", () => {
 		const plugin = cache({ queriesOnly: false });
 		const op = createOperation({ type: "mutation" });
-		const result: Result = { data: { id: "new" } };
+		const result: Result = { $: "snapshot", data: { id: "new" } };
 
 		plugin.afterResponse!(result, op);
 
@@ -360,7 +360,7 @@ describe("cache plugin", () => {
 	it("does not cache errors", () => {
 		const plugin = cache();
 		const op = createOperation();
-		const result: Result = { error: new Error("Failed") };
+		const result: Result = { $: "error", error: "Failed" };
 
 		plugin.afterResponse!(result, op);
 
@@ -374,7 +374,7 @@ describe("cache plugin", () => {
 		});
 		const op1 = createOperation({ input: { id: "1" } });
 		const op2 = createOperation({ input: { id: "2" } }); // Different input, same path
-		const result: Result = { data: { shared: true } };
+		const result: Result = { $: "snapshot", data: { shared: true } };
 
 		plugin.afterResponse!(result, op1);
 
@@ -387,7 +387,7 @@ describe("cache plugin", () => {
 		const plugin = cache();
 		const op1 = createOperation({ input: { id: "1" } });
 		const op2 = createOperation({ input: { id: "2" } });
-		const result: Result = { data: { id: "1" } };
+		const result: Result = { $: "snapshot", data: { id: "1" } };
 
 		plugin.afterResponse!(result, op1);
 

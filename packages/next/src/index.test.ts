@@ -8,7 +8,7 @@
 const hasDom = typeof document !== "undefined";
 
 import { test as bunTest, describe, expect } from "bun:test";
-import { type Observable, of } from "@sylphx/lens-core";
+import { type Message, type Observable, of } from "@sylphx/lens-core";
 
 const test = hasDom ? bunTest : bunTest.skip;
 
@@ -16,47 +16,44 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { createLensNext, type DehydratedState, dehydrate, fetchQuery } from "./index.js";
 
-// Helper type
-type LensResult<T> = { data: T | null; error: Error | null };
-
-// Mock server for testing - returns Observable like real server
+// Mock server for testing - returns Observable with Message format
 const createMockServer = () => ({
-	execute: ({ path, input }: { path: string; input?: unknown }): Observable<LensResult<unknown>> => {
+	execute: ({ path, input }: { path: string; input?: unknown }): Observable<Message> => {
 		if (path === "user.get") {
-			return of({ data: { id: (input as { id: string }).id, name: "Test User" }, error: null });
+			return of({ $: "snapshot", data: { id: (input as { id: string }).id, name: "Test User" } } as Message);
 		}
 		if (path === "user.list") {
-			return of({ data: [{ id: "1", name: "User 1" }], error: null });
+			return of({ $: "snapshot", data: [{ id: "1", name: "User 1" }] } as Message);
 		}
 		if (path === "observable") {
 			// Return an observable for SSE testing
 			return {
 				subscribe: (handlers: {
-					next: (value: { data?: unknown }) => void;
+					next: (value: Message) => void;
 					error: (err: Error) => void;
 					complete: () => void;
 				}) => {
-					setTimeout(() => handlers.next({ data: "event1" }), 10);
-					setTimeout(() => handlers.next({ data: "event2" }), 20);
+					setTimeout(() => handlers.next({ $: "snapshot", data: "event1" }), 10);
+					setTimeout(() => handlers.next({ $: "snapshot", data: "event2" }), 20);
 					setTimeout(() => handlers.complete(), 30);
 					return { unsubscribe: () => {} };
 				},
-			} as unknown as Observable<LensResult<unknown>>;
+			} as unknown as Observable<Message>;
 		}
 		if (path === "observable.error") {
 			// Observable that errors
 			return {
 				subscribe: (handlers: {
-					next: (value: { data?: unknown }) => void;
+					next: (value: Message) => void;
 					error: (err: Error) => void;
 					complete: () => void;
 				}) => {
 					setTimeout(() => handlers.error(new Error("Stream error")), 10);
 					return { unsubscribe: () => {} };
 				},
-			} as unknown as Observable<LensResult<unknown>>;
+			} as unknown as Observable<Message>;
 		}
-		return of({ data: null, error: new Error("Not found") });
+		return of({ $: "error", error: "Not found" } as Message);
 	},
 });
 

@@ -586,15 +586,15 @@ describe("http.server transport", () => {
 		}),
 		execute: async (op: Operation) => {
 			if (op.path === "user.get") {
-				return { data: { id: "123", name: "John" } };
+				return { $: "snapshot", data: { id: "123", name: "John" } };
 			}
 			if (op.path === "user.update") {
-				return { data: { id: "123", name: "Updated" } };
+				return { $: "snapshot", data: { id: "123", name: "Updated" } };
 			}
 			if (op.path === "error.test") {
 				throw new Error("Test server error");
 			}
-			return { error: new Error("Unknown operation") };
+			return { $: "error", error: "Unknown operation" };
 		},
 	});
 
