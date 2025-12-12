@@ -224,10 +224,14 @@ function createPollingObservable(
 					} else {
 						retries = 0;
 
-						// Only emit if value changed
-						const newValue = JSON.stringify(result.data);
-						if (newValue !== JSON.stringify(lastValue)) {
-							lastValue = result.data;
+						// Emit if data changed OR if update command present (stateless architecture)
+						const hasDataChange = JSON.stringify(result.data) !== JSON.stringify(lastValue);
+						const hasUpdate = result.update !== undefined;
+
+						if (hasDataChange || hasUpdate) {
+							if (result.data !== undefined) {
+								lastValue = result.data;
+							}
 							observer.next?.(result);
 						}
 					}

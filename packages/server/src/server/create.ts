@@ -700,11 +700,11 @@ class LensServerImpl<
 					})),
 				};
 			case "array":
-				// Array operations at field path
+				// Array operations at field path - preserve as array command with field
 				return {
-					type: "field",
+					type: "array",
+					operation: command.operation,
 					field: prefix,
-					update: { strategy: "value", data: command }, // Pass array op as data
 				};
 			default:
 				return command;

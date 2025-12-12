@@ -76,6 +76,52 @@ interface SubscriptionState {
 // =============================================================================
 
 /**
+ * Apply an array operation to the current array state.
+ */
+function applyArrayOperation(state: unknown, op: EmitCommand extends { type: "array"; operation: infer O } ? O : never): unknown {
+	const arr = Array.isArray(state) ? [...state] : [];
+	switch (op.op) {
+		case "push":
+			return [...arr, op.item];
+		case "unshift":
+			return [op.item, ...arr];
+		case "insert":
+			arr.splice(op.index, 0, op.item);
+			return arr;
+		case "remove":
+			arr.splice(op.index, 1);
+			return arr;
+		case "removeById": {
+			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+			if (idx >= 0) arr.splice(idx, 1);
+			return arr;
+		}
+		case "update":
+			arr[op.index] = op.item;
+			return arr;
+		case "updateById": {
+			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+			if (idx >= 0) arr[idx] = op.item;
+			return arr;
+		}
+		case "merge":
+			if (arr[op.index] && typeof arr[op.index] === "object" && !Array.isArray(arr[op.index])) {
+				arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
+			}
+			return arr;
+		case "mergeById": {
+			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+			if (idx >= 0 && arr[idx] && typeof arr[idx] === "object" && !Array.isArray(arr[idx])) {
+				arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
+			}
+			return arr;
+		}
+		default:
+			return arr;
+	}
+}
+
+/**
  * Apply an emit command to the current state.
  * Used by client to apply server-sent updates (stateless server architecture).
  */
@@ -105,7 +151,8 @@ function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
 		}
 
 		case "batch":
-			if (state && typeof state === "object") {
+			// Batch operations only apply to plain objects, not arrays
+			if (state && typeof state === "object" && !Array.isArray(state)) {
 				let result = { ...(state as Record<string, unknown>) };
 				for (const update of command.updates) {
 					result = setFieldByPath(
@@ -119,48 +166,16 @@ function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
 			return state;
 
 		case "array": {
-			// Array operations
-			const arr = Array.isArray(state) ? [...state] : [];
-			const op = command.operation;
-			switch (op.op) {
-				case "push":
-					return [...arr, op.item];
-				case "unshift":
-					return [op.item, ...arr];
-				case "insert":
-					arr.splice(op.index, 0, op.item);
-					return arr;
-				case "remove":
-					arr.splice(op.index, 1);
-					return arr;
-				case "removeById": {
-					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-					if (idx >= 0) arr.splice(idx, 1);
-					return arr;
-				}
-				case "update":
-					arr[op.index] = op.item;
-					return arr;
-				case "updateById": {
-					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-					if (idx >= 0) arr[idx] = op.item;
-					return arr;
-				}
-				case "merge":
-					if (arr[op.index] && typeof arr[op.index] === "object") {
-						arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
-					}
-					return arr;
-				case "mergeById": {
-					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-					if (idx >= 0 && arr[idx] && typeof arr[idx] === "object") {
-						arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
-					}
-					return arr;
-				}
-				default:
-					return arr;
+			// Array operations - may have optional field path for nested arrays
+			if (command.field) {
+				// Apply array operation at nested field path
+				const currentArray = getFieldByPath(state, command.field);
+				const newArray = applyArrayOperation(currentArray, command.operation);
+				return setFieldByPath((state ?? {}) as Record<string, unknown>, command.field, newArray);
 			}
+
+			// Root-level array operation
+			return applyArrayOperation(state, command.operation);
 		}
 
 		default:
@@ -619,10 +634,20 @@ class ClientImpl {
 						// Handle update commands (stateless server architecture)
 						// Client applies updates to local state for minimal wire transfer
 						if (result.update) {
-							sub.data = applyEmitCommand(result.update, sub.data);
-							sub.error = null; // Clear previous error on update
-							for (const observer of sub.observers) {
-								observer.next?.(sub.data);
+							try {
+								sub.data = applyEmitCommand(result.update, sub.data);
+								sub.error = null; // Clear previous error on update
+								for (const observer of sub.observers) {
+									observer.next?.(sub.data);
+								}
+							} catch (updateErr) {
+								// Error applying update - notify observers but keep existing state
+								const err =
+									updateErr instanceof Error ? updateErr : new Error(String(updateErr));
+								sub.error = err;
+								for (const observer of sub.observers) {
+									observer.error?.(err);
+								}
 							}
 						}
 						if (result.error) {

@@ -326,8 +326,9 @@ describe("SSE Transport", () => {
 			await new Promise((r) => setTimeout(r, 10));
 
 			const es = MockEventSource.getLastInstance()!;
-			es.simulateMessage({ id: "123", name: "Alice" });
-			es.simulateMessage({ id: "123", name: "Bob" });
+			// Server sends { data } wrapped results for stateless architecture
+			es.simulateMessage({ data: { id: "123", name: "Alice" } });
+			es.simulateMessage({ data: { id: "123", name: "Bob" } });
 
 			expect(messages).toEqual([
 				{ id: "123", name: "Alice" },

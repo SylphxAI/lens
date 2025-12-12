@@ -212,8 +212,10 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 
 					eventSource.onmessage = (event) => {
 						try {
-							const data = JSON.parse(event.data);
-							observer.next?.({ data });
+							// Parse as full Result type for stateless architecture
+							// Server sends { data } for initial, { update } for incremental
+							const result = JSON.parse(event.data) as Result;
+							observer.next?.(result);
 						} catch (error) {
 							observer.error?.(error as Error);
 						}

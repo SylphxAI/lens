@@ -297,7 +297,7 @@ export type EmitCommand =
 	| { type: "full"; data: unknown; replace: boolean }
 	| { type: "field"; field: string; update: Update }
 	| { type: "batch"; updates: InternalFieldUpdate[] }
-	| { type: "array"; operation: ArrayOperation };
+	| { type: "array"; operation: ArrayOperation; field?: string };
 
 // =============================================================================
 // Factory Functions

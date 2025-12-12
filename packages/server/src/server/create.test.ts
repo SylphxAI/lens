@@ -31,6 +31,52 @@ import { createApp } from "./create.js";
 // =============================================================================
 
 /**
+ * Apply array operation to state.
+ */
+function applyArrayOp(state: unknown, op: EmitCommand extends { type: "array"; operation: infer O } ? O : never): unknown {
+	const arr = Array.isArray(state) ? [...state] : [];
+	switch (op.op) {
+		case "push":
+			return [...arr, op.item];
+		case "unshift":
+			return [op.item, ...arr];
+		case "insert":
+			arr.splice(op.index, 0, op.item);
+			return arr;
+		case "remove":
+			arr.splice(op.index, 1);
+			return arr;
+		case "removeById": {
+			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+			if (idx >= 0) arr.splice(idx, 1);
+			return arr;
+		}
+		case "update":
+			arr[op.index] = op.item;
+			return arr;
+		case "updateById": {
+			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+			if (idx >= 0) arr[idx] = op.item;
+			return arr;
+		}
+		case "merge":
+			if (arr[op.index] && typeof arr[op.index] === "object" && !Array.isArray(arr[op.index])) {
+				arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
+			}
+			return arr;
+		case "mergeById": {
+			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+			if (idx >= 0 && arr[idx] && typeof arr[idx] === "object" && !Array.isArray(arr[idx])) {
+				arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
+			}
+			return arr;
+		}
+		default:
+			return arr;
+	}
+}
+
+/**
  * Apply emit command to state (simulates client-side behavior).
  * In the stateless architecture, server sends { update } and client applies it.
  */
@@ -53,7 +99,8 @@ function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
 		}
 
 		case "batch":
-			if (state && typeof state === "object") {
+			// Batch operations only apply to plain objects, not arrays
+			if (state && typeof state === "object" && !Array.isArray(state)) {
 				let result = { ...(state as Record<string, unknown>) };
 				for (const update of command.updates) {
 					result = setFieldByPath(
@@ -67,47 +114,13 @@ function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
 			return state;
 
 		case "array": {
-			const arr = Array.isArray(state) ? [...state] : [];
-			const op = command.operation;
-			switch (op.op) {
-				case "push":
-					return [...arr, op.item];
-				case "unshift":
-					return [op.item, ...arr];
-				case "insert":
-					arr.splice(op.index, 0, op.item);
-					return arr;
-				case "remove":
-					arr.splice(op.index, 1);
-					return arr;
-				case "removeById": {
-					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-					if (idx >= 0) arr.splice(idx, 1);
-					return arr;
-				}
-				case "update":
-					arr[op.index] = op.item;
-					return arr;
-				case "updateById": {
-					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-					if (idx >= 0) arr[idx] = op.item;
-					return arr;
-				}
-				case "merge":
-					if (arr[op.index] && typeof arr[op.index] === "object") {
-						arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
-					}
-					return arr;
-				case "mergeById": {
-					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-					if (idx >= 0 && arr[idx] && typeof arr[idx] === "object") {
-						arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
-					}
-					return arr;
-				}
-				default:
-					return arr;
+			// Handle optional field path for nested array operations
+			if (command.field) {
+				const currentArray = getFieldByPath(state, command.field);
+				const newArray = applyArrayOp(currentArray, command.operation);
+				return setFieldByPath((state ?? {}) as Record<string, unknown>, command.field, newArray);
 			}
+			return applyArrayOp(state, command.operation);
 		}
 
 		default:

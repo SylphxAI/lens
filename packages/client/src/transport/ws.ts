@@ -68,6 +68,8 @@ interface WsMessage {
 		| "reconnect_ack";
 	id?: string;
 	data?: unknown;
+	/** Update command for incremental updates (stateless architecture) */
+	update?: import("@sylphx/lens-core").EmitCommand;
 	error?: { message: string };
 	// For subscription updates with version
 	version?: Version;
@@ -233,14 +235,18 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 						subInfo.observer.error?.(new Error(message.error.message));
 					} else {
 						// Update version in registry if provided
-						if (message.version !== undefined) {
+						if (message.version !== undefined && message.data !== undefined) {
 							registry.updateVersion(
 								message.id!,
 								message.version,
 								message.data as Record<string, unknown>,
 							);
 						}
-						subInfo.observer.next?.({ data: message.data });
+						// Forward full Result (data and/or update) for stateless architecture
+						const result: Result = {};
+						if (message.data !== undefined) result.data = message.data;
+						if (message.update !== undefined) result.update = message.update;
+						subInfo.observer.next?.(result);
 					}
 				}
 				break;
