@@ -5,17 +5,20 @@
  * Server only does: getMetadata() and execute()
  *
  * STATELESS ARCHITECTURE:
- * - Server sends initial data via { data }
- * - Server sends updates via { update: EmitCommand }
- * - Client applies updates to local state
+ * - Server sends initial data via { $: "snapshot", data }
+ * - Server sends updates via { $: "ops", ops: Op[] }
+ * - Client applies updates to local state using applyOps
  */
 
 import { describe, expect, it } from "bun:test";
 import {
-	applyUpdate,
-	type EmitCommand,
+	applyOps,
 	entity,
 	firstValueFrom,
+	isError,
+	isOps,
+	isSnapshot,
+	type Message,
 	mutation,
 	query,
 	resolver,
@@ -31,135 +34,20 @@ import { createApp } from "./create.js";
 // =============================================================================
 
 /**
- * Apply array operation to state.
- */
-function applyArrayOp(state: unknown, op: EmitCommand extends { type: "array"; operation: infer O } ? O : never): unknown {
-	const arr = Array.isArray(state) ? [...state] : [];
-	switch (op.op) {
-		case "push":
-			return [...arr, op.item];
-		case "unshift":
-			return [op.item, ...arr];
-		case "insert":
-			arr.splice(op.index, 0, op.item);
-			return arr;
-		case "remove":
-			arr.splice(op.index, 1);
-			return arr;
-		case "removeById": {
-			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-			if (idx >= 0) arr.splice(idx, 1);
-			return arr;
-		}
-		case "update":
-			arr[op.index] = op.item;
-			return arr;
-		case "updateById": {
-			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-			if (idx >= 0) arr[idx] = op.item;
-			return arr;
-		}
-		case "merge":
-			if (arr[op.index] && typeof arr[op.index] === "object" && !Array.isArray(arr[op.index])) {
-				arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
-			}
-			return arr;
-		case "mergeById": {
-			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-			if (idx >= 0 && arr[idx] && typeof arr[idx] === "object" && !Array.isArray(arr[idx])) {
-				arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
-			}
-			return arr;
-		}
-		default:
-			return arr;
-	}
-}
-
-/**
- * Apply emit command to state (simulates client-side behavior).
- * In the stateless architecture, server sends { update } and client applies it.
- */
-function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
-	switch (command.type) {
-		case "full":
-			if (command.replace) return command.data;
-			if (state && typeof state === "object" && typeof command.data === "object") {
-				return { ...state, ...(command.data as Record<string, unknown>) };
-			}
-			return command.data;
-
-		case "field": {
-			if (command.field === "") return applyUpdate(state, command.update);
-			return setFieldByPath(
-				(state ?? {}) as Record<string, unknown>,
-				command.field,
-				applyUpdate(getFieldByPath(state, command.field), command.update),
-			);
-		}
-
-		case "batch":
-			// Batch operations only apply to plain objects, not arrays
-			if (state && typeof state === "object" && !Array.isArray(state)) {
-				let result = { ...(state as Record<string, unknown>) };
-				for (const update of command.updates) {
-					result = setFieldByPath(
-						result,
-						update.field,
-						applyUpdate(getFieldByPath(result, update.field), update.update),
-					) as Record<string, unknown>;
-				}
-				return result;
-			}
-			return state;
-
-		case "array": {
-			// Handle optional field path for nested array operations
-			if (command.field) {
-				const currentArray = getFieldByPath(state, command.field);
-				const newArray = applyArrayOp(currentArray, command.operation);
-				return setFieldByPath((state ?? {}) as Record<string, unknown>, command.field, newArray);
-			}
-			return applyArrayOp(state, command.operation);
-		}
-
-		default:
-			return state;
-	}
-}
-
-function getFieldByPath(obj: unknown, path: string): unknown {
-	if (!obj || typeof obj !== "object") return undefined;
-	const parts = path.split(".");
-	let current: unknown = obj;
-	for (const part of parts) {
-		if (!current || typeof current !== "object") return undefined;
-		current = (current as Record<string, unknown>)[part];
-	}
-	return current;
-}
-
-function setFieldByPath(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
-	const parts = path.split(".");
-	if (parts.length === 1) return { ...obj, [path]: value };
-	const [first, ...rest] = parts;
-	const nested = obj[first];
-	if (nested && typeof nested === "object") {
-		return { ...obj, [first]: setFieldByPath(nested as Record<string, unknown>, rest.join("."), value) };
-	}
-	return { ...obj, [first]: setFieldByPath({}, rest.join("."), value) };
-}
-
-/**
  * Create a results collector that simulates client behavior.
- * Maintains current state by applying incoming updates.
+ * Maintains current state by applying incoming Message updates.
+ *
+ * NEW PROTOCOL:
+ * - { $: "snapshot", data } → replace current state
+ * - { $: "ops", ops: Op[] } → apply operations to current state
+ * - { $: "error", error } → error message
  */
 function createResultsCollector() {
 	let currentData: unknown = null;
-	const rawResults: Array<{ data?: unknown; update?: EmitCommand }> = [];
+	const rawResults: Message[] = [];
 
 	return {
-		/** Raw results (data or update) */
+		/** Raw results (Message format) */
 		get raw() {
 			return rawResults;
 		},
@@ -167,18 +55,18 @@ function createResultsCollector() {
 		get current() {
 			return currentData;
 		},
-		/** Number of updates received */
+		/** Number of ops messages received */
 		get updateCount() {
-			return rawResults.filter((r) => r.update).length;
+			return rawResults.filter((r) => isOps(r)).length;
 		},
-		/** Push a result (applies update if present) */
-		push(result: { data?: unknown; update?: EmitCommand; error?: Error }) {
+		/** Push a Message result (applies ops if present) */
+		push(result: Message) {
 			rawResults.push(result);
-			if (result.data !== undefined) {
+			if (isSnapshot(result)) {
 				currentData = result.data;
 			}
-			if (result.update) {
-				currentData = applyEmitCommand(result.update, currentData);
+			if (isOps(result)) {
+				currentData = applyOps(currentData, result.ops);
 			}
 		},
 	};
@@ -372,12 +260,14 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(result.data).toEqual({
-			id: "123",
-			name: "Test User",
-			email: "test@example.com",
-		});
-		expect(result.error).toBeUndefined();
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({
+				id: "123",
+				name: "Test User",
+				email: "test@example.com",
+			});
+		}
 	});
 
 	it("executes mutation successfully", async () => {
@@ -392,12 +282,14 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(result.data).toEqual({
-			id: "new-id",
-			name: "New User",
-			email: "new@example.com",
-		});
-		expect(result.error).toBeUndefined();
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({
+				id: "new-id",
+				name: "New User",
+				email: "new@example.com",
+			});
+		}
 	});
 
 	it("returns error for unknown operation", async () => {
@@ -412,9 +304,10 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(result.data).toBeUndefined();
-		expect(result.error).toBeInstanceOf(Error);
-		expect(result.error?.message).toContain("not found");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toContain("not found");
+		}
 	});
 
 	it("returns error for invalid input", async () => {
@@ -429,8 +322,7 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(result.data).toBeUndefined();
-		expect(result.error).toBeInstanceOf(Error);
+		expect(isError(result)).toBe(true);
 	});
 
 	it("executes router operations with dot notation", async () => {
@@ -450,11 +342,14 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(queryResult.data).toEqual({
-			id: "456",
-			name: "Test User",
-			email: "test@example.com",
-		});
+		expect(isSnapshot(queryResult)).toBe(true);
+		if (isSnapshot(queryResult)) {
+			expect(queryResult.data).toEqual({
+				id: "456",
+				name: "Test User",
+				email: "test@example.com",
+			});
+		}
 
 		const mutationResult = await firstValueFrom(
 			server.execute({
@@ -463,11 +358,14 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(mutationResult.data).toEqual({
-			id: "new-id",
-			name: "Router User",
-			email: undefined,
-		});
+		expect(isSnapshot(mutationResult)).toBe(true);
+		if (isSnapshot(mutationResult)) {
+			expect(mutationResult.data).toEqual({
+				id: "new-id",
+				name: "Router User",
+				email: undefined,
+			});
+		}
 	});
 
 	it("handles resolver errors gracefully", async () => {
@@ -488,9 +386,10 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(result.data).toBeUndefined();
-		expect(result.error).toBeInstanceOf(Error);
-		expect(result.error?.message).toBe("Resolver error");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toBe("Resolver error");
+		}
 	});
 
 	it("executes query without input", async () => {
@@ -504,7 +403,10 @@ describe("execute", () => {
 			}),
 		);
 
-		expect(result.data).toHaveLength(2);
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toHaveLength(2);
+		}
 	});
 });
 
@@ -592,11 +494,14 @@ describe("selection", () => {
 			}),
 		);
 
-		expect(result.data).toEqual({
-			id: "123", // id always included
-			name: "Test User",
-		});
-		expect((result.data as Record<string, unknown>).email).toBeUndefined();
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({
+				id: "123", // id always included
+				name: "Test User",
+			});
+			expect((result.data as Record<string, unknown>).email).toBeUndefined();
+		}
 	});
 });
 
@@ -714,14 +619,16 @@ describe("field resolvers", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toBeDefined();
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toBeDefined();
 
-		const data = result.data as { id: string; name: string; posts: { id: string; title: string }[] };
-		expect(data.id).toBe("a1");
-		expect(data.name).toBe("Alice");
-		expect(data.posts).toHaveLength(2); // limit: 2
-		expect(data.posts.every((p) => p.title)).toBe(true); // only selected fields
+			const data = result.data as { id: string; name: string; posts: { id: string; title: string }[] };
+			expect(data.id).toBe("a1");
+			expect(data.name).toBe("Alice");
+			expect(data.posts).toHaveLength(2); // limit: 2
+			expect(data.posts.every((p) => p.title)).toBe(true); // only selected fields
+		}
 	});
 
 	it("passes context to field resolvers", async () => {
@@ -981,7 +888,7 @@ describe("field resolvers", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					collector.push(result as { data?: unknown; update?: EmitCommand });
+					collector.push(result as Message);
 				},
 			});
 
@@ -997,14 +904,13 @@ describe("field resolvers", () => {
 		// Wait for emit to process
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		// STATELESS: Server sends update command, not re-resolved data
+		// STATELESS: Server sends ops command, not re-resolved data
 		expect(collector.raw.length).toBe(2);
 		expect(postsResolverCallCount).toBe(1); // NOT called again - stateless!
 
-		// Second result should be an update command
+		// Second result should be an ops command
 		const updateResult = collector.raw[1];
-		expect(updateResult.update).toBeDefined();
-		expect(updateResult.data).toBeUndefined();
+		expect(isOps(updateResult)).toBe(true);
 
 		// Client applies update: name is updated, posts preserved from initial
 		const currentState = collector.current as { name: string; posts: { id: string }[] };
@@ -1178,7 +1084,7 @@ describe("field resolvers", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					collector.push(result as { data?: unknown; update?: EmitCommand });
+					collector.push(result as Message);
 				},
 			});
 
@@ -1188,8 +1094,11 @@ describe("field resolvers", () => {
 		expect(collector.raw.length).toBe(1);
 		expect(capturedFieldEmit).toBeDefined();
 
-		const initialResult = collector.raw[0] as { data: { posts: { id: string }[] } };
-		expect(initialResult.data.posts).toHaveLength(2);
+		const initialResult = collector.raw[0];
+		expect(isSnapshot(initialResult)).toBe(true);
+		if (isSnapshot(initialResult)) {
+			expect((initialResult.data as { posts: { id: string }[] }).posts).toHaveLength(2);
+		}
 
 		// Use field-level emit to update just the posts field
 		const newPosts = [
@@ -1202,9 +1111,9 @@ describe("field resolvers", () => {
 		// Wait for field emit to process
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		// STATELESS: Second result should be update command
+		// STATELESS: Second result should be ops command
 		expect(collector.raw.length).toBe(2);
-		expect(collector.raw[1].update).toBeDefined();
+		expect(isOps(collector.raw[1])).toBe(true);
 
 		// Client applies update to get final state
 		const currentState = collector.current as { posts: { id: string; title: string }[] };
@@ -1238,13 +1147,17 @@ describe("field resolvers", () => {
 		});
 
 		const subscription = observable.subscribe({
-			next: (value) => collector.push(value as { data?: unknown; update?: EmitCommand }),
+			next: (value) => collector.push(value as Message),
 		});
 
 		// Wait for initial result
 		await new Promise((resolve) => setTimeout(resolve, 50));
 		expect(collector.raw.length).toBe(1);
-		expect((collector.raw[0] as { data: { name: string } }).data.name).toBe("Initial");
+		const firstResult = collector.raw[0];
+		expect(isSnapshot(firstResult)).toBe(true);
+		if (isSnapshot(firstResult)) {
+			expect(firstResult.data.name).toBe("Initial");
+		}
 
 		// STATELESS: All emits are forwarded (no deduplication)
 		capturedEmit!({ id: "1", name: "Initial" });
@@ -1344,7 +1257,7 @@ describe("field resolvers", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					collector.push(result as { data?: unknown; update?: EmitCommand });
+					collector.push(result as Message);
 				},
 			});
 
@@ -1357,8 +1270,11 @@ describe("field resolvers", () => {
 		expect(subscribeCallCount).toBe(1); // Subscriber called once
 		expect(capturedFieldEmit).toBeDefined(); // Emit captured from subscribe phase
 
-		const initialResult = collector.raw[0] as { data: { posts: { id: string }[] } };
-		expect(initialResult.data.posts).toHaveLength(2);
+		const initialResult = collector.raw[0];
+		expect(isSnapshot(initialResult)).toBe(true);
+		if (isSnapshot(initialResult)) {
+			expect((initialResult.data as { posts: { id: string }[] }).posts).toHaveLength(2);
+		}
 
 		// Use field emit to push update (from subscribe phase)
 		const updatedPosts = [
@@ -1371,9 +1287,9 @@ describe("field resolvers", () => {
 		// Wait for update
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		// STATELESS: Second result is update command
+		// STATELESS: Second result is ops command
 		expect(collector.raw.length).toBe(2);
-		expect(collector.raw[1].update).toBeDefined();
+		expect(isOps(collector.raw[1])).toBe(true);
 
 		// Client applies update to get final state
 		const currentState = collector.current as { posts: { id: string; title: string }[] };
@@ -1403,8 +1319,10 @@ describe("observable behavior", () => {
 			}),
 		);
 
-		expect(result.data).toEqual({ id: "1", name: "Test" });
-		expect(result.error).toBeUndefined();
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({ id: "1", name: "Test" });
+		}
 	});
 
 	it("keeps subscription open for potential emit", async () => {
@@ -1455,7 +1373,10 @@ describe("observable behavior", () => {
 			}),
 		);
 
-		expect(result.data).toEqual({ id: "new", name: "Test" });
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({ id: "new", name: "Test" });
+		}
 	});
 
 	it("can be unsubscribed", async () => {
@@ -1511,7 +1432,7 @@ describe("emit backpressure", () => {
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (value) => collector.push(value as { data?: unknown; update?: EmitCommand }),
+				next: (value) => collector.push(value as Message),
 			});
 
 		await new Promise((r) => setTimeout(r, 50));
@@ -1555,8 +1476,10 @@ describe("observable error handling", () => {
 			}),
 		);
 
-		expect(result.error).toBeDefined();
-		expect(result.error?.message).toBe("Test error");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toBe("Test error");
+		}
 	});
 
 	it("handles async resolver errors", async () => {
@@ -1576,8 +1499,10 @@ describe("observable error handling", () => {
 			}),
 		);
 
-		expect(result.error).toBeDefined();
-		expect(result.error?.message).toBe("Async error");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toBe("Async error");
+		}
 	});
 });
 
@@ -1925,21 +1850,25 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const server = createApp({ queries: { liveUser } });
 
-		const results: unknown[] = [];
+		const results: Message[] = [];
 		const subscription = server
 			.execute({
 				path: "liveUser",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => results.push(result as Message),
 			});
 
 		// Wait for initial result and subscriber setup
 		await new Promise((r) => setTimeout(r, 50));
 
 		expect(results.length).toBe(1);
-		expect((results[0] as { data: { name: string } }).data.name).toBe("Initial");
+		const firstResult = results[0];
+		expect(isSnapshot(firstResult)).toBe(true);
+		if (isSnapshot(firstResult)) {
+			expect(firstResult.data.name).toBe("Initial");
+		}
 		expect(subscriberCalled).toBe(true);
 		expect(capturedEmit).toBeDefined();
 		expect(capturedOnCleanup).toBeDefined();
@@ -1966,20 +1895,24 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
+				next: (result) => collector.push(result as Message),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
 		expect(collector.raw.length).toBe(1);
-		expect((collector.raw[0] as { data: { name: string } }).data.name).toBe("Initial");
+		const firstResult = collector.raw[0];
+		expect(isSnapshot(firstResult)).toBe(true);
+		if (isSnapshot(firstResult)) {
+			expect(firstResult.data.name).toBe("Initial");
+		}
 
-		// Emit update via subscriber - STATELESS: sends update command
+		// Emit update via subscriber - STATELESS: sends ops command
 		capturedEmit!({ id: "1", name: "Updated" });
 		await new Promise((r) => setTimeout(r, 50));
 
 		expect(collector.raw.length).toBe(2);
-		expect(collector.raw[1].update).toBeDefined(); // Update command
+		expect(isOps(collector.raw[1])).toBe(true); // Ops command
 		expect((collector.current as { name: string }).name).toBe("Updated");
 
 		// Emit another update
@@ -2071,8 +2004,8 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const server = createApp({ queries: { liveUser } });
 
-		const results: unknown[] = [];
-		const errors: Error[] = [];
+		const results: Message[] = [];
+		const errors: string[] = [];
 
 		const subscription = server
 			.execute({
@@ -2081,10 +2014,11 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					if (result.error) {
-						errors.push(result.error);
+					const msg = result as Message;
+					if (isError(msg)) {
+						errors.push(msg.error);
 					} else {
-						results.push(result);
+						results.push(msg);
 					}
 				},
 			});
@@ -2096,7 +2030,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 		expect(results.length).toBe(1);
 		// Error from subscriber should be reported
 		expect(errors.length).toBe(1);
-		expect(errors[0].message).toBe("Subscriber error");
+		expect(errors[0]).toBe("Subscriber error");
 
 		subscription.unsubscribe();
 	});
@@ -2126,15 +2060,19 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 				input: { id: "c1" },
 			})
 			.subscribe({
-				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
+				next: (result) => collector.push(result as Message),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
 		expect(collector.raw.length).toBe(1);
-		expect((collector.raw[0] as { data: { count: number } }).data.count).toBe(0);
+		const firstResult = collector.raw[0];
+		expect(isSnapshot(firstResult)).toBe(true);
+		if (isSnapshot(firstResult)) {
+			expect(firstResult.data.count).toBe(0);
+		}
 
-		// Emit updates - STATELESS: sends update commands
+		// Emit updates - STATELESS: sends ops commands
 		capturedEmit!({ id: "c1", count: 1 });
 		await new Promise((r) => setTimeout(r, 50));
 		expect(collector.raw.length).toBe(2);
@@ -2168,22 +2106,25 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
+				next: (result) => collector.push(result as Message),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
 		expect(collector.raw.length).toBe(1);
-		const initial = (collector.raw[0] as { data: { name: string; status: string } }).data;
-		expect(initial.name).toBe("Initial");
-		expect(initial.status).toBe("offline");
+		const initialResult = collector.raw[0];
+		expect(isSnapshot(initialResult)).toBe(true);
+		if (isSnapshot(initialResult)) {
+			expect(initialResult.data.name).toBe("Initial");
+			expect(initialResult.data.status).toBe("offline");
+		}
 
-		// Use merge for partial update - STATELESS: sends update command
+		// Use merge for partial update - STATELESS: sends ops command
 		capturedEmit!.merge({ status: "online" });
 		await new Promise((r) => setTimeout(r, 50));
 
 		expect(collector.raw.length).toBe(2);
-		expect(collector.raw[1].update).toBeDefined(); // Update command
+		expect(isOps(collector.raw[1])).toBe(true); // Ops command
 		const updated = collector.current as { name: string; status: string };
 		expect(updated.name).toBe("Initial"); // Preserved
 		expect(updated.status).toBe("online"); // Updated
@@ -2212,7 +2153,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
+				next: (result) => collector.push(result as Message),
 			});
 
 		// Wait for initial result
@@ -2328,14 +2269,14 @@ describe("scalar field subscription with emit.delta()", () => {
 			resolvers: [userResolver],
 		});
 
-		const results: unknown[] = [];
+		const results: Message[] = [];
 		const subscription = server
 			.execute({
 				path: "getUserWithBio",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => results.push(result as Message),
 			});
 
 		// Wait for subscription setup
@@ -2343,7 +2284,11 @@ describe("scalar field subscription with emit.delta()", () => {
 
 		// Initial result
 		expect(results.length).toBe(1);
-		expect((results[0] as { data: { bio: string } }).data.bio).toBe("Initial bio");
+		const firstResult = results[0];
+		expect(isSnapshot(firstResult)).toBe(true);
+		if (isSnapshot(firstResult)) {
+			expect((firstResult.data as { bio: string }).bio).toBe("Initial bio");
+		}
 
 		// Check that emit has delta method (EmitScalar)
 		expect(capturedEmit).toBeDefined();
@@ -2395,7 +2340,7 @@ describe("scalar field subscription with emit.delta()", () => {
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
+				next: (result) => collector.push(result as Message),
 			});
 
 		// Wait for subscription setup
@@ -2403,17 +2348,21 @@ describe("scalar field subscription with emit.delta()", () => {
 
 		// Initial result
 		expect(collector.raw.length).toBe(1);
-		expect((collector.raw[0] as { data: { content: string } }).data.content).toBe("Hello");
+		const initialResult = collector.raw[0];
+		expect(isSnapshot(initialResult)).toBe(true);
+		if (isSnapshot(initialResult)) {
+			expect((initialResult.data as { content: string }).content).toBe("Hello");
+		}
 
-		// Use emit.delta() to append text - STATELESS: sends delta command
+		// Use emit.delta() to append text - STATELESS: sends ops command
 		capturedEmit?.delta?.([{ position: Infinity, insert: " World" }]);
 
 		// Wait for update
 		await new Promise((r) => setTimeout(r, 50));
 
-		// STATELESS: Received update command
+		// STATELESS: Received ops command
 		expect(collector.raw.length).toBe(2);
-		expect(collector.raw[1].update).toBeDefined();
+		expect(isOps(collector.raw[1])).toBe(true);
 
 		// Client applies delta to get final state
 		const currentState = collector.current as { content: string };

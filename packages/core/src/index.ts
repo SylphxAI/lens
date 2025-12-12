@@ -405,6 +405,8 @@ export {
 	type EmitScalar,
 	type FieldUpdate,
 	type InternalFieldUpdate,
+	// Op conversion
+	toOps,
 } from "./emit/index.js";
 
 // =============================================================================
@@ -534,6 +536,23 @@ export {
 	throwError,
 	type Unsubscribable,
 } from "./observable/index.js";
+
+// =============================================================================
+// Wire Protocol
+// =============================================================================
+
+export {
+	applyOp,
+	applyOps,
+	isError,
+	isOps,
+	isSnapshot,
+	type Message,
+	type MessageData,
+	type MessageObservable,
+	type MessageObserver,
+	type Op,
+} from "./protocol/index.js";
 
 // =============================================================================
 // Plugin System

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { entity, firstValueFrom, lens, mutation, query, t } from "@sylphx/lens-core";
+import { entity, firstValueFrom, isError, isSnapshot, lens, mutation, query, t } from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
 import { createApp } from "../server/create.js";
@@ -60,8 +60,10 @@ describe("E2E - Basic Operations", () => {
 
 		const result = await firstValueFrom(server.execute({ path: "getUsers" }));
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toEqual(mockUsers);
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual(mockUsers);
+		}
 	});
 
 	it("query with input", async () => {
@@ -86,8 +88,10 @@ describe("E2E - Basic Operations", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toEqual(mockUsers[0]);
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual(mockUsers[0]);
+		}
 	});
 
 	it("mutation", async () => {
@@ -113,13 +117,15 @@ describe("E2E - Basic Operations", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toEqual({
-			id: "user-new",
-			name: "Charlie",
-			email: "charlie@example.com",
-			status: "offline",
-		});
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({
+				id: "user-new",
+				name: "Charlie",
+				email: "charlie@example.com",
+				status: "offline",
+			});
+		}
 	});
 
 	it("handles query errors", async () => {
@@ -140,9 +146,10 @@ describe("E2E - Basic Operations", () => {
 			}),
 		);
 
-		expect(result.data).toBeUndefined();
-		expect(result.error).toBeInstanceOf(Error);
-		expect(result.error?.message).toBe("Query failed");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toBe("Query failed");
+		}
 	});
 
 	it("handles unknown operation", async () => {
@@ -155,8 +162,10 @@ describe("E2E - Basic Operations", () => {
 			}),
 		);
 
-		expect(result.data).toBeUndefined();
-		expect(result.error?.message).toContain("not found");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toContain("not found");
+		}
 	});
 });
 
@@ -254,15 +263,17 @@ describe("E2E - Selection", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		// Should include id (always) and selected fields
-		expect(result.data).toEqual({
-			id: "user-1",
-			name: "Alice",
-		});
-		// Should not include unselected fields
-		expect((result.data as Record<string, unknown>).email).toBeUndefined();
-		expect((result.data as Record<string, unknown>).status).toBeUndefined();
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			// Should include id (always) and selected fields
+			expect(result.data).toEqual({
+				id: "user-1",
+				name: "Alice",
+			});
+			// Should not include unselected fields
+			expect((result.data as Record<string, unknown>).email).toBeUndefined();
+			expect((result.data as Record<string, unknown>).status).toBeUndefined();
+		}
 	});
 
 	it("includes id by default in selection", async () => {
@@ -286,10 +297,13 @@ describe("E2E - Selection", () => {
 			}),
 		);
 
-		expect(result.data).toEqual({
-			id: "user-1",
-			email: "alice@example.com",
-		});
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toEqual({
+				id: "user-1",
+				email: "alice@example.com",
+			});
+		}
 	});
 });
 
@@ -351,15 +365,17 @@ describe("E2E - Entity Resolvers", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toMatchObject({
-			id: "user-1",
-			name: "Alice",
-			posts: [
-				{ id: "post-1", title: "Hello World" },
-				{ id: "post-2", title: "Second Post" },
-			],
-		});
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toMatchObject({
+				id: "user-1",
+				name: "Alice",
+				posts: [
+					{ id: "post-1", title: "Hello World" },
+					{ id: "post-2", title: "Second Post" },
+				],
+			});
+		}
 	});
 
 	it("handles DataLoader batching for entity resolvers", async () => {
@@ -414,10 +430,12 @@ describe("E2E - Entity Resolvers", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		// Resolvers are called - exact count depends on DataLoader batching behavior
-		expect(batchCallCount).toBeGreaterThanOrEqual(2);
-		expect(result.data).toHaveLength(2);
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			// Resolvers are called - exact count depends on DataLoader batching behavior
+			expect(batchCallCount).toBeGreaterThanOrEqual(2);
+			expect(result.data).toHaveLength(2);
+		}
 	});
 });
 

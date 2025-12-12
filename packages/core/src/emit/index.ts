@@ -453,3 +453,9 @@ export function createEmit<T>(
 	}
 	return createEmitObject<T & object>(handler) as Emit<T>;
 }
+
+// =============================================================================
+// Op Conversion
+// =============================================================================
+
+export { toOps } from "./to-ops.js";

@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it, mock } from "bun:test";
+import { isSnapshot } from "@sylphx/lens-core";
 import type { LensServerInterface } from "./http.js";
 import { http } from "./http.js";
 import type { Metadata, Observable, Operation, Result } from "./types.js";
@@ -159,8 +160,8 @@ describe("http transport", () => {
 				type: "query",
 			})) as Result;
 
-			expect(result.error).toBeInstanceOf(Error);
-			expect(result.error?.message).toContain("500");
+			expect(result.$).toBe("error");
+			expect((result as { $: "error"; error: string }).error).toContain("500");
 		});
 
 		it("returns error on network failure", async () => {
@@ -179,8 +180,8 @@ describe("http transport", () => {
 				type: "query",
 			})) as Result;
 
-			expect(result.error).toBeInstanceOf(Error);
-			expect(result.error?.message).toBe("Network error");
+			expect(result.$).toBe("error");
+			expect((result as { $: "error"; error: string }).error).toBe("Network error");
 		});
 
 		it("includes operation meta headers", async () => {
@@ -237,8 +238,8 @@ describe("http transport", () => {
 				meta: { timeout: 50 }, // 50ms timeout
 			})) as Result;
 
-			expect(result.error).toBeInstanceOf(Error);
-			expect(result.error?.message).toBe("Request timeout");
+			expect(result.$).toBe("error");
+			expect((result as { $: "error"; error: string }).error).toBe("Request timeout");
 		});
 
 		it("clears timeout when request completes successfully before timeout", async () => {
@@ -298,7 +299,8 @@ describe("http transport", () => {
 			let callCount = 0;
 			const mockFetch = mock(async () => {
 				callCount++;
-				return Response.json({ data: { count: callCount } });
+				// Use new Message format
+				return Response.json({ $: "snapshot", data: { count: callCount } });
 			}) as unknown as typeof fetch;
 
 			const transport = http({
@@ -315,7 +317,11 @@ describe("http transport", () => {
 
 			const values: number[] = [];
 			const sub = observable.subscribe({
-				next: (r) => values.push((r.data as { count: number }).count),
+				next: (r) => {
+					if (isSnapshot(r)) {
+						values.push((r.data as { count: number }).count);
+					}
+				},
 			});
 
 			// Wait for a few polls
@@ -330,7 +336,8 @@ describe("http transport", () => {
 			const mockFetch = mock(async () => {
 				callCount++;
 				// Return same value for first 2 calls, then different
-				return Response.json({ data: { value: callCount > 2 ? "changed" : "same" } });
+				// Use new Message format with $ discriminator
+				return Response.json({ $: "snapshot", data: { value: callCount > 2 ? "changed" : "same" } });
 			}) as unknown as typeof fetch;
 
 			const transport = http({
@@ -347,7 +354,11 @@ describe("http transport", () => {
 
 			const values: string[] = [];
 			const sub = observable.subscribe({
-				next: (r) => values.push((r.data as { value: string }).value),
+				next: (r) => {
+					if (isSnapshot(r)) {
+						values.push((r.data as { value: string }).value);
+					}
+				},
 			});
 
 			await new Promise((r) => setTimeout(r, 150));
@@ -361,7 +372,8 @@ describe("http transport", () => {
 			let callCount = 0;
 			const mockFetch = mock(async () => {
 				callCount++;
-				return Response.json({ data: { count: callCount } });
+				// Use new Message format
+				return Response.json({ $: "snapshot", data: { count: callCount } });
 			}) as unknown as typeof fetch;
 
 			const transport = http({
@@ -395,7 +407,8 @@ describe("http transport", () => {
 				if (callCount <= 3) {
 					return new Response("Error", { status: 500 });
 				}
-				return Response.json({ data: { success: true } });
+				// Use new Message format
+				return Response.json({ $: "snapshot", data: { success: true } });
 			}) as unknown as typeof fetch;
 
 			const transport = http({
@@ -414,7 +427,11 @@ describe("http transport", () => {
 			const errors: Error[] = [];
 
 			observable.subscribe({
-				next: (r) => values.push(r.data),
+				next: (r) => {
+					if (isSnapshot(r)) {
+						values.push(r.data);
+					}
+				},
 				error: (e) => errors.push(e),
 			});
 
@@ -522,7 +539,8 @@ describe("http transport", () => {
 			const mockFetch = mock(async () => {
 				return {
 					ok: true,
-					json: async () => ({ data: circularData }),
+					// Use new Message format with $ discriminator
+					json: async () => ({ $: "snapshot", data: circularData }),
 				} as Response;
 			}) as unknown as typeof fetch;
 

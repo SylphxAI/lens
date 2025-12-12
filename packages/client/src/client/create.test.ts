@@ -413,10 +413,10 @@ describe("startSubscription", () => {
 	it("starts real subscription for subscription operations", async () => {
 		const mockObservable: Observable<Result> = {
 			subscribe: (observer) => {
-				// Emit multiple values
-				setTimeout(() => observer.next?.({ data: { count: 1 } }), 10);
-				setTimeout(() => observer.next?.({ data: { count: 2 } }), 20);
-				setTimeout(() => observer.next?.({ data: { count: 3 } }), 30);
+				// Emit multiple values using Message protocol format
+				setTimeout(() => observer.next?.({ $: "snapshot", data: { count: 1 } }), 10);
+				setTimeout(() => observer.next?.({ $: "snapshot", data: { count: 2 } }), 20);
+				setTimeout(() => observer.next?.({ $: "snapshot", data: { count: 3 } }), 30);
 				return { unsubscribe: () => {} };
 			},
 		};
@@ -454,7 +454,7 @@ describe("startSubscription", () => {
 	it("handles subscription errors gracefully", async () => {
 		const mockObservable: Observable<Result> = {
 			subscribe: (observer) => {
-				setTimeout(() => observer.next?.({ data: { value: 1 } }), 10);
+				setTimeout(() => observer.next?.({ $: "snapshot", data: { value: 1 } }), 10);
 				setTimeout(() => observer.error?.(new Error("Subscription error")), 20);
 				return { unsubscribe: () => {} };
 			},
@@ -493,7 +493,7 @@ describe("startSubscription", () => {
 	it("handles subscription completion", async () => {
 		const mockObservable: Observable<Result> = {
 			subscribe: (observer) => {
-				setTimeout(() => observer.next?.({ data: { final: true } }), 10);
+				setTimeout(() => observer.next?.({ $: "snapshot", data: { final: true } }), 10);
 				setTimeout(() => observer.complete?.(), 20);
 				return { unsubscribe: () => {} };
 			},

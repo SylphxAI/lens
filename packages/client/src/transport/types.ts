@@ -47,15 +47,9 @@ export interface Operation {
 
 /**
  * Result from operation execution.
+ * Uses the new Message protocol format.
  */
-export interface Result<T = unknown> {
-	/** Initial data or full replacement */
-	data?: T;
-	/** Error if operation failed */
-	error?: Error;
-	/** Update command for incremental updates (stateless architecture) */
-	update?: import("@sylphx/lens-core").EmitCommand;
-}
+export type Result<T = unknown> = import("@sylphx/lens-core").Message<T>;
 
 // =============================================================================
 // Connection State

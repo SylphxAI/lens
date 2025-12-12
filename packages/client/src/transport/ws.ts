@@ -55,6 +55,8 @@ export type { ConnectionState } from "./types.js";
 
 /**
  * Internal message types.
+ * Note: Server now sends Message protocol format ({ $: "snapshot" | "ops" | "error" })
+ * embedded within WsMessage for subscription updates.
  */
 interface WsMessage {
 	type:
@@ -67,10 +69,13 @@ interface WsMessage {
 		| "reconnect"
 		| "reconnect_ack";
 	id?: string;
+	/** Message payload (Message protocol format for subscriptions) */
 	data?: unknown;
-	/** Update command for incremental updates (stateless architecture) */
-	update?: import("@sylphx/lens-core").EmitCommand;
-	error?: { message: string };
+	/** Message discriminator for embedded Message protocol */
+	$?: "snapshot" | "ops" | "error";
+	/** Ops for incremental updates */
+	ops?: import("@sylphx/lens-core").Op[];
+	error?: { message: string } | string;
 	// For subscription updates with version
 	version?: Version;
 	entity?: string;
@@ -219,9 +224,11 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 				if (pending) {
 					pendingOperations.delete(message.id!);
 					if (message.error) {
-						pending.resolve({ error: new Error(message.error.message) });
+						const errMsg =
+							typeof message.error === "string" ? message.error : message.error.message;
+						pending.resolve({ $: "error", error: errMsg });
 					} else {
-						pending.resolve({ data: message.data });
+						pending.resolve({ $: "snapshot", data: message.data });
 					}
 				}
 				break;
@@ -231,8 +238,10 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 				const subInfo = subscriptionObservers.get(message.id!);
 				if (subInfo) {
 					if (message.error) {
+						const errMsg =
+							typeof message.error === "string" ? message.error : message.error.message;
 						registry.markError(message.id!);
-						subInfo.observer.error?.(new Error(message.error.message));
+						subInfo.observer.error?.(new Error(errMsg));
 					} else {
 						// Update version in registry if provided
 						if (message.version !== undefined && message.data !== undefined) {
@@ -242,11 +251,22 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 								message.data as Record<string, unknown>,
 							);
 						}
-						// Forward full Result (data and/or update) for stateless architecture
-						const result: Result = {};
-						if (message.data !== undefined) result.data = message.data;
-						if (message.update !== undefined) result.update = message.update;
-						subInfo.observer.next?.(result);
+						// Forward Message protocol format for stateless architecture
+						// Server sends embedded Message: { $: "snapshot", data } or { $: "ops", ops }
+						if (message.$ === "snapshot") {
+							subInfo.observer.next?.({ $: "snapshot", data: message.data });
+						} else if (message.$ === "ops" && message.ops) {
+							subInfo.observer.next?.({ $: "ops", ops: message.ops });
+						} else if (message.$ === "error") {
+							const errMsg =
+								typeof message.error === "string"
+									? message.error
+									: (message.error?.message ?? "Unknown error");
+							subInfo.observer.next?.({ $: "error", error: errMsg });
+						} else if (message.data !== undefined) {
+							// Legacy: plain data without $ discriminator
+							subInfo.observer.next?.({ $: "snapshot", data: message.data });
+						}
 					}
 				}
 				break;
@@ -261,7 +281,11 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 				const pending = pendingOperations.get(message.id!);
 				if (pending) {
 					pendingOperations.delete(message.id!);
-					pending.resolve({ error: new Error(message.error?.message ?? "Unknown error") });
+					const errMsg =
+						typeof message.error === "string"
+							? message.error
+							: (message.error?.message ?? "Unknown error");
+					pending.resolve({ $: "error", error: errMsg });
 				}
 				break;
 			}
@@ -312,8 +336,8 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 						current = applyPatch(current, patchSet as PatchOperation[]);
 					}
 					registry.processReconnectResult(result.id, result.version, current);
-					// Notify observer with updated data
-					subInfo.observer.next?.({ data: current });
+					// Notify observer with updated data (Message protocol format)
+					subInfo.observer.next?.({ $: "snapshot", data: current });
 				} else {
 					// No local data to patch, treat as snapshot needed
 					registry.markError(result.id);
@@ -330,7 +354,7 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 						: result.data;
 
 					registry.processReconnectResult(result.id, result.version, data);
-					subInfo.observer.next?.({ data });
+					subInfo.observer.next?.({ $: "snapshot", data });
 				}
 				break;
 			}
@@ -339,7 +363,7 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 				// Entity was deleted
 				registry.remove(result.id);
 				subscriptionObservers.delete(result.id);
-				subInfo.observer.next?.({ data: null });
+				subInfo.observer.next?.({ $: "snapshot", data: null });
 				subInfo.observer.complete?.();
 				break;
 
@@ -487,7 +511,7 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 			setTimeout(() => {
 				if (pendingOperations.has(op.id)) {
 					pendingOperations.delete(op.id);
-					resolve({ error: new Error("Operation timeout") });
+					resolve({ $: "error", error: "Operation timeout" });
 				}
 			}, timeout);
 		});

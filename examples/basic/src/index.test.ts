@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { app, db, type AppRouter } from "./server";
 import { createClient, inProcess } from "@sylphx/lens-client";
 import type { InferRouterClient } from "@sylphx/lens-core";
-import { firstValueFrom } from "@sylphx/lens-core";
+import { firstValueFrom, isError, isSnapshot } from "@sylphx/lens-core";
 
 // =============================================================================
 // Setup
@@ -45,9 +45,11 @@ describe("Server Direct Execution", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toBeDefined();
-		expect((result.data as { name: string }).name).toBe("Alice");
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toBeDefined();
+			expect((result.data as { name: string }).name).toBe("Alice");
+		}
 	});
 
 	it("executes mutations via app.execute()", async () => {
@@ -58,10 +60,12 @@ describe("Server Direct Execution", () => {
 			}),
 		);
 
-		expect(result.error).toBeUndefined();
-		expect(result.data).toBeDefined();
-		expect((result.data as { name: string }).name).toBe("Charlie");
-		expect(db.users.size).toBe(3);
+		expect(isSnapshot(result)).toBe(true);
+		if (isSnapshot(result)) {
+			expect(result.data).toBeDefined();
+			expect((result.data as { name: string }).name).toBe("Charlie");
+			expect(db.users.size).toBe(3);
+		}
 	});
 
 	it("returns error for non-existent entity", async () => {
@@ -72,8 +76,10 @@ describe("Server Direct Execution", () => {
 			}),
 		);
 
-		expect(result.error).toBeDefined();
-		expect(result.error?.message).toBe("User not found");
+		expect(isError(result)).toBe(true);
+		if (isError(result)) {
+			expect(result.error).toBe("User not found");
+		}
 	});
 });
 

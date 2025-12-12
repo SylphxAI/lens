@@ -34,7 +34,7 @@
  */
 
 import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import { firstValueFrom } from "@sylphx/lens-core";
+import { firstValueFrom, isError, isSnapshot } from "@sylphx/lens-core";
 import { createServerClientProxy, type LensServer } from "@sylphx/lens-server";
 import { type ComputedRef, computed, ref } from "vue";
 
@@ -212,11 +212,15 @@ async function handleQuery(
 
 		const result = await firstValueFrom(server.execute({ path, input }));
 
-		if (result.error) {
-			return { error: result.error.message };
+		if (isError(result)) {
+			return { error: result.error };
 		}
 
-		return { data: result.data };
+		if (isSnapshot(result)) {
+			return { data: result.data };
+		}
+
+		return { error: "Unexpected response format" };
 	} catch (error) {
 		return { error: error instanceof Error ? error.message : "Unknown error" };
 	}
@@ -242,11 +246,15 @@ async function handleMutation(
 		const input = body.input;
 		const result = await firstValueFrom(server.execute({ path, input }));
 
-		if (result.error) {
-			return { error: result.error.message };
+		if (isError(result)) {
+			return { error: result.error };
 		}
 
-		return { data: result.data };
+		if (isSnapshot(result)) {
+			return { data: result.data };
+		}
+
+		return { error: "Unexpected response format" };
 	} catch (error) {
 		return { error: error instanceof Error ? error.message : "Unknown error" };
 	}

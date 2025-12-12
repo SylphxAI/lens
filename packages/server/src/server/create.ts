@@ -34,10 +34,12 @@ import {
 	isMutationDef,
 	isQueryDef,
 	type LiveQueryDef,
+	type Message,
 	mergeModelCollections,
 	type Observable,
 	type ResolverDef,
 	type RouterDef,
+	toOps,
 	valuesEqual,
 } from "@sylphx/lens-core";
 import { createContext, runWithContext } from "../context/index.js";
@@ -433,7 +435,11 @@ class LensServerImpl<
 		if (!isQuery && !isMutation) {
 			return {
 				subscribe: (observer) => {
-					observer.next?.({ error: new Error(`Operation not found: ${path}`) });
+					observer.next?.({
+						$: "error",
+						error: `Operation not found: ${path}`,
+						code: "NOT_FOUND",
+					} as Message);
 					observer.complete?.();
 					return { unsubscribe: () => {} };
 				},
@@ -472,7 +478,8 @@ class LensServerImpl<
 					}
 					lastEmittedResult = data;
 					lastEmittedHash = dataHash;
-					observer.next?.({ data });
+					// Emit snapshot message
+					observer.next?.({ $: "snapshot", data } as Message);
 				};
 
 				// Run the operation
@@ -480,7 +487,11 @@ class LensServerImpl<
 					try {
 						const def = isQuery ? this.queries[path] : this.mutations[path];
 						if (!def) {
-							observer.next?.({ error: new Error(`Operation not found: ${path}`) });
+							observer.next?.({
+								$: "error",
+								error: `Operation not found: ${path}`,
+								code: "NOT_FOUND",
+							} as Message);
 							observer.complete?.();
 							return;
 						}
@@ -499,8 +510,10 @@ class LensServerImpl<
 							const result = def._input.safeParse(cleanInput);
 							if (!result.success) {
 								observer.next?.({
-									error: new Error(`Invalid input: ${JSON.stringify(result.error)}`),
-								});
+									$: "error",
+									error: `Invalid input: ${JSON.stringify(result.error)}`,
+									code: "VALIDATION_ERROR",
+								} as Message);
 								observer.complete?.();
 								return;
 							}
@@ -511,19 +524,24 @@ class LensServerImpl<
 						await runWithContext(this.ctx, context, async () => {
 							const resolver = def._resolve;
 							if (!resolver) {
-								observer.next?.({ error: new Error(`Operation ${path} has no resolver`) });
+								observer.next?.({
+									$: "error",
+									error: `Operation ${path} has no resolver`,
+									code: "NO_RESOLVER",
+								} as Message);
 								observer.complete?.();
 								return;
 							}
 
 							// Create emit handler with async queue processing
-							// STATELESS ARCHITECTURE: Server forwards emit commands directly to client.
+							// STATELESS ARCHITECTURE: Server forwards emit commands as ops directly to client.
 							// Client is responsible for applying updates to local state.
 							// This enables serverless deployments and minimal wire transfer.
 							const emitHandler = (command: EmitCommand) => {
 								if (cancelled) return;
-								// Forward command directly to client - no state maintained on server
-								observer.next?.({ update: command });
+								// Convert command to ops and send - no state maintained on server
+								const ops = toOps(command);
+								observer.next?.({ $: "ops", ops } as Message);
 							};
 
 							// Detect array output type: [EntityDef] is stored as single-element array
@@ -539,7 +557,10 @@ class LensServerImpl<
 
 							// Create field emit factory for field-level live queries (STATELESS)
 							const createFieldEmit = isQuery
-								? this.createFieldEmitFactory((command) => observer.next?.({ update: command }))
+								? this.createFieldEmitFactory((command) => {
+										const ops = toOps(command);
+										observer.next?.({ $: "ops", ops } as Message);
+									})
 								: undefined;
 
 							const lensContext = { ...context, emit, onCleanup };
@@ -595,9 +616,12 @@ class LensServerImpl<
 											}
 										} catch (err) {
 											if (!cancelled) {
+												const errMsg = err instanceof Error ? err.message : String(err);
 												observer.next?.({
-													error: err instanceof Error ? err : new Error(String(err)),
-												});
+													$: "error",
+													error: errMsg,
+													code: "SUBSCRIBE_ERROR",
+												} as Message);
 											}
 										}
 									}
@@ -612,7 +636,8 @@ class LensServerImpl<
 						});
 					} catch (error) {
 						if (!cancelled) {
-							observer.next?.({ error: error instanceof Error ? error : new Error(String(error)) });
+							const errMsg = error instanceof Error ? error.message : String(error);
+							observer.next?.({ $: "error", error: errMsg, code: "INTERNAL_ERROR" } as Message);
 							observer.complete?.();
 						}
 					} finally {

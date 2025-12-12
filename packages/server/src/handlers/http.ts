@@ -5,7 +5,7 @@
  * Works with Bun, Node (with adapter), Vercel, Cloudflare Workers.
  */
 
-import { firstValueFrom } from "@sylphx/lens-core";
+import { firstValueFrom, isError, isSnapshot } from "@sylphx/lens-core";
 import type { LensServer } from "../server/create.js";
 
 // =============================================================================
@@ -347,8 +347,8 @@ export function createHTTPHandler(
 					}),
 				);
 
-				if (result.error) {
-					return new Response(JSON.stringify({ error: sanitize(result.error) }), {
+				if (isError(result)) {
+					return new Response(JSON.stringify({ error: result.error }), {
 						status: 500,
 						headers: {
 							"Content-Type": "application/json",
@@ -357,7 +357,17 @@ export function createHTTPHandler(
 					});
 				}
 
-				return new Response(JSON.stringify({ data: result.data }), {
+				if (isSnapshot(result)) {
+					return new Response(JSON.stringify({ data: result.data }), {
+						headers: {
+							"Content-Type": "application/json",
+							...baseHeaders,
+						},
+					});
+				}
+
+				// ops message - forward as-is
+				return new Response(JSON.stringify(result), {
 					headers: {
 						"Content-Type": "application/json",
 						...baseHeaders,

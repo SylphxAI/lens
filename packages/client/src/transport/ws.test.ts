@@ -3,6 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { isError } from "@sylphx/lens-core";
 import type { Observable, Result } from "./types.js";
 import { ws } from "./ws.js";
 
@@ -364,8 +365,10 @@ describe("ws transport", () => {
 
 			const result = (await resultPromise) as Result;
 
-			expect(result.error).toBeInstanceOf(Error);
-			expect(result.error?.message).toBe("User not found");
+			expect(isError(result)).toBe(true);
+			if (isError(result)) {
+				expect(result.error).toBe("User not found");
+			}
 		});
 
 		it("handles error message type", async () => {
@@ -390,7 +393,10 @@ describe("ws transport", () => {
 
 			const result = (await resultPromise) as Result;
 
-			expect(result.error?.message).toBe("Internal server error");
+			expect(isError(result)).toBe(true);
+			if (isError(result)) {
+				expect(result.error).toBe("Internal server error");
+			}
 		});
 
 		it("times out if no response received", async () => {
@@ -406,7 +412,10 @@ describe("ws transport", () => {
 			// Don't send response - let it timeout
 			const result = (await resultPromise) as Result;
 
-			expect(result.error?.message).toBe("Operation timeout");
+			expect(isError(result)).toBe(true);
+			if (isError(result)) {
+				expect(result.error).toBe("Operation timeout");
+			}
 		});
 	});
 

@@ -1062,7 +1062,8 @@ describe("hasInlineResolvers()", () => {
 			id: t.id(),
 			name: t.string(),
 		})).subscribe({
-			name: () =>
+			name:
+				() =>
 				({ emit }) => {
 					emit("test");
 				},
@@ -1080,7 +1081,8 @@ describe("hasInlineResolvers()", () => {
 				name: ({ source }) => (source as { name: string }).name,
 			})
 			.subscribe({
-				name: () =>
+				name:
+					() =>
 					({ emit }) => {
 						emit("test");
 					},
@@ -1117,7 +1119,8 @@ describe("createResolverFromEntity() with model chain methods", () => {
 				name: ({ source }) => (source as { name: string }).name,
 			})
 			.subscribe({
-				name: () =>
+				name:
+					() =>
 					({ emit }) => {
 						emit("test");
 					},
@@ -1140,7 +1143,8 @@ describe("createResolverFromEntity() with model chain methods", () => {
 				balance: ({ source }) => `$${(source as { balance: number }).balance}`,
 			})
 			.subscribe({
-				balance: () =>
+				balance:
+					() =>
 					({ emit }) => {
 						subscriberCalled = true;
 						emit("$100");

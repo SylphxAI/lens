@@ -165,13 +165,14 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 
 			if (!response.ok) {
 				return {
-					error: new Error(`HTTP ${response.status}: ${response.statusText}`),
+					$: "error",
+					error: `HTTP ${response.status}: ${response.statusText}`,
 				};
 			}
 
 			return (await response.json()) as Result;
 		} catch (error) {
-			return { error: error as Error };
+			return { $: "error", error: error instanceof Error ? error.message : String(error) };
 		}
 	}
 
@@ -212,10 +213,10 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 
 					eventSource.onmessage = (event) => {
 						try {
-							// Parse as full Result type for stateless architecture
-							// Server sends { data } for initial, { update } for incremental
-							const result = JSON.parse(event.data) as Result;
-							observer.next?.(result);
+							// Parse as Message type for stateless architecture
+							// Server sends { $: "snapshot", data } or { $: "ops", ops }
+							const message = JSON.parse(event.data) as Result;
+							observer.next?.(message);
 						} catch (error) {
 							observer.error?.(error as Error);
 						}

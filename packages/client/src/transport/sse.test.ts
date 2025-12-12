@@ -3,6 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { isError } from "@sylphx/lens-core";
 import { type SseConnectionState, sse } from "./sse.js";
 
 // =============================================================================
@@ -240,8 +241,10 @@ describe("SSE Transport", () => {
 				input: { id: "999" },
 			});
 
-			expect(result.error).toBeDefined();
-			expect(result.error?.message).toBe("HTTP 404: Not Found");
+			expect(isError(result)).toBe(true);
+			if (isError(result)) {
+				expect(result.error).toBe("HTTP 404: Not Found");
+			}
 		});
 
 		it("includes custom headers from options", async () => {

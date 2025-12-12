@@ -158,15 +158,11 @@ export interface LensOperation {
 	input?: unknown;
 }
 
-/** Result from operation execution */
-export interface LensResult<T = unknown> {
-	/** Initial data or full replacement */
-	data?: T;
-	/** Error if operation failed */
-	error?: Error;
-	/** Update command for incremental updates (stateless architecture) */
-	update?: import("@sylphx/lens-core").EmitCommand;
-}
+/**
+ * Result from operation execution.
+ * Uses the new Message protocol format.
+ */
+export type LensResult<T = unknown> = import("@sylphx/lens-core").Message<T>;
 
 // =============================================================================
 // Client Communication

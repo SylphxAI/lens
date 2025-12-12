@@ -24,6 +24,8 @@
 
 import {
 	firstValueFrom,
+	isError,
+	isSnapshot,
 	type ReconnectMessage,
 	type ReconnectSubscription,
 } from "@sylphx/lens-core";
@@ -272,19 +274,23 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		}
 
 		// Execute query first to get data
-		let result: { data?: unknown; error?: Error };
+		let resultData: unknown;
 		try {
-			result = await firstValueFrom(server.execute({ path: operation, input }));
+			const result = await firstValueFrom(server.execute({ path: operation, input }));
 
-			if (result.error) {
+			if (isError(result)) {
 				conn.ws.send(
 					JSON.stringify({
 						type: "error",
 						id,
-						error: { code: "EXECUTION_ERROR", message: result.error.message },
+						error: { code: "EXECUTION_ERROR", message: result.error },
 					}),
 				);
 				return;
+			}
+
+			if (isSnapshot(result)) {
+				resultData = result.data;
 			}
 		} catch (error) {
 			conn.ws.send(
@@ -298,7 +304,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		}
 
 		// Extract entities from result
-		const entities = result.data ? extractEntities(result.data) : [];
+		const entities = resultData ? extractEntities(resultData) : [];
 
 		// Check for duplicate subscription ID - cleanup old one first
 		const existingSub = conn.subscriptions.get(id);
@@ -329,7 +335,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 			fields,
 			entityKeys: new Set(entities.map(({ entity, entityId }) => `${entity}:${entityId}`)),
 			cleanups: [],
-			lastData: result.data,
+			lastData: resultData,
 		};
 
 		// Register subscriptions with server for each entity
@@ -456,27 +462,29 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				}),
 			);
 
-			if (result.error) {
+			if (isError(result)) {
 				conn.ws.send(
 					JSON.stringify({
 						type: "error",
 						id: message.id,
-						error: { code: "EXECUTION_ERROR", message: result.error.message },
+						error: { code: "EXECUTION_ERROR", message: result.error },
 					}),
 				);
 				return;
 			}
 
-			// Apply field selection if specified
-			const selected = message.fields ? applySelection(result.data, message.fields) : result.data;
+			if (isSnapshot(result)) {
+				// Apply field selection if specified
+				const selected = message.fields ? applySelection(result.data, message.fields) : result.data;
 
-			conn.ws.send(
-				JSON.stringify({
-					type: "result",
-					id: message.id,
-					data: selected,
-				}),
-			);
+				conn.ws.send(
+					JSON.stringify({
+						type: "result",
+						id: message.id,
+						data: selected,
+					}),
+				);
+			}
 		} catch (error) {
 			conn.ws.send(
 				JSON.stringify({
@@ -498,32 +506,32 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				}),
 			);
 
-			if (result.error) {
+			if (isError(result)) {
 				conn.ws.send(
 					JSON.stringify({
 						type: "error",
 						id: message.id,
-						error: { code: "EXECUTION_ERROR", message: result.error.message },
+						error: { code: "EXECUTION_ERROR", message: result.error },
 					}),
 				);
 				return;
 			}
 
-			// Broadcast to all subscribers of affected entities
-			if (result.data) {
+			if (isSnapshot(result)) {
+				// Broadcast to all subscribers of affected entities
 				const entities = extractEntities(result.data);
 				for (const { entity, entityId, entityData } of entities) {
 					await server.broadcast(entity, entityId, entityData);
 				}
-			}
 
-			conn.ws.send(
-				JSON.stringify({
-					type: "result",
-					id: message.id,
-					data: result.data,
-				}),
-			);
+				conn.ws.send(
+					JSON.stringify({
+						type: "result",
+						id: message.id,
+						data: result.data,
+					}),
+				);
+			}
 		} catch (error) {
 			conn.ws.send(
 				JSON.stringify({

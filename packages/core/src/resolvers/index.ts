@@ -862,8 +862,19 @@ export function createResolverFromEntity<
 
 	// Get model-level resolvers/subscribers if present (new API)
 	const model = entity as {
-		_fieldResolvers?: Record<string, (params: { source: unknown; parent: unknown; args: unknown; ctx: unknown }) => unknown>;
-		_fieldSubscribers?: Record<string, (params: { source: unknown; parent: unknown; args: unknown; ctx: unknown }) => Publisher<unknown>>;
+		_fieldResolvers?: Record<
+			string,
+			(params: { source: unknown; parent: unknown; args: unknown; ctx: unknown }) => unknown
+		>;
+		_fieldSubscribers?: Record<
+			string,
+			(params: {
+				source: unknown;
+				parent: unknown;
+				args: unknown;
+				ctx: unknown;
+			}) => Publisher<unknown>
+		>;
 	};
 	const modelResolvers = model._fieldResolvers ?? {};
 	const modelSubscribers = model._fieldSubscribers ?? {};

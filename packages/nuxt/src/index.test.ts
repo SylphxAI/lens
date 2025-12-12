@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { fromPromise, type Observable, of, throwError } from "@sylphx/lens-core";
+import { fromPromise, type Message, type Observable, of, throwError } from "@sylphx/lens-core";
 import { createLensNuxt } from "./index.js";
 
 // =============================================================================
@@ -27,25 +27,23 @@ afterEach(() => {
 	}
 });
 
-// Helper to create Observable from result
-type LensResult<T> = { data: T | null; error: Error | null };
-
 // Mock server for testing - returns Observable like real server
+// Uses new Message protocol format
 const createMockServer = () => ({
-	execute: ({ path, input }: { path: string; input?: unknown }): Observable<LensResult<unknown>> => {
+	execute: ({ path, input }: { path: string; input?: unknown }): Observable<Message> => {
 		if (path === "user.get") {
-			return of({ data: { id: (input as { id: string }).id, name: "Test User" }, error: null });
+			return of({ $: "snapshot", data: { id: (input as { id: string }).id, name: "Test User" } } as Message);
 		}
 		if (path === "user.list") {
-			return of({ data: [{ id: "1", name: "User 1" }], error: null });
+			return of({ $: "snapshot", data: [{ id: "1", name: "User 1" }] } as Message);
 		}
 		if (path === "user.create") {
-			return of({ data: { id: "new-id", name: (input as { name: string }).name }, error: null });
+			return of({ $: "snapshot", data: { id: "new-id", name: (input as { name: string }).name } } as Message);
 		}
 		if (path === "user.error") {
-			return of({ data: null, error: new Error("User error") });
+			return of({ $: "error", error: "User error" } as Message);
 		}
-		return of({ data: null, error: new Error("Not found") });
+		return of({ $: "error", error: "Not found" } as Message);
 	},
 });
 
@@ -612,7 +610,8 @@ describe("useQuery", () => {
 		});
 
 		const server = {
-			execute: () => fromPromise(delayedPromise.then(() => ({ data: [{ id: "1", name: "User 1" }], error: null }))),
+			// Use new Message format
+			execute: () => fromPromise(delayedPromise.then(() => ({ $: "snapshot", data: [{ id: "1", name: "User 1" }] }))),
 		};
 
 		const lens = createLensNuxt({ server: server as any });
@@ -622,8 +621,8 @@ describe("useQuery", () => {
 		// Give time for the query to start executing
 		await new Promise((resolve) => setTimeout(resolve, 10));
 
-		// Resolve the delayed promise
-		resolveFn!({ data: [{ id: "1", name: "User 1" }], error: null });
+		// Resolve the delayed promise - use new Message format
+		resolveFn!({ $: "snapshot", data: [{ id: "1", name: "User 1" }] });
 
 		const result = await resultPromise;
 

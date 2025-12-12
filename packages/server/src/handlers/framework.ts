@@ -37,7 +37,7 @@
  * ```
  */
 
-import { firstValueFrom } from "@sylphx/lens-core";
+import { firstValueFrom, isError, isSnapshot } from "@sylphx/lens-core";
 import type { LensServer } from "../server/create.js";
 
 // =============================================================================
@@ -77,11 +77,16 @@ export function createServerClientProxy(server: LensServer): unknown {
 				const input = args[0];
 				const result = await firstValueFrom(server.execute({ path, input }));
 
-				if (result.error) {
-					throw result.error;
+				if (isError(result)) {
+					throw new Error(result.error);
 				}
 
-				return result.data;
+				if (isSnapshot(result)) {
+					return result.data;
+				}
+
+				// ops message - shouldn't happen for one-shot calls
+				return null;
 			},
 		});
 	}
@@ -115,11 +120,16 @@ export async function handleWebQuery(
 
 		const result = await firstValueFrom(server.execute({ path, input }));
 
-		if (result.error) {
-			return Response.json({ error: result.error.message }, { status: 400 });
+		if (isError(result)) {
+			return Response.json({ error: result.error }, { status: 400 });
 		}
 
-		return Response.json({ data: result.data });
+		if (isSnapshot(result)) {
+			return Response.json({ data: result.data });
+		}
+
+		// ops message - forward as-is
+		return Response.json(result);
 	} catch (error) {
 		return Response.json(
 			{ error: error instanceof Error ? error.message : "Unknown error" },
@@ -150,11 +160,16 @@ export async function handleWebMutation(
 
 		const result = await firstValueFrom(server.execute({ path, input }));
 
-		if (result.error) {
-			return Response.json({ error: result.error.message }, { status: 400 });
+		if (isError(result)) {
+			return Response.json({ error: result.error }, { status: 400 });
 		}
 
-		return Response.json({ data: result.data });
+		if (isSnapshot(result)) {
+			return Response.json({ data: result.data });
+		}
+
+		// ops message - forward as-is
+		return Response.json(result);
 	} catch (error) {
 		return Response.json(
 			{ error: error instanceof Error ? error.message : "Unknown error" },

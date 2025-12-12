@@ -5,6 +5,7 @@
  * Handles query/mutation via POST, subscriptions via polling.
  */
 
+import { isError, isOps, isSnapshot } from "@sylphx/lens-core";
 import type {
 	LensServerInterface,
 	Metadata,
@@ -169,7 +170,8 @@ async function executeRequest(
 
 		if (!response.ok) {
 			return {
-				error: new Error(`HTTP ${response.status}: ${response.statusText}`),
+				$: "error",
+				error: `HTTP ${response.status}: ${response.statusText}`,
 			};
 		}
 
@@ -177,9 +179,9 @@ async function executeRequest(
 		return result as Result;
 	} catch (error) {
 		if (error instanceof Error && error.name === "AbortError") {
-			return { error: new Error("Request timeout") };
+			return { $: "error", error: "Request timeout" };
 		}
-		return { error: error as Error };
+		return { $: "error", error: error instanceof Error ? error.message : String(error) };
 	}
 }
 
@@ -208,31 +210,32 @@ function createPollingObservable(
 				if (!active) return;
 
 				try {
-					const result = await executeRequest(baseUrl, op, {
+					const message = await executeRequest(baseUrl, op, {
 						headers: options.headers,
 						fetch: options.fetch,
 					});
 
 					if (!active) return;
 
-					if (result.error) {
+					if (isError(message)) {
 						retries++;
 						if (retries > options.maxRetries) {
-							observer.error?.(result.error);
+							observer.error?.(new Error(message.error));
 							return;
 						}
 					} else {
 						retries = 0;
 
-						// Emit if data changed OR if update command present (stateless architecture)
-						const hasDataChange = JSON.stringify(result.data) !== JSON.stringify(lastValue);
-						const hasUpdate = result.update !== undefined;
-
-						if (hasDataChange || hasUpdate) {
-							if (result.data !== undefined) {
-								lastValue = result.data;
+						// Emit if data changed OR if ops message (stateless architecture)
+						if (isSnapshot(message)) {
+							const hasDataChange = JSON.stringify(message.data) !== JSON.stringify(lastValue);
+							if (hasDataChange) {
+								lastValue = message.data;
+								observer.next?.(message);
 							}
-							observer.next?.(result);
+						} else if (isOps(message)) {
+							// Ops messages always trigger update
+							observer.next?.(message);
 						}
 					}
 

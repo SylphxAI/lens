@@ -7,7 +7,7 @@
  * Lazy connection - transport.connect() is called on first operation.
  */
 
-import { applyUpdate, type EmitCommand, type RouterDef } from "@sylphx/lens-core";
+import { applyOps, isError, isOps, isSnapshot, type RouterDef } from "@sylphx/lens-core";
 import type { Plugin } from "../transport/plugin.js";
 import {
 	hasAnySubscription,
@@ -69,161 +69,6 @@ interface SubscriptionState {
 	unsubscribe?: (() => void) | undefined;
 	/** Selection object for field-level subscription detection */
 	select?: SelectionObject;
-}
-
-// =============================================================================
-// Emit Command Application
-// =============================================================================
-
-/**
- * Apply an array operation to the current array state.
- */
-function applyArrayOperation(state: unknown, op: EmitCommand extends { type: "array"; operation: infer O } ? O : never): unknown {
-	const arr = Array.isArray(state) ? [...state] : [];
-	switch (op.op) {
-		case "push":
-			return [...arr, op.item];
-		case "unshift":
-			return [op.item, ...arr];
-		case "insert":
-			arr.splice(op.index, 0, op.item);
-			return arr;
-		case "remove":
-			arr.splice(op.index, 1);
-			return arr;
-		case "removeById": {
-			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-			if (idx >= 0) arr.splice(idx, 1);
-			return arr;
-		}
-		case "update":
-			arr[op.index] = op.item;
-			return arr;
-		case "updateById": {
-			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-			if (idx >= 0) arr[idx] = op.item;
-			return arr;
-		}
-		case "merge":
-			if (arr[op.index] && typeof arr[op.index] === "object" && !Array.isArray(arr[op.index])) {
-				arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
-			}
-			return arr;
-		case "mergeById": {
-			const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
-			if (idx >= 0 && arr[idx] && typeof arr[idx] === "object" && !Array.isArray(arr[idx])) {
-				arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
-			}
-			return arr;
-		}
-		default:
-			return arr;
-	}
-}
-
-/**
- * Apply an emit command to the current state.
- * Used by client to apply server-sent updates (stateless server architecture).
- */
-function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
-	switch (command.type) {
-		case "full":
-			if (command.replace) {
-				return command.data;
-			}
-			// Merge mode
-			if (state && typeof state === "object" && typeof command.data === "object") {
-				return { ...state, ...(command.data as Record<string, unknown>) };
-			}
-			return command.data;
-
-		case "field": {
-			// Empty field = scalar root value (e.g., emit.delta on a string field)
-			if (command.field === "") {
-				return applyUpdate(state, command.update);
-			}
-			// Nested field path (e.g., "user.profile.name")
-			return setFieldByPath(
-				(state ?? {}) as Record<string, unknown>,
-				command.field,
-				applyUpdate(getFieldByPath(state, command.field), command.update),
-			);
-		}
-
-		case "batch":
-			// Batch operations only apply to plain objects, not arrays
-			if (state && typeof state === "object" && !Array.isArray(state)) {
-				let result = { ...(state as Record<string, unknown>) };
-				for (const update of command.updates) {
-					result = setFieldByPath(
-						result,
-						update.field,
-						applyUpdate(getFieldByPath(result, update.field), update.update),
-					) as Record<string, unknown>;
-				}
-				return result;
-			}
-			return state;
-
-		case "array": {
-			// Array operations - may have optional field path for nested arrays
-			if (command.field) {
-				// Apply array operation at nested field path
-				const currentArray = getFieldByPath(state, command.field);
-				const newArray = applyArrayOperation(currentArray, command.operation);
-				return setFieldByPath((state ?? {}) as Record<string, unknown>, command.field, newArray);
-			}
-
-			// Root-level array operation
-			return applyArrayOperation(state, command.operation);
-		}
-
-		default:
-			return state;
-	}
-}
-
-/**
- * Get a value at a nested path in an object.
- */
-function getFieldByPath(obj: unknown, path: string): unknown {
-	if (!obj || typeof obj !== "object") return undefined;
-	const parts = path.split(".");
-	let current: unknown = obj;
-	for (const part of parts) {
-		if (!current || typeof current !== "object") return undefined;
-		current = (current as Record<string, unknown>)[part];
-	}
-	return current;
-}
-
-/**
- * Set a value at a nested path in an object.
- * Creates a shallow copy at each level.
- */
-function setFieldByPath(
-	obj: Record<string, unknown>,
-	path: string,
-	value: unknown,
-): Record<string, unknown> {
-	const parts = path.split(".");
-	if (parts.length === 1) {
-		return { ...obj, [path]: value };
-	}
-
-	const [first, ...rest] = parts;
-	const nested = obj[first];
-	if (nested && typeof nested === "object") {
-		return {
-			...obj,
-			[first]: setFieldByPath(nested as Record<string, unknown>, rest.join("."), value),
-		};
-	}
-	// Create nested structure if it doesn't exist
-	return {
-		...obj,
-		[first]: setFieldByPath({} as Record<string, unknown>, rest.join("."), value),
-	};
 }
 
 // =============================================================================
@@ -312,15 +157,15 @@ class ClientImpl {
 		}
 
 		// Handle errors through plugins
-		if (result.error) {
-			const error = result.error;
+		if (isError(result)) {
+			const error = new Error(result.error);
 			for (const plugin of this.plugins) {
 				if (plugin.onError) {
 					try {
 						result = await plugin.onError(error, processedOp, () => this.execute(processedOp));
-						if (!result.error) break;
+						if (!isError(result)) break;
 					} catch (e) {
-						result = { error: e as Error };
+						result = { $: "error", error: e instanceof Error ? e.message : String(e) };
 					}
 				}
 			}
@@ -558,20 +403,25 @@ class ClientImpl {
 
 					const response = await this.execute(op);
 
-					if (response.error) {
-						throw response.error;
+					if (isError(response)) {
+						throw new Error(response.error);
 					}
 
-					sub.data = response.data;
+					if (isSnapshot(response)) {
+						sub.data = response.data;
 
-					// Notify all observers
-					for (const observer of sub.observers) {
-						observer.next?.(response.data);
+						// Notify all observers
+						for (const observer of sub.observers) {
+							observer.next?.(response.data);
+						}
+
+						return onfulfilled
+							? onfulfilled(response.data as T)
+							: (response.data as unknown as TResult1);
 					}
 
-					return onfulfilled
-						? onfulfilled(response.data as T)
-						: (response.data as unknown as TResult1);
+					// ops message - shouldn't happen for one-shot queries
+					return onfulfilled ? onfulfilled(sub.data as T) : (sub.data as unknown as TResult1);
 				} catch (error) {
 					const err = error instanceof Error ? error : new Error(String(error));
 					sub.error = err;
@@ -622,37 +472,36 @@ class ClientImpl {
 
 			if (this.isObservable(resultOrObservable)) {
 				const subscription = resultOrObservable.subscribe({
-					next: (result) => {
-						// Handle full data (initial or replacement)
-						if (result.data !== undefined) {
-							sub.data = result.data;
+					next: (message) => {
+						// Handle snapshot (initial data or full replacement)
+						if (isSnapshot(message)) {
+							sub.data = message.data;
 							sub.error = null; // Clear previous error on new data
 							for (const observer of sub.observers) {
-								observer.next?.(result.data);
+								observer.next?.(message.data);
 							}
 						}
-						// Handle update commands (stateless server architecture)
+						// Handle ops (incremental updates - stateless server architecture)
 						// Client applies updates to local state for minimal wire transfer
-						if (result.update) {
+						else if (isOps(message)) {
 							try {
-								sub.data = applyEmitCommand(result.update, sub.data);
+								sub.data = applyOps(sub.data, message.ops);
 								sub.error = null; // Clear previous error on update
 								for (const observer of sub.observers) {
 									observer.next?.(sub.data);
 								}
 							} catch (updateErr) {
 								// Error applying update - notify observers but keep existing state
-								const err =
-									updateErr instanceof Error ? updateErr : new Error(String(updateErr));
+								const err = updateErr instanceof Error ? updateErr : new Error(String(updateErr));
 								sub.error = err;
 								for (const observer of sub.observers) {
 									observer.error?.(err);
 								}
 							}
 						}
-						if (result.error) {
-							const err =
-								result.error instanceof Error ? result.error : new Error(String(result.error));
+						// Handle error message
+						else if (isError(message)) {
+							const err = new Error(message.error);
 							sub.error = err;
 							for (const observer of sub.observers) {
 								observer.error?.(err);
@@ -707,11 +556,16 @@ class ClientImpl {
 
 		const response = await this.execute(op);
 
-		if (response.error) {
-			throw response.error;
+		if (isError(response)) {
+			throw new Error(response.error);
 		}
 
-		return { data: response.data as TOutput };
+		if (isSnapshot(response)) {
+			return { data: response.data as TOutput };
+		}
+
+		// ops message - shouldn't happen for mutations
+		return { data: null as unknown as TOutput };
 	}
 
 	// =========================================================================

@@ -47,7 +47,6 @@ export function isCompressionSupported(): boolean {
 	return typeof CompressionStream !== "undefined" && typeof DecompressionStream !== "undefined";
 }
 
-
 // =============================================================================
 // Compression Functions
 // =============================================================================

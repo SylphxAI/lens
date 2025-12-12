@@ -17,7 +17,7 @@
  * ```
  */
 
-import { firstValueFrom } from "@sylphx/lens-core";
+import { firstValueFrom, isError, isSnapshot } from "@sylphx/lens-core";
 import type { LensServer } from "@sylphx/lens-server";
 
 // =============================================================================
@@ -80,11 +80,16 @@ async function handleQuery(server: LensServer, path: string, url: URL): Promise<
 
 		const result = await firstValueFrom(server.execute({ path, input }));
 
-		if (result.error) {
-			return Response.json({ error: result.error.message }, { status: 400 });
+		if (isError(result)) {
+			return Response.json({ error: result.error }, { status: 400 });
 		}
 
-		return Response.json({ data: result.data });
+		if (isSnapshot(result)) {
+			return Response.json({ data: result.data });
+		}
+
+		// ops message - shouldn't happen for one-shot queries
+		return Response.json({ data: null });
 	} catch (error) {
 		return Response.json(
 			{ error: error instanceof Error ? error.message : "Unknown error" },
@@ -104,11 +109,16 @@ async function handleMutation(
 
 		const result = await firstValueFrom(server.execute({ path, input }));
 
-		if (result.error) {
-			return Response.json({ error: result.error.message }, { status: 400 });
+		if (isError(result)) {
+			return Response.json({ error: result.error }, { status: 400 });
 		}
 
-		return Response.json({ data: result.data });
+		if (isSnapshot(result)) {
+			return Response.json({ data: result.data });
+		}
+
+		// ops message - shouldn't happen for mutations
+		return Response.json({ data: null });
 	} catch (error) {
 		return Response.json(
 			{ error: error instanceof Error ? error.message : "Unknown error" },
@@ -127,42 +137,30 @@ function handleSSE(server: LensServer, path: string, request: Request): Response
 			const encoder = new TextEncoder();
 
 			// Execute subscription
-			const result = server.execute({
-				path,
-				input,
+			const observable = server.execute({ path, input });
+
+			const subscription = observable.subscribe({
+				next: (message) => {
+					// Send message as-is (Message protocol format)
+					const data = `data: ${JSON.stringify(message)}\n\n`;
+					controller.enqueue(encoder.encode(data));
+				},
+				error: (err) => {
+					const errorMsg = { $: "error", error: err.message, code: "STREAM_ERROR" };
+					const data = `data: ${JSON.stringify(errorMsg)}\n\n`;
+					controller.enqueue(encoder.encode(data));
+					controller.close();
+				},
+				complete: () => {
+					controller.close();
+				},
 			});
 
-			// Handle observable subscription
-			if (result && typeof result === "object" && "subscribe" in result) {
-				const observable = result as {
-					subscribe: (handlers: {
-						next: (value: { data?: unknown }) => void;
-						error: (err: Error) => void;
-						complete: () => void;
-					}) => { unsubscribe: () => void };
-				};
-
-				const subscription = observable.subscribe({
-					next: (value) => {
-						const data = `data: ${JSON.stringify(value.data)}\n\n`;
-						controller.enqueue(encoder.encode(data));
-					},
-					error: (err) => {
-						const data = `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`;
-						controller.enqueue(encoder.encode(data));
-						controller.close();
-					},
-					complete: () => {
-						controller.close();
-					},
-				});
-
-				// Cleanup on abort
-				request.signal.addEventListener("abort", () => {
-					subscription.unsubscribe();
-					controller.close();
-				});
-			}
+			// Cleanup on abort
+			request.signal.addEventListener("abort", () => {
+				subscription.unsubscribe();
+				controller.close();
+			});
 		},
 	});
 
@@ -220,11 +218,16 @@ function createServerProxy(server: LensServer, prefix: string): unknown {
 			const input = args[0];
 			const result = await firstValueFrom(server.execute({ path: prefix, input }));
 
-			if (result.error) {
-				throw result.error;
+			if (isError(result)) {
+				throw new Error(result.error);
 			}
 
-			return result.data;
+			if (isSnapshot(result)) {
+				return result.data;
+			}
+
+			// ops message - shouldn't happen for one-shot calls
+			return null;
 		},
 	});
 }
