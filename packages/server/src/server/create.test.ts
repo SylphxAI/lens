@@ -80,9 +80,31 @@ function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
 				case "remove":
 					arr.splice(op.index, 1);
 					return arr;
+				case "removeById": {
+					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+					if (idx >= 0) arr.splice(idx, 1);
+					return arr;
+				}
 				case "update":
 					arr[op.index] = op.item;
 					return arr;
+				case "updateById": {
+					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+					if (idx >= 0) arr[idx] = op.item;
+					return arr;
+				}
+				case "merge":
+					if (arr[op.index] && typeof arr[op.index] === "object") {
+						arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
+					}
+					return arr;
+				case "mergeById": {
+					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+					if (idx >= 0 && arr[idx] && typeof arr[idx] === "object") {
+						arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
+					}
+					return arr;
+				}
 				default:
 					return arr;
 			}
