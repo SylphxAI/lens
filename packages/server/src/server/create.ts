@@ -16,7 +16,6 @@
  */
 
 import {
-	applyUpdate,
 	type ContextValue,
 	collectModelsFromOperations,
 	collectModelsFromRouter,
@@ -104,54 +103,6 @@ export type {
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
 	return value != null && typeof value === "object" && Symbol.asyncIterator in value;
-}
-
-/**
- * Ring buffer with O(1) enqueue/dequeue operations.
- * Used for emit queue to avoid O(n) Array.shift() performance issues.
- */
-class RingBuffer<T> {
-	private buffer: (T | null)[];
-	private head = 0; // Points to first element to dequeue
-	private tail = 0; // Points to where to enqueue next
-	private count = 0;
-
-	constructor(private capacity: number) {
-		this.buffer = new Array(capacity).fill(null);
-	}
-
-	get size(): number {
-		return this.count;
-	}
-
-	get isEmpty(): boolean {
-		return this.count === 0;
-	}
-
-	/** Enqueue item. If at capacity, drops oldest item (returns true if dropped). */
-	enqueue(item: T): boolean {
-		let dropped = false;
-		if (this.count >= this.capacity) {
-			// Drop oldest (backpressure)
-			this.head = (this.head + 1) % this.capacity;
-			this.count--;
-			dropped = true;
-		}
-		this.buffer[this.tail] = item;
-		this.tail = (this.tail + 1) % this.capacity;
-		this.count++;
-		return dropped;
-	}
-
-	/** Dequeue and return item, or null if empty. */
-	dequeue(): T | null {
-		if (this.count === 0) return null;
-		const item = this.buffer[this.head];
-		this.buffer[this.head] = null; // Allow GC
-		this.head = (this.head + 1) % this.capacity;
-		this.count--;
-		return item;
-	}
 }
 
 // =============================================================================
@@ -504,7 +455,6 @@ class LensServerImpl<
 		return {
 			subscribe: (observer) => {
 				let cancelled = false;
-				let currentState: unknown;
 				let lastEmittedResult: unknown;
 				let lastEmittedHash: string | undefined;
 				const cleanups: (() => void)[] = [];
@@ -567,69 +517,13 @@ class LensServerImpl<
 							}
 
 							// Create emit handler with async queue processing
-							// Emit commands are queued and processed through processQueryResult
-							// to ensure field resolvers run on every emit
-							let emitProcessing = false;
-							const MAX_EMIT_QUEUE_SIZE = 100; // Backpressure: prevent memory bloat
-							const emitQueue = new RingBuffer<EmitCommand>(MAX_EMIT_QUEUE_SIZE);
-
-							const processEmitQueue = async () => {
-								if (emitProcessing || cancelled) return;
-								emitProcessing = true;
-
-								let command = emitQueue.dequeue();
-								while (command !== null && !cancelled) {
-									// Clear DataLoader cache before re-processing
-									// This ensures field resolvers re-run with fresh data
-									this.clearLoaders();
-
-									currentState = this.applyEmitCommand(command, currentState);
-
-									// Process through field resolvers (unlike before where we bypassed this)
-									// Note: createFieldEmit is created after this function but used lazily
-									const fieldEmitFactory = isQuery
-										? this.createFieldEmitFactory(
-												() => currentState,
-												(state) => {
-													currentState = state;
-												},
-												emitIfChanged,
-												select,
-												context,
-												onCleanup,
-											)
-										: undefined;
-
-									const processed = isQuery
-										? await this.processQueryResult(
-												path,
-												currentState,
-												select,
-												context,
-												onCleanup,
-												fieldEmitFactory,
-											)
-										: currentState;
-
-									emitIfChanged(processed);
-									command = emitQueue.dequeue();
-								}
-
-								emitProcessing = false;
-							};
-
+							// STATELESS ARCHITECTURE: Server forwards emit commands directly to client.
+							// Client is responsible for applying updates to local state.
+							// This enables serverless deployments and minimal wire transfer.
 							const emitHandler = (command: EmitCommand) => {
 								if (cancelled) return;
-
-								// Enqueue command - RingBuffer handles backpressure automatically
-								// (drops oldest if at capacity, which is correct for live queries)
-								emitQueue.enqueue(command);
-								// Fire async processing (don't await - emit should be sync from caller's perspective)
-								processEmitQueue().catch((err) => {
-									if (!cancelled) {
-										observer.next?.({ error: err instanceof Error ? err : new Error(String(err)) });
-									}
-								});
+								// Forward command directly to client - no state maintained on server
+								observer.next?.({ update: command });
 							};
 
 							// Detect array output type: [EntityDef] is stored as single-element array
@@ -643,18 +537,9 @@ class LensServerImpl<
 								};
 							};
 
-							// Create field emit factory for field-level live queries
+							// Create field emit factory for field-level live queries (STATELESS)
 							const createFieldEmit = isQuery
-								? this.createFieldEmitFactory(
-										() => currentState,
-										(state) => {
-											currentState = state;
-										},
-										emitIfChanged,
-										select,
-										context,
-										onCleanup,
-									)
+								? this.createFieldEmitFactory((command) => observer.next?.({ update: command }))
 								: undefined;
 
 							const lensContext = { ...context, emit, onCleanup };
@@ -664,7 +549,6 @@ class LensServerImpl<
 								// Streaming: emit each yielded value
 								for await (const value of result) {
 									if (cancelled) break;
-									currentState = value;
 									const processed = await this.processQueryResult(
 										path,
 										value,
@@ -681,7 +565,6 @@ class LensServerImpl<
 							} else {
 								// One-shot: emit single value
 								const value = await result;
-								currentState = value;
 								const processed = isQuery
 									? await this.processQueryResult(
 											path,
@@ -749,168 +632,39 @@ class LensServerImpl<
 		};
 	}
 
-	/**
-	 * Apply emit command to current state.
-	 */
-	private applyEmitCommand(command: EmitCommand, state: unknown): unknown {
-		switch (command.type) {
-			case "full":
-				if (command.replace) {
-					return command.data;
-				}
-				// Merge mode
-				if (state && typeof state === "object" && typeof command.data === "object") {
-					return { ...state, ...(command.data as Record<string, unknown>) };
-				}
-				return command.data;
-
-			case "field": {
-				// Empty field = scalar root value (e.g., emit.delta on a string field)
-				if (command.field === "") {
-					return applyUpdate(state, command.update);
-				}
-				// Named field - apply update to that field
-				if (state && typeof state === "object") {
-					const currentValue = (state as Record<string, unknown>)[command.field];
-					const newValue = applyUpdate(currentValue, command.update);
-					return {
-						...(state as Record<string, unknown>),
-						[command.field]: newValue,
-					};
-				}
-				return { [command.field]: applyUpdate(undefined, command.update) };
-			}
-
-			case "batch":
-				if (state && typeof state === "object") {
-					const result = { ...(state as Record<string, unknown>) };
-					for (const update of command.updates) {
-						const currentValue = result[update.field];
-						result[update.field] = applyUpdate(currentValue, update.update);
-					}
-					return result;
-				}
-				return state;
-
-			case "array": {
-				// Array operations - simplified handling
-				const arr = Array.isArray(state) ? [...state] : [];
-				const op = command.operation;
-				switch (op.op) {
-					case "push":
-						return [...arr, op.item];
-					case "unshift":
-						return [op.item, ...arr];
-					case "insert":
-						arr.splice(op.index, 0, op.item);
-						return arr;
-					case "remove":
-						arr.splice(op.index, 1);
-						return arr;
-					case "update":
-						arr[op.index] = op.item;
-						return arr;
-					default:
-						return arr;
-				}
-			}
-
-			default:
-				return state;
-		}
-	}
-
 	// =========================================================================
 	// Result Processing
 	// =========================================================================
 
 	/**
-	 * Factory type for creating field-level emit handlers.
-	 * Each field gets its own emit with full Emit<T> API (.delta, .patch, .push, etc).
+	 * Factory for creating field-level emit handlers (STATELESS).
+	 * Each field gets its own emit that forwards commands to the observer with the field path.
+	 * Client is responsible for applying updates to local state.
 	 */
 	private createFieldEmitFactory(
-		getCurrentState: () => unknown,
-		setCurrentState: (state: unknown) => void,
-		notifyObserver: (data: unknown) => void,
-		select: SelectionObject | undefined,
-		context: TContext | undefined,
-		onCleanup: ((fn: () => void) => void) | undefined,
+		sendUpdate: (command: EmitCommand) => void,
 	): (fieldPath: string, resolvedValue?: unknown) => Emit<unknown> | undefined {
 		return (fieldPath: string, resolvedValue?: unknown) => {
 			if (!fieldPath) return undefined;
 
-			// Determine output type from resolved value (if provided) or current field value
-			const state = getCurrentState();
-			const currentFieldValue =
-				resolvedValue !== undefined
-					? resolvedValue
-					: state
-						? this.getFieldByPath(state, fieldPath)
-						: undefined;
-
 			// Determine emit type: array, scalar, or object
 			let outputType: "array" | "object" | "scalar" = "object";
-			if (Array.isArray(currentFieldValue)) {
+			if (Array.isArray(resolvedValue)) {
 				outputType = "array";
 			} else if (
-				currentFieldValue === null ||
-				typeof currentFieldValue === "string" ||
-				typeof currentFieldValue === "number" ||
-				typeof currentFieldValue === "boolean"
+				resolvedValue === null ||
+				typeof resolvedValue === "string" ||
+				typeof resolvedValue === "number" ||
+				typeof resolvedValue === "boolean"
 			) {
 				outputType = "scalar";
 			}
 
-			// Track field value locally (for fields not yet in fullState)
-			let localFieldValue = resolvedValue;
-
-			// Create emit handler that applies commands to the field's value
+			// STATELESS: Forward command with field path prefix to client
 			const emitHandler = (command: EmitCommand) => {
-				const fullState = getCurrentState();
-				if (!fullState || typeof fullState !== "object") return;
-
-				// Get current field value from state, or use local value if not in state yet
-				const stateFieldValue = this.getFieldByPath(fullState, fieldPath);
-				const fieldValue = stateFieldValue !== undefined ? stateFieldValue : localFieldValue;
-				const newFieldValue = this.applyEmitCommand(command, fieldValue);
-
-				// Update local tracking
-				localFieldValue = newFieldValue;
-
-				// Update state with new field value
-				const updatedState = this.setFieldByPath(
-					fullState as Record<string, unknown>,
-					fieldPath,
-					newFieldValue,
-				);
-				setCurrentState(updatedState);
-
-				// Resolve nested fields on the new value and notify observer
-				(async () => {
-					try {
-						const nestedInputs = select ? extractNestedInputs(select) : undefined;
-						const processed = await this.resolveEntityFields(
-							updatedState,
-							nestedInputs,
-							context,
-							"",
-							onCleanup,
-							this.createFieldEmitFactory(
-								getCurrentState,
-								setCurrentState,
-								notifyObserver,
-								select,
-								context,
-								onCleanup,
-							),
-						);
-						const result = select ? applySelection(processed, select) : processed;
-						notifyObserver(result);
-					} catch (err) {
-						// Field emit errors are logged but don't break the stream
-						console.error(`Field emit error at path "${fieldPath}":`, err);
-					}
-				})();
+				// Transform command to include field path
+				const prefixedCommand = this.prefixCommandPath(command, fieldPath);
+				sendUpdate(prefixedCommand);
 			};
 
 			return createEmit<unknown>(emitHandler, outputType);
@@ -918,42 +672,43 @@ class LensServerImpl<
 	}
 
 	/**
-	 * Get a value at a nested path in an object.
+	 * Prefix a command's field path for nested field emits.
 	 */
-	private getFieldByPath(obj: unknown, path: string): unknown {
-		if (!obj || typeof obj !== "object") return undefined;
-		const parts = path.split(".");
-		let current: unknown = obj;
-		for (const part of parts) {
-			if (!current || typeof current !== "object") return undefined;
-			current = (current as Record<string, unknown>)[part];
+	private prefixCommandPath(command: EmitCommand, prefix: string): EmitCommand {
+		switch (command.type) {
+			case "full":
+				// Full replacement at field path
+				return {
+					type: "field",
+					field: prefix,
+					update: { strategy: "value", data: command.data },
+				};
+			case "field":
+				// Nested field path
+				return {
+					type: "field",
+					field: command.field ? `${prefix}.${command.field}` : prefix,
+					update: command.update,
+				};
+			case "batch":
+				// Prefix all fields in batch
+				return {
+					type: "batch",
+					updates: command.updates.map((u) => ({
+						field: `${prefix}.${u.field}`,
+						update: u.update,
+					})),
+				};
+			case "array":
+				// Array operations at field path
+				return {
+					type: "field",
+					field: prefix,
+					update: { strategy: "value", data: command }, // Pass array op as data
+				};
+			default:
+				return command;
 		}
-		return current;
-	}
-
-	/**
-	 * Set a value at a nested path in an object.
-	 * Creates a shallow copy at each level.
-	 */
-	private setFieldByPath(
-		obj: Record<string, unknown>,
-		path: string,
-		value: unknown,
-	): Record<string, unknown> {
-		const parts = path.split(".");
-		if (parts.length === 1) {
-			return { ...obj, [path]: value };
-		}
-
-		const [first, ...rest] = parts;
-		const nested = obj[first];
-		if (nested && typeof nested === "object") {
-			return {
-				...obj,
-				[first]: this.setFieldByPath(nested as Record<string, unknown>, rest.join("."), value),
-			};
-		}
-		return obj;
 	}
 
 	private async processQueryResult<T>(

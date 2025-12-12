@@ -7,7 +7,7 @@
  * Lazy connection - transport.connect() is called on first operation.
  */
 
-import type { RouterDef } from "@sylphx/lens-core";
+import { applyUpdate, type EmitCommand, type RouterDef } from "@sylphx/lens-core";
 import type { Plugin } from "../transport/plugin.js";
 import {
 	hasAnySubscription,
@@ -69,6 +69,146 @@ interface SubscriptionState {
 	unsubscribe?: (() => void) | undefined;
 	/** Selection object for field-level subscription detection */
 	select?: SelectionObject;
+}
+
+// =============================================================================
+// Emit Command Application
+// =============================================================================
+
+/**
+ * Apply an emit command to the current state.
+ * Used by client to apply server-sent updates (stateless server architecture).
+ */
+function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
+	switch (command.type) {
+		case "full":
+			if (command.replace) {
+				return command.data;
+			}
+			// Merge mode
+			if (state && typeof state === "object" && typeof command.data === "object") {
+				return { ...state, ...(command.data as Record<string, unknown>) };
+			}
+			return command.data;
+
+		case "field": {
+			// Empty field = scalar root value (e.g., emit.delta on a string field)
+			if (command.field === "") {
+				return applyUpdate(state, command.update);
+			}
+			// Nested field path (e.g., "user.profile.name")
+			return setFieldByPath(
+				(state ?? {}) as Record<string, unknown>,
+				command.field,
+				applyUpdate(getFieldByPath(state, command.field), command.update),
+			);
+		}
+
+		case "batch":
+			if (state && typeof state === "object") {
+				let result = { ...(state as Record<string, unknown>) };
+				for (const update of command.updates) {
+					result = setFieldByPath(
+						result,
+						update.field,
+						applyUpdate(getFieldByPath(result, update.field), update.update),
+					) as Record<string, unknown>;
+				}
+				return result;
+			}
+			return state;
+
+		case "array": {
+			// Array operations
+			const arr = Array.isArray(state) ? [...state] : [];
+			const op = command.operation;
+			switch (op.op) {
+				case "push":
+					return [...arr, op.item];
+				case "unshift":
+					return [op.item, ...arr];
+				case "insert":
+					arr.splice(op.index, 0, op.item);
+					return arr;
+				case "remove":
+					arr.splice(op.index, 1);
+					return arr;
+				case "removeById": {
+					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+					if (idx >= 0) arr.splice(idx, 1);
+					return arr;
+				}
+				case "update":
+					arr[op.index] = op.item;
+					return arr;
+				case "updateById": {
+					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+					if (idx >= 0) arr[idx] = op.item;
+					return arr;
+				}
+				case "merge":
+					if (arr[op.index] && typeof arr[op.index] === "object") {
+						arr[op.index] = { ...(arr[op.index] as object), ...(op.partial as object) };
+					}
+					return arr;
+				case "mergeById": {
+					const idx = arr.findIndex((item) => (item as { id?: string })?.id === op.id);
+					if (idx >= 0 && arr[idx] && typeof arr[idx] === "object") {
+						arr[idx] = { ...(arr[idx] as object), ...(op.partial as object) };
+					}
+					return arr;
+				}
+				default:
+					return arr;
+			}
+		}
+
+		default:
+			return state;
+	}
+}
+
+/**
+ * Get a value at a nested path in an object.
+ */
+function getFieldByPath(obj: unknown, path: string): unknown {
+	if (!obj || typeof obj !== "object") return undefined;
+	const parts = path.split(".");
+	let current: unknown = obj;
+	for (const part of parts) {
+		if (!current || typeof current !== "object") return undefined;
+		current = (current as Record<string, unknown>)[part];
+	}
+	return current;
+}
+
+/**
+ * Set a value at a nested path in an object.
+ * Creates a shallow copy at each level.
+ */
+function setFieldByPath(
+	obj: Record<string, unknown>,
+	path: string,
+	value: unknown,
+): Record<string, unknown> {
+	const parts = path.split(".");
+	if (parts.length === 1) {
+		return { ...obj, [path]: value };
+	}
+
+	const [first, ...rest] = parts;
+	const nested = obj[first];
+	if (nested && typeof nested === "object") {
+		return {
+			...obj,
+			[first]: setFieldByPath(nested as Record<string, unknown>, rest.join("."), value),
+		};
+	}
+	// Create nested structure if it doesn't exist
+	return {
+		...obj,
+		[first]: setFieldByPath({} as Record<string, unknown>, rest.join("."), value),
+	};
 }
 
 // =============================================================================
@@ -468,11 +608,21 @@ class ClientImpl {
 			if (this.isObservable(resultOrObservable)) {
 				const subscription = resultOrObservable.subscribe({
 					next: (result) => {
+						// Handle full data (initial or replacement)
 						if (result.data !== undefined) {
 							sub.data = result.data;
 							sub.error = null; // Clear previous error on new data
 							for (const observer of sub.observers) {
 								observer.next?.(result.data);
+							}
+						}
+						// Handle update commands (stateless server architecture)
+						// Client applies updates to local state for minimal wire transfer
+						if (result.update) {
+							sub.data = applyEmitCommand(result.update, sub.data);
+							sub.error = null; // Clear previous error on update
+							for (const observer of sub.observers) {
+								observer.next?.(sub.data);
 							}
 						}
 						if (result.error) {

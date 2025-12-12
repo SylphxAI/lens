@@ -3,13 +3,151 @@
  *
  * Tests for the pure executor server.
  * Server only does: getMetadata() and execute()
+ *
+ * STATELESS ARCHITECTURE:
+ * - Server sends initial data via { data }
+ * - Server sends updates via { update: EmitCommand }
+ * - Client applies updates to local state
  */
 
 import { describe, expect, it } from "bun:test";
-import { entity, firstValueFrom, mutation, query, resolver, router, t } from "@sylphx/lens-core";
+import {
+	applyUpdate,
+	type EmitCommand,
+	entity,
+	firstValueFrom,
+	mutation,
+	query,
+	resolver,
+	router,
+	t,
+} from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
 import { createApp } from "./create.js";
+
+// =============================================================================
+// Test Helpers for Stateless Architecture
+// =============================================================================
+
+/**
+ * Apply emit command to state (simulates client-side behavior).
+ * In the stateless architecture, server sends { update } and client applies it.
+ */
+function applyEmitCommand(command: EmitCommand, state: unknown): unknown {
+	switch (command.type) {
+		case "full":
+			if (command.replace) return command.data;
+			if (state && typeof state === "object" && typeof command.data === "object") {
+				return { ...state, ...(command.data as Record<string, unknown>) };
+			}
+			return command.data;
+
+		case "field": {
+			if (command.field === "") return applyUpdate(state, command.update);
+			return setFieldByPath(
+				(state ?? {}) as Record<string, unknown>,
+				command.field,
+				applyUpdate(getFieldByPath(state, command.field), command.update),
+			);
+		}
+
+		case "batch":
+			if (state && typeof state === "object") {
+				let result = { ...(state as Record<string, unknown>) };
+				for (const update of command.updates) {
+					result = setFieldByPath(
+						result,
+						update.field,
+						applyUpdate(getFieldByPath(result, update.field), update.update),
+					) as Record<string, unknown>;
+				}
+				return result;
+			}
+			return state;
+
+		case "array": {
+			const arr = Array.isArray(state) ? [...state] : [];
+			const op = command.operation;
+			switch (op.op) {
+				case "push":
+					return [...arr, op.item];
+				case "unshift":
+					return [op.item, ...arr];
+				case "insert":
+					arr.splice(op.index, 0, op.item);
+					return arr;
+				case "remove":
+					arr.splice(op.index, 1);
+					return arr;
+				case "update":
+					arr[op.index] = op.item;
+					return arr;
+				default:
+					return arr;
+			}
+		}
+
+		default:
+			return state;
+	}
+}
+
+function getFieldByPath(obj: unknown, path: string): unknown {
+	if (!obj || typeof obj !== "object") return undefined;
+	const parts = path.split(".");
+	let current: unknown = obj;
+	for (const part of parts) {
+		if (!current || typeof current !== "object") return undefined;
+		current = (current as Record<string, unknown>)[part];
+	}
+	return current;
+}
+
+function setFieldByPath(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
+	const parts = path.split(".");
+	if (parts.length === 1) return { ...obj, [path]: value };
+	const [first, ...rest] = parts;
+	const nested = obj[first];
+	if (nested && typeof nested === "object") {
+		return { ...obj, [first]: setFieldByPath(nested as Record<string, unknown>, rest.join("."), value) };
+	}
+	return { ...obj, [first]: setFieldByPath({}, rest.join("."), value) };
+}
+
+/**
+ * Create a results collector that simulates client behavior.
+ * Maintains current state by applying incoming updates.
+ */
+function createResultsCollector() {
+	let currentData: unknown = null;
+	const rawResults: Array<{ data?: unknown; update?: EmitCommand }> = [];
+
+	return {
+		/** Raw results (data or update) */
+		get raw() {
+			return rawResults;
+		},
+		/** Current accumulated state */
+		get current() {
+			return currentData;
+		},
+		/** Number of updates received */
+		get updateCount() {
+			return rawResults.filter((r) => r.update).length;
+		},
+		/** Push a result (applies update if present) */
+		push(result: { data?: unknown; update?: EmitCommand; error?: Error }) {
+			rawResults.push(result);
+			if (result.data !== undefined) {
+				currentData = result.data;
+			}
+			if (result.update) {
+				currentData = applyEmitCommand(result.update, currentData);
+			}
+		},
+	};
+}
 
 // =============================================================================
 // Test Entities
@@ -739,8 +877,9 @@ describe("field resolvers", () => {
 		expect(data.posts).toHaveLength(3); // All of Alice's posts (default limit 10)
 	});
 
-	it("emit() goes through field resolvers", async () => {
-		// Track how many times posts resolver is called
+	it("emit() sends update command (stateless architecture)", async () => {
+		// STATELESS: Field resolvers only run on initial resolve.
+		// Emits forward commands to client - no re-resolution on server.
 		let postsResolverCallCount = 0;
 
 		const Author = entity("Author", {
@@ -792,7 +931,7 @@ describe("field resolvers", () => {
 		});
 
 		// Subscribe to query with nested posts
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "getAuthor",
@@ -807,31 +946,35 @@ describe("field resolvers", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					results.push(result);
+					collector.push(result as { data?: unknown; update?: EmitCommand });
 				},
 			});
 
 		// Wait for initial result
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(results.length).toBe(1);
+		expect(collector.raw.length).toBe(1);
 		expect(postsResolverCallCount).toBe(1); // Called once for initial query
 
-		// Add a new post to the mock DB
-		mockDb.posts.push({ id: "p3", title: "Post 3", authorId: "a1" });
-
-		// Emit updated author (this should trigger field resolvers)
+		// Emit updated author
 		capturedEmit!({ id: "a1", name: "Alice Updated" });
 
 		// Wait for emit to process
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(results.length).toBe(2);
-		expect(postsResolverCallCount).toBe(2); // Called again after emit!
+		// STATELESS: Server sends update command, not re-resolved data
+		expect(collector.raw.length).toBe(2);
+		expect(postsResolverCallCount).toBe(1); // NOT called again - stateless!
 
-		// Verify the emitted result includes the new post (from re-running posts resolver)
-		const latestResult = results[1] as { data: { posts: { id: string }[] } };
-		expect(latestResult.data.posts).toHaveLength(3); // Should have 3 posts now
+		// Second result should be an update command
+		const updateResult = collector.raw[1];
+		expect(updateResult.update).toBeDefined();
+		expect(updateResult.data).toBeUndefined();
+
+		// Client applies update: name is updated, posts preserved from initial
+		const currentState = collector.current as { name: string; posts: { id: string }[] };
+		expect(currentState.name).toBe("Alice Updated");
+		expect(currentState.posts).toHaveLength(2); // Original 2 posts preserved
 
 		subscription.unsubscribe();
 	});
@@ -922,7 +1065,8 @@ describe("field resolvers", () => {
 		expect(cleanupCalled).toBe(true);
 	});
 
-	it("field-level emit updates specific field and notifies observer", async () => {
+	it("field-level emit sends update command (stateless)", async () => {
+		// STATELESS: Field emit sends update command with field path prefix
 		const Author = entity("Author", {
 			id: t.id(),
 			name: t.string(),
@@ -984,7 +1128,7 @@ describe("field resolvers", () => {
 			context: () => ({ db: mockDb }),
 		});
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "getAuthor",
@@ -999,17 +1143,17 @@ describe("field resolvers", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					results.push(result);
+					collector.push(result as { data?: unknown; update?: EmitCommand });
 				},
 			});
 
 		// Wait for initial result
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(results.length).toBe(1);
+		expect(collector.raw.length).toBe(1);
 		expect(capturedFieldEmit).toBeDefined();
 
-		const initialResult = results[0] as { data: { posts: { id: string }[] } };
+		const initialResult = collector.raw[0] as { data: { posts: { id: string }[] } };
 		expect(initialResult.data.posts).toHaveLength(2);
 
 		// Use field-level emit to update just the posts field
@@ -1023,15 +1167,20 @@ describe("field resolvers", () => {
 		// Wait for field emit to process
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(results.length).toBe(2);
-		const updatedResult = results[1] as { data: { posts: { id: string; title: string }[] } };
-		expect(updatedResult.data.posts).toHaveLength(3);
-		expect(updatedResult.data.posts[2].title).toBe("New Post 3");
+		// STATELESS: Second result should be update command
+		expect(collector.raw.length).toBe(2);
+		expect(collector.raw[1].update).toBeDefined();
+
+		// Client applies update to get final state
+		const currentState = collector.current as { posts: { id: string; title: string }[] };
+		expect(currentState.posts).toHaveLength(3);
+		expect(currentState.posts[2].title).toBe("New Post 3");
 
 		subscription.unsubscribe();
 	});
 
-	it("emit skips observer notification when value unchanged", async () => {
+	it("stateless server forwards all emit commands (no deduplication)", async () => {
+		// STATELESS: Server forwards all commands. Deduplication is client/plugin responsibility.
 		type EmitFn = (data: { id: string; name: string }) => void;
 		let capturedEmit: EmitFn | undefined;
 
@@ -1047,42 +1196,33 @@ describe("field resolvers", () => {
 		const testRouter = router({ liveQuery });
 		const app = createApp({ router: testRouter });
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const observable = app.execute({
 			path: "liveQuery",
 			input: { id: "1" },
 		});
 
 		const subscription = observable.subscribe({
-			next: (value) => results.push(value),
+			next: (value) => collector.push(value as { data?: unknown; update?: EmitCommand }),
 		});
 
 		// Wait for initial result
 		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(results.length).toBe(1);
-		const firstResult = results[0] as { data: { id: string; name: string } };
-		expect(firstResult.data.name).toBe("Initial");
+		expect(collector.raw.length).toBe(1);
+		expect((collector.raw[0] as { data: { name: string } }).data.name).toBe("Initial");
 
-		// Emit same value - should be skipped (equality check)
+		// STATELESS: All emits are forwarded (no deduplication)
 		capturedEmit!({ id: "1", name: "Initial" });
 		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(results.length).toBe(1); // Still 1, not 2
+		expect(collector.raw.length).toBe(2); // Command forwarded
 
-		// Emit same value again - should be skipped
-		capturedEmit!({ id: "1", name: "Initial" });
-		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(results.length).toBe(1); // Still 1
-
-		// Emit different value - should emit
+		// Emit different value
 		capturedEmit!({ id: "1", name: "Changed" });
 		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(results.length).toBe(2); // Now 2
-		expect((results[1] as { data: { name: string } }).data.name).toBe("Changed");
+		expect(collector.raw.length).toBe(3); // Another command
 
-		// Emit same "Changed" value again - should be skipped
-		capturedEmit!({ id: "1", name: "Changed" });
-		await new Promise((resolve) => setTimeout(resolve, 50));
-		expect(results.length).toBe(2); // Still 2
+		// Client applies all updates to get final state
+		expect((collector.current as { name: string }).name).toBe("Changed");
 
 		subscription.unsubscribe();
 	});
@@ -1154,7 +1294,7 @@ describe("field resolvers", () => {
 			context: () => ({ db: mockDb }),
 		});
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "getAuthor",
@@ -1169,7 +1309,7 @@ describe("field resolvers", () => {
 			})
 			.subscribe({
 				next: (result) => {
-					results.push(result);
+					collector.push(result as { data?: unknown; update?: EmitCommand });
 				},
 			});
 
@@ -1177,12 +1317,12 @@ describe("field resolvers", () => {
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		// Verify initial resolution
-		expect(results.length).toBe(1);
+		expect(collector.raw.length).toBe(1);
 		expect(resolveCallCount).toBe(1); // Resolver called once
 		expect(subscribeCallCount).toBe(1); // Subscriber called once
 		expect(capturedFieldEmit).toBeDefined(); // Emit captured from subscribe phase
 
-		const initialResult = results[0] as { data: { posts: { id: string }[] } };
+		const initialResult = collector.raw[0] as { data: { posts: { id: string }[] } };
 		expect(initialResult.data.posts).toHaveLength(2);
 
 		// Use field emit to push update (from subscribe phase)
@@ -1196,10 +1336,14 @@ describe("field resolvers", () => {
 		// Wait for update
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(results.length).toBe(2);
-		const updatedResult = results[1] as { data: { posts: { id: string; title: string }[] } };
-		expect(updatedResult.data.posts).toHaveLength(3);
-		expect(updatedResult.data.posts[2].title).toBe("New Post");
+		// STATELESS: Second result is update command
+		expect(collector.raw.length).toBe(2);
+		expect(collector.raw[1].update).toBeDefined();
+
+		// Client applies update to get final state
+		const currentState = collector.current as { posts: { id: string; title: string }[] };
+		expect(currentState.posts).toHaveLength(3);
+		expect(currentState.posts[2].title).toBe("New Post");
 
 		subscription.unsubscribe();
 	});
@@ -1311,7 +1455,8 @@ describe("observable behavior", () => {
 // =============================================================================
 
 describe("emit backpressure", () => {
-	it("handles rapid emit calls without losing data", async () => {
+	it("handles rapid emit calls (stateless - forwards all commands)", async () => {
+		// STATELESS: Server forwards all emit commands synchronously
 		type EmitFn = (data: unknown) => void;
 		let capturedEmit: EmitFn | undefined;
 
@@ -1324,14 +1469,14 @@ describe("emit backpressure", () => {
 
 		const server = createApp({ queries: { liveQuery } });
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "liveQuery",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (value) => results.push(value),
+				next: (value) => collector.push(value as { data?: unknown; update?: EmitCommand }),
 			});
 
 		await new Promise((r) => setTimeout(r, 50));
@@ -1344,13 +1489,11 @@ describe("emit backpressure", () => {
 		// Wait for all emits to process
 		await new Promise((r) => setTimeout(r, 100));
 
-		// Should have received all unique values
-		// Note: deduplication may reduce count if emit is too fast
-		expect(results.length).toBeGreaterThan(1);
+		// STATELESS: Should receive 1 initial + 10 updates (all forwarded)
+		expect(collector.raw.length).toBe(11);
 
-		// The last result should have count = 10
-		const lastResult = results[results.length - 1] as { data: { count: number } };
-		expect(lastResult.data.count).toBe(10);
+		// Final state after applying all updates
+		expect((collector.current as { count: number }).count).toBe(10);
 
 		subscription.unsubscribe();
 	});
@@ -1769,7 +1912,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 		subscription.unsubscribe();
 	});
 
-	it("emits updates from subscriber emit function", async () => {
+	it("emits updates from subscriber emit function (stateless)", async () => {
 		let capturedEmit: ((value: { id: string; name: string }) => void) | undefined;
 
 		const liveUser = query()
@@ -1781,34 +1924,35 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const server = createApp({ queries: { liveUser } });
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "liveUser",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(1);
-		expect((results[0] as { data: { name: string } }).data.name).toBe("Initial");
+		expect(collector.raw.length).toBe(1);
+		expect((collector.raw[0] as { data: { name: string } }).data.name).toBe("Initial");
 
-		// Emit update via subscriber
+		// Emit update via subscriber - STATELESS: sends update command
 		capturedEmit!({ id: "1", name: "Updated" });
 		await new Promise((r) => setTimeout(r, 50));
 
-		expect(results.length).toBe(2);
-		expect((results[1] as { data: { name: string } }).data.name).toBe("Updated");
+		expect(collector.raw.length).toBe(2);
+		expect(collector.raw[1].update).toBeDefined(); // Update command
+		expect((collector.current as { name: string }).name).toBe("Updated");
 
 		// Emit another update
 		capturedEmit!({ id: "1", name: "Updated Again" });
 		await new Promise((r) => setTimeout(r, 50));
 
-		expect(results.length).toBe(3);
-		expect((results[2] as { data: { name: string } }).data.name).toBe("Updated Again");
+		expect(collector.raw.length).toBe(3);
+		expect((collector.current as { name: string }).name).toBe("Updated Again");
 
 		subscription.unsubscribe();
 	});
@@ -1922,7 +2066,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 		subscription.unsubscribe();
 	});
 
-	it("works with router-based operations", async () => {
+	it("works with router-based operations (stateless)", async () => {
 		let capturedEmit: ((value: { id: string; count: number }) => void) | undefined;
 
 		const liveCounter = query()
@@ -1940,36 +2084,36 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const server = createApp({ router: appRouter });
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "counter.live",
 				input: { id: "c1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(1);
-		expect((results[0] as { data: { count: number } }).data.count).toBe(0);
+		expect(collector.raw.length).toBe(1);
+		expect((collector.raw[0] as { data: { count: number } }).data.count).toBe(0);
 
-		// Emit updates
+		// Emit updates - STATELESS: sends update commands
 		capturedEmit!({ id: "c1", count: 1 });
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(2);
-		expect((results[1] as { data: { count: number } }).data.count).toBe(1);
+		expect(collector.raw.length).toBe(2);
+		expect((collector.current as { count: number }).count).toBe(1);
 
 		capturedEmit!({ id: "c1", count: 5 });
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(3);
-		expect((results[2] as { data: { count: number } }).data.count).toBe(5);
+		expect(collector.raw.length).toBe(3);
+		expect((collector.current as { count: number }).count).toBe(5);
 
 		subscription.unsubscribe();
 	});
 
-	it("supports emit.merge for partial updates", async () => {
+	it("supports emit.merge for partial updates (stateless)", async () => {
 		type EmitFn = ((value: unknown) => void) & { merge: (partial: unknown) => void };
 		let capturedEmit: EmitFn | undefined;
 
@@ -1982,36 +2126,39 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const server = createApp({ queries: { liveUser } });
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "liveUser",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(1);
-		const initial = (results[0] as { data: { name: string; status: string } }).data;
+		expect(collector.raw.length).toBe(1);
+		const initial = (collector.raw[0] as { data: { name: string; status: string } }).data;
 		expect(initial.name).toBe("Initial");
 		expect(initial.status).toBe("offline");
 
-		// Use merge for partial update
+		// Use merge for partial update - STATELESS: sends update command
 		capturedEmit!.merge({ status: "online" });
 		await new Promise((r) => setTimeout(r, 50));
 
-		expect(results.length).toBe(2);
-		const updated = (results[1] as { data: { name: string; status: string } }).data;
+		expect(collector.raw.length).toBe(2);
+		expect(collector.raw[1].update).toBeDefined(); // Update command
+		const updated = collector.current as { name: string; status: string };
 		expect(updated.name).toBe("Initial"); // Preserved
 		expect(updated.status).toBe("online"); // Updated
 
 		subscription.unsubscribe();
 	});
 
-	it("deduplicates identical emit values", async () => {
+	it("stateless server forwards all emits (deduplication is client responsibility)", async () => {
+		// STATELESS: Server forwards all emit commands without deduplication.
+		// Deduplication can be done by client or via optional plugins.
 		let capturedEmit: ((value: { id: string; name: string }) => void) | undefined;
 
 		const liveUser = query()
@@ -2023,34 +2170,37 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const server = createApp({ queries: { liveUser } });
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "liveUser",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
 			});
 
 		// Wait for initial result
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(1);
+		expect(collector.raw.length).toBe(1);
 
-		// Emit same value multiple times
+		// STATELESS: All emits are forwarded (no server-side deduplication)
 		capturedEmit!({ id: "1", name: "Initial" });
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(1); // Should be deduplicated
+		expect(collector.raw.length).toBe(2); // Forwarded, not deduplicated
 
 		// Emit different value
 		capturedEmit!({ id: "1", name: "Changed" });
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(2);
+		expect(collector.raw.length).toBe(3);
 
-		// Emit same changed value again
+		// Emit same value again - still forwarded
 		capturedEmit!({ id: "1", name: "Changed" });
 		await new Promise((r) => setTimeout(r, 50));
-		expect(results.length).toBe(2); // Should be deduplicated
+		expect(collector.raw.length).toBe(4); // All forwarded
+
+		// Final state is correct after applying all updates
+		expect((collector.current as { name: string }).name).toBe("Changed");
 
 		subscription.unsubscribe();
 	});
@@ -2167,7 +2317,7 @@ describe("scalar field subscription with emit.delta()", () => {
 		subscription.unsubscribe();
 	});
 
-	it("emit.delta() appends text to string field", async () => {
+	it("emit.delta() sends delta command (stateless)", async () => {
 		// UserWithContent - content field resolved by field resolver
 		const UserWithContent = entity("UserWithContent", {
 			id: t.id(),
@@ -2203,32 +2353,36 @@ describe("scalar field subscription with emit.delta()", () => {
 			resolvers: [userResolver],
 		});
 
-		const results: unknown[] = [];
+		const collector = createResultsCollector();
 		const subscription = server
 			.execute({
 				path: "getUserWithContent",
 				input: { id: "1" },
 			})
 			.subscribe({
-				next: (result) => results.push(result),
+				next: (result) => collector.push(result as { data?: unknown; update?: EmitCommand }),
 			});
 
 		// Wait for subscription setup
 		await new Promise((r) => setTimeout(r, 50));
 
 		// Initial result
-		expect(results.length).toBe(1);
-		expect((results[0] as { data: { content: string } }).data.content).toBe("Hello");
+		expect(collector.raw.length).toBe(1);
+		expect((collector.raw[0] as { data: { content: string } }).data.content).toBe("Hello");
 
-		// Use emit.delta() to append text
+		// Use emit.delta() to append text - STATELESS: sends delta command
 		capturedEmit?.delta?.([{ position: Infinity, insert: " World" }]);
 
 		// Wait for update
 		await new Promise((r) => setTimeout(r, 50));
 
-		// Should have received update with delta applied
-		expect(results.length).toBe(2);
-		expect((results[1] as { data: { content: string } }).data.content).toBe("Hello World");
+		// STATELESS: Received update command
+		expect(collector.raw.length).toBe(2);
+		expect(collector.raw[1].update).toBeDefined();
+
+		// Client applies delta to get final state
+		const currentState = collector.current as { content: string };
+		expect(currentState.content).toBe("Hello World");
 
 		subscription.unsubscribe();
 	});
