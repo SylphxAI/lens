@@ -220,6 +220,99 @@ const user = await client.user.get({ id: '123' }, {
 
 **Key difference**: Lens doesn't require code generation - types are inferred directly from TypeScript.
 
+## Automatic Selection Merging
+
+When multiple components subscribe to the same endpoint with different field selections, Lens automatically merges them for optimal efficiency.
+
+### How It Works
+
+```typescript
+// Component A - wants name only
+const UserName = () => {
+  const { data } = client.user.get.useQuery({
+    input: { id: '123' },
+    select: { name: true }
+  })
+  return <h1>{data?.name}</h1>
+}
+
+// Component B - wants email and status
+const UserStatus = () => {
+  const { data } = client.user.get.useQuery({
+    input: { id: '123' },
+    select: { email: true, status: true }
+  })
+  return <span>{data?.email} - {data?.status}</span>
+}
+```
+
+**What happens internally:**
+
+1. Component A subscribes with `{ name: true }`
+2. Component B subscribes with `{ email: true, status: true }`
+3. Lens merges to `{ name: true, email: true, status: true }`
+4. **ONE** network request/subscription is made with the merged selection
+5. Each component receives only their requested fields:
+   - Component A gets `{ id, name }`
+   - Component B gets `{ id, email, status }`
+
+### Dynamic Expansion
+
+When a new component needs additional fields, Lens automatically re-subscribes:
+
+```typescript
+// Initially: Component A subscribes → request { name }
+// Then: Component B subscribes → re-subscribe with { name, email, status }
+// Both components receive updated data
+```
+
+### Data Filtering
+
+Each component receives only what it requested - no data leakage:
+
+```typescript
+// Server returns full data:
+// { id: '123', name: 'Alice', email: 'alice@example.com', status: 'online' }
+
+// Component A sees: { id: '123', name: 'Alice' }
+// Component B sees: { id: '123', email: 'alice@example.com', status: 'online' }
+```
+
+### Query Batching
+
+Queries in the same microtask are automatically batched:
+
+```typescript
+// These three queries execute as ONE request
+const [user, posts, comments] = await Promise.all([
+  client.user.get({ input: { id: '123' }, select: { name: true } }),
+  client.user.get({ input: { id: '123' }, select: { email: true } }),
+  client.user.get({ input: { id: '123' }, select: { status: true } }),
+])
+
+// Internal: ONE request with { name, email, status }
+// Each promise resolves with its filtered data
+```
+
+### Benefits
+
+| Without Merging | With Merging |
+|----------------|--------------|
+| 100 components = 100 requests | 100 components = 10 requests (unique endpoints) |
+| Duplicate data streams | Single optimized stream per endpoint |
+| High bandwidth usage | Minimal bandwidth |
+| Server overload risk | Efficient server utilization |
+
+### Cleanup
+
+When components unmount, they're automatically cleaned up:
+
+```typescript
+// Component A unmounts → removed from subscriber list
+// Component B still active → subscription continues
+// All components unmount → subscription closed
+```
+
 ## Performance Benefits
 
 Selection optimizes both network and database:
