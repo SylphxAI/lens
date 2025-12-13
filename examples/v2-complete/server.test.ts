@@ -1,24 +1,15 @@
 /**
  * Test the V2 Complete Example
  *
- * NOTE: Tests are temporarily skipped. Cycle detection was added to
- * resolveEntityFields (type:id based tracking), but the hang persists.
- * The issue may be in the inProcess transport or the lens().withPlugins() pattern.
- *
- * Progress made:
- * - Added cycle detection to resolveEntityFields (server/create.ts)
- * - Uses Set<"type:id"> to track visited entities
- * - Main package tests (1245+) all pass
- *
- * TODO: Investigate hang with inProcess transport specifically
+ * Tests circular entity references (User.posts -> Post.author -> User).
+ * Cycle detection in resolveEntityFields prevents infinite recursion.
  */
 import { describe, it, expect, beforeEach } from "bun:test";
 import { createClient, inProcess } from "@sylphx/lens-client";
 import { firstValueFrom, type InferRouterClient } from "@sylphx/lens-core";
 import { app, db, type AppRouter } from "./server";
 
-// Skip until inProcess transport issue is resolved
-const testSuite = describe.skip;
+const testSuite = describe;
 
 // =============================================================================
 // Setup
