@@ -1,23 +1,23 @@
 # @sylphx/lens-client
 
-## 2.6.1
+## 2.7.0 (2025-12-13)
 
-### Patch Changes
+### ✨ Features
 
-- 1b0f4bf: ## Bug Fixes
+- **client:** implement field merging and query batching ([2b5c7cb](https://github.com/SylphxAI/lens/commit/2b5c7cbdef121e838261c4ccee1bdfdd3a4a5885))
 
-  - Fix memory leak in WebSocket handshake timeout cleanup
-  - Fix TypeScript strict mode errors across packages
-  - Add cycle detection to `resolveEntityFields` preventing infinite recursion with circular entity references (e.g., User.posts → Post.author → User)
+### 🐛 Bug Fixes
 
-  ## Tests
+- memory leak and add cycle detection for circular entity refs ([a5d4c08](https://github.com/SylphxAI/lens/commit/a5d4c086c4711baefbbd5c4fa2ed80a6e78078e1))
+- resolve TypeScript strict mode and biome lint issues ([36f0104](https://github.com/SylphxAI/lens/commit/36f0104d980acd6b61a1795a1d561ab5990a14e9))
 
-  - Unskip v2-complete tests after cycle detection fix (15 tests now passing)
-  - Add comprehensive tests for dataloader batching
-  - Fix biome lint issues (import sorting, unused variables)
+### ♻️ Refactoring
 
-- Updated dependencies [1b0f4bf]
-  - @sylphx/lens-core@2.12.1
+- consolidate SubscriptionRegistry to core package ([15662a1](https://github.com/SylphxAI/lens/commit/15662a1894b671706c7dcb913f9582b7e0f60f6e))
+
+### 🔧 Chores
+
+- fix biome lint issues ([12cb976](https://github.com/SylphxAI/lens/commit/12cb976132235aeff1df8fdead71fce6916e6301))
 
 ## 2.6.0
 
