@@ -1,24 +1,23 @@
 /**
  * Test the V2 Complete Example
  *
- * FIXME: These tests are temporarily skipped due to a hang issue.
- * When resolvers have circular references (User.posts -> Post.author -> User),
- * the execution hangs indefinitely. The setTimeout in the event loop never fires,
- * suggesting synchronous blocking in the async execution path.
+ * NOTE: Tests are temporarily skipped. Cycle detection was added to
+ * resolveEntityFields (type:id based tracking), but the hang persists.
+ * The issue may be in the inProcess transport or the lens().withPlugins() pattern.
  *
- * Root cause investigation needed:
- * - resolveEntityFields recursive calls may need cycle detection
- * - Issue manifests in v2-complete but not in server.test.ts
- * - Difference: v2-complete uses lens<TContext>().withPlugins() pattern
+ * Progress made:
+ * - Added cycle detection to resolveEntityFields (server/create.ts)
+ * - Uses Set<"type:id"> to track visited entities
+ * - Main package tests (1245+) all pass
  *
- * See: https://github.com/SylphxAI/Lens/issues/TBD
+ * TODO: Investigate hang with inProcess transport specifically
  */
 import { describe, it, expect, beforeEach } from "bun:test";
 import { createClient, inProcess } from "@sylphx/lens-client";
 import { firstValueFrom, type InferRouterClient } from "@sylphx/lens-core";
 import { app, db, type AppRouter } from "./server";
 
-// Skip all tests until the hang issue is resolved
+// Skip until inProcess transport issue is resolved
 const testSuite = describe.skip;
 
 // =============================================================================

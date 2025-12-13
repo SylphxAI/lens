@@ -523,15 +523,25 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 			const ws = await ensureConnection();
 
 			return new Promise((resolve, reject) => {
+				let completed = false;
+
+				const cleanup = () => {
+					if (!completed) {
+						completed = true;
+						clearTimeout(timeoutId);
+						ws.removeEventListener("message", messageHandler);
+					}
+				};
+
 				const timeoutId = setTimeout(() => {
+					cleanup();
 					reject(new Error("Handshake timeout"));
 				}, timeout);
 
 				const messageHandler = (event: MessageEvent) => {
 					const message = JSON.parse(event.data as string) as WsMessage;
 					if (message.type === "handshake") {
-						clearTimeout(timeoutId);
-						ws.removeEventListener("message", messageHandler);
+						cleanup();
 						metadata = message.data as Metadata;
 						resolve(metadata);
 					}

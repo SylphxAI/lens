@@ -756,6 +756,7 @@ class LensServerImpl<
 			"",
 			onCleanup,
 			createFieldEmit,
+			new Set(), // Cycle detection for circular entity references (type:id)
 		);
 		if (select) {
 			return applySelection(processed, select) as T;
@@ -773,6 +774,7 @@ class LensServerImpl<
 	 * @param fieldPath - Current path for nested field resolution
 	 * @param onCleanup - Cleanup registration for live query subscriptions
 	 * @param createFieldEmit - Factory for creating field-specific emit handlers
+	 * @param visited - Set of "type:id" keys to track visited entities and prevent circular reference infinite loops
 	 */
 	private async resolveEntityFields<T>(
 		data: T,
@@ -781,6 +783,7 @@ class LensServerImpl<
 		fieldPath = "",
 		onCleanup?: (fn: () => void) => void,
 		createFieldEmit?: (fieldPath: string, resolvedValue?: unknown) => Emit<unknown> | undefined,
+		visited: Set<string> = new Set(),
 	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 
@@ -794,6 +797,7 @@ class LensServerImpl<
 						fieldPath,
 						onCleanup,
 						createFieldEmit,
+						visited,
 					),
 				),
 			) as Promise<T>;
@@ -804,6 +808,17 @@ class LensServerImpl<
 		const obj = data as Record<string, unknown>;
 		const typeName = this.getTypeName(obj);
 		if (!typeName) return data;
+
+		// Cycle detection using entity type + ID to prevent infinite loops
+		// This handles circular entity references like User.posts -> Post.author -> User
+		const entityId = obj.id ?? obj._id ?? obj.uuid;
+		if (entityId !== undefined) {
+			const entityKey = `${typeName}:${entityId}`;
+			if (visited.has(entityKey)) {
+				return data; // Already resolved this entity, return as-is
+			}
+			visited.add(entityKey);
+		}
 
 		const resolverDef = this.resolverMap.get(typeName);
 		if (!resolverDef) return data;
@@ -833,6 +848,7 @@ class LensServerImpl<
 					currentPath,
 					onCleanup,
 					createFieldEmit,
+					visited,
 				);
 				continue;
 			}
@@ -943,6 +959,7 @@ class LensServerImpl<
 				currentPath,
 				onCleanup,
 				createFieldEmit,
+				visited,
 			);
 		}
 
