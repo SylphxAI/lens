@@ -754,7 +754,10 @@ class ClientImpl {
 		} catch (error) {
 			// Reset on connection failure so retry can work
 			endpoint.isSubscribed = false;
-			throw error;
+			// Distribute error to observers instead of throwing (caller doesn't catch)
+			const err = error instanceof Error ? error : new Error(String(error));
+			this.distributeError(endpoint, err);
+			return;
 		}
 
 		// Mutations don't support subscription - no-op
