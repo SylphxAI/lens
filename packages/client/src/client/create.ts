@@ -4,10 +4,20 @@
  * Primary client for Lens API framework.
  * Uses Transport + Plugin architecture for clean, extensible design.
  *
- * Lazy connection - transport.connect() is called on first operation.
+ * Features:
+ * - Lazy connection - transport.connect() is called on first operation
+ * - Query batching - queries in same microtask are batched together
+ * - Selection merging - multiple observers share one subscription with merged fields
+ * - Data filtering - each observer receives only their requested fields
  */
 
 import { applyOps, isError, isOps, isSnapshot, type RouterDef } from "@sylphx/lens-core";
+import {
+	type EndpointKey,
+	filterToSelection,
+	mergeSelections,
+	type SubscriberId,
+} from "../selection/field-merger.js";
 import type { Plugin } from "../transport/plugin.js";
 import {
 	hasAnySubscription,
@@ -55,25 +65,52 @@ export type {
 
 /** Observer entry for subscription tracking */
 interface ObserverEntry {
+	id: SubscriberId;
+	selection: SelectionObject | undefined;
 	next?: ((data: unknown) => void) | undefined;
 	error?: ((err: Error) => void) | undefined;
 	complete?: (() => void) | undefined;
 }
 
-/** Subscription state */
-interface SubscriptionState {
+/** Subscription state for an endpoint */
+interface EndpointState {
+	/** Current data (full merged data from server) */
 	data: unknown;
+	/** Current error */
 	error: Error | null;
+	/** Is subscription completed */
 	completed: boolean;
-	observers: Set<ObserverEntry>;
+	/** All observers with their selections */
+	observers: Map<SubscriberId, ObserverEntry>;
+	/** Current merged selection */
+	mergedSelection: SelectionObject | undefined;
+	/** Unsubscribe function from transport */
 	unsubscribe?: (() => void) | undefined;
-	/** Selection object for field-level subscription detection */
-	select?: SelectionObject;
+	/** Is currently subscribed to server */
+	isSubscribed: boolean;
+}
+
+/** Pending query batch for microtask batching */
+interface PendingQueryBatch {
+	path: string;
+	input: unknown;
+	observers: Array<{
+		id: SubscriberId;
+		selection: SelectionObject | undefined;
+		resolve: (data: unknown) => void;
+		reject: (error: Error) => void;
+	}>;
+	mergedSelection: SelectionObject | undefined;
 }
 
 // =============================================================================
 // Client Implementation
 // =============================================================================
+
+let subscriberIdCounter = 0;
+function generateSubscriberId(): SubscriberId {
+	return `sub_${Date.now()}_${++subscriberIdCounter}`;
+}
 
 class ClientImpl {
 	private transport: Transport;
@@ -83,10 +120,14 @@ class ClientImpl {
 	private metadata: Metadata | null = null;
 	private connectPromise: Promise<Metadata> | null = null;
 
-	/** Subscription states */
-	private subscriptions = new Map<string, SubscriptionState>();
+	/** Endpoint states - tracks all active subscriptions/queries */
+	private endpoints = new Map<EndpointKey, EndpointState>();
 
-	/** Cached QueryResult objects by key (stable references for React) */
+	/** Pending query batches - collects queries in same microtask */
+	private pendingBatches = new Map<EndpointKey, PendingQueryBatch>();
+	private batchScheduled = false;
+
+	/** Cached QueryResult objects by key+selection (stable references for React) */
 	private queryResultCache = new Map<string, QueryResult<unknown>>();
 
 	/** Maps original observer/callback to entry for proper cleanup */
@@ -237,9 +278,6 @@ class ClientImpl {
 	 * Returns true if:
 	 * 1. Operation is declared as subscription (async generator)
 	 * 2. Any selected field in the return type is a subscription field
-	 *
-	 * @param path - Operation path
-	 * @param select - Selection object for the operation
 	 */
 	private requiresSubscription(path: string, select?: SelectionObject): boolean {
 		const meta = this.getOperationMeta(path);
@@ -267,7 +305,7 @@ class ClientImpl {
 	/** Cache for object input hashes to avoid repeated JSON.stringify */
 	private inputHashCache = new WeakMap<object, string>();
 
-	private makeQueryKey(path: string, input: unknown): string {
+	private makeEndpointKey(path: string, input: unknown): EndpointKey {
 		// Fast path for common cases
 		if (input === undefined || input === null) {
 			return `${path}:null`;
@@ -281,12 +319,266 @@ class ClientImpl {
 		const obj = input as object;
 		let hash = this.inputHashCache.get(obj);
 		if (!hash) {
-			// Generate unique hash for this object instance
-			// Fall back to JSON.stringify for content-based equality
 			hash = JSON.stringify(input);
 			this.inputHashCache.set(obj, hash);
 		}
 		return `${path}:${hash}`;
+	}
+
+	/** Make cache key for QueryResult (includes selection for different select() calls) */
+	private makeQueryResultKey(endpointKey: EndpointKey, select?: SelectionObject): string {
+		if (!select) return endpointKey;
+		return `${endpointKey}:${JSON.stringify(select)}`;
+	}
+
+	// =========================================================================
+	// Selection Merging
+	// =========================================================================
+
+	/**
+	 * Get or create endpoint state.
+	 */
+	private getOrCreateEndpoint(key: EndpointKey): EndpointState {
+		let endpoint = this.endpoints.get(key);
+		if (!endpoint) {
+			endpoint = {
+				data: null,
+				error: null,
+				completed: false,
+				observers: new Map(),
+				mergedSelection: undefined,
+				isSubscribed: false,
+			};
+			this.endpoints.set(key, endpoint);
+		}
+		return endpoint;
+	}
+
+	/**
+	 * Add observer to endpoint and recompute merged selection.
+	 * Returns analysis of selection change.
+	 */
+	private addObserver(
+		key: EndpointKey,
+		observer: ObserverEntry,
+	): { endpoint: EndpointState; selectionChanged: boolean; isExpanded: boolean } {
+		const endpoint = this.getOrCreateEndpoint(key);
+		const previousSelection = endpoint.mergedSelection;
+
+		// Add observer
+		endpoint.observers.set(observer.id, observer);
+
+		// Recompute merged selection
+		const selections = Array.from(endpoint.observers.values())
+			.map((o) => o.selection)
+			.filter((s): s is SelectionObject => s !== undefined);
+
+		endpoint.mergedSelection = selections.length > 0 ? mergeSelections(selections) : undefined;
+
+		// Analyze change
+		const selectionChanged =
+			JSON.stringify(previousSelection) !== JSON.stringify(endpoint.mergedSelection);
+		const isExpanded =
+			selectionChanged && this.isSelectionExpanded(previousSelection, endpoint.mergedSelection);
+
+		return { endpoint, selectionChanged, isExpanded };
+	}
+
+	/**
+	 * Remove observer from endpoint and recompute merged selection.
+	 */
+	private removeObserver(
+		key: EndpointKey,
+		observerId: SubscriberId,
+	): { endpoint: EndpointState | undefined; shouldUnsubscribe: boolean } {
+		const endpoint = this.endpoints.get(key);
+		if (!endpoint) return { endpoint: undefined, shouldUnsubscribe: false };
+
+		endpoint.observers.delete(observerId);
+
+		if (endpoint.observers.size === 0) {
+			// No more observers - cleanup
+			return { endpoint, shouldUnsubscribe: true };
+		}
+
+		// Recompute merged selection (could shrink, but we don't re-subscribe for shrink)
+		const selections = Array.from(endpoint.observers.values())
+			.map((o) => o.selection)
+			.filter((s): s is SelectionObject => s !== undefined);
+
+		endpoint.mergedSelection = selections.length > 0 ? mergeSelections(selections) : undefined;
+
+		return { endpoint, shouldUnsubscribe: false };
+	}
+
+	/**
+	 * Check if new selection is expanded (has new fields).
+	 */
+	private isSelectionExpanded(
+		previous: SelectionObject | undefined,
+		current: SelectionObject | undefined,
+	): boolean {
+		if (!previous) return current !== undefined;
+		if (!current) return false;
+
+		const previousKeys = this.flattenSelectionKeys(previous);
+		const currentKeys = this.flattenSelectionKeys(current);
+
+		for (const key of currentKeys) {
+			if (!previousKeys.has(key)) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Flatten selection to set of field paths.
+	 */
+	private flattenSelectionKeys(selection: SelectionObject, prefix = ""): Set<string> {
+		const keys = new Set<string>();
+
+		for (const [key, value] of Object.entries(selection)) {
+			const path = prefix ? `${prefix}.${key}` : key;
+			keys.add(path);
+
+			if (typeof value === "object" && value !== null && value !== true) {
+				const nested =
+					"select" in value ? (value.select as SelectionObject) : (value as SelectionObject);
+				if (nested && typeof nested === "object") {
+					for (const nestedKey of this.flattenSelectionKeys(nested, path)) {
+						keys.add(nestedKey);
+					}
+				}
+			}
+		}
+
+		return keys;
+	}
+
+	/**
+	 * Distribute data to all observers with filtering.
+	 */
+	private distributeData(endpoint: EndpointState, data: unknown): void {
+		endpoint.data = data;
+		endpoint.error = null;
+
+		for (const observer of endpoint.observers.values()) {
+			if (observer.next) {
+				const filteredData = observer.selection
+					? filterToSelection(data, observer.selection)
+					: data;
+				observer.next(filteredData);
+			}
+		}
+	}
+
+	/**
+	 * Distribute error to all observers.
+	 */
+	private distributeError(endpoint: EndpointState, error: Error): void {
+		endpoint.error = error;
+
+		for (const observer of endpoint.observers.values()) {
+			observer.error?.(error);
+		}
+	}
+
+	// =========================================================================
+	// Query Batching
+	// =========================================================================
+
+	/**
+	 * Schedule a query to be batched in the current microtask.
+	 * Queries to the same endpoint are merged and executed together.
+	 */
+	private scheduleBatchedQuery(
+		key: EndpointKey,
+		path: string,
+		input: unknown,
+		selection: SelectionObject | undefined,
+	): Promise<unknown> {
+		return new Promise((resolve, reject) => {
+			const observerId = generateSubscriberId();
+
+			let batch = this.pendingBatches.get(key);
+			if (!batch) {
+				batch = {
+					path,
+					input,
+					observers: [],
+					mergedSelection: undefined,
+				};
+				this.pendingBatches.set(key, batch);
+			}
+
+			// Add to batch
+			batch.observers.push({ id: observerId, selection, resolve, reject });
+
+			// Merge selection
+			const selections = batch.observers
+				.map((o) => o.selection)
+				.filter((s): s is SelectionObject => s !== undefined);
+			batch.mergedSelection = selections.length > 0 ? mergeSelections(selections) : undefined;
+
+			// Schedule flush if not already scheduled
+			if (!this.batchScheduled) {
+				this.batchScheduled = true;
+				queueMicrotask(() => this.flushBatches());
+			}
+		});
+	}
+
+	/**
+	 * Execute all pending batched queries.
+	 */
+	private async flushBatches(): Promise<void> {
+		this.batchScheduled = false;
+
+		const batches = Array.from(this.pendingBatches.entries());
+		this.pendingBatches.clear();
+
+		// Execute all batches in parallel
+		await Promise.all(
+			batches.map(async ([key, batch]) => {
+				try {
+					const op: Operation = {
+						id: this.generateId("query", batch.path),
+						path: batch.path,
+						type: "query",
+						input: batch.input,
+						meta: batch.mergedSelection ? { select: batch.mergedSelection } : {},
+					};
+
+					const response = await this.execute(op);
+
+					if (isError(response)) {
+						const error = new Error(response.error);
+						for (const observer of batch.observers) {
+							observer.reject(error);
+						}
+						return;
+					}
+
+					if (isSnapshot(response)) {
+						// Update endpoint state
+						const endpoint = this.getOrCreateEndpoint(key);
+						endpoint.data = response.data;
+
+						// Distribute filtered data to each observer
+						for (const observer of batch.observers) {
+							const filteredData = observer.selection
+								? filterToSelection(response.data, observer.selection)
+								: response.data;
+							observer.resolve(filteredData);
+						}
+					}
+				} catch (error) {
+					const err = error instanceof Error ? error : new Error(String(error));
+					for (const observer of batch.observers) {
+						observer.reject(err);
+					}
+				}
+			}),
+		);
 	}
 
 	// =========================================================================
@@ -294,51 +586,50 @@ class ClientImpl {
 	// =========================================================================
 
 	executeQuery<T>(path: string, input: unknown, select?: SelectionObject): QueryResult<T> {
-		const key = this.makeQueryKey(path, input);
+		const key = this.makeEndpointKey(path, input);
+		const cacheKey = this.makeQueryResultKey(key, select);
 
 		// Return cached QueryResult for stable reference (important for React hooks)
-		const cached = this.queryResultCache.get(key);
-		if (cached && !select) {
+		const cached = this.queryResultCache.get(cacheKey);
+		if (cached) {
 			return cached as QueryResult<T>;
 		}
 
-		if (!this.subscriptions.has(key)) {
-			this.subscriptions.set(key, {
-				data: null,
-				error: null,
-				completed: false,
-				observers: new Set(),
-				...(select && { select }), // Store selection for field-level subscription detection
-			});
-		}
-		const sub = this.subscriptions.get(key)!;
+		const endpoint = this.getOrCreateEndpoint(key);
 
 		const result: QueryResult<T> = {
 			get value() {
-				return sub.data as T | null;
+				// Return filtered data for this selection
+				if (endpoint.data === null) return null;
+				return (select ? filterToSelection(endpoint.data, select) : endpoint.data) as T | null;
 			},
 
 			subscribe: (
 				observerOrCallback?: import("@sylphx/lens-core").Observer<T> | ((data: T) => void),
 			) => {
+				const observerId = generateSubscriberId();
+
 				// Normalize to ObserverEntry
 				let entry: ObserverEntry;
 
 				if (typeof observerOrCallback === "function") {
-					// Callback function pattern
 					const callback = observerOrCallback;
-					entry = { next: (data: unknown) => callback(data as T) };
+					entry = {
+						id: observerId,
+						selection: select,
+						next: (data: unknown) => callback(data as T),
+					};
 				} else if (observerOrCallback && typeof observerOrCallback === "object") {
-					// Observer object pattern
 					const observer = observerOrCallback;
 					entry = {
+						id: observerId,
+						selection: select,
 						next: observer.next ? (data: unknown) => observer.next!(data as T) : undefined,
 						error: observer.error,
 						complete: observer.complete,
 					};
 				} else {
-					// No observer provided - just trigger subscription
-					entry = {};
+					entry = { id: observerId, selection: select };
 				}
 
 				// Store mapping for cleanup
@@ -346,21 +637,31 @@ class ClientImpl {
 					this.observerEntries.set(observerOrCallback, entry);
 				}
 
-				sub.observers.add(entry);
+				// Add observer and check if selection expanded
+				const { endpoint: ep, isExpanded } = this.addObserver(key, entry);
 
-				// Replay current state to new observer
-				if (sub.error && entry.error) {
-					entry.error(sub.error);
-				} else if (sub.data !== null && entry.next) {
-					entry.next(sub.data);
-				}
-				if (sub.completed && entry.complete) {
-					entry.complete();
-				}
-
-				// Start subscription if not already running
-				if (!sub.unsubscribe) {
+				// Start or update subscription
+				if (!ep.isSubscribed) {
 					this.startSubscription(path, input, key);
+				} else if (isExpanded) {
+					// Selection expanded - need to re-subscribe with new merged selection
+					// Don't replay stale data - wait for fresh data from re-subscription
+					if (ep.unsubscribe) {
+						ep.unsubscribe();
+					}
+					ep.isSubscribed = false;
+					this.startSubscription(path, input, key);
+				} else {
+					// Not expanding - safe to replay current state to new observer (filtered)
+					if (ep.error && entry.error) {
+						entry.error(ep.error);
+					} else if (ep.data !== null && entry.next) {
+						const filteredData = select ? filterToSelection(ep.data, select) : ep.data;
+						entry.next(filteredData);
+					}
+					if (ep.completed && entry.complete) {
+						entry.complete();
+					}
 				}
 
 				// Return unsubscribe function
@@ -368,16 +669,20 @@ class ClientImpl {
 					if (observerOrCallback) {
 						const storedEntry = this.observerEntries.get(observerOrCallback);
 						if (storedEntry) {
-							sub.observers.delete(storedEntry);
+							const { shouldUnsubscribe } = this.removeObserver(key, storedEntry.id);
+
+							if (shouldUnsubscribe) {
+								ep.unsubscribe?.();
+								ep.isSubscribed = false;
+								this.endpoints.delete(key);
+								// Clean up all QueryResult caches for this endpoint
+								for (const [k] of this.queryResultCache) {
+									if (k.startsWith(key)) {
+										this.queryResultCache.delete(k);
+									}
+								}
+							}
 						}
-					}
-					// Cleanup subscription when no observers remain
-					if (sub.observers.size === 0 && sub.unsubscribe) {
-						sub.unsubscribe();
-						sub.unsubscribe = undefined;
-						// Clean up subscription state to prevent memory leak
-						this.subscriptions.delete(key);
-						this.queryResultCache.delete(key);
 					}
 				};
 			},
@@ -393,42 +698,23 @@ class ClientImpl {
 				onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
 			): Promise<TResult1 | TResult2> => {
 				try {
-					const op: Operation = {
-						id: this.generateId("query", path),
-						path,
-						type: "query",
-						input,
-						meta: select ? { select } : {},
-					};
+					// Use batched query execution
+					const data = await this.scheduleBatchedQuery(key, path, input, select);
 
-					const response = await this.execute(op);
-
-					if (isError(response)) {
-						throw new Error(response.error);
+					// Also update endpoint state for subscribe() calls
+					const ep = this.getOrCreateEndpoint(key);
+					if (ep.data === null) {
+						ep.data = data;
 					}
 
-					if (isSnapshot(response)) {
-						sub.data = response.data;
-
-						// Notify all observers
-						for (const observer of sub.observers) {
-							observer.next?.(response.data);
-						}
-
-						return onfulfilled
-							? onfulfilled(response.data as T)
-							: (response.data as unknown as TResult1);
-					}
-
-					// ops message - shouldn't happen for one-shot queries
-					return onfulfilled ? onfulfilled(sub.data as T) : (sub.data as unknown as TResult1);
+					return onfulfilled ? onfulfilled(data as T) : (data as unknown as TResult1);
 				} catch (error) {
 					const err = error instanceof Error ? error : new Error(String(error));
-					sub.error = err;
 
-					// Notify error observers
-					for (const observer of sub.observers) {
-						observer.error?.(err);
+					// Update endpoint error state
+					const ep = this.endpoints.get(key);
+					if (ep) {
+						ep.error = err;
 					}
 
 					if (onrejected) {
@@ -439,33 +725,40 @@ class ClientImpl {
 			},
 		};
 
-		// Cache the QueryResult for stable reference (only for non-select queries)
-		if (!select) {
-			this.queryResultCache.set(key, result as QueryResult<unknown>);
-		}
+		// Cache the QueryResult for stable reference
+		this.queryResultCache.set(cacheKey, result as QueryResult<unknown>);
 
 		return result;
 	}
 
-	private async startSubscription(path: string, input: unknown, key: string): Promise<void> {
-		const sub = this.subscriptions.get(key);
-		if (!sub) return;
+	// =========================================================================
+	// Subscription Management
+	// =========================================================================
+
+	private async startSubscription(path: string, input: unknown, key: EndpointKey): Promise<void> {
+		const endpoint = this.endpoints.get(key);
+		if (!endpoint) return;
 
 		await this.ensureConnected();
 
-		// Check if this operation requires subscription transport:
-		// 1. Operation is declared as subscription (async generator)
-		// 2. Any selected field in the return type is a subscription field
-		const isSubscription = this.requiresSubscription(path, sub.select);
+		// Mutations don't support subscription - no-op
+		const meta = this.getOperationMeta(path);
+		if (meta?.type === "mutation") {
+			return;
+		}
 
-		// For subscriptions: use Observable streaming (WS/SSE)
-		// For queries: use Promise path (HTTP) - subscribe() on query just gets 1 value
+		// Check if this operation requires subscription transport
+		const isSubscription = this.requiresSubscription(path, endpoint.mergedSelection);
+
+		endpoint.isSubscribed = true;
+
 		if (isSubscription) {
 			const op: Operation = {
 				id: this.generateId("subscription", path),
 				path,
 				type: "subscription",
 				input,
+				meta: endpoint.mergedSelection ? { select: endpoint.mergedSelection } : {},
 			};
 
 			const resultOrObservable = this.transport.execute(op);
@@ -473,65 +766,46 @@ class ClientImpl {
 			if (this.isObservable(resultOrObservable)) {
 				const subscription = resultOrObservable.subscribe({
 					next: (message) => {
-						// Handle snapshot (initial data or full replacement)
 						if (isSnapshot(message)) {
-							sub.data = message.data;
-							sub.error = null; // Clear previous error on new data
-							for (const observer of sub.observers) {
-								observer.next?.(message.data);
-							}
-						}
-						// Handle ops (incremental updates - stateless server architecture)
-						// Client applies updates to local state for minimal wire transfer
-						else if (isOps(message)) {
+							this.distributeData(endpoint, message.data);
+						} else if (isOps(message)) {
 							try {
-								sub.data = applyOps(sub.data, message.ops);
-								sub.error = null; // Clear previous error on update
-								for (const observer of sub.observers) {
-									observer.next?.(sub.data);
-								}
+								const newData = applyOps(endpoint.data, message.ops);
+								this.distributeData(endpoint, newData);
 							} catch (updateErr) {
-								// Error applying update - notify observers but keep existing state
 								const err = updateErr instanceof Error ? updateErr : new Error(String(updateErr));
-								sub.error = err;
-								for (const observer of sub.observers) {
-									observer.error?.(err);
-								}
+								this.distributeError(endpoint, err);
 							}
-						}
-						// Handle error message
-						else if (isError(message)) {
-							const err = new Error(message.error);
-							sub.error = err;
-							for (const observer of sub.observers) {
-								observer.error?.(err);
-							}
+						} else if (isError(message)) {
+							this.distributeError(endpoint, new Error(message.error));
 						}
 					},
 					error: (err) => {
-						sub.error = err;
-						for (const observer of sub.observers) {
-							observer.error?.(err);
-						}
+						this.distributeError(endpoint, err);
 					},
 					complete: () => {
-						sub.completed = true;
-						for (const observer of sub.observers) {
+						endpoint.completed = true;
+						for (const observer of endpoint.observers.values()) {
 							observer.complete?.();
 						}
 					},
 				});
 
-				sub.unsubscribe = () => subscription.unsubscribe();
+				endpoint.unsubscribe = () => subscription.unsubscribe();
 			}
 		} else {
-			// Query: execute once via Promise, notify observers, complete
-			this.executeQuery(path, input).then(() => {
-				sub.completed = true;
-				for (const observer of sub.observers) {
+			// Query: execute once via batched Promise, notify observers, complete
+			try {
+				const data = await this.scheduleBatchedQuery(key, path, input, endpoint.mergedSelection);
+				this.distributeData(endpoint, data);
+				endpoint.completed = true;
+				for (const observer of endpoint.observers.values()) {
 					observer.complete?.();
 				}
-			});
+			} catch (error) {
+				const err = error instanceof Error ? error : new Error(String(error));
+				this.distributeError(endpoint, err);
+			}
 		}
 	}
 
@@ -574,10 +848,6 @@ class ClientImpl {
 
 	/**
 	 * Create accessor with unified { input, select } pattern.
-	 * Accepts QueryDescriptor: { input?: TInput, select?: SelectionObject }
-	 *
-	 * Backwards compatible: if descriptor has no 'input' or 'select' keys,
-	 * treats the entire object as input (legacy API).
 	 */
 	createAccessor(
 		path: string,
@@ -594,7 +864,7 @@ class ClientImpl {
 			const input = isNewApi ? (descriptor as { input?: unknown })?.input : descriptor;
 			const select = isNewApi ? (descriptor as { select?: SelectionObject })?.select : undefined;
 
-			// Delegate to executeQuery for all query functionality (caching, subscriptions, etc.)
+			// Delegate to executeQuery for all query functionality
 			const queryResult = this.executeQuery<unknown>(path, input, select);
 
 			// Store original then for queries
@@ -632,6 +902,30 @@ class ClientImpl {
 			return queryResult;
 		};
 	}
+
+	// =========================================================================
+	// Debug API
+	// =========================================================================
+
+	/**
+	 * Get statistics about active subscriptions (for debugging).
+	 */
+	getStats(): {
+		endpointCount: number;
+		totalObservers: number;
+		pendingBatches: number;
+	} {
+		let totalObservers = 0;
+		for (const endpoint of this.endpoints.values()) {
+			totalObservers += endpoint.observers.size;
+		}
+
+		return {
+			endpointCount: this.endpoints.size,
+			totalObservers,
+			pendingBatches: this.pendingBatches.size,
+		};
+	}
 }
 
 // =============================================================================
@@ -644,25 +938,10 @@ class ClientImpl {
  * Connection starts immediately in background. First operation waits
  * for handshake to complete, then uses metadata to determine operation type.
  *
- * @example
- * Type inference from transport (recommended):
- * ```typescript
- * const server = createApp({ router: appRouter });
- * const client = createClient({
- *   transport: inProcess({ app }),
- * });
- * // client is fully typed automatically!
- * ```
- *
- * @example
- * Explicit type parameter (for HTTP transport):
- * ```typescript
- * import type { AppRouter } from './server';
- *
- * const client = createClient<RouterApiShape<AppRouter>>({
- *   transport: http({ url: '/api' }),
- * });
- * ```
+ * Features:
+ * - Query batching: queries in same microtask are merged and executed together
+ * - Selection merging: multiple components can share one subscription
+ * - Data filtering: each component receives only its requested fields
  */
 // Overload 1: Infer from typed transport (inProcess)
 export function createClient<TApi extends { router: RouterDef }>(
