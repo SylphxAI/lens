@@ -18,9 +18,9 @@ import {
 	type ReconnectConfig,
 	type ReconnectMessage,
 	type ReconnectResult,
+	SubscriptionRegistry,
 	type Version,
 } from "@sylphx/lens-core";
-import { SubscriptionRegistry } from "@sylphx/lens-core";
 import type {
 	ConnectionState,
 	Metadata,

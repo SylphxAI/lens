@@ -461,6 +461,8 @@ export {
 	// Compression functions
 	compressIfNeeded,
 	createMetricsTracker,
+	// Subscription tracking
+	createSubscriptionRegistry,
 	DEFAULT_COMPRESSION_CONFIG,
 	DEFAULT_METRICS_CONFIG,
 	DEFAULT_OPERATION_LOG_CONFIG,
@@ -503,8 +505,6 @@ export {
 	type ReconnectSubscription,
 	type SubscriptionAckMessage,
 	type SubscriptionObserver,
-	// Subscription tracking
-	createSubscriptionRegistry,
 	SubscriptionRegistry,
 	type SubscriptionRegistryStats,
 	type SubscriptionResult,

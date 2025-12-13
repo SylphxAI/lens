@@ -163,7 +163,8 @@ describe("DataLoader", () => {
 	describe("edge cases", () => {
 		it("handles empty batch gracefully", async () => {
 			const batchFn = mock(async (keys: string[]) => keys.map((k) => `value-${k}`));
-			const loader = new DataLoader(batchFn);
+			// Create loader but don't load anything - verify no crash
+			const _loader = new DataLoader(batchFn);
 
 			// Just trigger flush without any loads (edge case)
 			// This shouldn't happen in practice, but verify it doesn't crash
