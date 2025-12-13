@@ -744,7 +744,18 @@ class ClientImpl {
 		const endpoint = this.endpoints.get(key);
 		if (!endpoint) return;
 
-		await this.ensureConnected();
+		// Set immediately to prevent race condition:
+		// Multiple subscribe() calls could pass the !isSubscribed check before
+		// ensureConnected() completes, creating duplicate server subscriptions.
+		endpoint.isSubscribed = true;
+
+		try {
+			await this.ensureConnected();
+		} catch (error) {
+			// Reset on connection failure so retry can work
+			endpoint.isSubscribed = false;
+			throw error;
+		}
 
 		// Mutations don't support subscription - no-op
 		const meta = this.getOperationMeta(path);
@@ -754,8 +765,6 @@ class ClientImpl {
 
 		// Check if this operation requires subscription transport
 		const isSubscription = this.requiresSubscription(path, endpoint.mergedSelection);
-
-		endpoint.isSubscribed = true;
 
 		if (isSubscription) {
 			const op: Operation = {

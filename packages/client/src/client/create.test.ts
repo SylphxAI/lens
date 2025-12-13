@@ -554,6 +554,61 @@ describe("startSubscription", () => {
 		expect(values.length).toBe(1);
 		expect(values[0]).toEqual({ value: 999 });
 	});
+
+	it("prevents race condition with multiple rapid subscribe calls", async () => {
+		// This test verifies fix for lens-client 2.7.0 race condition:
+		// Multiple rapid subscribe() calls could pass the !isSubscribed check
+		// before ensureConnected() completes, creating duplicate server subscriptions.
+		let subscriptionCount = 0;
+
+		const mockObservable: Observable<Result> = {
+			subscribe: (observer) => {
+				subscriptionCount++;
+				setTimeout(() => observer.next?.({ $: "snapshot", data: { count: subscriptionCount } }), 10);
+				return { unsubscribe: () => {} };
+			},
+		};
+
+		const mockApp: LensServerInterface = {
+			getMetadata: () => ({
+				version: "1.0.0",
+				operations: {
+					counter: {
+						watch: { type: "subscription" },
+					},
+				},
+			}),
+			execute: () => mockObservable,
+		};
+
+		const client = createClient({
+			transport: inProcess({ app: mockApp }),
+		});
+
+		const result = client.counter.watch();
+
+		// Rapidly call subscribe multiple times (simulating race condition)
+		const values1: unknown[] = [];
+		const values2: unknown[] = [];
+		const values3: unknown[] = [];
+
+		// All three calls happen synchronously before any async work completes
+		result.subscribe((data) => values1.push(data));
+		result.subscribe((data) => values2.push(data));
+		result.subscribe((data) => values3.push(data));
+
+		// Wait for subscription to emit
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		// Only ONE server subscription should have been created
+		// (before the fix, subscriptionCount would be 3)
+		expect(subscriptionCount).toBe(1);
+
+		// All observers should receive the same data
+		expect(values1).toEqual([{ count: 1 }]);
+		expect(values2).toEqual([{ count: 1 }]);
+		expect(values3).toEqual([{ count: 1 }]);
+	});
 });
 
 // =============================================================================
