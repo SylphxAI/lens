@@ -111,3 +111,9 @@ export {
 	ReconnectionMetricsTracker,
 	type ReconnectionRecord,
 } from "./metrics.js";
+
+// =============================================================================
+// Subscription Registry
+// =============================================================================
+
+export { createSubscriptionRegistry, SubscriptionRegistry } from "./subscription-registry.js";

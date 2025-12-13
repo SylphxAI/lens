@@ -20,7 +20,7 @@ import {
 	type ReconnectResult,
 	type Version,
 } from "@sylphx/lens-core";
-import { SubscriptionRegistry } from "../reconnect/subscription-registry.js";
+import { SubscriptionRegistry } from "@sylphx/lens-core";
 import type {
 	ConnectionState,
 	Metadata,

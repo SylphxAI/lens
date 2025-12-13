@@ -503,7 +503,9 @@ export {
 	type ReconnectSubscription,
 	type SubscriptionAckMessage,
 	type SubscriptionObserver,
-	// Subscription tracking types (implementation in client)
+	// Subscription tracking
+	createSubscriptionRegistry,
+	SubscriptionRegistry,
 	type SubscriptionRegistryStats,
 	type SubscriptionResult,
 	type SubscriptionState,
