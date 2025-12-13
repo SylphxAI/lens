@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [1b0f4bf]
+  - @sylphx/lens-core@2.12.1
+
 ## 1.1.4
 
 ### Patch Changes

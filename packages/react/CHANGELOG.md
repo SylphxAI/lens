@@ -1,5 +1,13 @@
 # @sylphx/lens-react
 
+## 2.5.5
+
+### Patch Changes
+
+- Updated dependencies [1b0f4bf]
+  - @sylphx/lens-core@2.12.1
+  - @sylphx/lens-client@2.6.1
+
 ## 2.5.4
 
 ### Patch Changes

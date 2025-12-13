@@ -1,5 +1,24 @@
 # @sylphx/lens-server
 
+## 2.14.1
+
+### Patch Changes
+
+- 1b0f4bf: ## Bug Fixes
+
+  - Fix memory leak in WebSocket handshake timeout cleanup
+  - Fix TypeScript strict mode errors across packages
+  - Add cycle detection to `resolveEntityFields` preventing infinite recursion with circular entity references (e.g., User.posts → Post.author → User)
+
+  ## Tests
+
+  - Unskip v2-complete tests after cycle detection fix (15 tests now passing)
+  - Add comprehensive tests for dataloader batching
+  - Fix biome lint issues (import sorting, unused variables)
+
+- Updated dependencies [1b0f4bf]
+  - @sylphx/lens-core@2.12.1
+
 ## 2.14.0
 
 ### Minor Changes

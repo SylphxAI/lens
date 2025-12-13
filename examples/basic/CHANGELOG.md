@@ -1,5 +1,14 @@
 # lens-basic-example
 
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [1b0f4bf]
+  - @sylphx/lens-core@2.12.1
+  - @sylphx/lens-client@2.6.1
+  - @sylphx/lens-server@2.14.1
+
 ## 1.0.2
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @sylphx/lens
 
+## 2.2.4
+
+### Patch Changes
+
+- Updated dependencies [1b0f4bf]
+  - @sylphx/lens-core@2.12.1
+  - @sylphx/lens-client@2.6.1
+  - @sylphx/lens-server@2.14.1
+
 ## 2.2.3
 
 ### Patch Changes
