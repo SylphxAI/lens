@@ -561,15 +561,14 @@ describe("model() with plain object definition", () => {
 				title: string(),
 			});
 
-			const User = model("User", {
+			const User = model<AppContext>("User", {
 				id: id(),
 				name: string(),
 				posts: list(() => Post),
 			}).resolve({
 				posts: ({ source, ctx }) => {
 					void source.id; // Access source
-					void ctx; // Access context
-					return [];
+					return ctx.db.posts.filter((p) => p.authorId === source.id);
 				},
 			});
 

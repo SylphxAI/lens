@@ -181,13 +181,16 @@ export class SelectionRegistry {
 		}
 
 		// Add subscriber
-		endpoint.subscribers.set(subscriberId, {
+		const subscriberMeta: SubscriberMetadata = {
 			id: subscriberId,
 			selection,
 			onData,
-			onError,
 			createdAt: Date.now(),
-		});
+		};
+		if (onError) {
+			subscriberMeta.onError = onError;
+		}
+		endpoint.subscribers.set(subscriberId, subscriberMeta);
 
 		// Recompute merged selection
 		const newSelection = this.computeMergedSelection(endpoint);
@@ -451,7 +454,12 @@ export class SelectionRegistry {
 			const path = prefix ? `${prefix}.${key}` : key;
 			keys.add(path);
 
-			if (typeof value === "object" && value !== null && value !== true) {
+			// Skip boolean values (true means select field, no nesting)
+			if (typeof value === "boolean") {
+				continue;
+			}
+
+			if (typeof value === "object" && value !== null) {
 				// Handle nested selections
 				let nestedSelection: SelectionObject | undefined;
 

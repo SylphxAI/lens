@@ -917,14 +917,18 @@ export function createResolverFromEntity<
 				},
 			};
 		} else if (modelSubscriber) {
-			// SUBSCRIBE MODE: Only subscriber from model chain (uses Publisher pattern)
+			// LIVE MODE (subscriber-only): Field exposed from parent, with live updates via Publisher
+			// Uses passthrough resolver for initial data, subscriber for updates
 			fields[fieldName] = {
 				_kind: "resolved" as const,
-				_mode: "subscribe" as const,
+				_mode: "live" as const,
 				_returnType: undefined,
 				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
-					// Return the publisher factory
+				_resolver: ({ parent }: { parent: unknown }) => {
+					// Passthrough: extract field from parent data
+					return (parent as Record<string, unknown>)[fieldName];
+				},
+				_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
 					return modelSubscriber({ source: parent, parent, args: {}, ctx });
 				},
 			};

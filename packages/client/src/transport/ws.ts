@@ -258,10 +258,8 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 						} else if (message.$ === "ops" && message.ops) {
 							subInfo.observer.next?.({ $: "ops", ops: message.ops });
 						} else if (message.$ === "error") {
-							const errMsg =
-								typeof message.error === "string"
-									? message.error
-									: (message.error?.message ?? "Unknown error");
+							// When $ is "error", error is a string per Message protocol
+							const errMsg = String(message.error ?? "Unknown error");
 							subInfo.observer.next?.({ $: "error", error: errMsg });
 						} else if (message.data !== undefined) {
 							// Legacy: plain data without $ discriminator
@@ -576,7 +574,8 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 							version: 0,
 							lastData: null,
 							observer: {
-								next: (result) => observer.next?.({ data: result.data }),
+								// Transform SubscriptionResult to Message format
+								next: (result) => observer.next?.({ $: "snapshot", data: result.data }),
 								error: (error) => observer.error?.(error),
 								complete: () => observer.complete?.(),
 							},

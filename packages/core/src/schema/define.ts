@@ -252,6 +252,7 @@ export const entity: typeof defineEntity & {
 	 * }));
 	 * ```
 	 */
+	// biome-ignore lint/style/useShorthandFunctionType: Generic call signature for type augmentation
 	<TContext>(name: string): EntityBuilder_<TContext>;
 } = Object.assign(defineEntity, <TContext>(name: string) => new EntityBuilder_<TContext>(name));
 

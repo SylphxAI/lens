@@ -440,7 +440,12 @@ class ClientImpl {
 			const path = prefix ? `${prefix}.${key}` : key;
 			keys.add(path);
 
-			if (typeof value === "object" && value !== null && value !== true) {
+			// Skip boolean values (true means select field, no nesting)
+			if (typeof value === "boolean") {
+				continue;
+			}
+
+			if (typeof value === "object" && value !== null) {
 				const nested =
 					"select" in value ? (value.select as SelectionObject) : (value as SelectionObject);
 				if (nested && typeof nested === "object") {
