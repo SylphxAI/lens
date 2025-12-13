@@ -1,20 +1,23 @@
 # @sylphx/lens-core
 
-## 2.12.1
+## 2.12.1 (2025-12-13)
 
-### Patch Changes
+### 🐛 Bug Fixes
 
-- 1b0f4bf: ## Bug Fixes
+- resolve TypeScript strict mode and biome lint issues ([36f0104](https://github.com/SylphxAI/lens/commit/36f0104d980acd6b61a1795a1d561ab5990a14e9))
 
-  - Fix memory leak in WebSocket handshake timeout cleanup
-  - Fix TypeScript strict mode errors across packages
-  - Add cycle detection to `resolveEntityFields` preventing infinite recursion with circular entity references (e.g., User.posts → Post.author → User)
+### ♻️ Refactoring
 
-  ## Tests
+- consolidate SubscriptionRegistry to core package ([15662a1](https://github.com/SylphxAI/lens/commit/15662a1894b671706c7dcb913f9582b7e0f60f6e))
 
-  - Unskip v2-complete tests after cycle detection fix (15 tests now passing)
-  - Add comprehensive tests for dataloader batching
-  - Fix biome lint issues (import sorting, unused variables)
+### ✅ Tests
+
+- add comprehensive tests for array-strategy and dataloader ([cf5e540](https://github.com/SylphxAI/lens/commit/cf5e54016035c2e9057a16a53eda595e79f95727))
+- add comprehensive tests for array-strategy and dataloader ([cfdcd4d](https://github.com/SylphxAI/lens/commit/cfdcd4dd514732952d02c7d5ce545ad8be0651fe))
+
+### 🔧 Chores
+
+- fix biome lint issues ([12cb976](https://github.com/SylphxAI/lens/commit/12cb976132235aeff1df8fdead71fce6916e6301))
 
 ## 2.12.0
 

@@ -1,23 +1,19 @@
 # @sylphx/lens-server
 
-## 2.14.1
+## 2.14.1 (2025-12-13)
 
-### Patch Changes
+### 🐛 Bug Fixes
 
-- 1b0f4bf: ## Bug Fixes
+- memory leak and add cycle detection for circular entity refs ([a5d4c08](https://github.com/SylphxAI/lens/commit/a5d4c086c4711baefbbd5c4fa2ed80a6e78078e1))
 
-  - Fix memory leak in WebSocket handshake timeout cleanup
-  - Fix TypeScript strict mode errors across packages
-  - Add cycle detection to `resolveEntityFields` preventing infinite recursion with circular entity references (e.g., User.posts → Post.author → User)
+### ✅ Tests
 
-  ## Tests
+- add comprehensive tests for array-strategy and dataloader ([cf5e540](https://github.com/SylphxAI/lens/commit/cf5e54016035c2e9057a16a53eda595e79f95727))
+- add comprehensive tests for array-strategy and dataloader ([cfdcd4d](https://github.com/SylphxAI/lens/commit/cfdcd4dd514732952d02c7d5ce545ad8be0651fe))
 
-  - Unskip v2-complete tests after cycle detection fix (15 tests now passing)
-  - Add comprehensive tests for dataloader batching
-  - Fix biome lint issues (import sorting, unused variables)
+### 🔧 Chores
 
-- Updated dependencies [1b0f4bf]
-  - @sylphx/lens-core@2.12.1
+- fix biome lint issues ([12cb976](https://github.com/SylphxAI/lens/commit/12cb976132235aeff1df8fdead71fce6916e6301))
 
 ## 2.14.0
 
