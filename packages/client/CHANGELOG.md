@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.7.1 (2025-12-13)
+
+### 🐛 Bug Fixes
+
+- **client:** race condition and error handling improvements (#85) ([fc22df0](https://github.com/SylphxAI/lens/commit/fc22df061f7368ab81e5f46396eaff80e9e503b1))
+
 ## 2.7.0 (2025-12-13)
 
 ### ✨ Features
