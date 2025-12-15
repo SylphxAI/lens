@@ -40,9 +40,13 @@ export {
 	// Transport capability interfaces
 	type FullTransport,
 	type HttpServerTransportOptions,
+	// HTTP + SSE bundled transport
+	type HttpSseTransportInstance,
+	type HttpSseTransportOptions,
 	type HttpTransportOptions,
 	// Transports
 	http,
+	httpSse,
 	// Legacy alias (deprecated)
 	type InProcessTransportOptions,
 	inProcess,
@@ -75,8 +79,10 @@ export {
 	type SseTransportOptions,
 	type SubscriptionCapable,
 	type SubscriptionOnlyTransport,
-	// SSE
+	// SSE (atomic - subscriptions only)
 	sse,
+	// Deprecated alias for old httpSse behavior
+	sseLegacy,
 	// Types
 	type Transport,
 	type TransportBase,
