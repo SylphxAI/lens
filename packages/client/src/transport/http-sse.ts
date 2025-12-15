@@ -371,11 +371,3 @@ export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInsta
 		},
 	};
 }
-
-/**
- * @deprecated Use `httpSse()` instead. The `sse()` function has been renamed to
- * `httpSse()` to clarify that it bundles HTTP + SSE together.
- *
- * For pure SSE transport (subscription only), use `sse()` from main export with `routeByType()`.
- */
-export const sse: typeof httpSse = httpSse;

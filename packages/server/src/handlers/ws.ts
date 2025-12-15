@@ -83,6 +83,9 @@ export type { WSHandler, WSHandlerOptions } from "./ws-types.js";
 export function createWSHandler(server: LensServer, options: WSHandlerOptions = {}): WSHandler {
 	const { logger = {} } = options;
 
+	// Get plugin manager for direct hook calls
+	const pluginManager = server.getPluginManager();
+
 	// Security limits with sensible defaults
 	const maxMessageSize = options.maxMessageSize ?? 1024 * 1024; // 1MB
 	const maxSubscriptionsPerClient = options.maxSubscriptionsPerClient ?? 100;
@@ -149,11 +152,11 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		connections.set(clientId, conn);
 		wsToConnection.set(ws as object, conn);
 
-		// Register client with server (handles plugins + state manager)
-		const sendFn = (msg: unknown) => {
-			ws.send(JSON.stringify(msg));
+		// Register client with plugins
+		const sendFn = (message: unknown) => {
+			ws.send(JSON.stringify(message));
 		};
-		const allowed = await server.addClient(clientId, sendFn);
+		const allowed = await pluginManager.runOnConnect({ clientId, send: sendFn });
 		if (!allowed) {
 			ws.close();
 			connections.delete(clientId);
@@ -317,8 +320,8 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					logger.error?.("Cleanup error:", e);
 				}
 			}
-			// Unsubscribe from server
-			server.unsubscribe({
+			// Unsubscribe via plugins
+			pluginManager.runOnUnsubscribe({
 				clientId: conn.id,
 				subscriptionId: id,
 				operation: existingSub.operation,
@@ -338,10 +341,10 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 			lastData: resultData,
 		};
 
-		// Register subscriptions with server for each entity
+		// Register subscriptions with plugins for each entity
 		for (const { entity, entityId, entityData } of entities) {
-			// Server handles plugin hooks and subscription tracking
-			const allowed = await server.subscribe({
+			// Plugin handles subscription tracking
+			const allowed = await pluginManager.runOnSubscribe({
 				clientId: conn.id,
 				subscriptionId: id,
 				operation,
@@ -362,8 +365,27 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				return;
 			}
 
-			// Send initial data through server (runs through plugin hooks)
-			await server.send(conn.id, id, entity, entityId, entityData, true);
+			// Send initial data through plugin hooks
+			const transformedData = await pluginManager.runBeforeSend({
+				clientId: conn.id,
+				subscriptionId: id,
+				entity,
+				entityId,
+				data: entityData,
+				isInitial: true,
+				fields: "*",
+			});
+
+			await pluginManager.runAfterSend({
+				clientId: conn.id,
+				subscriptionId: id,
+				entity,
+				entityId,
+				data: transformedData,
+				isInitial: true,
+				fields: "*",
+				timestamp: Date.now(),
+			});
 		}
 
 		conn.subscriptions.set(id, sub);
@@ -413,10 +435,10 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		// Update adapter tracking
 		sub.fields = newFields;
 
-		// Notify server (runs plugin hooks)
+		// Notify plugins of field updates
 		for (const entityKey of sub.entityKeys) {
 			const [entity, entityId] = entityKey.split(":");
-			await server.updateFields({
+			await pluginManager.runOnUpdateFields({
 				clientId: conn.id,
 				subscriptionId: sub.id,
 				entity,
@@ -443,8 +465,8 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 
 		conn.subscriptions.delete(message.id);
 
-		// Server handles unsubscription (plugin hooks + state manager cleanup)
-		server.unsubscribe({
+		// Plugin handles unsubscription
+		pluginManager.runOnUnsubscribe({
 			clientId: conn.id,
 			subscriptionId: message.id,
 			operation: sub.operation,
@@ -521,7 +543,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				// Broadcast to all subscribers of affected entities
 				const entities = extractEntities(result.data);
 				for (const { entity, entityId, entityData } of entities) {
-					await server.broadcast(entity, entityId, entityData);
+					await pluginManager.runOnBroadcast({ entity, entityId, data: entityData });
 				}
 
 				conn.ws.send(
@@ -578,7 +600,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		};
 
 		// Check if server supports reconnection (via plugins)
-		const results = await server.handleReconnect(ctx);
+		const results = await pluginManager.runOnReconnect(ctx);
 
 		if (results === null) {
 			conn.ws.send(
@@ -657,8 +679,8 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		// Cleanup rate limit tracking
 		clientMessageTimestamps.delete(conn.id);
 
-		// Server handles removal (plugin hooks + state manager cleanup)
-		server.removeClient(conn.id, subscriptionCount);
+		// Plugin handles disconnection
+		pluginManager.runOnDisconnect({ clientId: conn.id, subscriptionCount });
 	}
 
 	// Helper: Extract entities from data

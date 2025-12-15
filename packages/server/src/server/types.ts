@@ -187,21 +187,17 @@ export interface WebSocketLike {
 // =============================================================================
 
 /**
- * Lens server interface
+ * Lens server interface - Pure Executor
+ *
+ * The server is a pure operation executor. It receives operations and returns results.
+ * Runtime concerns (connections, transport, protocol) are handled by adapters/handlers.
  *
  * Core methods:
  * - getMetadata() - Server metadata for transport handshake
- * - execute() - Execute any operation
+ * - execute() - Execute any operation (returns Observable)
  *
- * Subscription support (used by adapters):
- * - addClient() / removeClient() - Client connection management
- * - subscribe() / unsubscribe() - Subscription lifecycle
- * - send() - Send data to client (runs through plugin hooks)
- * - broadcast() - Broadcast to all entity subscribers
- * - handleReconnect() - Handle client reconnection
- *
- * The server handles all business logic including state management (via plugins).
- * Handlers are pure protocol translators that call these methods.
+ * For handlers that need plugin integration (WS, SSE with state management),
+ * use getPluginManager() to access plugin hooks directly.
  */
 export interface LensServer {
 	/** Get server metadata for transport handshake */
@@ -221,99 +217,18 @@ export interface LensServer {
 	 */
 	execute(op: LensOperation): Observable<LensResult>;
 
-	// =========================================================================
-	// Subscription Support (Optional - used by WS/SSE handlers)
-	// =========================================================================
-
 	/**
-	 * Register a client connection.
-	 * Call when a client connects via WebSocket/SSE.
-	 */
-	addClient(clientId: string, send: ClientSendFn): Promise<boolean>;
-
-	/**
-	 * Remove a client connection.
-	 * Call when a client disconnects.
-	 */
-	removeClient(clientId: string, subscriptionCount: number): void;
-
-	/**
-	 * Subscribe a client to an entity.
-	 * Runs plugin hooks and sets up state tracking (if clientState is enabled).
-	 */
-	subscribe(ctx: import("../plugin/types.js").SubscribeContext): Promise<boolean>;
-
-	/**
-	 * Unsubscribe a client from an entity.
-	 * Runs plugin hooks and cleans up state tracking.
-	 */
-	unsubscribe(ctx: import("../plugin/types.js").UnsubscribeContext): void;
-
-	/**
-	 * Send data to a client for a specific subscription.
-	 * Runs through plugin hooks (beforeSend/afterSend) for optimization.
-	 */
-	send(
-		clientId: string,
-		subscriptionId: string,
-		entity: string,
-		entityId: string,
-		data: Record<string, unknown>,
-		isInitial: boolean,
-	): Promise<void>;
-
-	/**
-	 * Broadcast data to all subscribers of an entity.
-	 * Runs through plugin hooks for each subscriber.
-	 */
-	broadcast(entity: string, entityId: string, data: Record<string, unknown>): Promise<void>;
-
-	/**
-	 * Handle a reconnection request from a client.
-	 * Uses plugin hooks (onReconnect) for reconnection logic.
-	 */
-	handleReconnect(
-		ctx: import("../plugin/types.js").ReconnectContext,
-	): Promise<import("../plugin/types.js").ReconnectHookResult[] | null>;
-
-	/**
-	 * Update subscribed fields for a client's subscription.
-	 * Runs plugin hooks (onUpdateFields) to sync state.
-	 */
-	updateFields(ctx: import("../plugin/types.js").UpdateFieldsContext): Promise<void>;
-
-	/**
-	 * Get the plugin manager for direct hook access.
+	 * Get the plugin manager for handlers that need plugin integration.
+	 *
+	 * Handlers should use this to call plugin hooks directly:
+	 * - pluginManager.runOnConnect() - When client connects
+	 * - pluginManager.runOnDisconnect() - When client disconnects
+	 * - pluginManager.runOnSubscribe() - When client subscribes
+	 * - pluginManager.runOnUnsubscribe() - When client unsubscribes
+	 * - pluginManager.runOnReconnect() - For reconnection handling
+	 * - etc.
 	 */
 	getPluginManager(): PluginManager;
-
-	// =========================================================================
-	// Subscription Detection (Deprecated - Use client-side with entities metadata)
-	// =========================================================================
-
-	/**
-	 * Check if any selected field (recursively) is a subscription.
-	 *
-	 * @deprecated Use client-side subscription detection with `getMetadata().entities` instead.
-	 * The client should use the entities metadata to determine transport routing.
-	 *
-	 * @param entityName - The entity type name
-	 * @param select - Selection object (if undefined, checks ALL fields)
-	 * @returns true if any selected field is a subscription
-	 */
-	hasAnySubscription(entityName: string, select?: SelectionObject): boolean;
-
-	/**
-	 * Check if an operation requires streaming transport.
-	 *
-	 * @deprecated Use client-side transport detection with `getMetadata().entities` instead.
-	 * The client should determine transport based on operation type from metadata
-	 * and entity field modes.
-	 *
-	 * @param path - Operation path
-	 * @param select - Selection object for return type fields
-	 */
-	requiresStreamingTransport(path: string, select?: SelectionObject): boolean;
 }
 
 // =============================================================================
