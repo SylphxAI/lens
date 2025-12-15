@@ -1484,10 +1484,10 @@ describe("Edge Cases and Race Conditions", () => {
 			connectResolve = resolve;
 		});
 
-		let subscriptionStarted = false;
+		let _subscriptionStarted = false;
 		const mockObservable: Observable<Result> = {
 			subscribe: (observer) => {
-				subscriptionStarted = true;
+				_subscriptionStarted = true;
 				observer.next?.({ $: "snapshot", data: { value: 1 } });
 				return { unsubscribe: () => {} };
 			},
@@ -1536,7 +1536,7 @@ describe("Edge Cases and Race Conditions", () => {
 		// When selection expands, it sets isSubscribed=false then calls startSubscription
 		// Another subscribe could slip in between
 		let subscriptionCount = 0;
-		let lastSelection: unknown = null;
+		let _lastSelection: unknown = null;
 
 		const mockObservable: Observable<Result> = {
 			subscribe: (observer) => {
@@ -1556,7 +1556,7 @@ describe("Edge Cases and Race Conditions", () => {
 				},
 			}),
 			execute: (op) => {
-				lastSelection = op.meta?.select;
+				_lastSelection = op.meta?.select;
 				return mockObservable;
 			},
 		};
@@ -1835,7 +1835,7 @@ describe("Edge Cases and Race Conditions", () => {
 	});
 
 	it("handles concurrent subscribe with different selections", async () => {
-		let executionCount = 0;
+		let _executionCount = 0;
 		const selections: unknown[] = [];
 
 		const mockObservable: Observable<Result> = {
@@ -1862,7 +1862,7 @@ describe("Edge Cases and Race Conditions", () => {
 				},
 			}),
 			execute: (op) => {
-				executionCount++;
+				_executionCount++;
 				selections.push(op.meta?.select);
 				return mockObservable;
 			},
@@ -1877,9 +1877,18 @@ describe("Edge Cases and Race Conditions", () => {
 		const values2: unknown[] = [];
 		const values3: unknown[] = [];
 
-		client.user.get().select({ name: true }).subscribe((d) => values1.push(d));
-		client.user.get().select({ email: true }).subscribe((d) => values2.push(d));
-		client.user.get().select({ phone: true }).subscribe((d) => values3.push(d));
+		client.user
+			.get()
+			.select({ name: true })
+			.subscribe((d) => values1.push(d));
+		client.user
+			.get()
+			.select({ email: true })
+			.subscribe((d) => values2.push(d));
+		client.user
+			.get()
+			.select({ phone: true })
+			.subscribe((d) => values3.push(d));
 
 		await new Promise((resolve) => setTimeout(resolve, 100));
 

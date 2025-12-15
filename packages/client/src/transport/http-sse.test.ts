@@ -4,7 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { isError } from "@sylphx/lens-core";
-import { type SseConnectionState, httpSse, sse as sseLegacy } from "./http-sse.js";
+import { httpSse, type SseConnectionState, sse as sseLegacy } from "./http-sse.js";
 
 // =============================================================================
 // Mock EventSource

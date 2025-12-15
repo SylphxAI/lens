@@ -110,14 +110,10 @@ export {
 
 // HTTP (atomic - query/mutation with polling fallback)
 export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http.js";
-
-// SSE (atomic - subscriptions only, for composition)
-export { type SseTransportOptions, type SseTransportInstance, sse } from "./sse.js";
-
 // HTTP + SSE (bundled - recommended for most use cases)
 export {
-	type HttpSseTransportOptions,
 	type HttpSseTransportInstance,
+	type HttpSseTransportOptions,
 	httpSse,
 	// Deprecated aliases (for backward compatibility)
 	/** @deprecated Use `ConnectionState` from types instead */
@@ -125,7 +121,6 @@ export {
 	/** @deprecated Use `httpSse()` instead. `sseLegacy` was the old bundled HTTP+SSE transport. */
 	sse as sseLegacy,
 } from "./http-sse.js";
-
 // Route (composition helpers)
 export {
 	type RouteByTypeConfig,
@@ -136,6 +131,8 @@ export {
 	routeByType,
 	type TypeSafeRouteByTypeConfig,
 } from "./route.js";
+// SSE (atomic - subscriptions only, for composition)
+export { type SseTransportInstance, type SseTransportOptions, sse } from "./sse.js";
 
 // WebSocket (can handle all operations)
 export { type WsTransportInstance, type WsTransportOptions, ws } from "./ws.js";
