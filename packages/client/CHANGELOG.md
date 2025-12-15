@@ -1,5 +1,16 @@
 # @sylphx/lens-client
 
+## 2.7.2 (2025-12-15)
+
+### 🐛 Bug Fixes
+
+- add explicit type annotation for deprecated sse export ([cb21cac](https://github.com/SylphxAI/lens/commit/cb21cac0971a88ad3e9da70c3b2a0f7ba8a29a5d))
+- resolve biome lint issues ([e7ea595](https://github.com/SylphxAI/lens/commit/e7ea5952c2ea61ed274ba1ce628038d3fac447d7))
+
+### ♻️ Refactoring
+
+- **client:** cleaner transport API design ([fedb16c](https://github.com/SylphxAI/lens/commit/fedb16cec9577d7551a080d6ec684f130a3ccea7))
+
 ## 2.7.1 (2025-12-13)
 
 ### 🐛 Bug Fixes
