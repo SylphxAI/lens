@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.7.3 (2025-12-15)
+
+### 🐛 Bug Fixes
+
+- **client:** export httpSse from main index ([e7608af](https://github.com/SylphxAI/lens/commit/e7608afb3780ea88f9478e12b92061ac9a2ae184))
+
 ## 2.7.2 (2025-12-15)
 
 ### 🐛 Bug Fixes
