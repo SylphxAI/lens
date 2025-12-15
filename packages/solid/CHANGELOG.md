@@ -1,5 +1,11 @@
 # @sylphx/lens-solid
 
+## 2.3.7 (2025-12-15)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 2.7.2
+
 ## 2.3.6 (2025-12-13)
 
 ### 📦 Dependencies
