@@ -1,22 +1,17 @@
 /**
- * @sylphx/lens-client - SSE-Only Transport
+ * @sylphx/lens-client - HTTP + SSE Transport
  *
- * Pure Server-Sent Events transport for subscriptions only.
- * This is an atomic transport meant for composition with routeByType().
+ * Bundled transport combining HTTP and Server-Sent Events.
+ * - Query/Mutation: HTTP POST
+ * - Subscription: SSE (EventSource)
  *
- * For query/mutation, use http() transport.
- * For an all-in-one solution, use httpSse() instead.
+ * This is a convenience all-in-one transport for common use cases.
+ * For composition with routeByType(), use separate http() and sseOnly() transports.
  *
- * @example
- * ```typescript
- * // Compose with http() for full functionality
- * const client = createClient({
- *   transport: routeByType({
- *     default: http({ url: '/api' }),
- *     subscription: sse({ url: '/api' }),
- *   }),
- * })
- * ```
+ * SSE is a good middle-ground between HTTP polling and WebSocket:
+ * - Simpler than WebSocket (HTTP-based, one-way)
+ * - More efficient than polling (server push)
+ * - Better serverless compatibility than WebSocket
  */
 
 import type {
@@ -26,8 +21,7 @@ import type {
 	Observer,
 	Operation,
 	Result,
-	SubscriptionCapable,
-	TransportBase,
+	Transport,
 } from "./types.js";
 
 // =============================================================================
@@ -35,17 +29,17 @@ import type {
 // =============================================================================
 
 /**
- * SSE-only transport options.
+ * HTTP + SSE transport options.
  */
-export interface SseTransportOptions {
-	/** Server URL for SSE endpoint */
+export interface HttpSseTransportOptions {
+	/** Server URL (base URL for HTTP and SSE endpoints) */
 	url: string;
-	/** Default headers (note: EventSource has limited header support) */
-	headers?: Record<string, string>;
+	/** Default headers for HTTP requests */
+	headers?: HeadersInit;
+	/** Fetch implementation (default: global fetch) */
+	fetch?: typeof fetch;
 	/** EventSource implementation (default: global EventSource) */
 	EventSource?: typeof EventSource;
-	/** Fetch implementation for metadata (default: global fetch) */
-	fetch?: typeof fetch;
 	/** Retry options for SSE reconnection */
 	retry?: {
 		/** Enable automatic reconnection (default: true) */
@@ -62,9 +56,19 @@ export interface SseTransportOptions {
 }
 
 /**
- * SSE-only transport instance.
+ * @deprecated Use `HttpSseTransportOptions` instead
  */
-export interface SseTransportInstance extends TransportBase, SubscriptionCapable {
+export type SseTransportOptions = HttpSseTransportOptions;
+
+/**
+ * @deprecated Use `ConnectionState` from types.ts instead
+ */
+export type SseConnectionState = ConnectionState;
+
+/**
+ * HTTP + SSE transport instance with additional methods.
+ */
+export interface HttpSseTransportInstance extends Transport {
 	/** Get current connection state */
 	getConnectionState(): ConnectionState;
 	/** Get active subscription count */
@@ -73,39 +77,52 @@ export interface SseTransportInstance extends TransportBase, SubscriptionCapable
 	close(): void;
 }
 
+/**
+ * @deprecated Use `HttpSseTransportInstance` instead
+ */
+export type SseTransportInstance = HttpSseTransportInstance;
+
 // =============================================================================
-// SSE-Only Transport
+// HTTP + SSE Transport
 // =============================================================================
 
 /**
- * Create SSE-only transport for subscriptions.
+ * Create HTTP + SSE bundled transport.
  *
- * This is a pure, atomic transport that only handles subscriptions via EventSource.
- * Use with routeByType() to combine with http() for query/mutation support.
+ * This is an all-in-one convenience transport that handles:
+ * - Queries via HTTP POST
+ * - Mutations via HTTP POST
+ * - Subscriptions via Server-Sent Events (EventSource)
+ *
+ * For finer control, use routeByType() with separate transports:
+ * ```typescript
+ * routeByType({
+ *   default: http({ url: '/api' }),
+ *   subscription: sseOnly({ url: '/api' }),
+ * })
+ * ```
  *
  * @example
  * ```typescript
- * import { http, sse, routeByType } from '@sylphx/lens-client/transport'
- *
  * const client = createClient({
- *   transport: routeByType({
- *     default: http({ url: '/api' }),
- *     subscription: sse({ url: '/api/events' }),
- *   }),
+ *   transport: httpSse({ url: '/api/lens' }),
  * })
  *
- * // Subscriptions use SSE
- * client.messages.stream().subscribe((msg) => {
- *   console.log('New message:', msg)
+ * // Query (HTTP POST)
+ * const user = await client.user.get({ id: '123' })
+ *
+ * // Subscription (SSE)
+ * client.user.get({ id: '123' }).subscribe((user) => {
+ *   console.log('User updated:', user)
  * })
  * ```
  */
-export function sse(options: SseTransportOptions): SseTransportInstance {
+export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInstance {
 	const {
 		url,
 		headers: defaultHeaders = {},
-		EventSource: EventSourceImpl = EventSource,
 		fetch: fetchImpl = fetch,
+		EventSource: EventSourceImpl = EventSource,
 		retry = {},
 		onConnectionStateChange,
 	} = options;
@@ -148,9 +165,43 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 	}
 
 	/**
+	 * Execute HTTP request for query/mutation.
+	 */
+	async function executeHttp(op: Operation): Promise<Result> {
+		try {
+			const response = await fetchImpl(baseUrl, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Accept: "application/json",
+					...defaultHeaders,
+					...((op.meta?.headers as Record<string, string>) ?? {}),
+				},
+				body: JSON.stringify({
+					id: op.id,
+					path: op.path,
+					type: op.type,
+					input: op.input,
+				}),
+			});
+
+			if (!response.ok) {
+				return {
+					$: "error",
+					error: `HTTP ${response.status}: ${response.statusText}`,
+				};
+			}
+
+			return (await response.json()) as Result;
+		} catch (error) {
+			return { $: "error", error: error instanceof Error ? error.message : String(error) };
+		}
+	}
+
+	/**
 	 * Create SSE subscription.
 	 */
-	function createSubscription(op: Operation): Observable<Result> {
+	function createSseSubscription(op: Operation): Observable<Result> {
 		return {
 			subscribe(observer: Observer<Result>) {
 				const subId = op.id;
@@ -164,11 +215,6 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 					}
 					sseUrl.searchParams.set("_sse", "1"); // Mark as SSE request
 
-					// Add headers as query params (EventSource doesn't support custom headers)
-					for (const [key, value] of Object.entries(defaultHeaders)) {
-						sseUrl.searchParams.set(`_h_${key}`, value);
-					}
-
 					const eventSource = new EventSourceImpl(sseUrl.toString());
 
 					// Track subscription
@@ -180,7 +226,7 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 					}
 
 					eventSource.onopen = () => {
-						retryCount = 0;
+						retryCount = 0; // Reset on successful connection
 						if (subscriptions.has(subId)) {
 							subscriptions.get(subId)!.retryCount = 0;
 						}
@@ -189,6 +235,8 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 
 					eventSource.onmessage = (event) => {
 						try {
+							// Parse as Message type for stateless architecture
+							// Server sends { $: "snapshot", data } or { $: "ops", ops }
 							const message = JSON.parse(event.data) as Result;
 							observer.next?.(message);
 						} catch (error) {
@@ -196,7 +244,10 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 						}
 					};
 
+					// Handle custom events
 					eventSource.addEventListener("error", (_event) => {
+						// EventSource will auto-reconnect on most errors
+						// But we track state for visibility
 						if (eventSource.readyState === EventSourceImpl.CLOSED) {
 							if (retryEnabled && retryCount < maxAttempts) {
 								setConnectionState("reconnecting");
@@ -205,6 +256,8 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 									subscriptions.get(subId)!.retryCount = retryCount;
 								}
 
+								// EventSource handles reconnection automatically
+								// But if it's fully closed, we reconnect manually
 								const delay = getRetryDelay(retryCount);
 								setTimeout(() => {
 									if (subscriptions.has(subId)) {
@@ -241,8 +294,10 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 					});
 				}
 
+				// Start connection
 				connect();
 
+				// Return unsubscribe function
 				return {
 					unsubscribe() {
 						const sub = subscriptions.get(subId);
@@ -280,11 +335,14 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 		},
 
 		/**
-		 * Execute subscription operation.
-		 * Only subscriptions are supported - use http() for query/mutation.
+		 * Execute operation.
+		 * HTTP POST for query/mutation, SSE for subscription.
 		 */
-		subscription(op: Operation): Observable<Result> {
-			return createSubscription(op);
+		execute(op: Operation): Promise<Result> | Observable<Result> {
+			if (op.type === "subscription") {
+				return createSseSubscription(op);
+			}
+			return executeHttp(op);
 		},
 
 		/**
@@ -305,11 +363,19 @@ export function sse(options: SseTransportOptions): SseTransportInstance {
 		 * Close all connections.
 		 */
 		close(): void {
-			for (const [_id, sub] of subscriptions) {
+			for (const [id, sub] of subscriptions) {
 				sub.eventSource.close();
+				subscriptions.delete(id);
 			}
-			subscriptions.clear();
 			setConnectionState("disconnected");
 		},
 	};
 }
+
+/**
+ * @deprecated Use `httpSse()` instead. The `sse()` function has been renamed to
+ * `httpSse()` to clarify that it bundles HTTP + SSE together.
+ *
+ * For pure SSE transport (subscription only), use `sseOnly()` with `routeByType()`.
+ */
+export const sse = httpSse;

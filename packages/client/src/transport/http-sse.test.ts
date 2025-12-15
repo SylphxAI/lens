@@ -1,10 +1,10 @@
 /**
- * @sylphx/lens-client - SSE Transport Tests
+ * @sylphx/lens-client - HTTP + SSE Transport Tests
  */
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { isError } from "@sylphx/lens-core";
-import { type SseConnectionState, sse } from "./sse.js";
+import { type SseConnectionState, httpSse, sse as sseLegacy } from "./http-sse.js";
 
 // =============================================================================
 // Mock EventSource
@@ -96,7 +96,7 @@ class MockEventSource {
 // Tests
 // =============================================================================
 
-describe("SSE Transport", () => {
+describe("HTTP + SSE Transport", () => {
 	let mockFetch: ReturnType<typeof mock>;
 
 	beforeEach(() => {
@@ -113,9 +113,28 @@ describe("SSE Transport", () => {
 		MockEventSource.clearInstances();
 	});
 
+	describe("httpSse (new name)", () => {
+		it("works with httpSse function name", async () => {
+			const transport = httpSse({
+				url: "http://localhost:3000/api",
+				fetch: mockFetch as typeof fetch,
+				EventSource: MockEventSource as unknown as typeof EventSource,
+			});
+
+			const metadata = await transport.connect();
+			expect(metadata.version).toBe("1.0.0");
+		});
+	});
+
+	describe("sseLegacy (deprecated alias)", () => {
+		it("sseLegacy is an alias for httpSse", () => {
+			expect(sseLegacy).toBe(httpSse);
+		});
+	});
+
 	describe("connect", () => {
 		it("fetches metadata from server", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -137,7 +156,7 @@ describe("SSE Transport", () => {
 				}),
 			);
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -147,7 +166,7 @@ describe("SSE Transport", () => {
 		});
 
 		it("normalizes URL by removing trailing slash", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api/",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -168,7 +187,7 @@ describe("SSE Transport", () => {
 				}),
 			);
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -203,7 +222,7 @@ describe("SSE Transport", () => {
 				}),
 			);
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -228,7 +247,7 @@ describe("SSE Transport", () => {
 				}),
 			);
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -255,7 +274,7 @@ describe("SSE Transport", () => {
 				}),
 			);
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				headers: { Authorization: "Bearer token123" },
@@ -275,7 +294,7 @@ describe("SSE Transport", () => {
 
 	describe("execute - subscription", () => {
 		it("creates EventSource for subscription", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -307,7 +326,7 @@ describe("SSE Transport", () => {
 		});
 
 		it("receives messages from EventSource", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -340,7 +359,7 @@ describe("SSE Transport", () => {
 		});
 
 		it("handles unsubscribe", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -367,7 +386,7 @@ describe("SSE Transport", () => {
 		});
 
 		it("handles complete event", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -397,7 +416,7 @@ describe("SSE Transport", () => {
 		it("tracks connection state changes", async () => {
 			const states: SseConnectionState[] = [];
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -423,7 +442,7 @@ describe("SSE Transport", () => {
 		});
 
 		it("returns to disconnected when all subscriptions end", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -448,7 +467,7 @@ describe("SSE Transport", () => {
 
 	describe("close", () => {
 		it("closes all subscriptions", async () => {
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,
@@ -484,7 +503,7 @@ describe("SSE Transport", () => {
 		it("can disable retry", async () => {
 			const errors: Error[] = [];
 
-			const transport = sse({
+			const transport = httpSse({
 				url: "http://localhost:3000/api",
 				fetch: mockFetch as typeof fetch,
 				EventSource: MockEventSource as unknown as typeof EventSource,

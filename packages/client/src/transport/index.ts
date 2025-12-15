@@ -2,6 +2,36 @@
  * @sylphx/lens-client - Transport System
  *
  * Pluggable transport layer for client-server communication.
+ *
+ * ## Transport Types
+ *
+ * ### Atomic Transports (for composition)
+ * - `http()` - HTTP POST for query/mutation
+ * - `sse()` - SSE for subscriptions only
+ * - `ws()` - WebSocket for all operations
+ *
+ * ### Bundled Transports (convenience)
+ * - `httpSse()` - HTTP + SSE combined (query/mutation via HTTP, subscriptions via SSE)
+ *
+ * ### Composition
+ * - `routeByType()` - Route different operation types to different transports
+ * - `route()` - Route by path pattern
+ *
+ * @example
+ * ```typescript
+ * // Option 1: Use bundled transport (simple)
+ * const client = createClient({
+ *   transport: httpSse({ url: '/api' }),
+ * })
+ *
+ * // Option 2: Compose transports (flexible)
+ * const client = createClient({
+ *   transport: routeByType({
+ *     default: http({ url: '/api' }),
+ *     subscription: sse({ url: '/api/events' }),
+ *   }),
+ * })
+ * ```
  */
 
 // =============================================================================
@@ -77,9 +107,26 @@ export {
 	type InProcessTransportOptions,
 	inProcess,
 } from "./direct.js";
-// HTTP
+
+// HTTP (atomic - query/mutation with polling fallback)
 export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http.js";
-// Route
+
+// SSE (atomic - subscriptions only, for composition)
+export { type SseTransportOptions, type SseTransportInstance, sse } from "./sse.js";
+
+// HTTP + SSE (bundled - recommended for most use cases)
+export {
+	type HttpSseTransportOptions,
+	type HttpSseTransportInstance,
+	httpSse,
+	// Deprecated aliases (for backward compatibility)
+	/** @deprecated Use `ConnectionState` from types instead */
+	type SseConnectionState,
+	/** @deprecated Use `httpSse()` instead. `sseLegacy` was the old bundled HTTP+SSE transport. */
+	sse as sseLegacy,
+} from "./http-sse.js";
+
+// Route (composition helpers)
 export {
 	type RouteByTypeConfig,
 	type RouteConfig,
@@ -89,12 +136,6 @@ export {
 	routeByType,
 	type TypeSafeRouteByTypeConfig,
 } from "./route.js";
-// SSE (Server-Sent Events)
-export {
-	type SseConnectionState,
-	type SseTransportInstance,
-	type SseTransportOptions,
-	sse,
-} from "./sse.js";
-// WebSocket
+
+// WebSocket (can handle all operations)
 export { type WsTransportInstance, type WsTransportOptions, ws } from "./ws.js";
