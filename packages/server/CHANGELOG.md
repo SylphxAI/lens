@@ -2,6 +2,23 @@
 
 ## 3.0.1 (2025-12-16)
 
+v3.0.1 - Remove deprecated APIs
+
+### ♻️ Refactoring
+
+- 💥 **core:** v3.0 - remove deprecated APIs and unify types ([a3e8d79](https://github.com/SylphxAI/lens/commit/a3e8d79f9db246918fe4ea21ba65cf82bde46b82))
+
+### 🔧 Chores
+
+- set versions to 3.0.1 (skip deprecated 3.0.0) ([4d92feb](https://github.com/SylphxAI/lens/commit/4d92febb4d0fa86fe45147abc89743b18922b1ca))
+
+### 💥 Breaking Changes
+
+- **core:** v3.0 - remove deprecated APIs and unify types ([a3e8d79](https://github.com/SylphxAI/lens/commit/a3e8d79f9db246918fe4ea21ba65cf82bde46b82))
+  Major API cleanup for v3.0
+
+## 3.0.1 (2025-12-16)
+
 v3.0 - Remove deprecated APIs and unify types
 
 ### ♻️ Refactoring
