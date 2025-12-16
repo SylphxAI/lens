@@ -4,7 +4,7 @@
  * Comprehensive tests demonstrating the field merging algorithm.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
 	filterToSelection,
 	getEndpointKey,

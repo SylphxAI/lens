@@ -86,6 +86,7 @@ export {
 	type TransportBase,
 	type TypeSafeRouteByTypeConfig,
 	type Unsubscribable,
+	type WsTransportInstance,
 	type WsTransportOptions,
 	ws,
 } from "./transport/index.js";

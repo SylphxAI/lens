@@ -253,20 +253,6 @@ describe("ReconnectionMetricsTracker", () => {
 		});
 	});
 
-	describe("compression tracking", () => {
-		it("tracks bytes transferred and saved", () => {
-			const tracker = new ReconnectionMetricsTracker();
-
-			tracker.recordCompression(1000, 250); // 75% compression
-			tracker.recordCompression(2000, 400); // 80% compression
-
-			const metrics = tracker.getMetrics();
-
-			expect(metrics.bytesTransferred).toBe(650); // 250 + 400
-			expect(metrics.bytesSaved).toBe(2350); // (1000-250) + (2000-400)
-		});
-	});
-
 	describe("event collection", () => {
 		it("emits events to collector", () => {
 			const events: MetricsEvent[] = [];

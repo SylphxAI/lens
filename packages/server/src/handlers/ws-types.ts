@@ -62,6 +62,33 @@ export interface WSHandlerOptions {
 }
 
 /**
+ * WebSocket handler configuration with all required values.
+ */
+export interface WSHandlerConfig {
+	/** Maximum message size in bytes */
+	maxMessageSize: number;
+	/** Maximum subscriptions per client */
+	maxSubscriptionsPerClient: number;
+	/** Maximum total connections */
+	maxConnections: number;
+	/** Rate limit: messages per window */
+	rateLimitMaxMessages: number;
+	/** Rate limit: window in milliseconds */
+	rateLimitWindowMs: number;
+}
+
+/**
+ * Default WebSocket handler configuration.
+ */
+export const DEFAULT_WS_HANDLER_CONFIG: WSHandlerConfig = {
+	maxMessageSize: 1024 * 1024, // 1MB
+	maxSubscriptionsPerClient: 100,
+	maxConnections: 10000,
+	rateLimitMaxMessages: 100,
+	rateLimitWindowMs: 1000,
+};
+
+/**
  * WebSocket adapter for Bun's websocket handler.
  */
 export interface WSHandler {

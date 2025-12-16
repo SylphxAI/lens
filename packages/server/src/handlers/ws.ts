@@ -30,22 +30,25 @@ import {
 	type ReconnectSubscription,
 } from "@sylphx/lens-core";
 import type { LensServer, WebSocketLike } from "../server/create.js";
-import type {
-	ClientConnection,
-	ClientMessage,
-	ClientSubscription,
-	HandshakeMessage,
-	MutationMessage,
-	QueryMessage,
-	SubscribeMessage,
-	UnsubscribeMessage,
-	UpdateFieldsMessage,
-	WSHandler,
-	WSHandlerOptions,
+import {
+	type ClientConnection,
+	type ClientMessage,
+	type ClientSubscription,
+	DEFAULT_WS_HANDLER_CONFIG,
+	type HandshakeMessage,
+	type MutationMessage,
+	type QueryMessage,
+	type SubscribeMessage,
+	type UnsubscribeMessage,
+	type UpdateFieldsMessage,
+	type WSHandler,
+	type WSHandlerConfig,
+	type WSHandlerOptions,
 } from "./ws-types.js";
 
-// Re-export types for external use
-export type { WSHandler, WSHandlerOptions } from "./ws-types.js";
+// Re-export types and config for external use
+export type { WSHandler, WSHandlerConfig, WSHandlerOptions } from "./ws-types.js";
+export { DEFAULT_WS_HANDLER_CONFIG } from "./ws-types.js";
 
 // =============================================================================
 // WebSocket Handler Factory
@@ -86,14 +89,16 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Get plugin manager for direct hook calls
 	const pluginManager = server.getPluginManager();
 
-	// Security limits with sensible defaults
-	const maxMessageSize = options.maxMessageSize ?? 1024 * 1024; // 1MB
-	const maxSubscriptionsPerClient = options.maxSubscriptionsPerClient ?? 100;
-	const maxConnections = options.maxConnections ?? 10000;
-
-	// Rate limiting configuration
-	const rateLimitMaxMessages = options.rateLimit?.maxMessages ?? 100;
-	const rateLimitWindowMs = options.rateLimit?.windowMs ?? 1000;
+	// Resolve configuration with defaults
+	const config: WSHandlerConfig = {
+		maxMessageSize: options.maxMessageSize ?? DEFAULT_WS_HANDLER_CONFIG.maxMessageSize,
+		maxSubscriptionsPerClient:
+			options.maxSubscriptionsPerClient ?? DEFAULT_WS_HANDLER_CONFIG.maxSubscriptionsPerClient,
+		maxConnections: options.maxConnections ?? DEFAULT_WS_HANDLER_CONFIG.maxConnections,
+		rateLimitMaxMessages:
+			options.rateLimit?.maxMessages ?? DEFAULT_WS_HANDLER_CONFIG.rateLimitMaxMessages,
+		rateLimitWindowMs: options.rateLimit?.windowMs ?? DEFAULT_WS_HANDLER_CONFIG.rateLimitWindowMs,
+	};
 
 	// Rate limit tracking per client (sliding window)
 	const clientMessageTimestamps = new Map<string, number[]>();
@@ -104,7 +109,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	 */
 	function isRateLimited(clientId: string): boolean {
 		const now = Date.now();
-		const windowStart = now - rateLimitWindowMs;
+		const windowStart = now - config.rateLimitWindowMs;
 
 		let timestamps = clientMessageTimestamps.get(clientId);
 		if (!timestamps) {
@@ -118,13 +123,58 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		}
 
 		// Check if over limit
-		if (timestamps.length >= rateLimitMaxMessages) {
+		if (timestamps.length >= config.rateLimitMaxMessages) {
 			return true;
 		}
 
 		// Record this message
 		timestamps.push(now);
 		return false;
+	}
+
+	/**
+	 * Sanitize error message to avoid leaking internal details.
+	 * Only exposes safe, actionable error messages to clients.
+	 */
+	function sanitizeErrorMessage(error: unknown): string {
+		if (error instanceof Error) {
+			const message = error.message;
+			// Don't expose messages that look like stack traces or internal paths
+			if (
+				message.includes("\n") ||
+				message.includes("/") ||
+				message.includes("\\") ||
+				message.includes("at ") ||
+				message.length > 200
+			) {
+				return "An internal error occurred";
+			}
+			return message;
+		}
+		return "An error occurred";
+	}
+
+	/**
+	 * Send an error message to a client.
+	 * Used for async handler errors to avoid leaking internal details.
+	 */
+	function sendErrorToClient(
+		conn: ClientConnection,
+		id: string | undefined,
+		code: string,
+		message: string,
+	): void {
+		try {
+			conn.ws.send(
+				JSON.stringify({
+					type: "error",
+					...(id !== undefined && { id }),
+					error: { code, message },
+				}),
+			);
+		} catch {
+			// Connection may already be closed
+		}
 	}
 
 	// Connection tracking
@@ -135,8 +185,10 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle new WebSocket connection
 	async function handleConnection(ws: WebSocketLike): Promise<void> {
 		// Check connection limit
-		if (connections.size >= maxConnections) {
-			logger.warn?.(`Connection limit reached (${maxConnections}), rejecting new connection`);
+		if (connections.size >= config.maxConnections) {
+			logger.warn?.(
+				`Connection limit reached (${config.maxConnections}), rejecting new connection`,
+			);
 			ws.close(1013, "Server at capacity");
 			return;
 		}
@@ -176,14 +228,16 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 	// Handle incoming message
 	function handleMessage(conn: ClientConnection, data: string): void {
 		// Check message size limit
-		if (data.length > maxMessageSize) {
-			logger.warn?.(`Message too large (${data.length} bytes > ${maxMessageSize}), rejecting`);
+		if (data.length > config.maxMessageSize) {
+			logger.warn?.(
+				`Message too large (${data.length} bytes > ${config.maxMessageSize}), rejecting`,
+			);
 			conn.ws.send(
 				JSON.stringify({
 					type: "error",
 					error: {
 						code: "MESSAGE_TOO_LARGE",
-						message: `Message exceeds ${maxMessageSize} byte limit`,
+						message: `Message exceeds ${config.maxMessageSize} byte limit`,
 					},
 				}),
 			);
@@ -198,7 +252,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					type: "error",
 					error: {
 						code: "RATE_LIMITED",
-						message: `Rate limit exceeded: max ${rateLimitMaxMessages} messages per ${rateLimitWindowMs}ms`,
+						message: `Rate limit exceeded: max ${config.rateLimitMaxMessages} messages per ${config.rateLimitWindowMs}ms`,
 					},
 				}),
 			);
@@ -213,29 +267,44 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					handleHandshake(conn, message);
 					break;
 				case "subscribe":
-					handleSubscribe(conn, message);
+					handleSubscribe(conn, message).catch((error) => {
+						logger.error?.("Subscribe handler error:", error);
+						sendErrorToClient(conn, message.id, "INTERNAL_ERROR", "Subscription failed");
+					});
 					break;
 				case "updateFields":
-					handleUpdateFields(conn, message);
+					handleUpdateFields(conn, message).catch((error) => {
+						logger.error?.("UpdateFields handler error:", error);
+						sendErrorToClient(conn, message.id, "INTERNAL_ERROR", "Field update failed");
+					});
 					break;
 				case "unsubscribe":
 					handleUnsubscribe(conn, message);
 					break;
 				case "query":
-					handleQuery(conn, message);
+					handleQuery(conn, message).catch((error) => {
+						logger.error?.("Query handler error:", error);
+						sendErrorToClient(conn, message.id, "INTERNAL_ERROR", "Query failed");
+					});
 					break;
 				case "mutation":
-					handleMutation(conn, message);
+					handleMutation(conn, message).catch((error) => {
+						logger.error?.("Mutation handler error:", error);
+						sendErrorToClient(conn, message.id, "INTERNAL_ERROR", "Mutation failed");
+					});
 					break;
 				case "reconnect":
-					handleReconnect(conn, message);
+					handleReconnect(conn, message).catch((error) => {
+						logger.error?.("Reconnect handler error:", error);
+						sendErrorToClient(conn, undefined, "INTERNAL_ERROR", "Reconnect failed");
+					});
 					break;
 			}
 		} catch (error) {
 			conn.ws.send(
 				JSON.stringify({
 					type: "error",
-					error: { code: "PARSE_ERROR", message: String(error) },
+					error: { code: "PARSE_ERROR", message: sanitizeErrorMessage(error) },
 				}),
 			);
 		}
@@ -259,9 +328,12 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		const { id, operation, input, fields } = message;
 
 		// Check subscription limit (skip if replacing existing subscription)
-		if (!conn.subscriptions.has(id) && conn.subscriptions.size >= maxSubscriptionsPerClient) {
+		if (
+			!conn.subscriptions.has(id) &&
+			conn.subscriptions.size >= config.maxSubscriptionsPerClient
+		) {
 			logger.warn?.(
-				`Subscription limit reached for client ${conn.id} (${maxSubscriptionsPerClient}), rejecting`,
+				`Subscription limit reached for client ${conn.id} (${config.maxSubscriptionsPerClient}), rejecting`,
 			);
 			conn.ws.send(
 				JSON.stringify({
@@ -269,7 +341,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					id,
 					error: {
 						code: "SUBSCRIPTION_LIMIT",
-						message: `Maximum ${maxSubscriptionsPerClient} subscriptions per client`,
+						message: `Maximum ${config.maxSubscriptionsPerClient} subscriptions per client`,
 					},
 				}),
 			);
@@ -300,7 +372,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				JSON.stringify({
 					type: "error",
 					id,
-					error: { code: "EXECUTION_ERROR", message: String(error) },
+					error: { code: "EXECUTION_ERROR", message: sanitizeErrorMessage(error) },
 				}),
 			);
 			return;
@@ -321,11 +393,15 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				}
 			}
 			// Unsubscribe via plugins
-			pluginManager.runOnUnsubscribe({
-				clientId: conn.id,
-				subscriptionId: id,
-				operation: existingSub.operation,
-				entityKeys: Array.from(existingSub.entityKeys),
+			Promise.resolve(
+				pluginManager.runOnUnsubscribe({
+					clientId: conn.id,
+					subscriptionId: id,
+					operation: existingSub.operation,
+					entityKeys: Array.from(existingSub.entityKeys),
+				}),
+			).catch((error) => {
+				logger.error?.("Plugin unsubscribe error:", error);
 			});
 			conn.subscriptions.delete(id);
 		}
@@ -466,11 +542,15 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		conn.subscriptions.delete(message.id);
 
 		// Plugin handles unsubscription
-		pluginManager.runOnUnsubscribe({
-			clientId: conn.id,
-			subscriptionId: message.id,
-			operation: sub.operation,
-			entityKeys: Array.from(sub.entityKeys),
+		Promise.resolve(
+			pluginManager.runOnUnsubscribe({
+				clientId: conn.id,
+				subscriptionId: message.id,
+				operation: sub.operation,
+				entityKeys: Array.from(sub.entityKeys),
+			}),
+		).catch((error) => {
+			logger.error?.("Plugin unsubscribe error:", error);
 		});
 	}
 
@@ -512,7 +592,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				JSON.stringify({
 					type: "error",
 					id: message.id,
-					error: { code: "EXECUTION_ERROR", message: String(error) },
+					error: { code: "EXECUTION_ERROR", message: sanitizeErrorMessage(error) },
 				}),
 			);
 		}
@@ -543,7 +623,41 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				// Broadcast to all subscribers of affected entities
 				const entities = extractEntities(result.data);
 				for (const { entity, entityId, entityData } of entities) {
-					await pluginManager.runOnBroadcast({ entity, entityId, data: entityData });
+					const broadcastResult = await pluginManager.runOnBroadcast({
+						entity,
+						entityId,
+						data: entityData,
+					});
+
+					// Route broadcast to all subscribers of this entity
+					if (broadcastResult) {
+						const entityKey = `${entity}:${entityId}`;
+						for (const [clientId, clientConn] of connections) {
+							// Skip the client that made the mutation (they'll get the result below)
+							if (clientId === conn.id) continue;
+
+							for (const sub of clientConn.subscriptions.values()) {
+								if (sub.entityKeys.has(entityKey)) {
+									// Send update to subscriber
+									const updateMessage = broadcastResult.patch
+										? {
+												type: "update",
+												subscriptionId: sub.id,
+												version: broadcastResult.version,
+												patch: broadcastResult.patch,
+											}
+										: {
+												type: "update",
+												subscriptionId: sub.id,
+												version: broadcastResult.version,
+												data: broadcastResult.data,
+											};
+
+									clientConn.ws.send(JSON.stringify(updateMessage));
+								}
+							}
+						}
+					}
 				}
 
 				conn.ws.send(
@@ -559,7 +673,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 				JSON.stringify({
 					type: "error",
 					id: message.id,
-					error: { code: "EXECUTION_ERROR", message: String(error) },
+					error: { code: "EXECUTION_ERROR", message: sanitizeErrorMessage(error) },
 				}),
 			);
 		}
@@ -650,7 +764,7 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					type: "error",
 					error: {
 						code: "RECONNECT_ERROR",
-						message: String(error),
+						message: sanitizeErrorMessage(error),
 						reconnectId: message.reconnectId,
 					},
 				}),
@@ -680,7 +794,11 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 		clientMessageTimestamps.delete(conn.id);
 
 		// Plugin handles disconnection
-		pluginManager.runOnDisconnect({ clientId: conn.id, subscriptionCount });
+		Promise.resolve(pluginManager.runOnDisconnect({ clientId: conn.id, subscriptionCount })).catch(
+			(error) => {
+				logger.error?.("Plugin disconnect error:", error);
+			},
+		);
 	}
 
 	// Helper: Extract entities from data

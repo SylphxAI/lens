@@ -3,12 +3,8 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import {
-	createSubscriptionRegistry,
-	hashEntityState,
-	SubscriptionRegistry,
-	type TrackedSubscription,
-} from "@sylphx/lens-core";
+import { hashEntityState } from "@sylphx/lens-core";
+import { createSubscriptionRegistry, SubscriptionRegistry, type TrackedSubscription } from "./subscription-registry.js";
 
 // =============================================================================
 // Test Helpers

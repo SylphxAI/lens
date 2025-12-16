@@ -31,8 +31,7 @@
 	"license": "MIT",
 	"dependencies": {
 		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/reify": "^0.1.2",
-		"@msgpack/msgpack": "^3.1.2"
+		"@sylphx/reify": "^0.1.2"
 	},
 	"devDependencies": {
 		"@sylphx/lens-server": "workspace:*",

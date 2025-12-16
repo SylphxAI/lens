@@ -147,24 +147,26 @@ export function operations<TContext>(): Operations<TContext> {
 // Helpers
 // =============================================================================
 
-let tempIdCounter = 0;
-
 /**
  * Generate a temporary ID for optimistic updates.
+ * Uses timestamp + random suffix for uniqueness without global state.
  *
  * @example
  * ```typescript
  * .optimistic('create')  // Auto-generates tempId
- * tempId()  // Returns "temp_0", "temp_1", etc.
+ * tempId()  // Returns "temp_1234567890_abc123", etc.
  * ```
  */
 export function tempId(): string {
-	return `temp_${tempIdCounter++}`;
+	return `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** Reset temp ID counter (for testing) */
+/**
+ * @deprecated No longer needed - tempId() is now stateless.
+ * This function is a no-op kept for backwards compatibility.
+ */
 export function resetTempIdCounter(): void {
-	tempIdCounter = 0;
+	// No-op - tempId() is now stateless
 }
 
 /** Check if an ID is a temporary ID */

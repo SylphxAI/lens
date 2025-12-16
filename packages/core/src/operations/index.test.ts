@@ -4,7 +4,7 @@
  * Tests for the query() and mutation() builder pattern.
  */
 
-import { beforeEach, describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { entity } from "../schema/define.js";
 import { t } from "../schema/types.js";
@@ -245,32 +245,36 @@ describe("mutation() builder", () => {
 // =============================================================================
 
 describe("tempId()", () => {
-	beforeEach(() => {
-		resetTempIdCounter();
-	});
-
 	it("generates unique temporary IDs", () => {
 		const id1 = tempId();
 		const id2 = tempId();
 		const id3 = tempId();
 
-		expect(id1).toBe("temp_0");
-		expect(id2).toBe("temp_1");
-		expect(id3).toBe("temp_2");
+		// All IDs should be unique
+		expect(id1).not.toBe(id2);
+		expect(id2).not.toBe(id3);
+		expect(id1).not.toBe(id3);
+
+		// All IDs should start with "temp_"
+		expect(id1.startsWith("temp_")).toBe(true);
+		expect(id2.startsWith("temp_")).toBe(true);
+		expect(id3.startsWith("temp_")).toBe(true);
 	});
 
 	it("isTempId identifies temporary IDs", () => {
 		expect(isTempId("temp_0")).toBe(true);
 		expect(isTempId("temp_123")).toBe(true);
+		expect(isTempId("temp_1234567890_abc123")).toBe(true);
+		expect(isTempId(tempId())).toBe(true);
 		expect(isTempId("real-id")).toBe(false);
 		expect(isTempId("123")).toBe(false);
 	});
 
-	it("resetTempIdCounter resets the counter", () => {
-		tempId();
-		tempId();
+	it("resetTempIdCounter is deprecated no-op", () => {
+		// Should not throw - kept for backwards compatibility
 		resetTempIdCounter();
-		expect(tempId()).toBe("temp_0");
+		const id = tempId();
+		expect(isTempId(id)).toBe(true);
 	});
 });
 

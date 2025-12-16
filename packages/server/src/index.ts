@@ -108,6 +108,7 @@ export {
 	createSSEHandler,
 	// WebSocket Handler
 	createWSHandler,
+	DEFAULT_WS_HANDLER_CONFIG,
 	type FrameworkHandlerOptions,
 	type Handler,
 	type HandlerOptions,
@@ -118,6 +119,7 @@ export {
 	handleWebSSE,
 	type SSEHandlerOptions,
 	type WSHandler,
+	type WSHandlerConfig,
 	type WSHandlerOptions,
 } from "./handlers/index.js";
 

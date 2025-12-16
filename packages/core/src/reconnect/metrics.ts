@@ -2,7 +2,7 @@
  * @sylphx/lens-core - Reconnection Metrics
  *
  * Metrics and observability for the reconnection system.
- * Tracks reconnection attempts, latency, data transfer, and compression statistics.
+ * Tracks reconnection attempts, latency, and data transfer statistics.
  */
 
 import type {
@@ -85,7 +85,6 @@ export class ReconnectionMetricsTracker {
 	private totalFailures = 0;
 	private totalSubscriptionsProcessed = 0;
 	private totalBytesTransferred = 0;
-	private totalBytesCompressed = 0;
 
 	// Status counters
 	private statusCounts: Record<ReconnectStatus, number> = {
@@ -230,14 +229,6 @@ export class ReconnectionMetricsTracker {
 		});
 	}
 
-	/**
-	 * Record compression statistics.
-	 */
-	recordCompression(originalSize: number, compressedSize: number): void {
-		this.totalBytesTransferred += compressedSize;
-		this.totalBytesCompressed += originalSize - compressedSize;
-	}
-
 	// ===========================================================================
 	// Metrics Retrieval
 	// ===========================================================================
@@ -267,11 +258,6 @@ export class ReconnectionMetricsTracker {
 			totalSubscriptionsProcessed: this.totalSubscriptionsProcessed,
 			statusBreakdown: { ...this.statusCounts },
 			bytesTransferred: this.totalBytesTransferred,
-			bytesSaved: this.totalBytesCompressed,
-			compressionRatio:
-				this.totalBytesTransferred > 0
-					? (this.totalBytesTransferred - this.totalBytesCompressed) / this.totalBytesTransferred
-					: 1,
 		};
 	}
 
@@ -339,7 +325,6 @@ export class ReconnectionMetricsTracker {
 		this.totalFailures = 0;
 		this.totalSubscriptionsProcessed = 0;
 		this.totalBytesTransferred = 0;
-		this.totalBytesCompressed = 0;
 		this.statusCounts = { current: 0, patched: 0, snapshot: 0, deleted: 0, error: 0 };
 		this.latencies = [];
 	}

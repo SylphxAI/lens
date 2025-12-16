@@ -468,12 +468,6 @@ export interface ReconnectionMetrics {
 
 	/** Total bytes transferred */
 	bytesTransferred: number;
-
-	/** Total bytes saved by compression */
-	bytesSaved: number;
-
-	/** Compression ratio (0-1) */
-	compressionRatio: number;
 }
 
 /**
@@ -494,47 +488,6 @@ export interface ReconnectionHealth {
 
 	/** Number of pending reconnections */
 	pendingReconnects: number;
-}
-
-// =============================================================================
-// Compressed Payload (for large snapshots)
-// =============================================================================
-
-/**
- * Compression algorithm.
- */
-export type CompressionAlgorithm = "gzip" | "deflate" | "none";
-
-/**
- * Compressed payload wrapper.
- */
-export interface CompressedPayload {
-	/** Indicates this is compressed */
-	compressed: true;
-
-	/** Compression algorithm used */
-	algorithm: CompressionAlgorithm;
-
-	/** Base64 encoded compressed data */
-	data: string;
-
-	/** Original size in bytes (for logging) */
-	originalSize: number;
-
-	/** Compressed size in bytes */
-	compressedSize: number;
-}
-
-/**
- * Check if value is compressed payload.
- */
-export function isCompressedPayload(value: unknown): value is CompressedPayload {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"compressed" in value &&
-		(value as CompressedPayload).compressed === true
-	);
 }
 
 // =============================================================================

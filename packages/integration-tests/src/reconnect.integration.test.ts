@@ -10,12 +10,8 @@ import { describe, expect, it } from "bun:test";
 import { SubscriptionRegistry } from "@sylphx/lens-client";
 import {
 	applyPatch,
-	compressIfNeeded,
-	decompressIfNeeded,
 	generateReconnectId,
 	hashEntityState,
-	isCompressedPayload,
-	isCompressionSupported,
 	type PatchOperation,
 	PROTOCOL_VERSION,
 	type ReconnectMessage,
@@ -495,44 +491,6 @@ describe("reconnection integration", () => {
 			expect(coalesced.find((p) => p.path === "/age")?.value).toBe(26);
 			expect(coalesced.find((p) => p.path === "/status")?.value).toBe("active");
 			expect(coalesced.find((p) => p.path === "/temp")?.op).toBe("remove");
-		});
-	});
-
-	describe("compression integration", () => {
-		it("compresses and decompresses large payloads", async () => {
-			// Create large data that benefits from compression
-			const largeData = {
-				users: Array(100)
-					.fill(null)
-					.map((_, i) => ({
-						id: `user-${i}`,
-						name: `User Number ${i}`,
-						email: `user${i}@example.com`,
-						bio: "This is a repeated bio that compresses well. ".repeat(10),
-					})),
-			};
-
-			// Compress
-			const compressed = await compressIfNeeded(largeData, { threshold: 100 });
-
-			if (isCompressionSupported()) {
-				expect(isCompressedPayload(compressed)).toBe(true);
-				if (isCompressedPayload(compressed)) {
-					expect(compressed.compressedSize).toBeLessThan(compressed.originalSize);
-				}
-			}
-
-			// Decompress
-			const decompressed = await decompressIfNeeded(compressed);
-			expect(decompressed).toEqual(largeData);
-		});
-
-		it("skips compression for small payloads", async () => {
-			const smallData = { name: "Alice" };
-			const result = await compressIfNeeded(smallData, { threshold: 1000 });
-
-			expect(isCompressedPayload(result)).toBe(false);
-			expect(result).toEqual(smallData);
 		});
 	});
 

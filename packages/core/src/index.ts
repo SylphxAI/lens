@@ -452,35 +452,21 @@ export {
 export {
 	// Patch utilities (shared)
 	applyPatch,
-	// Compression types
-	type CompressedPayload,
-	type CompressionAlgorithm,
-	type CompressionConfig,
 	type ConnectionQuality,
 	type ConnectionState,
-	// Compression functions
-	compressIfNeeded,
 	createMetricsTracker,
 	// Subscription tracking
 	createSubscriptionRegistry,
-	DEFAULT_COMPRESSION_CONFIG,
 	DEFAULT_METRICS_CONFIG,
 	DEFAULT_OPERATION_LOG_CONFIG,
 	DEFAULT_RECONNECT_CONFIG,
-	decompressIfNeeded,
 	deepEqual,
 	FieldHashMap,
-	formatCompressionStats,
 	generateReconnectId,
-	getCompressionRatio,
-	getSpaceSaved,
 	HashCache,
 	hashEntityFields,
 	hashEntityState,
 	hashValue,
-	// Utilities
-	isCompressedPayload,
-	isCompressionSupported,
 	type MetricsCollector,
 	type MetricsConfig,
 	type MetricsEvent,

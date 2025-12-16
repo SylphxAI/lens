@@ -220,6 +220,7 @@ function createPollingObservable(
 					if (isError(message)) {
 						retries++;
 						if (retries > options.maxRetries) {
+							active = false;
 							observer.error?.(new Error(message.error));
 							return;
 						}
@@ -245,6 +246,7 @@ function createPollingObservable(
 					}
 				} catch (error) {
 					if (active) {
+						active = false;
 						observer.error?.(error as Error);
 					}
 				}

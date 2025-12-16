@@ -9,18 +9,16 @@
 import {
 	applyPatch,
 	DEFAULT_RECONNECT_CONFIG,
-	decompressIfNeeded,
 	generateReconnectId,
-	isCompressedPayload,
 	type PatchOperation,
 	PROTOCOL_VERSION,
 	type ReconnectAckMessage,
 	type ReconnectConfig,
 	type ReconnectMessage,
 	type ReconnectResult,
-	SubscriptionRegistry,
 	type Version,
 } from "@sylphx/lens-core";
+import { SubscriptionRegistry } from "../reconnect/subscription-registry.js";
 import type {
 	ConnectionState,
 	Metadata,
@@ -293,16 +291,16 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 	/**
 	 * Handle reconnect acknowledgment from server.
 	 */
-	async function handleReconnectAck(ack: ReconnectAckMessage): Promise<void> {
+	function handleReconnectAck(ack: ReconnectAckMessage): void {
 		// Verify this is the reconnect we're waiting for
 		if (ack.reconnectId !== pendingReconnect) {
 			return;
 		}
 		pendingReconnect = null;
 
-		// Process each subscription result (handles decompression)
+		// Process each subscription result
 		for (const result of ack.results) {
-			await processReconnectResult(result);
+			processReconnectResult(result);
 		}
 
 		// Notify callback
@@ -311,9 +309,8 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 
 	/**
 	 * Process a single reconnect result.
-	 * Handles decompression of compressed snapshots.
 	 */
-	async function processReconnectResult(result: ReconnectResult): Promise<void> {
+	function processReconnectResult(result: ReconnectResult): void {
 		const subInfo = subscriptionObservers.get(result.id);
 		if (!subInfo) return;
 
@@ -344,15 +341,10 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 			}
 
 			case "snapshot": {
-				// Full state replacement (may be compressed)
+				// Full state replacement
 				if (result.data) {
-					// Decompress if needed
-					const data = isCompressedPayload(result.data)
-						? await decompressIfNeeded<Record<string, unknown>>(result.data)
-						: result.data;
-
-					registry.processReconnectResult(result.id, result.version, data);
-					subInfo.observer.next?.({ $: "snapshot", data });
+					registry.processReconnectResult(result.id, result.version, result.data);
+					subInfo.observer.next?.({ $: "snapshot", data: result.data });
 				}
 				break;
 			}
@@ -593,16 +585,20 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 						});
 
 						// Send subscribe message
-						ensureConnection().then((ws) => {
-							ws.send(
-								JSON.stringify({
-									type: "subscription",
-									id: op.id,
-									path: op.path,
-									input: op.input,
-								}),
-							);
-						});
+						ensureConnection()
+							.then((ws) => {
+								ws.send(
+									JSON.stringify({
+										type: "subscription",
+										id: op.id,
+										path: op.path,
+										input: op.input,
+									}),
+								);
+							})
+							.catch((err) => {
+								observer.error?.(err instanceof Error ? err : new Error(String(err)));
+							});
 
 						return {
 							unsubscribe() {
