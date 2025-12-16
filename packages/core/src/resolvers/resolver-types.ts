@@ -95,15 +95,13 @@ export type FieldLiveContext<TContext, TResult = unknown> = TContext & {
  */
 export type FieldResolveParams<TParent, TArgs, TContext> = {
 	/**
-	 * Parent object being resolved (preferred).
+	 * Source object being resolved.
 	 * @example
 	 * ```typescript
 	 * .resolve(({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id))
 	 * ```
 	 */
 	source: TParent;
-	/** @deprecated Use `source` instead for consistency with GraphQL terminology */
-	parent: TParent;
 	/** Field arguments (if any) */
 	args: TArgs;
 	ctx: FieldQueryContext<TContext>;
@@ -114,10 +112,8 @@ export type FieldResolveParams<TParent, TArgs, TContext> = {
  * Returns a Publisher that receives subscription callbacks.
  */
 export type FieldSubscribeParams<TParent, TArgs, TContext> = {
-	/** Parent object being resolved (preferred) */
+	/** Source object being resolved */
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	/** Field arguments (if any) */
 	args: TArgs;
 	ctx: TContext;
@@ -167,8 +163,6 @@ export type FieldLiveSubscribeFn<TParent, TArgs, TContext, TResult> = (
 /** Field resolver function without args for .resolve() */
 export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: FieldQueryContext<TContext>;
 }) => TResult | Promise<TResult>;
 
@@ -178,16 +172,12 @@ export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
  */
 export type FieldSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: FieldSubscriptionContext<TContext, TResult>;
 }) => void | Promise<void>;
 
 /** Live field subscriber function without args - returns Publisher */
 export type FieldLiveSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: TContext;
 }) => Publisher<TResult>;
 

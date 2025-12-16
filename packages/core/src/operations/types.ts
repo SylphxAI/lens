@@ -204,18 +204,13 @@ export type LensContext<TContext, TOutput = unknown> = TContext & LensContextExt
  */
 export interface QueryResolverContext<TInput = unknown, TContext = unknown> {
 	/**
-	 * Parsed and validated input (preferred).
+	 * Parsed and validated input.
 	 * @example
 	 * ```typescript
 	 * .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
 	 * ```
 	 */
 	args: TInput;
-	/**
-	 * @deprecated Use `args` instead for consistency with field resolvers.
-	 * Parsed and validated input.
-	 */
-	input: TInput;
 	/** User context (no Lens extensions for queries) */
 	ctx: QueryContext<TContext>;
 }
@@ -225,10 +220,8 @@ export interface QueryResolverContext<TInput = unknown, TContext = unknown> {
  * ctx has emit and onCleanup.
  */
 export interface EmitResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
-	/** Parsed and validated input (preferred) */
+	/** Parsed and validated input */
 	args: TInput;
-	/** @deprecated Use `args` instead */
-	input: TInput;
 	/** Context with emit and onCleanup */
 	ctx: EmitSubscriptionContext<TContext, TOutput>;
 }
@@ -238,10 +231,8 @@ export interface EmitResolverContext<TInput = unknown, TOutput = unknown, TConte
  * ctx has onCleanup but no emit.
  */
 export interface GeneratorResolverContext<TInput = unknown, TContext = unknown> {
-	/** Parsed and validated input (preferred) */
+	/** Parsed and validated input */
 	args: TInput;
-	/** @deprecated Use `args` instead */
-	input: TInput;
 	/** Context with onCleanup only */
 	ctx: GeneratorSubscriptionContext<TContext>;
 }

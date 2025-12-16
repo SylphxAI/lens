@@ -29,7 +29,6 @@
 import type { ModelDef } from "./model.js";
 import type { EntityDefinition } from "./types.js";
 import {
-	ArrayType,
 	BigIntType,
 	BooleanType,
 	BytesType,
@@ -41,8 +40,6 @@ import {
 	IdType,
 	IntType,
 	JsonType,
-	LazyManyType,
-	LazyOneType,
 	ObjectType,
 	ScalarType,
 	StringType,
@@ -184,9 +181,9 @@ export const NULLABLE_SYMBOL: unique symbol = Symbol("lens:nullable");
 
 // Legacy aliases for backward compatibility
 /** @deprecated Use LIST_SYMBOL instead */
-export const LIST_FIELD_SYMBOL = LIST_SYMBOL;
+export const LIST_FIELD_SYMBOL: typeof LIST_SYMBOL = LIST_SYMBOL;
 /** @deprecated Use NULLABLE_SYMBOL instead */
-export const NULLABLE_FIELD_SYMBOL = NULLABLE_SYMBOL;
+export const NULLABLE_FIELD_SYMBOL: typeof NULLABLE_SYMBOL = NULLABLE_SYMBOL;
 
 // =============================================================================
 // List Type (unified for fields and return types)
@@ -210,7 +207,7 @@ export function isListDef(value: unknown): value is ListDef<unknown> {
 }
 
 /** @deprecated Use isListDef instead */
-export const isListFieldDef = isListDef;
+export const isListFieldDef: typeof isListDef = isListDef;
 
 /**
  * List/array type.
@@ -259,7 +256,7 @@ export function isNullableDef(value: unknown): value is NullableDef<unknown> {
 }
 
 /** @deprecated Use isNullableDef instead */
-export const isNullableFieldDef = isNullableDef;
+export const isNullableFieldDef: typeof isNullableDef = isNullableDef;
 
 /**
  * Nullable type.
