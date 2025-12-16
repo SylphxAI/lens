@@ -81,13 +81,12 @@ export {
 	type SubscriptionOnlyTransport,
 	// SSE (atomic - subscriptions only)
 	sse,
-	// Deprecated alias for old httpSse behavior
-	sseLegacy,
 	// Types
 	type Transport,
 	type TransportBase,
 	type TypeSafeRouteByTypeConfig,
 	type Unsubscribable,
+	type WsTransportInstance,
 	type WsTransportOptions,
 	ws,
 } from "./transport/index.js";

@@ -2,8 +2,15 @@
  * @sylphx/lens-client - Reconnection Module
  *
  * Client-side reconnection utilities for seamless state synchronization.
- * Re-exports from @sylphx/lens-core for backwards compatibility.
  */
 
-// Re-export from core (single source of truth)
-export { createSubscriptionRegistry, SubscriptionRegistry } from "@sylphx/lens-core";
+// Subscription Registry (client-side runtime)
+export {
+	createSubscriptionRegistry,
+	type ReconnectSubscription,
+	type SubscriptionObserver,
+	SubscriptionRegistry,
+	type SubscriptionRegistryStats,
+	type SubscriptionState,
+	type TrackedSubscription,
+} from "./subscription-registry.js";

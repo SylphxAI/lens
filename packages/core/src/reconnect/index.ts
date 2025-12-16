@@ -10,9 +10,6 @@
 // =============================================================================
 
 export type {
-	CompressedPayload,
-	// Compression
-	CompressionAlgorithm,
 	ConnectionQuality,
 	// Connection state
 	ConnectionState,
@@ -51,8 +48,6 @@ export {
 	DEFAULT_OPERATION_LOG_CONFIG,
 	DEFAULT_RECONNECT_CONFIG,
 	generateReconnectId,
-	// Utilities
-	isCompressedPayload,
 	// Constants
 	PROTOCOL_VERSION,
 } from "./types.js";
@@ -84,21 +79,6 @@ export {
 export { applyPatch } from "./operation-log.js";
 
 // =============================================================================
-// Compression
-// =============================================================================
-
-export {
-	type CompressionConfig,
-	compressIfNeeded,
-	DEFAULT_COMPRESSION_CONFIG,
-	decompressIfNeeded,
-	formatCompressionStats,
-	getCompressionRatio,
-	getSpaceSaved,
-	isCompressionSupported,
-} from "./compression.js";
-
-// =============================================================================
 // Metrics
 // =============================================================================
 
@@ -113,7 +93,15 @@ export {
 } from "./metrics.js";
 
 // =============================================================================
-// Subscription Registry
+// Subscription Registry (moved to @sylphx/lens-client)
 // =============================================================================
 
+/**
+ * @deprecated Import from @sylphx/lens-client instead:
+ * `import { SubscriptionRegistry } from "@sylphx/lens-client"`
+ */
+/**
+ * @deprecated Import from @sylphx/lens-client instead:
+ * `import { createSubscriptionRegistry } from "@sylphx/lens-client"`
+ */
 export { createSubscriptionRegistry, SubscriptionRegistry } from "./subscription-registry.js";

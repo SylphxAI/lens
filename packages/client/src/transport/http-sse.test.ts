@@ -4,7 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { isError } from "@sylphx/lens-core";
-import { httpSse, type SseConnectionState, sse as sseLegacy } from "./http-sse.js";
+import { httpSse, type SseConnectionState } from "./http-sse.js";
 
 // =============================================================================
 // Mock EventSource
@@ -123,12 +123,6 @@ describe("HTTP + SSE Transport", () => {
 
 			const metadata = await transport.connect();
 			expect(metadata.version).toBe("1.0.0");
-		});
-	});
-
-	describe("sseLegacy (deprecated alias)", () => {
-		it("sseLegacy is an alias for httpSse", () => {
-			expect(sseLegacy).toBe(httpSse);
 		});
 	});
 

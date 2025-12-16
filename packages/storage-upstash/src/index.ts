@@ -349,5 +349,10 @@ export function upstashStorage(options: UpstashStorageOptions): OpLogStorage {
 				await redis.del(...keys);
 			}
 		},
+
+		async dispose(): Promise<void> {
+			// No-op for HTTP-based Upstash storage.
+			// There are no persistent connections to close.
+		},
 	};
 }

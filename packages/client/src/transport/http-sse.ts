@@ -14,11 +14,11 @@
  * - Better serverless compatibility than WebSocket
  */
 
+import { DEFAULT_SSE_RETRY_CONFIG, SseConnectionManager } from "./sse-connection.js";
 import type {
 	ConnectionState,
 	Metadata,
 	Observable,
-	Observer,
 	Operation,
 	Result,
 	Transport,
@@ -127,42 +127,19 @@ export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInsta
 		onConnectionStateChange,
 	} = options;
 
-	const {
-		enabled: retryEnabled = true,
-		maxAttempts = 10,
-		baseDelay = 1000,
-		maxDelay = 30000,
-	} = retry;
-
 	// Normalize URL (remove trailing slash)
 	const baseUrl = url.replace(/\/$/, "");
 
-	// Track active subscriptions
-	const subscriptions = new Map<
-		string,
-		{
-			eventSource: EventSource;
-			observer: Observer<Result>;
-			retryCount: number;
-		}
-	>();
-
-	let connectionState: ConnectionState = "disconnected";
-
-	// Helper to update connection state
-	function setConnectionState(state: ConnectionState) {
-		if (connectionState !== state) {
-			connectionState = state;
-			onConnectionStateChange?.(state);
-		}
-	}
-
-	// Helper to compute retry delay with exponential backoff + jitter
-	function getRetryDelay(attempt: number): number {
-		const exponentialDelay = baseDelay * Math.pow(2, attempt);
-		const jitter = Math.random() * 0.3 * exponentialDelay;
-		return Math.min(exponentialDelay + jitter, maxDelay);
-	}
+	// Create connection manager for SSE subscriptions
+	const connectionManager = new SseConnectionManager({
+		baseUrl,
+		EventSource: EventSourceImpl,
+		retry: {
+			...DEFAULT_SSE_RETRY_CONFIG,
+			...retry,
+		},
+		onConnectionStateChange,
+	});
 
 	/**
 	 * Execute HTTP request for query/mutation.
@@ -198,122 +175,6 @@ export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInsta
 		}
 	}
 
-	/**
-	 * Create SSE subscription.
-	 */
-	function createSseSubscription(op: Operation): Observable<Result> {
-		return {
-			subscribe(observer: Observer<Result>) {
-				const subId = op.id;
-				let retryCount = 0;
-
-				function connect() {
-					// Build SSE URL with operation info
-					const sseUrl = new URL(`${baseUrl}/${op.path}`);
-					if (op.input !== undefined) {
-						sseUrl.searchParams.set("input", JSON.stringify(op.input));
-					}
-					sseUrl.searchParams.set("_sse", "1"); // Mark as SSE request
-
-					const eventSource = new EventSourceImpl(sseUrl.toString());
-
-					// Track subscription
-					subscriptions.set(subId, { eventSource, observer, retryCount });
-
-					// Update state
-					if (subscriptions.size === 1) {
-						setConnectionState("connecting");
-					}
-
-					eventSource.onopen = () => {
-						retryCount = 0; // Reset on successful connection
-						if (subscriptions.has(subId)) {
-							subscriptions.get(subId)!.retryCount = 0;
-						}
-						setConnectionState("connected");
-					};
-
-					eventSource.onmessage = (event) => {
-						try {
-							// Parse as Message type for stateless architecture
-							// Server sends { $: "snapshot", data } or { $: "ops", ops }
-							const message = JSON.parse(event.data) as Result;
-							observer.next?.(message);
-						} catch (error) {
-							observer.error?.(error as Error);
-						}
-					};
-
-					// Handle custom events
-					eventSource.addEventListener("error", (_event) => {
-						// EventSource will auto-reconnect on most errors
-						// But we track state for visibility
-						if (eventSource.readyState === EventSourceImpl.CLOSED) {
-							if (retryEnabled && retryCount < maxAttempts) {
-								setConnectionState("reconnecting");
-								retryCount++;
-								if (subscriptions.has(subId)) {
-									subscriptions.get(subId)!.retryCount = retryCount;
-								}
-
-								// EventSource handles reconnection automatically
-								// But if it's fully closed, we reconnect manually
-								const delay = getRetryDelay(retryCount);
-								setTimeout(() => {
-									if (subscriptions.has(subId)) {
-										subscriptions.delete(subId);
-										connect();
-									}
-								}, delay);
-							} else {
-								observer.error?.(new Error("SSE connection failed"));
-								subscriptions.delete(subId);
-								if (subscriptions.size === 0) {
-									setConnectionState("disconnected");
-								}
-							}
-						}
-					});
-
-					eventSource.addEventListener("complete", () => {
-						observer.complete?.();
-						eventSource.close();
-						subscriptions.delete(subId);
-						if (subscriptions.size === 0) {
-							setConnectionState("disconnected");
-						}
-					});
-
-					eventSource.addEventListener("lens-error", (event) => {
-						try {
-							const errorData = JSON.parse((event as MessageEvent).data);
-							observer.error?.(new Error(errorData.message || "SSE error"));
-						} catch {
-							observer.error?.(new Error("SSE error"));
-						}
-					});
-				}
-
-				// Start connection
-				connect();
-
-				// Return unsubscribe function
-				return {
-					unsubscribe() {
-						const sub = subscriptions.get(subId);
-						if (sub) {
-							sub.eventSource.close();
-							subscriptions.delete(subId);
-							if (subscriptions.size === 0) {
-								setConnectionState("disconnected");
-							}
-						}
-					},
-				};
-			},
-		};
-	}
-
 	return {
 		/**
 		 * Connect and get metadata from server.
@@ -340,7 +201,7 @@ export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInsta
 		 */
 		execute(op: Operation): Promise<Result> | Observable<Result> {
 			if (op.type === "subscription") {
-				return createSseSubscription(op);
+				return connectionManager.createSubscription(op);
 			}
 			return executeHttp(op);
 		},
@@ -349,33 +210,21 @@ export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInsta
 		 * Get current connection state.
 		 */
 		getConnectionState(): ConnectionState {
-			return connectionState;
+			return connectionManager.getConnectionState();
 		},
 
 		/**
 		 * Get active subscription count.
 		 */
 		getSubscriptionCount(): number {
-			return subscriptions.size;
+			return connectionManager.getSubscriptionCount();
 		},
 
 		/**
 		 * Close all connections.
 		 */
 		close(): void {
-			for (const [id, sub] of subscriptions) {
-				sub.eventSource.close();
-				subscriptions.delete(id);
-			}
-			setConnectionState("disconnected");
+			connectionManager.close();
 		},
 	};
 }
-
-/**
- * @deprecated Use `httpSse()` instead. The `sse()` function has been renamed to
- * `httpSse()` to clarify that it bundles HTTP + SSE together.
- *
- * For pure SSE transport (subscription only), use `sse()` from main export with `routeByType()`.
- */
-export const sse: typeof httpSse = httpSse;

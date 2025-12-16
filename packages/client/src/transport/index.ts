@@ -115,11 +115,9 @@ export {
 	type HttpSseTransportInstance,
 	type HttpSseTransportOptions,
 	httpSse,
-	// Deprecated aliases (for backward compatibility)
+	// Deprecated type aliases (for backward compatibility)
 	/** @deprecated Use `ConnectionState` from types instead */
 	type SseConnectionState,
-	/** @deprecated Use `httpSse()` instead. `sseLegacy` was the old bundled HTTP+SSE transport. */
-	sse as sseLegacy,
 } from "./http-sse.js";
 // Route (composition helpers)
 export {

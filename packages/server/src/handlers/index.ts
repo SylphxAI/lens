@@ -52,6 +52,8 @@ export {
 
 export {
 	createWSHandler,
+	DEFAULT_WS_HANDLER_CONFIG,
 	type WSHandler,
+	type WSHandlerConfig,
 	type WSHandlerOptions,
 } from "./ws.js";

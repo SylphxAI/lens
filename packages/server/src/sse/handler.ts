@@ -158,10 +158,17 @@ export class SSEHandler {
 
 	/**
 	 * Send a named event to a specific client.
+	 * Event names are validated to prevent header injection attacks.
 	 */
 	sendEvent(clientId: string, event: string, data: unknown): boolean {
 		const client = this.clients.get(clientId);
 		if (!client) return false;
+
+		// Validate event name to prevent SSE header injection
+		// Event names must not contain newlines, carriage returns, or colons
+		if (/[\r\n:]/.test(event)) {
+			return false;
+		}
 
 		try {
 			const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
