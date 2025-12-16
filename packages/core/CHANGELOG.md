@@ -1,5 +1,11 @@
 # @sylphx/lens-core
 
+## 2.13.0 (2025-12-16)
+
+### ✨ Features
+
+- **core:** add model to lens() factory for ergonomic API (#91) ([4b087e7](https://github.com/SylphxAI/lens/commit/4b087e76058744e4fddc2110e628a5ada2287efa))
+
 ## 2.12.2 (2025-12-16)
 
 ### 🐛 Bug Fixes
