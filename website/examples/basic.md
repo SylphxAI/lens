@@ -50,63 +50,69 @@ export const createContext = async (req: Request): Promise<AppContext> => {
 
 ```typescript
 // server/models.ts
-import { model } from '@sylphx/lens-core'
+import { lens, id, string, date, boolean, list, nullable } from '@sylphx/lens-core'
 import type { AppContext } from './context'
 
-export const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  createdAt: t.date(),
+const { model } = lens<AppContext>()
+
+export const User = model('User', {
+  id: id(),
+  name: string(),
+  email: string(),
+  createdAt: date(),
 
   // Computed field
-  displayName: t.string().resolve(({ parent }) =>
-    parent.name || parent.email.split('@')[0]
-  ),
+  displayName: string(),
 
   // Relation
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.post.findMany({ where: { authorId: parent.id } })
-  ),
-}))
+  posts: list(() => Post),
+}).resolve({
+  displayName: ({ source }) =>
+    source.name || source.email.split('@')[0],
+  posts: ({ source, ctx }) =>
+    ctx.db.post.findMany({ where: { authorId: source.id } }),
+})
 
-export const Post = model<AppContext>('Post', (t) => ({
-  id: t.id(),
-  title: t.string(),
-  content: t.string().optional(),
-  published: t.boolean(),
-  createdAt: t.date(),
+export const Post = model('Post', {
+  id: id(),
+  title: string(),
+  content: string().optional(),
+  published: boolean(),
+  createdAt: date(),
 
   // Relation
-  author: t.one(() => User).resolve(({ parent, ctx }) =>
-    ctx.db.user.findUnique({ where: { id: parent.authorId } })
-  ),
-}))
+  author: () => User,
+}).resolve({
+  author: ({ source, ctx }) =>
+    ctx.db.user.findUnique({ where: { id: source.authorId } }),
+})
 ```
 
 ### Router
 
 ```typescript
 // server/router.ts
-import { router, query, mutation } from '@sylphx/lens-server'
+import { lens, list } from '@sylphx/lens-core'
 import { z } from 'zod'
 import { User, Post } from './models'
 import type { AppContext } from './context'
 
+const { router, query, mutation } = lens<AppContext>()
+
 export const appRouter = router({
   user: {
-    list: query<AppContext>()
-      .returns([User])
+    list: query()
+      .returns(list(User))
       .resolve(({ ctx }) => ctx.db.user.findMany()),
 
-    get: query<AppContext>()
+    get: query()
       .input(z.object({ id: z.string() }))
       .returns(User)
       .resolve(({ input, ctx }) =>
         ctx.db.user.findUniqueOrThrow({ where: { id: input.id } })
       ),
 
-    create: mutation<AppContext>()
+    create: mutation()
       .input(z.object({
         name: z.string(),
         email: z.string().email(),
@@ -118,12 +124,12 @@ export const appRouter = router({
   },
 
   post: {
-    list: query<AppContext>()
+    list: query()
       .input(z.object({
         published: z.boolean().optional(),
         authorId: z.string().optional(),
       }).optional())
-      .returns([Post])
+      .returns(list(Post))
       .resolve(({ input, ctx }) =>
         ctx.db.post.findMany({
           where: {
@@ -133,14 +139,14 @@ export const appRouter = router({
         })
       ),
 
-    get: query<AppContext>()
+    get: query()
       .input(z.object({ id: z.string() }))
       .returns(Post)
       .resolve(({ input, ctx }) =>
         ctx.db.post.findUniqueOrThrow({ where: { id: input.id } })
       ),
 
-    create: mutation<AppContext>()
+    create: mutation()
       .input(z.object({
         title: z.string(),
         content: z.string().optional(),
@@ -157,7 +163,7 @@ export const appRouter = router({
         })
       }),
 
-    publish: mutation<AppContext>()
+    publish: mutation()
       .input(z.object({ id: z.string() }))
       .returns(Post)
       .resolve(async ({ input, ctx }) => {

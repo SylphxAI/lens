@@ -88,24 +88,30 @@ Client                    Transport               Server
 Models define data shape and field behavior:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
+import { lens, id, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+const User = model('User', {
   // Exposed: Value from parent object
-  id: t.id(),
-  name: t.string(),
+  id: id(),
+  name: string(),
 
   // Resolved: Computed at runtime
-  fullName: t.string().resolve(({ parent }) =>
-    `${parent.firstName} ${parent.lastName}`
-  ),
+  fullName: string(),
 
   // Live: Resolved + subscribes to updates
-  status: t.string()
-    .resolve(({ parent, ctx }) => ctx.cache.get(`status:${parent.id}`))
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${parent.id}`, emit)
-      onCleanup(unsub)
-    }),
-}))
+  status: string(),
+}).resolve({
+  fullName: ({ source }) =>
+    `${source.firstName} ${source.lastName}`,
+  status: ({ source, ctx }) => ctx.cache.get(`status:${source.id}`),
+}).subscribe({
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`status:${source.id}`, emit)
+    onCleanup(unsub)
+  },
+})
 ```
 
 Field modes:

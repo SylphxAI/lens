@@ -6,11 +6,13 @@
  *
  * @example
  * ```typescript
- * const User = model<AppContext>('User', (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   posts: t.many(() => Post),
- * }))
+ * const { model } = lens<AppContext>();
+ *
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   posts: list(() => Post),
+ * })
  * .resolve({
  *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
  * })
@@ -48,11 +50,13 @@ export type ScalarFieldsOnly<E extends EntityDefinition> = {
  *
  * @example
  * ```typescript
- * const User = model('User', (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   posts: t.many(() => Post),
- * }))
+ * const { model } = lens<AppContext>();
+ *
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   posts: list(() => Post),
+ * })
  *
  * type UserSource = InferModelSource<typeof User>
  * // { id: string; name: string }  - posts excluded (relation)
@@ -112,10 +116,13 @@ type InferFieldArgs<F> = F extends { _argsSchema: infer S }
  *
  * @example
  * ```typescript
- * .resolve({
+ * const User = model('User', {
+ *   id: id(),
+ *   posts: list(() => Post),
+ * }).resolve({
  *   posts: ({ source, args, ctx }) =>
  *     ctx.db.posts.filter(p => p.authorId === source.id)
- * })
+ * });
  * ```
  */
 export type ModelFieldResolver<TSource, TArgs, TContext, TResult> = (params: {
@@ -135,12 +142,15 @@ export type ModelFieldResolver<TSource, TArgs, TContext, TResult> = (params: {
  *
  * @example
  * ```typescript
- * .subscribe({
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ * }).subscribe({
  *   name: ({ source, ctx }) => ({ emit, onCleanup }) => {
  *     const unsub = ctx.events.on(`user:${source.id}:name`, emit)
  *     onCleanup(unsub)
  *   }
- * })
+ * });
  * ```
  */
 export type ModelFieldSubscriber<TSource, TArgs, TContext, TResult> = (params: {
@@ -213,10 +223,13 @@ export interface ModelDefChainable<
 	 *
 	 * @example
 	 * ```typescript
-	 * .resolve({
+	 * const User = model('User', {
+	 *   id: id(),
+	 *   posts: list(() => Post),
+	 * }).resolve({
 	 *   posts: ({ source, ctx }) =>
 	 *     ctx.db.posts.filter(p => p.authorId === source.id)
-	 * })
+	 * });
 	 * ```
 	 */
 	resolve<R extends FieldResolverMap<Fields, TContext>>(
@@ -229,12 +242,15 @@ export interface ModelDefChainable<
 	 *
 	 * @example
 	 * ```typescript
-	 * .subscribe({
+	 * const User = model('User', {
+	 *   id: id(),
+	 *   onlineStatus: () => Status,
+	 * }).subscribe({
 	 *   onlineStatus: ({ source, ctx }) => ({ emit, onCleanup }) => {
 	 *     ctx.presence.watch(source.id, emit)
 	 *     onCleanup(() => ctx.presence.unwatch(source.id))
 	 *   }
-	 * })
+	 * });
 	 * ```
 	 */
 	subscribe<S extends FieldSubscriberMap<Fields, TContext>>(
@@ -259,12 +275,16 @@ export interface ModelDefWithResolvers<
 	 *
 	 * @example
 	 * ```typescript
+	 * const User = model('User', {
+	 *   id: id(),
+	 *   name: string(),
+	 * })
 	 * .resolve({ ... })
 	 * .subscribe({
 	 *   name: ({ source, ctx }) => ({ emit, onCleanup }) => {
 	 *     ctx.events.on(`user:${source.id}:name`, emit)
 	 *   }
-	 * })
+	 * });
 	 * ```
 	 */
 	subscribe<S extends FieldSubscriberMap<Fields, TContext>>(
@@ -289,10 +309,14 @@ export interface ModelDefWithSubscribers<
 	 *
 	 * @example
 	 * ```typescript
+	 * const User = model('User', {
+	 *   id: id(),
+	 *   posts: list(() => Post),
+	 * })
 	 * .subscribe({ ... })
 	 * .resolve({
 	 *   posts: ({ source, ctx }) => ctx.db.posts.filter(...)
-	 * })
+	 * });
 	 * ```
 	 */
 	resolve<R extends FieldResolverMap<Fields, TContext>>(

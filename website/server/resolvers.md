@@ -1,41 +1,46 @@
 # Field Resolvers
 
-Field resolvers compute values for model fields at runtime. Lens supports two patterns: **inline resolvers** (in models) and **standalone resolvers**.
+Field resolvers compute values for model fields at runtime. Lens uses a chain-based pattern with `.resolve()` and `.subscribe()` methods.
 
-## Inline Resolvers (Recommended)
+## Basic Resolvers
 
-Define resolvers directly in your model:
+Define resolvers using the `.resolve()` chain method:
 
 ```typescript
-import { model } from '@sylphx/lens-core'
+import { lens, id, string, int, list } from '@sylphx/lens-core'
 
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  firstName: t.string(),
-  lastName: t.string(),
+type AppContext = { db: Database }
 
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  firstName: string(),
+  lastName: string(),
+  fullName: string(),
+  posts: list(() => Post),
+}).resolve({
   // Computed field
-  fullName: t.string().resolve(({ parent }) =>
-    `${parent.firstName} ${parent.lastName}`
-  ),
+  fullName: ({ source }) => `${source.firstName} ${source.lastName}`,
 
   // Relation
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.post.findMany({ where: { authorId: parent.id } })
-  ),
-}))
+  posts: ({ source, ctx }) =>
+    ctx.db.post.findMany({ where: { authorId: source.id } }),
+})
 ```
 
 ## Resolver Signature
 
 ```typescript
-.resolve(({ parent, args, ctx }) => value)
+.resolve({
+  fieldName: ({ source, args, ctx }) => value
+})
 ```
 
 | Parameter | Description |
 |-----------|-------------|
-| `parent` | The parent object being resolved |
-| `args` | Field arguments (if defined with `.args()`) |
+| `source` | The parent object being resolved |
+| `args` | Field arguments (if defined) |
 | `ctx` | Request context |
 
 ## Computed Fields
@@ -43,20 +48,21 @@ const User = model<AppContext>('User', (t) => ({
 Fields derived from other fields:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  firstName: t.string(),
-  lastName: t.string(),
+const { model } = lens<AppContext>()
 
+const User = model('User', {
+  firstName: string(),
+  lastName: string(),
+  fullName: string(),
+  postCount: int(),
+}).resolve({
   // Sync computed
-  fullName: t.string().resolve(({ parent }) =>
-    `${parent.firstName} ${parent.lastName}`
-  ),
+  fullName: ({ source }) => `${source.firstName} ${source.lastName}`,
 
   // Async computed
-  postCount: t.int().resolve(async ({ parent, ctx }) =>
-    ctx.db.post.count({ where: { authorId: parent.id } })
-  ),
-}))
+  postCount: async ({ source, ctx }) =>
+    ctx.db.post.count({ where: { authorId: source.id } }),
+})
 ```
 
 ## Relations
@@ -64,110 +70,98 @@ const User = model<AppContext>('User', (t) => ({
 ### One-to-One
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
+const { model } = lens<AppContext>()
 
-  profile: t.one(() => Profile).resolve(({ parent, ctx }) =>
-    ctx.db.profile.findUnique({ where: { userId: parent.id } })
-  ),
-}))
+const User = model('User', {
+  id: id(),
+  profileId: string(),
+  profile: () => Profile,
+}).resolve({
+  profile: ({ source, ctx }) =>
+    ctx.db.profile.findUnique({ where: { id: source.profileId } }),
+})
 ```
 
 ### One-to-Many
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
+const { model } = lens<AppContext>()
 
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.post.findMany({ where: { authorId: parent.id } })
-  ),
-}))
+const User = model('User', {
+  id: id(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) =>
+    ctx.db.post.findMany({ where: { authorId: source.id } }),
+})
 ```
 
 ### With Arguments
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
+const { model } = lens<AppContext>()
 
-  posts: t.many(() => Post)
-    .args(z.object({
+const User = model('User', {
+  id: id(),
+  posts: list(() => Post),
+}).resolve({
+  posts: {
+    args: z.object({
       limit: z.number().default(10),
       published: z.boolean().optional(),
-    }))
-    .resolve(({ parent, args, ctx }) =>
+    }),
+    resolve: ({ source, args, ctx }) =>
       ctx.db.post.findMany({
-        where: { authorId: parent.id, published: args.published },
+        where: { authorId: source.id, published: args.published },
         take: args.limit,
-      })
-    ),
-}))
+      }),
+  },
+})
 ```
 
 ## Live Fields
 
-Fields that push updates in real-time:
+Fields that push updates in real-time use the two-phase pattern:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
-  // Live field with two-phase resolution
-  status: t.string()
-    // Phase 1: Initial value
-    .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
-    // Phase 2: Subscribe to updates
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${parent.id}`, (status) => {
-        emit(status)
-      })
-      onCleanup(unsub)
-    }),
-}))
+const User = model('User', {
+  id: id(),
+  name: string(),
+  status: string(),
+}).resolve({
+  // Phase 1: Initial value
+  status: ({ source, ctx }) => ctx.db.getStatus(source.id),
+}).subscribe({
+  // Phase 2: Subscribe to updates (Publisher pattern)
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`status:${source.id}`, (status) => {
+      emit(status)
+    })
+    onCleanup(unsub)
+  },
+})
 ```
 
 See [Live Queries](/server/live-queries) for more details on the Publisher pattern.
-
-## Standalone Resolvers
-
-For complex cases, use standalone resolver definitions:
-
-```typescript
-import { resolver } from '@sylphx/lens-core'
-
-const UserResolver = resolver(User, {
-  fullName: {
-    resolve: ({ parent }) => `${parent.firstName} ${parent.lastName}`,
-  },
-
-  posts: {
-    resolve: ({ parent, ctx }) =>
-      ctx.db.post.findMany({ where: { authorId: parent.id } }),
-  },
-})
-
-// Register with app
-const app = createApp({
-  router: appRouter,
-  resolvers: [UserResolver],
-})
-```
 
 ## DataLoader Integration
 
 Lens automatically batches field resolution to avoid N+1 queries:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
+const { model } = lens<AppContext>()
 
+const User = model('User', {
+  id: id(),
+  departmentId: string(),
+  department: () => Department,
+}).resolve({
   // This is automatically batched when resolving multiple users
-  department: t.one(() => Department).resolve(({ parent, ctx }) =>
-    ctx.db.department.findUnique({ where: { id: parent.departmentId } })
-  ),
-}))
+  department: ({ source, ctx }) =>
+    ctx.db.department.findUnique({ where: { id: source.departmentId } }),
+})
 ```
 
 For custom batching, use DataLoader directly:
@@ -188,11 +182,15 @@ export const createContext = () => ({
 })
 
 // model
-const User = model<AppContext>('User', (t) => ({
-  department: t.one(() => Department).resolve(({ parent, ctx }) =>
-    ctx.loaders.department.load(parent.departmentId)
-  ),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  departmentId: string(),
+  department: () => Department,
+}).resolve({
+  department: ({ source, ctx }) =>
+    ctx.loaders.department.load(source.departmentId),
+})
 ```
 
 ## Field Modes
@@ -201,24 +199,28 @@ Each field has a resolution mode:
 
 | Mode | Description |
 |------|-------------|
-| `exposed` | Value comes from parent object (no resolver) |
+| `exposed` | Value comes from source object (no resolver) |
 | `resolve` | Computed once per request |
 | `live` | Two-phase: resolve + subscribe |
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  // exposed - value from parent
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
+const User = model('User', {
+  // exposed - value from source
+  id: id(),
+  name: string(),
+
+  // These need resolvers
+  fullName: string(),
+  status: string(),
+}).resolve({
   // resolve - computed
-  fullName: t.string().resolve(({ parent }) => ...),
-
-  // live - resolve + subscribe
-  status: t.string()
-    .resolve(({ parent, ctx }) => ...)
-    .subscribe(({ parent, ctx }) => ...),
-}))
+  fullName: ({ source }) => ...,
+}).subscribe({
+  // live - subscribe for updates
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => ...,
+})
 ```
 
 ## Error Handling
@@ -226,20 +228,23 @@ const User = model<AppContext>('User', (t) => ({
 Handle errors gracefully in resolvers:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  profile: t.one(() => Profile)
-    .optional()
-    .resolve(async ({ parent, ctx }) => {
-      try {
-        return await ctx.db.profile.findUnique({
-          where: { userId: parent.id },
-        })
-      } catch (error) {
-        console.error('Failed to load profile:', error)
-        return null
-      }
-    }),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  profileId: string(),
+  profile: nullable(() => Profile),
+}).resolve({
+  profile: async ({ source, ctx }) => {
+    try {
+      return await ctx.db.profile.findUnique({
+        where: { id: source.profileId },
+      })
+    } catch (error) {
+      console.error('Failed to load profile:', error)
+      return null
+    }
+  },
+})
 ```
 
 ## Best Practices
@@ -248,15 +253,17 @@ const User = model<AppContext>('User', (t) => ({
 
 ```typescript
 // ✅ Good: Single responsibility
-fullName: t.string().resolve(({ parent }) =>
-  `${parent.firstName} ${parent.lastName}`
-)
+.resolve({
+  fullName: ({ source }) => `${source.firstName} ${source.lastName}`
+})
 
 // ❌ Bad: Too much logic
-fullName: t.string().resolve(({ parent, ctx }) => {
-  const settings = ctx.db.settings.findUnique(...)
-  const locale = settings?.locale || 'en'
-  // ... complex formatting logic
+.resolve({
+  fullName: ({ source, ctx }) => {
+    const settings = ctx.db.settings.findUnique(...)
+    const locale = settings?.locale || 'en'
+    // ... complex formatting logic
+  }
 })
 ```
 
@@ -264,14 +271,15 @@ fullName: t.string().resolve(({ parent, ctx }) => {
 
 ```typescript
 // ✅ Good: Uses batching
-posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-  ctx.loaders.postsByAuthor.load(parent.id)
-)
+.resolve({
+  posts: ({ source, ctx }) => ctx.loaders.postsByAuthor.load(source.id)
+})
 
 // ⚠️ Acceptable: Individual queries (auto-batched by Lens)
-posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-  ctx.db.post.findMany({ where: { authorId: parent.id } })
-)
+.resolve({
+  posts: ({ source, ctx }) =>
+    ctx.db.post.findMany({ where: { authorId: source.id } })
+})
 ```
 
 ### 3. Type Your Context
@@ -284,23 +292,27 @@ interface AppContext {
   }
 }
 
-const User = model<AppContext>('User', (t) => ({
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  posts: list(() => Post),
+}).resolve({
   // ctx is fully typed
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.loaders.postsByAuthor.load(parent.id)
-  ),
-}))
+  posts: ({ source, ctx }) => ctx.loaders.postsByAuthor.load(source.id),
+})
 ```
 
 ### 4. Handle Optional Fields
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  // Mark as optional when it might not exist
-  profile: t.one(() => Profile)
-    .optional()
-    .resolve(({ parent, ctx }) =>
-      ctx.db.profile.findUnique({ where: { userId: parent.id } })
-    ),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  profileId: string(),
+  // Mark as nullable when it might not exist
+  profile: nullable(() => Profile),
+}).resolve({
+  profile: ({ source, ctx }) =>
+    ctx.db.profile.findUnique({ where: { id: source.profileId } }),
+})
 ```

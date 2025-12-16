@@ -38,8 +38,12 @@ export interface AppContext {
   }
 }
 
+import { lens } from '@sylphx/lens-core'
+
+const { model, query } = lens<AppContext>()
+
 // Use in operations
-const getUser = query<AppContext>()
+const getUser = query()
   .input(z.object({ id: z.string() }))
   .resolve(({ input, ctx }) => {
     // ctx.db, ctx.user, ctx.loaders are all typed
@@ -47,11 +51,12 @@ const getUser = query<AppContext>()
   })
 
 // Use in models
-const Post = model<AppContext>('Post', (t) => ({
-  author: t.one(() => User).resolve(({ parent, ctx }) =>
-    ctx.loaders.user.load(parent.authorId)
-  ),
-}))
+const Post = model('Post', {
+  author: () => User,
+}).resolve({
+  author: ({ source, ctx }) =>
+    ctx.loaders.user.load(source.authorId),
+})
 ```
 
 ## Model Type Extraction
@@ -61,14 +66,16 @@ const Post = model<AppContext>('Post', (t) => ({
 Extract TypeScript type from model:
 
 ```typescript
-import { InferModelType } from '@sylphx/lens-core'
+import { lens, id, string, int, InferModelType } from '@sylphx/lens-core'
 
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  age: t.int().optional(),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  email: string(),
+  age: int().optional(),
+})
 
 type UserType = InferModelType<typeof User>
 // { id: string; name: string; email: string; age?: number }
@@ -77,11 +84,15 @@ type UserType = InferModelType<typeof User>
 ### With Relations
 
 ```typescript
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post),
-}))
+import { lens, id, string, list, InferModelType } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+})
 
 type UserType = InferModelType<typeof User>
 // { id: string; name: string; posts: Post[] }

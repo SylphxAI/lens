@@ -43,7 +43,9 @@ app.execute(op: LensOperation): Observable<LensResult>
 Creates a query operation.
 
 ```typescript
-import { query } from '@sylphx/lens-server'
+import { lens } from '@sylphx/lens-core'
+
+const { query } = lens<AppContext>()
 
 const getUser = query()
   .input(z.object({ id: z.string() }))
@@ -68,7 +70,9 @@ const getUser = query()
 Creates a mutation operation.
 
 ```typescript
-import { mutation } from '@sylphx/lens-server'
+import { lens, tempId } from '@sylphx/lens-core'
+
+const { mutation } = lens<AppContext>()
 
 const createUser = mutation()
   .input(z.object({ name: z.string() }))
@@ -91,7 +95,9 @@ const createUser = mutation()
 Creates a router with namespaced operations.
 
 ```typescript
-import { router } from '@sylphx/lens-server'
+import { lens } from '@sylphx/lens-core'
+
+const { router, query, mutation } = lens<AppContext>()
 
 const appRouter = router({
   user: {
@@ -106,40 +112,44 @@ const appRouter = router({
 Creates a type-safe model definition.
 
 ```typescript
-import { model } from '@sylphx/lens-core'
+import { lens, id, string, list } from '@sylphx/lens-core'
 
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string().optional(),
-  posts: t.many(() => Post).resolve(({ parent, ctx }) => ...),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  email: string().optional(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) => ...,
+})
 ```
 
 ### Field Types
 
 | Method | TypeScript Type |
 |--------|-----------------|
-| `t.id()` | `string` |
-| `t.string()` | `string` |
-| `t.int()` | `number` |
-| `t.float()` | `number` |
-| `t.boolean()` | `boolean` |
-| `t.date()` | `Date` |
-| `t.json()` | `unknown` |
-| `t.enum([...])` | Union type |
-| `t.one(() => Model)` | Relation |
-| `t.many(() => Model)` | Array relation |
+| `id()` | `string` |
+| `string()` | `string` |
+| `int()` | `number` |
+| `float()` | `number` |
+| `boolean()` | `boolean` |
+| `date()` | `Date` |
+| `json()` | `unknown` |
+| `enumType([...])` | Union type |
+| `() => Model` | Relation |
+| `list(() => Model)` | Array relation |
 
 ### Field Modifiers
 
 | Method | Description |
 |--------|-------------|
 | `.optional()` | Field can be undefined |
-| `.nullable()` | Field can be null |
+| `nullable(type)` | Field can be null |
 | `.default(value)` | Default value |
-| `.resolve(fn)` | Field resolver |
-| `.subscribe(fn)` | Live subscription |
+| `.resolve({})` | Field resolvers |
+| `.subscribe({})` | Live subscriptions |
 | `.args(schema)` | Field arguments |
 
 ## createHTTPHandler

@@ -40,22 +40,28 @@ The `.resolve()` method runs once to get the initial value. It can be batched wi
 The `.subscribe()` method sets up watchers that emit updates over time.
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+import { lens, id, string } from '@sylphx/lens-core'
 
-  status: t.string()
-    // Phase 1: Get initial value (batchable)
-    .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
+type AppContext = { db: Database; statusService: StatusService }
 
-    // Phase 2: Subscribe to updates (Publisher pattern)
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.statusService.watch(parent.id, (status) => {
-        emit(status)
-      })
-      onCleanup(unsub)
-    }),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  status: string(),
+}).resolve({
+  // Phase 1: Get initial value (batchable)
+  status: ({ source, ctx }) => ctx.db.getStatus(source.id),
+}).subscribe({
+  // Phase 2: Subscribe to updates (Publisher pattern)
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.statusService.watch(source.id, (status) => {
+      emit(status)
+    })
+    onCleanup(unsub)
+  },
+})
 ```
 
 ## Publisher Pattern
@@ -63,14 +69,16 @@ const User = model<AppContext>('User', (t) => ({
 Subscriptions use the Publisher pattern where `emit` and `onCleanup` are passed via a callback:
 
 ```typescript
-.subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-  // Set up your subscription
-  const unsub = ctx.eventSource.on('change', (data) => {
-    emit(data)  // Push update to client
-  })
+.subscribe({
+  fieldName: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    // Set up your subscription
+    const unsub = ctx.eventSource.on('change', (data) => {
+      emit(data)  // Push update to client
+    })
 
-  // Cleanup when client disconnects
-  onCleanup(() => unsub())
+    // Cleanup when client disconnects
+    onCleanup(() => unsub())
+  }
 })
 ```
 
@@ -81,6 +89,12 @@ This pattern keeps `emit` and `onCleanup` separate from your application context
 For queries that need live updates at the operation level:
 
 ```typescript
+import { lens } from '@sylphx/lens-core'
+
+type AppContext = { db: Database; pubsub: PubSub }
+
+const { query } = lens<AppContext>()
+
 const getUser = query()
   .input(z.object({ id: z.string() }))
   .returns(User)
@@ -100,23 +114,31 @@ const getUser = query()
 For specific fields that need real-time updates:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+import { lens, id, string, list } from '@sylphx/lens-core'
 
-  // Only this field is live
-  onlineStatus: t.enum(['online', 'away', 'offline'])
-    .resolve(({ parent, ctx }) => ctx.presence.get(parent.id))
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.presence.watch(parent.id, emit)
-      onCleanup(unsub)
-    }),
+type AppContext = { db: Database; presence: PresenceService }
 
-  // This field is NOT live (no .subscribe)
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.post.findMany({ where: { authorId: parent.id } })
-  ),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  onlineStatus: string(),  // This field will be live
+  posts: list(() => Post), // This field is NOT live
+}).resolve({
+  // Live field - has both resolve and subscribe
+  onlineStatus: ({ source, ctx }) => ctx.presence.get(source.id),
+
+  // Non-live field - only resolve
+  posts: ({ source, ctx }) =>
+    ctx.db.post.findMany({ where: { authorId: source.id } }),
+}).subscribe({
+  // Only onlineStatus subscribes to updates
+  onlineStatus: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.presence.watch(source.id, emit)
+    onCleanup(unsub)
+  },
+})
 ```
 
 ## Emit API
@@ -189,27 +211,36 @@ You don't configure this - Lens handles it automatically based on data character
 ## Example: Real-time Chat
 
 ```typescript
-// Model with live messages
-const ChatRoom = model<AppContext>('ChatRoom', (t) => ({
-  id: t.id(),
-  name: t.string(),
+import { lens, id, string, list } from '@sylphx/lens-core'
+import { z } from 'zod'
 
-  messages: t.many(() => Message)
-    .args(z.object({ limit: z.number().default(50) }))
-    .resolve(({ parent, args, ctx }) =>
+type AppContext = { db: Database; pubsub: PubSub }
+
+const { model, query } = lens<AppContext>()
+
+// Model with live messages
+const ChatRoom = model('ChatRoom', {
+  id: id(),
+  name: string(),
+  messages: list(() => Message),
+}).resolve({
+  messages: {
+    args: z.object({ limit: z.number().default(50) }),
+    resolve: ({ source, args, ctx }) =>
       ctx.db.message.findMany({
-        where: { roomId: parent.id },
+        where: { roomId: source.id },
         take: args.limit,
         orderBy: { createdAt: 'desc' },
-      })
-    )
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`room:${parent.id}:message`, (msg) => {
-        emit.push(msg)
-      })
-      onCleanup(unsub)
-    }),
-}))
+      }),
+  },
+}).subscribe({
+  messages: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`room:${source.id}:message`, (msg) => {
+      emit.push(msg)
+    })
+    onCleanup(unsub)
+  },
+})
 
 // Query
 const getChatRoom = query()
@@ -229,27 +260,35 @@ client.chatRoom.get({ id: 'room-1' }).subscribe((room) => {
 ## Example: Live Dashboard
 
 ```typescript
-const Dashboard = model<AppContext>('Dashboard', (t) => ({
-  id: t.id(),
+import { lens, id, int, float } from '@sylphx/lens-core'
 
-  // Live metrics
-  activeUsers: t.int()
-    .resolve(({ ctx }) => ctx.metrics.getActiveUsers())
-    .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
-      const interval = setInterval(async () => {
-        emit(await ctx.metrics.getActiveUsers())
-      }, 5000)
-      onCleanup(() => clearInterval(interval))
-    }),
+type AppContext = { metrics: MetricsService }
 
-  // Live revenue
-  revenue: t.float()
-    .resolve(({ ctx }) => ctx.metrics.getRevenue())
-    .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.metrics.onRevenueChange(emit)
-      onCleanup(unsub)
-    }),
-}))
+const { model } = lens<AppContext>()
+
+const Dashboard = model('Dashboard', {
+  id: id(),
+  activeUsers: int(),
+  revenue: float(),
+}).resolve({
+  // Initial values
+  activeUsers: ({ ctx }) => ctx.metrics.getActiveUsers(),
+  revenue: ({ ctx }) => ctx.metrics.getRevenue(),
+}).subscribe({
+  // Live metrics - poll every 5 seconds
+  activeUsers: ({ ctx }) => ({ emit, onCleanup }) => {
+    const interval = setInterval(async () => {
+      emit(await ctx.metrics.getActiveUsers())
+    }, 5000)
+    onCleanup(() => clearInterval(interval))
+  },
+
+  // Live revenue - event-driven
+  revenue: ({ ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.metrics.onRevenueChange(emit)
+    onCleanup(unsub)
+  },
+})
 ```
 
 ## Best Practices
@@ -257,58 +296,68 @@ const Dashboard = model<AppContext>('Dashboard', (t) => ({
 ### 1. Use Two-Phase for Expensive Operations
 
 ```typescript
-// ✅ Good: Separate initial and updates
-status: t.string()
-  .resolve(({ parent, ctx }) => ctx.cache.get(`status:${parent.id}`))
-  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-    ctx.events.on(`status:${parent.id}`, emit)
-    onCleanup(() => ctx.events.off(`status:${parent.id}`, emit))
-  })
+const { model } = lens<AppContext>()
 
-// ❌ Bad: Mixing concerns
-status: t.string().resolve(({ parent, ctx }) => {
-  // Don't set up subscriptions in resolve
-  ctx.events.on(`status:${parent.id}`, (s) => ctx.emit(s))
-  return ctx.cache.get(`status:${parent.id}`)
+const User = model('User', {
+  id: id(),
+  status: string(),
+}).resolve({
+  // Phase 1: Fast initial load from cache
+  status: ({ source, ctx }) => ctx.cache.get(`status:${source.id}`),
+}).subscribe({
+  // Phase 2: Subscribe to real-time updates
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    ctx.events.on(`status:${source.id}`, emit)
+    onCleanup(() => ctx.events.off(`status:${source.id}`, emit))
+  },
 })
+
+// ❌ Bad: Mixing concerns in resolve
+// Don't set up subscriptions in resolve - use the two-phase pattern
 ```
 
 ### 2. Always Clean Up
 
 ```typescript
 // ✅ Good: Proper cleanup
-.subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-  const unsub = ctx.pubsub.on('event', emit)
-  onCleanup(unsub)  // Clean up on disconnect
+.subscribe({
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on('event', emit)
+    onCleanup(unsub)  // Clean up on disconnect
+  }
 })
 
 // ❌ Bad: Memory leak
-.subscribe(({ parent, ctx }) => ({ emit }) => {
-  ctx.pubsub.on('event', emit)  // Never cleaned up!
+.subscribe({
+  status: ({ source, ctx }) => ({ emit }) => {
+    ctx.pubsub.on('event', emit)  // Never cleaned up!
+  }
 })
 ```
 
 ### 3. Debounce High-Frequency Updates
 
 ```typescript
-.subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-  let timeout: NodeJS.Timeout | null = null
-  let pending: unknown = null
+.subscribe({
+  rapidField: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    let timeout: NodeJS.Timeout | null = null
+    let pending: unknown = null
 
-  const unsub = ctx.rapidEvents.on('update', (data) => {
-    pending = data
-    if (!timeout) {
-      timeout = setTimeout(() => {
-        emit(pending)
-        timeout = null
-      }, 100)  // Debounce to 10 updates/sec max
-    }
-  })
+    const unsub = ctx.rapidEvents.on('update', (data) => {
+      pending = data
+      if (!timeout) {
+        timeout = setTimeout(() => {
+          emit(pending)
+          timeout = null
+        }, 100)  // Debounce to 10 updates/sec max
+      }
+    })
 
-  onCleanup(() => {
-    unsub()
-    if (timeout) clearTimeout(timeout)
-  })
+    onCleanup(() => {
+      unsub()
+      if (timeout) clearTimeout(timeout)
+    })
+  }
 })
 ```
 
@@ -316,17 +365,21 @@ status: t.string().resolve(({ parent, ctx }) => {
 
 ```typescript
 // ✅ Good: Only emit changed fields
-.subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-  ctx.events.on('userUpdate', (changes) => {
-    emit.merge(changes)  // Only send changed fields
-  })
+.subscribe({
+  user: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    ctx.events.on('userUpdate', (changes) => {
+      emit.merge(changes)  // Only send changed fields
+    })
+  }
 })
 
 // ⚠️ Less efficient: Emit full object
-.subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-  ctx.events.on('userUpdate', async () => {
-    const user = await ctx.db.user.find(parent.id)
-    emit(user)  // Sends entire user even for small changes
-  })
+.subscribe({
+  user: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    ctx.events.on('userUpdate', async () => {
+      const user = await ctx.db.user.find(source.id)
+      emit(user)  // Sends entire user even for small changes
+    })
+  }
 })
 ```

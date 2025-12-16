@@ -13,7 +13,7 @@ bun add @sylphx/lens-core
 ### Model Definition (New API)
 
 ```typescript
-import { model, lens, router, list, nullable } from "@sylphx/lens-core";
+import { lens, id, string, int, float, list, nullable, router } from "@sylphx/lens-core";
 import { z } from "zod";
 
 interface AppContext {
@@ -21,50 +21,59 @@ interface AppContext {
   user: User | null;
 }
 
-// Define models with inline resolvers
-const User = model<AppContext>("User", (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  // Computed field
-  displayName: t.string().resolve(({ parent }) =>
-    `${parent.name} <${parent.email}>`
-  ),
-  // Relation with lazy reference (avoids circular deps)
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.posts.filter(p => p.authorId === parent.id)
-  ),
-  // Live field (real-time updates)
-  status: t.string()
-    .resolve(({ parent, ctx }) => ctx.getStatus(parent.id))
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${parent.id}`, emit);
-      onCleanup(unsub);
-    }),
-}));
+const { model, query, mutation } = lens<AppContext>();
 
-const Post = model<AppContext>("Post", (t) => ({
-  id: t.id(),
-  title: t.string(),
-  content: t.string(),
-  authorId: t.string(),
-  author: t.one(() => User).resolve(({ parent, ctx }) =>
-    ctx.db.users.get(parent.authorId)!
-  ),
-}));
+// Define models with inline resolvers
+const User = model("User", {
+  id: id(),
+  name: string(),
+  email: string(),
+  // Computed field
+  displayName: string(),
+  // Relation with lazy reference (avoids circular deps)
+  posts: list(() => Post),
+  // Live field (real-time updates)
+  status: string(),
+}).resolve({
+  displayName: ({ source }) =>
+    `${source.name} <${source.email}>`,
+  posts: ({ source, ctx }) =>
+    ctx.db.posts.filter(p => p.authorId === source.id),
+  status: {
+    resolve: ({ source, ctx }) => ctx.getStatus(source.id),
+    subscribe: ({ source, ctx }) => ({ emit, onCleanup }) => {
+      const unsub = ctx.pubsub.on(`status:${source.id}`, emit);
+      onCleanup(unsub);
+    },
+  },
+});
+
+const Post = model("Post", {
+  id: id(),
+  title: string(),
+  content: string(),
+  authorId: string(),
+  author: () => User,
+}).resolve({
+  author: ({ source, ctx }) =>
+    ctx.db.users.get(source.authorId)!
+});
 
 // Pure type model (no id) - still has resolvers
-const Stats = model<AppContext>("Stats", (t) => ({
-  totalUsers: t.int().resolve(({ ctx }) => ctx.db.users.count()),
-  averageAge: t.float().resolve(({ ctx }) => ctx.db.users.averageAge()),
-}));
+const Stats = model("Stats", {
+  totalUsers: int(),
+  averageAge: float(),
+}).resolve({
+  totalUsers: ({ ctx }) => ctx.db.users.count(),
+  averageAge: ({ ctx }) => ctx.db.users.averageAge(),
+});
 ```
 
 ### Operations
 
 ```typescript
-// Create typed builders
-const { query, mutation } = lens<AppContext>();
+// query and mutation come from lens<AppContext>()
+// already imported above
 
 // Query with model return type
 const getUser = query()
@@ -113,12 +122,18 @@ const appRouter = router({
 ### With Optimistic Updates
 
 ```typescript
-import { lens } from "@sylphx/lens-core";
+import { lens, id, string } from "@sylphx/lens-core";
 import { optimisticPlugin } from "@sylphx/lens-server";
 import { entity as e, temp, ref, now } from "@sylphx/reify";
 
-const { mutation, plugins } = lens<AppContext>()
+const { model, mutation, plugins } = lens<AppContext>()
   .withPlugins([optimisticPlugin()]);
+
+const Message = model("Message", {
+  id: id(),
+  content: string(),
+  createdAt: string(),
+});
 
 // Sugar syntax
 const updateUser = mutation()
@@ -143,9 +158,9 @@ const sendMessage = mutation()
 
 | Pattern | Example |
 |---------|---------|
-| Basic | `model("Name", (t) => ({ ... }))` |
-| Typed Context | `model<Ctx>("Name", (t) => ({ ... }))` |
-| Inline | `.returns(model("Result", (t) => ({ ... })))` |
+| Basic | `model("Name", { ... })` |
+| Get from lens | `const { model } = lens<Ctx>()` |
+| With resolvers | `model("Name", { ... }).resolve({ ... })` |
 
 ### Return Type Wrappers
 
@@ -156,23 +171,21 @@ const sendMessage = mutation()
 | List | `.returns(list(User))` | `User[]` |
 | Nullable List | `.returns(nullable(list(User)))` | `User[] \| null` |
 
-### Type Builder (`t`)
+### Field Builders
 
-| Method | Description |
-|--------|-------------|
-| `t.id()` | ID field (makes model normalizable) |
-| `t.string()` | String field |
-| `t.int()` | Integer field |
-| `t.float()` | Float field |
-| `t.boolean()` | Boolean field |
-| `t.date()` | Date field |
-| `t.enum([...])` | Enum field |
-| `t.one(() => E)` | Singular relation |
-| `t.many(() => E)` | Collection relation |
-| `.optional()` | Make field optional |
-| `.args(schema)` | Add field arguments |
-| `.resolve(fn)` | Field resolver |
-| `.subscribe(fn)` | Live updates (Publisher pattern) |
+| Function | Description |
+|----------|-------------|
+| `id()` | ID field (makes model normalizable) |
+| `string()` | String field |
+| `int()` | Integer field |
+| `float()` | Float field |
+| `boolean()` | Boolean field |
+| `date()` | Date field |
+| `list(() => E)` | Collection relation |
+| `() => E` | Singular relation (lazy) |
+| `nullable(T)` | Make field nullable |
+| `.resolve({ field: fn })` | Field resolvers |
+| Field with subscribe | `{ resolve: fn, subscribe: fn }` for live updates |
 
 ### Operations
 
@@ -183,14 +196,27 @@ const sendMessage = mutation()
 | `.optimistic("merge")` | Simple optimistic update |
 | `.optimistic(({ input }) => [...])` | Reify DSL optimistic |
 
-## Migration from entity()
+## Migration Guide
 
 ```typescript
-// Old (deprecated)
-const User = entity<AppContext>("User").define((t) => ({ ... }));
+// Old API (deprecated)
+import { model } from "@sylphx/lens-core"
+const User = model<AppContext>("User", (t) => ({
+  id: t.id(),
+  name: t.string(),
+  posts: t.many(() => Post),
+}));
 
-// New
-const User = model<AppContext>("User", (t) => ({ ... }));
+// New API
+import { lens, id, string, list } from "@sylphx/lens-core"
+const { model } = lens<AppContext>()
+const User = model("User", {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
+});
 ```
 
 ## License

@@ -1,29 +1,34 @@
 /**
  * @sylphx/lens-core - Field Type Builders
  *
- * Standalone functions for defining field types in models.
+ * Standalone functions for defining field types in models and return types.
  * No `t.` prefix needed - import directly.
  *
  * @example
  * ```typescript
- * import { model, id, string, int, list, nullable } from '@sylphx/lens-core'
+ * import { lens, id, string, int, list, nullable } from '@sylphx/lens-core'
  *
+ * const { model, query } = lens<AppContext>()
+ *
+ * // Model fields
  * const User = model('User', {
  *   id: id(),
  *   name: string(),
- *   age: int(),
  *   bio: nullable(string()),
  *   tags: list(string()),
  *   posts: list(() => Post),
- *   profile: Profile,
  * })
+ *
+ * // Return types (same list/nullable!)
+ * const getUsers = query()
+ *   .returns(list(User))
+ *   .resolve(...)
  * ```
  */
 
 import type { ModelDef } from "./model.js";
 import type { EntityDefinition } from "./types.js";
 import {
-	ArrayType,
 	BigIntType,
 	BooleanType,
 	BytesType,
@@ -35,8 +40,6 @@ import {
 	IdType,
 	IntType,
 	JsonType,
-	LazyManyType,
-	LazyOneType,
 	ObjectType,
 	ScalarType,
 	StringType,
@@ -163,190 +166,193 @@ export type FieldDef =
 	| FieldType<any, any>
 	| ModelLike
 	| LazyModelRef
-	| ListFieldDef<any>
-	| NullableFieldDef<any>;
+	| ListDef<any>
+	| NullableDef<any>;
 
 // =============================================================================
-// List Field Type
+// Unified Symbols (shared between field defs and return types)
 // =============================================================================
 
-/** Symbol to identify list fields */
-export const LIST_FIELD_SYMBOL: unique symbol = Symbol("lens:list-field");
+/** Symbol to identify list types */
+export const LIST_SYMBOL: unique symbol = Symbol("lens:list");
 
-/** List field wrapper */
-export interface ListFieldDef<T> {
-	[LIST_FIELD_SYMBOL]: true;
+/** Symbol to identify nullable types */
+export const NULLABLE_SYMBOL: unique symbol = Symbol("lens:nullable");
+
+// =============================================================================
+// List Type (unified for fields and return types)
+// =============================================================================
+
+/**
+ * List/array wrapper.
+ * Works for both model fields and return types.
+ */
+export interface ListDef<T> {
+	[LIST_SYMBOL]: true;
 	_inner: T;
-	_isLazy: boolean;
 }
 
-/** Check if value is a ListFieldDef */
-export function isListFieldDef(value: unknown): value is ListFieldDef<unknown> {
-	return typeof value === "object" && value !== null && LIST_FIELD_SYMBOL in value;
+/** Check if value is a ListDef */
+export function isListDef(value: unknown): value is ListDef<unknown> {
+	return typeof value === "object" && value !== null && LIST_SYMBOL in value;
 }
 
 /**
- * List/array field.
- * Works with both scalars and model references.
+ * List/array type.
+ * Works for both model fields and return types.
  *
  * @example
  * ```typescript
- * // Scalar array
- * tags: list(string())     // string[]
- * scores: list(int())      // number[]
+ * // Model fields
+ * tags: list(string())      // string[]
+ * posts: list(Post)         // Post[]
+ * posts: list(() => Post)   // Post[] (lazy ref for circular deps)
  *
- * // Model relation (direct)
- * posts: list(Post)        // Post[]
- *
- * // Model relation (lazy - for circular refs)
- * posts: list(() => Post)  // Post[]
+ * // Return types
+ * .returns(list(User))      // User[]
  * ```
  */
-export function list<T extends FieldType<any, any>>(inner: T): ListFieldDef<T>;
-export function list<T extends ModelLike>(inner: T): ListFieldDef<T>;
-export function list<T extends ModelLike>(inner: LazyModelRef<T>): ListFieldDef<LazyModelRef<T>>;
-export function list<T>(inner: T): ListFieldDef<T> {
-	const isLazy = typeof inner === "function";
+export function list<T extends FieldType<any, any>>(inner: T): ListDef<T>;
+export function list<T extends ModelLike>(inner: T): ListDef<T>;
+export function list<T extends ModelLike>(inner: LazyModelRef<T>): ListDef<LazyModelRef<T>>;
+export function list<T>(inner: T): ListDef<T> {
 	return {
-		[LIST_FIELD_SYMBOL]: true,
+		[LIST_SYMBOL]: true,
 		_inner: inner,
-		_isLazy: isLazy,
 	};
 }
 
 // =============================================================================
-// Nullable Field Type
+// Nullable Type (unified for fields and return types)
 // =============================================================================
 
-/** Symbol to identify nullable fields */
-export const NULLABLE_FIELD_SYMBOL: unique symbol = Symbol("lens:nullable-field");
-
-/** Nullable field wrapper */
-export interface NullableFieldDef<T> {
-	[NULLABLE_FIELD_SYMBOL]: true;
+/**
+ * Nullable wrapper.
+ * Works for both model fields and return types.
+ */
+export interface NullableDef<T> {
+	[NULLABLE_SYMBOL]: true;
 	_inner: T;
 }
 
-/** Check if value is a NullableFieldDef */
-export function isNullableFieldDef(value: unknown): value is NullableFieldDef<unknown> {
-	return typeof value === "object" && value !== null && NULLABLE_FIELD_SYMBOL in value;
+/** Check if value is a NullableDef */
+export function isNullableDef(value: unknown): value is NullableDef<unknown> {
+	return typeof value === "object" && value !== null && NULLABLE_SYMBOL in value;
 }
 
 /**
- * Nullable field.
- * Works with scalars, model references, and lists.
+ * Nullable type.
+ * Works for both model fields and return types.
  *
  * @example
  * ```typescript
- * // Nullable scalar
+ * // Model fields
  * bio: nullable(string())        // string | null
- *
- * // Nullable model reference
  * profile: nullable(Profile)     // Profile | null
- *
- * // Nullable list
  * tags: nullable(list(string())) // string[] | null
+ *
+ * // Return types
+ * .returns(nullable(User))       // User | null
  * ```
  */
-export function nullable<T extends FieldType<any, any>>(inner: T): NullableFieldDef<T>;
-export function nullable<T extends ModelLike>(inner: T): NullableFieldDef<T>;
-export function nullable<T extends ModelLike>(
-	inner: LazyModelRef<T>,
-): NullableFieldDef<LazyModelRef<T>>;
-export function nullable<T>(inner: ListFieldDef<T>): NullableFieldDef<ListFieldDef<T>>;
-export function nullable<T>(inner: T): NullableFieldDef<T> {
+export function nullable<T extends FieldType<any, any>>(inner: T): NullableDef<T>;
+export function nullable<T extends ModelLike>(inner: T): NullableDef<T>;
+export function nullable<T extends ModelLike>(inner: LazyModelRef<T>): NullableDef<LazyModelRef<T>>;
+export function nullable<T>(inner: ListDef<T>): NullableDef<ListDef<T>>;
+export function nullable<T>(inner: T): NullableDef<T> {
 	return {
-		[NULLABLE_FIELD_SYMBOL]: true,
+		[NULLABLE_SYMBOL]: true,
 		_inner: inner,
 	};
 }
 
 // =============================================================================
-// Field Definition Processing
+// Utility Types
 // =============================================================================
 
-import { isModelDef } from "./model.js";
+/**
+ * Unwrap a wrapped type to get the inner model.
+ */
+export type UnwrapType<T> =
+	T extends NullableDef<infer Inner>
+		? UnwrapType<Inner>
+		: T extends ListDef<infer Inner>
+			? UnwrapType<Inner>
+			: T;
 
 /**
- * Process a field definition and convert to internal field type.
- * Handles scalars, model refs, lists, and nullables.
+ * Check if a type is nullable.
  */
-export function processFieldDef(fieldDef: FieldDef): FieldType<any, any> {
-	// Already a FieldType (scalar)
-	if (fieldDef instanceof Object && "_type" in fieldDef && typeof fieldDef._type === "string") {
-		return fieldDef as FieldType<any, any>;
-	}
+export type IsNullable<T> = T extends NullableDef<unknown> ? true : false;
 
-	// List field
-	if (isListFieldDef(fieldDef)) {
-		const inner = fieldDef._inner;
-		if (typeof inner === "function") {
-			// Lazy model ref: list(() => Post)
-			return new LazyManyType(inner as () => unknown);
-		} else if (isModelDef(inner)) {
-			// Direct model ref: list(Post)
-			return new LazyManyType(() => inner);
-		} else {
-			// Scalar: list(string())
-			return new ArrayType(inner as FieldType<any, any>);
-		}
-	}
+/**
+ * Check if a type is a list.
+ */
+export type IsList<T> =
+	T extends NullableDef<infer Inner> ? IsList<Inner> : T extends ListDef<unknown> ? true : false;
 
-	// Nullable field
-	if (isNullableFieldDef(fieldDef)) {
-		const inner = processFieldDef(fieldDef._inner as FieldDef);
-		// Mark as nullable
-		(inner as any)._nullable = true;
-		return inner;
-	}
-
-	// Lazy model ref: () => Profile
-	if (typeof fieldDef === "function") {
-		return new LazyOneType(fieldDef);
-	}
-
-	// Direct model ref: Profile
-	if (isModelDef(fieldDef)) {
-		return new LazyOneType(() => fieldDef);
-	}
-
-	throw new Error(`Invalid field definition: ${String(fieldDef)}`);
+/**
+ * Check if inner type is a lazy reference (function).
+ */
+export function isLazyRef(value: unknown): value is () => unknown {
+	return typeof value === "function";
 }
 
 // =============================================================================
-// Type Inference
+// Type inference helpers
 // =============================================================================
 
-import type { InferScalar } from "./infer.js";
-import type { ScalarFieldsOnly } from "./model-resolvers.js";
-
-/** Infer TypeScript type from a field definition */
-export type InferFieldDefType<F> =
-	// List of scalars
-	F extends ListFieldDef<infer Inner>
-		? Inner extends FieldType<any, any>
-			? InferScalar<Inner>[]
-			: // List of model refs (lazy)
-				Inner extends () => infer M
-				? M extends ModelDef<string, infer Fields>
-					? ScalarFieldsOnly<Fields>[]
-					: unknown[]
-				: // List of model refs (direct)
-					Inner extends ModelDef<string, infer Fields>
-					? ScalarFieldsOnly<Fields>[]
-					: unknown[]
-		: // Nullable
-			F extends NullableFieldDef<infer Inner>
+/** Infer the TypeScript type from a FieldDef */
+export type InferFieldDefType<T> =
+	T extends ListDef<infer Inner>
+		? InferFieldDefType<Inner>[]
+		: T extends NullableDef<infer Inner>
 			? InferFieldDefType<Inner> | null
-			: // Lazy model ref
-				F extends () => infer M
-				? M extends ModelDef<string, infer Fields>
-					? ScalarFieldsOnly<Fields> | null
-					: unknown
-				: // Direct model ref
-					F extends ModelDef<string, infer Fields>
-					? ScalarFieldsOnly<Fields> | null
-					: // Scalar type
-						F extends FieldType<any, any>
-						? InferScalar<F>
-						: unknown;
+			: T extends FieldType<infer V, any>
+				? V
+				: T extends ModelLike
+					? T
+					: T extends LazyModelRef<infer M>
+						? M
+						: never;
+
+// =============================================================================
+// Processing helpers (for internal use)
+// =============================================================================
+
+/**
+ * Process a field definition to extract metadata.
+ * Used internally by model() to understand field structure.
+ */
+export function processFieldDef(def: FieldDef): {
+	isNullable: boolean;
+	isList: boolean;
+	isLazy: boolean;
+	innerType: unknown;
+} {
+	let current: unknown = def;
+	let isNullable = false;
+	let isList = false;
+
+	// Unwrap nullable
+	if (isNullableDef(current)) {
+		isNullable = true;
+		current = current._inner;
+	}
+
+	// Unwrap list
+	if (isListDef(current)) {
+		isList = true;
+		current = current._inner;
+	}
+
+	// Check if lazy reference
+	const isLazy = typeof current === "function";
+
+	return {
+		isNullable,
+		isList,
+		isLazy,
+		innerType: current,
+	};
+}

@@ -52,12 +52,18 @@ GraphQL pioneered field selection and type-safe APIs, but:
 
 ### With Lens
 ```typescript
+import { lens, id, string, list } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
 // No codegen needed - TypeScript IS the schema
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post).resolve(...)
-}))
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) => ...,
+})
 
 // Same query API as GraphQL selection
 client.user.get({ id }, {
@@ -137,16 +143,19 @@ type User {
 ```
 
 ```typescript
+import { lens, id, string, list } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
 // Lens model (TypeScript)
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post)
-    .args(z.object({ first: z.number().optional() }))
-    .resolve(({ parent, args, ctx }) =>
-      ctx.db.posts.findMany({ authorId: parent.id, take: args.first })
-    )
-}))
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post).args(z.object({ first: z.number().optional() })),
+}).resolve({
+  posts: ({ source, args, ctx }) =>
+    ctx.db.posts.findMany({ authorId: source.id, take: args.first }),
+})
 ```
 
 ## vs Real-time Platforms

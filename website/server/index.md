@@ -113,11 +113,13 @@ See [Operations](/server/operations) for details.
 Define your data shape with type builders:
 
 ```typescript
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+})
 ```
 
 See [Models](/server/models) for details.

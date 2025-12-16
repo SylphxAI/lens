@@ -64,28 +64,6 @@ export type Publisher<T> = (callbacks: SubscriptionCallbacks<T>) => void;
  */
 export type FieldQueryContext<TContext> = TContext;
 
-/**
- * @deprecated Use Publisher pattern instead. emit/onCleanup should be in publisher callback.
- * Context for field resolvers that emit updates (has emit and onCleanup).
- * Used with .subscribe() - can push updates over time.
- */
-export type FieldSubscriptionContext<TContext, TResult = unknown> = TContext & {
-	/** Emit a new value for this field */
-	emit: FieldEmit<TResult>;
-	/** Register cleanup function called when subscription ends */
-	onCleanup: OnCleanup;
-};
-
-/**
- * @deprecated Use FieldQueryContext or Publisher pattern
- * Extended context with live query capabilities.
- * User context is extended with emit and onCleanup.
- */
-export type FieldLiveContext<TContext, TResult = unknown> = TContext & {
-	emit: FieldEmit<TResult>;
-	onCleanup: OnCleanup;
-};
-
 // =============================================================================
 // Resolver Function Types
 // =============================================================================
@@ -95,15 +73,13 @@ export type FieldLiveContext<TContext, TResult = unknown> = TContext & {
  */
 export type FieldResolveParams<TParent, TArgs, TContext> = {
 	/**
-	 * Parent object being resolved (preferred).
+	 * Source object being resolved.
 	 * @example
 	 * ```typescript
 	 * .resolve(({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id))
 	 * ```
 	 */
 	source: TParent;
-	/** @deprecated Use `source` instead for consistency with GraphQL terminology */
-	parent: TParent;
 	/** Field arguments (if any) */
 	args: TArgs;
 	ctx: FieldQueryContext<TContext>;
@@ -114,10 +90,8 @@ export type FieldResolveParams<TParent, TArgs, TContext> = {
  * Returns a Publisher that receives subscription callbacks.
  */
 export type FieldSubscribeParams<TParent, TArgs, TContext> = {
-	/** Parent object being resolved (preferred) */
+	/** Source object being resolved */
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	/** Field arguments (if any) */
 	args: TArgs;
 	ctx: TContext;
@@ -129,24 +103,6 @@ export type FieldSubscribeParams<TParent, TArgs, TContext> = {
 export type FieldResolveFn<TParent, TArgs, TContext, TResult> = (
 	params: FieldResolveParams<TParent, TArgs, TContext>,
 ) => TResult | Promise<TResult>;
-
-/**
- * @deprecated Use .resolve().subscribe() instead.
- * Legacy field subscription function - receives ctx with emit/onCleanup.
- *
- * @example
- * ```typescript
- * .subscribe(({ parent, ctx }) => {
- *   ctx.emit(getInitial());
- *   ctx.onCleanup(() => cleanup());
- * })
- * ```
- */
-export type FieldSubscribeFn<TParent, TArgs, TContext, TResult> = (
-	params: FieldSubscribeParams<TParent, TArgs, TContext> & {
-		ctx: FieldSubscriptionContext<TContext, TResult>;
-	},
-) => void | Promise<void>;
 
 /**
  * Live field subscriber function - returns Publisher.
@@ -167,55 +123,14 @@ export type FieldLiveSubscribeFn<TParent, TArgs, TContext, TResult> = (
 /** Field resolver function without args for .resolve() */
 export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: FieldQueryContext<TContext>;
 }) => TResult | Promise<TResult>;
-
-/**
- * @deprecated Use .resolve().subscribe() instead.
- * Legacy field subscription function without args - receives ctx with emit/onCleanup.
- */
-export type FieldSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
-	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
-	ctx: FieldSubscriptionContext<TContext, TResult>;
-}) => void | Promise<void>;
 
 /** Live field subscriber function without args - returns Publisher */
 export type FieldLiveSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: TContext;
 }) => Publisher<TResult>;
-
-/**
- * @deprecated Use FieldResolveParams or FieldSubscribeParams
- */
-export type FieldResolverParams<TParent, TArgs, TContext, TResult = unknown> = {
-	source: TParent;
-	parent: TParent;
-	args: TArgs;
-	ctx: FieldLiveContext<TContext, TResult>;
-};
-
-/**
- * @deprecated Use FieldResolveFn or FieldSubscribeFn
- */
-export type FieldResolverFn<TParent, TArgs, TContext, TResult> = (
-	params: FieldResolverParams<TParent, TArgs, TContext, TResult>,
-) => TResult | Promise<TResult>;
-
-/**
- * @deprecated Use FieldResolveFnNoArgs or FieldSubscribeFnNoArgs
- */
-export type FieldResolverFnNoArgs<TParent, TContext, TResult> = (params: {
-	source: TParent;
-	parent: TParent;
-	ctx: FieldLiveContext<TContext, TResult>;
-}) => TResult | Promise<TResult>;
 
 // =============================================================================
 // Field Definition Types
@@ -243,27 +158,6 @@ export interface ResolvedField<
 		args: TArgs;
 		ctx: FieldQueryContext<TContext>;
 	}) => T | Promise<T>;
-}
-
-/**
- * @deprecated Prefer .resolve().subscribe() for better performance (batchable initial).
- * Subscribed field - uses legacy ctx.emit pattern.
- */
-export interface SubscribedField<
-	T = unknown,
-	TArgs = Record<string, never>,
-	TContext = FieldResolverContext,
-> {
-	readonly _kind: "resolved";
-	readonly _mode: "subscribe";
-	readonly _returnType: T;
-	readonly _argsSchema: z.ZodType<TArgs> | null;
-	/** Legacy resolver - receives ctx with emit/onCleanup, returns void */
-	readonly _resolver: (params: {
-		parent: unknown;
-		args: TArgs;
-		ctx: FieldSubscriptionContext<TContext, T>;
-	}) => void | Promise<void>;
 }
 
 /**
@@ -299,11 +193,10 @@ export interface LiveField<
 	readonly _subscriber: (params: { parent: unknown; args: TArgs; ctx: TContext }) => Publisher<T>;
 }
 
-/** Field definition (exposed, resolved, subscribed, or live) */
+/** Field definition (exposed, resolved, or live) */
 export type FieldDef<T = unknown, TArgs = unknown, TContext = FieldResolverContext> =
 	| ExposedField<T>
 	| ResolvedField<T, TArgs, TContext>
-	| SubscribedField<T, TArgs, TContext>
 	| LiveField<T, TArgs, TContext>;
 
 // =============================================================================
@@ -368,17 +261,6 @@ export interface ScalarFieldBuilder<T, TParent, TContext> {
 		fn: FieldResolveFnNoArgs<TParent, TContext, T>,
 	): ResolvedFieldChainable<T, Record<string, never>, TParent, TContext>;
 
-	/**
-	 * Define how to subscribe to this field (uses emit, returns void).
-	 * Use for fields that push updates from external sources.
-	 *
-	 * @deprecated Prefer .resolve().subscribe() for better performance.
-	 * .subscribe() alone requires manual initial value emission.
-	 */
-	subscribe(
-		fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
-	): SubscribedField<T, Record<string, never>, TContext>;
-
 	/** Make the field nullable */
 	nullable(): ScalarFieldBuilder<T | null, TParent, TContext>;
 }
@@ -392,12 +274,6 @@ export interface ScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
 	resolve(
 		fn: FieldResolveFn<TParent, TArgs, TContext, T>,
 	): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
-
-	/**
-	 * Define how to subscribe to this field with args (uses emit).
-	 * @deprecated Prefer .resolve().subscribe() for better performance.
-	 */
-	subscribe(fn: FieldSubscribeFn<TParent, TArgs, TContext, T>): SubscribedField<T, TArgs, TContext>;
 
 	/** Make the field nullable */
 	nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>;
@@ -419,15 +295,6 @@ export interface RelationFieldBuilder<T, TParent, TContext> {
 		fn: FieldResolveFnNoArgs<TParent, TContext, T>,
 	): ResolvedFieldChainable<T, Record<string, never>, TParent, TContext>;
 
-	/**
-	 * Define how to subscribe to this relation (uses emit, returns void).
-	 * Use for relations that push updates from external sources.
-	 * @deprecated Prefer .resolve().subscribe() for better performance.
-	 */
-	subscribe(
-		fn: FieldSubscribeFnNoArgs<TParent, TContext, T>,
-	): SubscribedField<T, Record<string, never>, TContext>;
-
 	/** Make the relation nullable */
 	nullable(): RelationFieldBuilder<T | null, TParent, TContext>;
 }
@@ -441,12 +308,6 @@ export interface RelationFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
 	resolve(
 		fn: FieldResolveFn<TParent, TArgs, TContext, T>,
 	): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
-
-	/**
-	 * Define how to subscribe to this relation with args (uses emit).
-	 * @deprecated Prefer .resolve().subscribe() for better performance.
-	 */
-	subscribe(fn: FieldSubscribeFn<TParent, TArgs, TContext, T>): SubscribedField<T, TArgs, TContext>;
 
 	/** Make the relation nullable */
 	nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>;
@@ -515,14 +376,16 @@ export interface FieldBuilder<
 
 	/**
 	 * JSON/object field with custom type T.
-	 * Use for JSON fields that need .resolve() or .subscribe().
+	 * Use for JSON fields that need .resolve().
 	 *
 	 * @example
 	 * ```typescript
 	 * resolver(Session, (f) => ({
-	 *   status: f.json<SessionStatus>().subscribe(({ ctx }) => {
-	 *     ctx.emit({ isActive: true, text: "Working..." });
-	 *   }),
+	 *   status: f.json<SessionStatus>()
+	 *     .resolve(({ source, ctx }) => ctx.db.getStatus(source.id))
+	 *     .subscribe(({ source, ctx }) => ({ emit }) => {
+	 *       ctx.statusService.watch(source.id, emit);
+	 *     }),
 	 * }));
 	 * ```
 	 */
@@ -598,14 +461,14 @@ export interface ResolverDef<
 	/** Check if field is exposed (vs resolved) */
 	isExposed(name: string): boolean;
 
-	/** Check if field is a subscription (uses emit pattern - "subscribe" or "live" mode) */
+	/** Check if field is a subscription (live mode with updates) */
 	isSubscription(name: string): boolean;
 
 	/** Check if field is a live field (has both resolver and subscriber) */
 	isLive(name: string): boolean;
 
-	/** Get the field mode: "exposed", "resolve", "subscribe", "live", or null if not found */
-	getFieldMode(name: string): "exposed" | "resolve" | "subscribe" | "live" | null;
+	/** Get the field mode: "exposed", "resolve", "live", or null if not found */
+	getFieldMode(name: string): "exposed" | "resolve" | "live" | null;
 
 	/** Get the args schema for a field (if any) */
 	getArgsSchema(name: string): z.ZodType | null;
@@ -625,9 +488,6 @@ export interface ResolverDef<
 	/**
 	 * Set up subscription for a live field.
 	 * Returns a Publisher that receives { emit, onCleanup } callbacks.
-	 *
-	 * For "live" mode: returns the _subscriber's Publisher.
-	 * For "subscribe" mode (legacy): returns null (use subscribeFieldLegacy instead).
 	 */
 	subscribeField<K extends keyof TFields>(
 		name: K,
@@ -635,17 +495,6 @@ export interface ResolverDef<
 		args: Record<string, unknown>,
 		ctx: TContext,
 	): Publisher<unknown> | null;
-
-	/**
-	 * @deprecated Legacy subscription - calls resolver with ctx.emit/ctx.onCleanup.
-	 * For "subscribe" mode only.
-	 */
-	subscribeFieldLegacy<K extends keyof TFields>(
-		name: K,
-		parent: InferParent<TEntity["fields"]>,
-		args: Record<string, unknown>,
-		ctx: FieldSubscriptionContext<TContext, unknown>,
-	): void | Promise<void>;
 
 	/** Resolve all fields for a parent with args per field */
 	resolveAll(
@@ -665,11 +514,9 @@ export type InferResolverOutput<R extends ResolverDef> = {
 		? T
 		: R["fields"][K] extends ResolvedField<infer T>
 			? T
-			: R["fields"][K] extends SubscribedField<infer T>
+			: R["fields"][K] extends LiveField<infer T>
 				? T
-				: R["fields"][K] extends LiveField<infer T>
-					? T
-					: never;
+				: never;
 };
 
 /** Infer selected fields from resolver */

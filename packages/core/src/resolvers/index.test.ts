@@ -652,39 +652,6 @@ describe("Subscription detection", () => {
 		expect(userResolver.isSubscription("posts")).toBe(false);
 	});
 
-	it("isSubscription returns true for .subscribe() fields", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			// Subscription field - uses emit pattern
-			status: f.string().subscribe(({ ctx }) => {
-				// Emit initial value
-				ctx.emit("online");
-				// Set up subscription
-				const interval = setInterval(() => ctx.emit("online"), 1000);
-				ctx.onCleanup(() => clearInterval(interval));
-			}),
-		}));
-
-		expect(userResolver.isSubscription("id")).toBe(false);
-		expect(userResolver.isSubscription("name")).toBe(false);
-		expect(userResolver.isSubscription("status")).toBe(true);
-	});
-
-	it("isSubscription returns true for relation .subscribe() fields", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			// Subscription relation - emits post updates
-			latestPosts: f.many(Post).subscribe(({ parent, ctx }) => {
-				const posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
-				ctx.emit(posts);
-				// Would normally set up pub/sub here
-			}),
-		}));
-
-		expect(userResolver.isSubscription("latestPosts")).toBe(true);
-	});
-
 	it("isSubscription returns false for non-existent field", () => {
 		const userResolver = resolver(User, (f) => ({
 			id: f.expose("id"),
@@ -721,22 +688,6 @@ describe("getFieldMode()", () => {
 		expect(userResolver.getFieldMode("posts")).toBe("resolve");
 	});
 
-	it("returns 'subscribe' for .subscribe() fields", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			status: f.string().subscribe(({ ctx }) => {
-				ctx.emit("online");
-			}),
-			livePosts: f.many(Post).subscribe(({ ctx }) => {
-				ctx.emit([]);
-			}),
-		}));
-
-		expect(userResolver.getFieldMode("id")).toBe("exposed");
-		expect(userResolver.getFieldMode("status")).toBe("subscribe");
-		expect(userResolver.getFieldMode("livePosts")).toBe("subscribe");
-	});
-
 	it("returns null for non-existent field", () => {
 		const userResolver = resolver(User, (f) => ({
 			id: f.expose("id"),
@@ -752,16 +703,9 @@ describe("getFieldMode()", () => {
 				.many(Post)
 				.args(z.object({ limit: z.number() }))
 				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
-			livePosts: f
-				.many(Post)
-				.args(z.object({ limit: z.number() }))
-				.subscribe(({ args, ctx }) => {
-					ctx.emit(ctx.db.posts.slice(0, args.limit));
-				}),
 		}));
 
 		expect(userResolver.getFieldMode("posts")).toBe("resolve");
-		expect(userResolver.getFieldMode("livePosts")).toBe("subscribe");
 	});
 });
 
@@ -785,18 +729,6 @@ describe("f.json<T>()", () => {
 		}));
 
 		expect(userResolver.getFieldMode("sessionStatus")).toBe("resolve");
-	});
-
-	it("supports .subscribe() with typed JSON", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			liveStatus: f.json<SessionStatus>().subscribe(({ ctx }) => {
-				ctx.emit({ isActive: true, text: "Online" });
-			}),
-		}));
-
-		expect(userResolver.getFieldMode("liveStatus")).toBe("subscribe");
-		expect(userResolver.isSubscription("liveStatus")).toBe(true);
 	});
 
 	it("supports .args() with typed JSON", () => {
@@ -853,24 +785,6 @@ describe("createResolverFromEntity()", () => {
 		expect(resolverDef.isExposed("lastName")).toBe(true);
 		expect(resolverDef.isExposed("fullName")).toBe(false);
 		expect(resolverDef.getFieldMode("fullName")).toBe("resolve");
-	});
-
-	it("converts inline .subscribe() to subscription field", () => {
-		const UserWithSubscription = entity("UserWithSubscription", (t) => ({
-			id: t.id(),
-			name: t.string(),
-			status: t.json<{ isActive: boolean }>().subscribe(({ ctx }) => {
-				ctx.emit({ isActive: true });
-			}),
-		}));
-
-		const resolverDef = createResolverFromEntity(UserWithSubscription);
-
-		expect(resolverDef.isExposed("id")).toBe(true);
-		expect(resolverDef.isExposed("name")).toBe(true);
-		expect(resolverDef.isExposed("status")).toBe(false);
-		expect(resolverDef.getFieldMode("status")).toBe("subscribe");
-		expect(resolverDef.isSubscription("status")).toBe(true);
 	});
 
 	it("resolves exposed fields from parent data", async () => {
@@ -1010,31 +924,6 @@ describe("hasInlineResolvers()", () => {
 		}));
 
 		expect(hasInlineResolvers(UserWithResolve)).toBe(true);
-	});
-
-	it("returns true for entity with .subscribe()", () => {
-		const UserWithSubscribe = entity("UserWithSubscribe", (t) => ({
-			id: t.id(),
-			name: t.string(),
-			status: t.json().subscribe(({ ctx }) => {
-				ctx.emit({ isActive: true });
-			}),
-		}));
-
-		expect(hasInlineResolvers(UserWithSubscribe)).toBe(true);
-	});
-
-	it("returns true for entity with both .resolve() and .subscribe()", () => {
-		const UserWithBoth = entity("UserWithBoth", (t) => ({
-			id: t.id(),
-			name: t.string(),
-			fullName: t.string().resolve(({ parent }) => parent.name),
-			status: t.json().subscribe(({ ctx }) => {
-				ctx.emit({ isActive: true });
-			}),
-		}));
-
-		expect(hasInlineResolvers(UserWithBoth)).toBe(true);
 	});
 
 	it("returns false for object-based entity definition", () => {

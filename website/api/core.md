@@ -9,13 +9,17 @@ Complete API reference for `@sylphx/lens-core`.
 Creates a model with type-safe fields.
 
 ```typescript
-import { model } from '@sylphx/lens-core'
+import { lens, id, string, list } from '@sylphx/lens-core'
 
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post).resolve(({ parent, ctx }) => ...),
-}))
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) => ...,
+})
 ```
 
 ### InferModelType
@@ -34,27 +38,31 @@ type UserType = InferModelType<typeof User>
 ### Scalar Types
 
 ```typescript
-t.id()        // string (unique identifier)
-t.string()    // string
-t.int()       // number (integer)
-t.float()     // number (floating point)
-t.boolean()   // boolean
-t.date()      // Date
-t.json()      // unknown (JSON value)
+import { id, string, int, float, boolean, date, json } from '@sylphx/lens-core'
+
+id()        // string (unique identifier)
+string()    // string
+int()       // number (integer)
+float()     // number (floating point)
+boolean()   // boolean
+date()      // Date
+json()      // unknown (JSON value)
 ```
 
 ### Enum Type
 
 ```typescript
-t.enum(['active', 'inactive', 'pending'])
+import { enumType } from '@sylphx/lens-core'
+
+enumType(['active', 'inactive', 'pending'])
 // Type: 'active' | 'inactive' | 'pending'
 ```
 
 ### Relation Types
 
 ```typescript
-t.one(() => Profile)     // Single relation
-t.many(() => Post)       // Array relation
+() => Profile     // Single relation
+list(() => Post)  // Array relation
 ```
 
 ## Field Modifiers
@@ -64,8 +72,14 @@ t.many(() => Post)       // Array relation
 Field can be undefined.
 
 ```typescript
-bio: t.string().optional()
-// Type: string | undefined
+import { lens, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+model('User', {
+  bio: string().optional(),
+  // Type: string | undefined
+})
 ```
 
 ### nullable
@@ -73,8 +87,14 @@ bio: t.string().optional()
 Field can be null.
 
 ```typescript
-deletedAt: t.date().nullable()
-// Type: Date | null
+import { lens, date, nullable } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+model('User', {
+  deletedAt: nullable(date()),
+  // Type: Date | null
+})
 ```
 
 ### default
@@ -82,7 +102,13 @@ deletedAt: t.date().nullable()
 Default value when not provided.
 
 ```typescript
-role: t.enum(['user', 'admin']).default('user')
+import { lens, enumType } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+model('User', {
+  role: enumType(['user', 'admin']).default('user'),
+})
 ```
 
 ### resolve
@@ -90,9 +116,16 @@ role: t.enum(['user', 'admin']).default('user')
 Compute field value at runtime.
 
 ```typescript
-fullName: t.string().resolve(({ parent }) =>
-  `${parent.firstName} ${parent.lastName}`
-)
+import { lens, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+model('User', {
+  fullName: string(),
+}).resolve({
+  fullName: ({ source }) =>
+    `${source.firstName} ${source.lastName}`,
+})
 ```
 
 ### subscribe
@@ -100,12 +133,20 @@ fullName: t.string().resolve(({ parent }) =>
 Subscribe to field updates (Publisher pattern).
 
 ```typescript
-status: t.string()
-  .resolve(({ parent, ctx }) => ctx.cache.get(`status:${parent.id}`))
-  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-    const unsub = ctx.pubsub.on(`status:${parent.id}`, emit)
+import { lens, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+model('User', {
+  status: string(),
+}).resolve({
+  status: ({ source, ctx }) => ctx.cache.get(`status:${source.id}`),
+}).subscribe({
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`status:${source.id}`, emit)
     onCleanup(unsub)
-  })
+  },
+})
 ```
 
 ### args
@@ -113,12 +154,18 @@ status: t.string()
 Define field arguments.
 
 ```typescript
-posts: t.many(() => Post)
-  .args(z.object({
+import { lens, list } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+model('User', {
+  posts: list(() => Post).args(z.object({
     first: z.number().default(10),
     published: z.boolean().optional(),
-  }))
-  .resolve(({ parent, args, ctx }) => ...)
+  })),
+}).resolve({
+  posts: ({ source, args, ctx }) => ...,
+})
 ```
 
 ## Return Type Wrappers
@@ -128,7 +175,9 @@ posts: t.many(() => Post)
 Wrap model to allow null return.
 
 ```typescript
-import { nullable } from '@sylphx/lens-core'
+import { lens, nullable } from '@sylphx/lens-core'
+
+const { query } = lens<AppContext>()
 
 const findUser = query()
   .input(z.object({ email: z.string() }))
@@ -141,7 +190,9 @@ const findUser = query()
 Wrap model to return array.
 
 ```typescript
-import { list } from '@sylphx/lens-core'
+import { lens, list } from '@sylphx/lens-core'
+
+const { query } = lens<AppContext>()
 
 const listUsers = query()
   .returns(list(User))  // or just [User]

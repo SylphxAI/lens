@@ -1,55 +1,59 @@
 # Models
 
-Models define the shape of your data with type-safe field definitions and inline resolvers.
+Models define the shape of your data with type-safe field definitions and resolvers.
 
 ## Basic Model
 
 ```typescript
-import { model } from '@sylphx/lens-core'
+import { lens, id, string, int, boolean, nullable } from '@sylphx/lens-core'
 
-const User = model<AppContext>('User', (t) => ({
+type AppContext = { db: Database }
+
+const { model } = lens<AppContext>()
+
+const User = model('User', {
   // Scalar fields
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  age: t.int().optional(),
-  isActive: t.boolean(),
-  createdAt: t.date(),
-  role: t.enum(['user', 'admin', 'vip']),
-}))
+  id: id(),
+  name: string(),
+  email: string(),
+  age: nullable(int()),
+  isActive: boolean(),
+})
 ```
 
 ## Field Types
 
 ### Scalar Types
 
-| Method | TypeScript Type | Description |
-|--------|-----------------|-------------|
-| `t.id()` | `string` | Unique identifier |
-| `t.string()` | `string` | Text |
-| `t.int()` | `number` | Integer |
-| `t.float()` | `number` | Floating point |
-| `t.boolean()` | `boolean` | True/false |
-| `t.date()` | `Date` | Date/time |
-| `t.json()` | `unknown` | JSON value |
-| `t.enum([...])` | Union type | Enumeration |
+| Function | TypeScript Type | Description |
+|----------|-----------------|-------------|
+| `id()` | `string` | Unique identifier |
+| `string()` | `string` | Text |
+| `int()` | `number` | Integer |
+| `float()` | `number` | Floating point |
+| `boolean()` | `boolean` | True/false |
+| `datetime()` | `Date` | Date/time |
+| `timestamp()` | `number` | Unix timestamp |
+| `decimal()` | `string` | Decimal number |
 
 ### Field Modifiers
 
 ```typescript
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
-  // Optional field
-  bio: t.string().optional(),
+const User = model('User', {
+  id: id(),
+  name: string(),
 
   // Nullable field
-  deletedAt: t.date().nullable(),
+  bio: nullable(string()),
 
-  // Default value
-  role: t.enum(['user', 'admin']).default('user'),
-}))
+  // List of values
+  tags: list(string()),
+
+  // Nullable list
+  metadata: nullable(list(string())),
+})
 ```
 
 ## Relations
@@ -57,29 +61,36 @@ const User = model('User', (t) => ({
 ### One-to-One
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
-  // One-to-one relation
-  profile: t.one(() => Profile).resolve(({ parent, ctx }) =>
-    ctx.db.profiles.findUnique({ where: { userId: parent.id } })
-  ),
-}))
+const User = model('User', {
+  id: id(),
+  name: string(),
+  profileId: string(),
+
+  // One-to-one relation (lazy reference)
+  profile: () => Profile,
+}).resolve({
+  profile: ({ source, ctx }) =>
+    ctx.db.profiles.findUnique({ where: { id: source.profileId } })
+})
 ```
 
 ### One-to-Many
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
 
   // One-to-many relation
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.posts.findMany({ where: { authorId: parent.id } })
-  ),
-}))
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) =>
+    ctx.db.posts.findMany({ where: { authorId: source.id } })
+})
 ```
 
 ### Lazy References
@@ -87,30 +98,40 @@ const User = model<AppContext>('User', (t) => ({
 Use arrow functions to avoid circular dependency issues:
 
 ```typescript
-const User = model('User', (t) => ({
-  posts: t.many(() => Post),  // Lazy reference
-}))
+const { model } = lens<AppContext>()
 
-const Post = model('Post', (t) => ({
-  author: t.one(() => User),  // Lazy reference back
-}))
+const User = model('User', {
+  id: id(),
+  posts: list(() => Post),  // Lazy reference
+})
+
+const Post = model('Post', {
+  id: id(),
+  authorId: string(),
+  author: () => User,  // Lazy reference back
+}).resolve({
+  author: ({ source, ctx }) => ctx.db.users.find(source.authorId)
+})
 ```
 
 ## Computed Fields
 
-Fields can be computed from the parent object:
+Fields can be computed from the source object:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  firstName: t.string(),
-  lastName: t.string(),
+const { model } = lens<AppContext>()
 
-  // Computed field
-  displayName: t.string().resolve(({ parent }) =>
-    `${parent.firstName} ${parent.lastName}`
-  ),
-}))
+const User = model('User', {
+  id: id(),
+  firstName: string(),
+  lastName: string(),
+
+  // Computed field (declared as string)
+  displayName: string(),
+}).resolve({
+  // Computed from source
+  displayName: ({ source }) => `${source.firstName} ${source.lastName}`
+})
 ```
 
 ## Field Arguments
@@ -118,34 +139,38 @@ const User = model<AppContext>('User', (t) => ({
 Fields can have arguments, like GraphQL:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+  postsCount: int(),
+}).resolve({
   // Field with arguments
-  posts: t.many(() => Post)
-    .args(z.object({
+  posts: {
+    args: z.object({
       first: z.number().default(10),
       published: z.boolean().optional(),
       orderBy: z.enum(['createdAt', 'title']).optional(),
-    }))
-    .resolve(({ parent, args, ctx }) =>
+    }),
+    resolve: ({ source, args, ctx }) =>
       ctx.db.posts.findMany({
-        where: { authorId: parent.id, published: args.published },
+        where: { authorId: source.id, published: args.published },
         take: args.first,
         orderBy: args.orderBy ? { [args.orderBy]: 'desc' } : undefined,
       })
-    ),
+  },
 
   // Computed with arguments
-  postsCount: t.int()
-    .args(z.object({ published: z.boolean().optional() }))
-    .resolve(({ parent, args, ctx }) =>
+  postsCount: {
+    args: z.object({ published: z.boolean().optional() }),
+    resolve: ({ source, args, ctx }) =>
       ctx.db.posts.count({
-        where: { authorId: parent.id, published: args.published },
+        where: { authorId: source.id, published: args.published },
       })
-    ),
-}))
+  },
+})
 ```
 
 ### Client Usage
@@ -168,22 +193,24 @@ client.user.get({ id: '1' }, {
 Fields can subscribe to updates:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
-  // Live field with two-phase resolution
-  status: t.string()
-    // Phase 1: Initial value (batchable)
-    .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
-    // Phase 2: Subscribe to updates (Publisher pattern)
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${parent.id}`, (status) => {
-        emit(status)
-      })
-      onCleanup(unsub)
-    }),
-}))
+const User = model('User', {
+  id: id(),
+  name: string(),
+  status: string(),
+}).resolve({
+  // Phase 1: Initial value (batchable)
+  status: ({ source, ctx }) => ctx.db.getStatus(source.id)
+}).subscribe({
+  // Phase 2: Subscribe to updates (Publisher pattern)
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`status:${source.id}`, (status) => {
+      emit(status)
+    })
+    onCleanup(unsub)
+  }
+})
 ```
 
 See [Live Queries](/server/live-queries) for more details.
@@ -205,9 +232,9 @@ type UserType = InferModelType<typeof User>
 Field resolvers receive these parameters:
 
 ```typescript
-({ parent, args, ctx }) => result
+({ source, args, ctx }) => result
 
-// parent: The parent object being resolved
+// source: The parent/source object being resolved
 // args: Field arguments (if defined)
 // ctx: Request context
 // Returns: The field value (sync or async)
@@ -227,19 +254,26 @@ type User {
 
 ```typescript
 // Lens equivalent
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post)
-    .args(z.object({
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+  postsCount: int(),
+}).resolve({
+  posts: {
+    args: z.object({
       first: z.number().optional(),
       published: z.boolean().optional(),
-    }))
-    .resolve(({ parent, args, ctx }) => ...),
-  postsCount: t.int()
-    .args(z.object({ published: z.boolean().optional() }))
-    .resolve(({ parent, args, ctx }) => ...),
-}))
+    }),
+    resolve: ({ source, args, ctx }) => ...
+  },
+  postsCount: {
+    args: z.object({ published: z.boolean().optional() }),
+    resolve: ({ source, args, ctx }) => ...
+  },
+})
 ```
 
 **Lens advantages:**

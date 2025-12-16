@@ -111,26 +111,31 @@ export {
 	float,
 	// Type inference
 	type InferFieldDefType,
+	type IsList,
+	type IsNullable,
 	id,
 	int,
+	isLazyRef,
 	// Type guards
-	isListFieldDef,
-	isNullableFieldDef,
+	isListDef,
+	isNullableDef,
 	json,
-	// Internal (for advanced use)
-	LIST_FIELD_SYMBOL,
-	// List/Nullable field types
-	type ListFieldDef,
-	// Field wrappers
-	list as listField,
-	NULLABLE_FIELD_SYMBOL,
-	type NullableFieldDef,
-	nullable as nullableField,
+	// Symbols
+	LIST_SYMBOL,
+	// Types
+	type ListDef,
+	// Functions
+	list,
+	NULLABLE_SYMBOL,
+	type NullableDef,
+	nullable,
 	object,
 	processFieldDef,
 	scalar,
 	string,
 	timestamp,
+	// Utility types
+	type UnwrapType,
 } from "./schema/fields.js";
 
 export {
@@ -150,25 +155,15 @@ export {
 } from "./schema/model-resolvers.js";
 
 // =============================================================================
-// Return Type Wrappers
+// Legacy Wrapper Aliases (for backward compatibility)
 // =============================================================================
 
 export {
-	// Utility types
-	type IsList,
-	type IsNullable,
-	// Type guards
 	isListWrapper,
 	isNullableWrapper,
-	// Symbols
-	LIST_SYMBOL,
-	// Types
+	// Legacy aliases - prefer ListDef/NullableDef from fields.js
 	type ListWrapper,
-	// Wrappers
-	list,
-	NULLABLE_SYMBOL,
 	type NullableWrapper,
-	nullable,
 	type UnwrapModel,
 } from "./schema/wrappers.js";
 
@@ -307,7 +302,6 @@ export {
 
 export {
 	type AnyProcedure,
-	// Query types (new)
 	type AnyQueryDef,
 	flattenRouter,
 	type InferRouterClient,
@@ -321,9 +315,6 @@ export {
 	isRouterDef,
 	isSubscribedQueryDef,
 	isTempId,
-	// Context types
-	type LensContext,
-	type LensContextExtensions,
 	type LiveQueryDef,
 	// Types
 	type MutationDef,
@@ -342,8 +333,6 @@ export {
 	type QueryMode,
 	type QueryResultType,
 	query,
-	type ResolverContext,
-	type ResolverFn,
 	type ReturnSpec,
 	type RouterDef,
 	type RouterRoutes,
@@ -351,7 +340,6 @@ export {
 	router,
 	type SubscribedQueryDef,
 	tempId,
-	type ZodLikeSchema,
 } from "./operations/index.js";
 
 // =============================================================================
@@ -366,9 +354,9 @@ export {
 	type FieldBuilder,
 	type FieldDef,
 	type FieldEmit,
-	type FieldLiveContext,
+	type FieldQueryContext,
+	type FieldResolveParams,
 	type FieldResolverContext,
-	type FieldResolverParams,
 	hasInlineResolvers,
 	type InferResolverOutput,
 	type InferResolverSelected,
