@@ -1,15 +1,13 @@
 /**
  * @sylphx/lens-core - Model Definition
  *
- * New unified API for defining data models (replaces entity).
- * Models with `id` field are normalizable/cacheable.
- * Models without `id` are pure types with resolvers.
+ * v3.0 API - Plain object model definitions only.
+ * No builder functions, no t. prefix.
  *
  * @example
  * ```typescript
  * import { model, id, string, int, list, nullable } from '@sylphx/lens-core'
  *
- * // New API (recommended) - no t. prefix
  * const User = model('User', {
  *   id: id(),
  *   name: string(),
@@ -22,13 +20,6 @@
  *   posts: ({ source, ctx }) =>
  *     ctx.db.posts.filter(p => p.authorId === source.id)
  * })
- *
- * // Legacy API (still supported) - with t. prefix
- * const User = model<AppContext>("User", (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   posts: t.many(() => Post),
- * }))
  * ```
  */
 
@@ -55,13 +46,7 @@ export type {
 	ModelDefWithSubscribers,
 } from "./model-resolvers.js";
 
-import {
-	createTypeBuilder,
-	type EntityDefinition,
-	type FieldType,
-	type TypeBuilder,
-	t as typeBuilder,
-} from "./types.js";
+import type { EntityDefinition, FieldType } from "./types.js";
 
 // =============================================================================
 // Model Symbol
@@ -75,7 +60,7 @@ export const MODEL_SYMBOL: unique symbol = Symbol("lens:model");
 // =============================================================================
 
 /**
- * Plain object field definition (new API).
+ * Plain object field definition.
  * Each field can be a scalar type, model reference, or wrapped type.
  *
  * @example
@@ -91,20 +76,6 @@ export const MODEL_SYMBOL: unique symbol = Symbol("lens:model");
  * ```
  */
 export type PlainFieldDefinition = Record<string, FieldDef>;
-
-/**
- * Model builder function type (legacy API).
- * Receives `t` type builder and returns field definitions.
- */
-export type ModelBuilder<Fields extends EntityDefinition> = (t: typeof typeBuilder) => Fields;
-
-/**
- * Context-aware model builder function type (legacy API).
- * Receives a typed `t` builder where resolve/subscribe have typed context.
- */
-export type ContextualModelBuilder<Fields extends EntityDefinition, TContext> = (
-	t: TypeBuilder<TContext>,
-) => Fields;
 
 /**
  * Model definition with name and fields.
@@ -139,96 +110,8 @@ export type InferModelType<M extends ModelDef> =
 	M extends ModelDef<string, infer F> ? InferEntity<F> : never;
 
 // =============================================================================
-// Model Definition Function
+// Type Helper
 // =============================================================================
-
-/**
- * Define a model with fields.
- *
- * Models with `id` field are normalizable and cacheable.
- * Models without `id` are pure types that can still have resolvers.
- *
- * @example
- * ```typescript
- * // New API (recommended) - plain object, no t. prefix
- * const User = model('User', {
- *   id: id(),
- *   name: string(),
- *   bio: nullable(string()),
- *   tags: list(string()),
- *   posts: list(() => Post),
- *   profile: Profile,
- * })
- * .resolve({
- *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
- * })
- *
- * // Legacy API - with t. prefix (still supported)
- * const User = model<AppContext>("User", (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   posts: t.many(() => Post),
- * }))
- * ```
- */
-// model<Context>() - returns factory for typed context
-export function model<TContext = unknown>(): ModelFactory<TContext>;
-// model<Context>("Name") - returns builder class for .define()
-export function model<TContext = unknown>(name: string): ModelBuilderClass<TContext>;
-// model("Name", { fields }) - NEW: plain object definition
-export function model<Name extends string, FieldDefs extends PlainFieldDefinition>(
-	name: Name,
-	fields: FieldDefs,
-): ModelDefChainable<Name, ProcessedFields<FieldDefs>, unknown>;
-// model("Name", (t) => fields) - legacy builder definition
-export function model<Name extends string, Fields extends EntityDefinition>(
-	name: Name,
-	builder: ModelBuilder<Fields>,
-): ModelDefChainable<Name, Fields, unknown>;
-export function model<
-	TContext = unknown,
-	Name extends string = string,
-	Fields extends EntityDefinition = EntityDefinition,
->(
-	nameOrNothing?: Name,
-	maybeBuilderOrFields?: ModelBuilder<Fields> | PlainFieldDefinition,
-):
-	| ModelFactory<TContext>
-	| ModelBuilderClass<TContext>
-	| ModelDefChainable<Name, Fields, TContext> {
-	// model<Context>() - returns factory
-	if (nameOrNothing === undefined) {
-		return createModelFactory<TContext>();
-	}
-
-	// model<Context>("Name") - returns builder class for .define()
-	if (maybeBuilderOrFields === undefined) {
-		return new ModelBuilderClass<TContext>(nameOrNothing);
-	}
-
-	// Check if it's a builder function or plain object
-	if (typeof maybeBuilderOrFields === "function") {
-		// model("Name", (t) => fields) - legacy builder definition
-		const fields = maybeBuilderOrFields(typeBuilder);
-		return createModelDefChainable<Name, Fields, TContext>(nameOrNothing, fields);
-	}
-
-	// model("Name", { fields }) - NEW: plain object definition
-	const processedFields = processPlainFields(maybeBuilderOrFields);
-	return createModelDefChainable<Name, Fields, TContext>(nameOrNothing, processedFields as Fields);
-}
-
-/**
- * Process plain field definitions into EntityDefinition.
- * Converts field defs (scalars, model refs, list/nullable wrappers) to FieldType instances.
- */
-function processPlainFields(fieldDefs: PlainFieldDefinition): EntityDefinition {
-	const result: EntityDefinition = {};
-	for (const [key, value] of Object.entries(fieldDefs)) {
-		result[key] = processFieldDef(value);
-	}
-	return result;
-}
 
 /**
  * Type helper to process plain field definitions.
@@ -246,45 +129,105 @@ type ProcessedFields<T extends PlainFieldDefinition> = {
 
 /**
  * Factory for creating models with typed context.
+ * Returns a function that creates models with plain object fields.
+ *
+ * @example
+ * ```typescript
+ * const { model } = lens<AppContext>();
+ *
+ * const User = model("User", {
+ *   id: id(),
+ *   name: string(),
+ * });
+ * ```
  */
-export type ModelFactory<TContext> = <Name extends string, Fields extends EntityDefinition>(
+export type ModelFactory<TContext> = <Name extends string, FieldDefs extends PlainFieldDefinition>(
 	name: Name,
-	builder: ContextualModelBuilder<Fields, TContext>,
-) => ModelDefChainable<Name, Fields, TContext>;
+	fields: FieldDefs,
+) => ModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext>;
 
 function createModelFactory<TContext>(): ModelFactory<TContext> {
-	return <Name extends string, Fields extends EntityDefinition>(
+	return <Name extends string, FieldDefs extends PlainFieldDefinition>(
 		name: Name,
-		builder: ContextualModelBuilder<Fields, TContext>,
-	): ModelDefChainable<Name, Fields, TContext> => {
-		const contextualBuilder = createTypeBuilder<TContext>();
-		const fields = builder(contextualBuilder);
-		return createModelDefChainable<Name, Fields, TContext>(name, fields);
+		fields: FieldDefs,
+	): ModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext> => {
+		const processedFields = processPlainFields(fields);
+		return createModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext>(
+			name,
+			processedFields as ProcessedFields<FieldDefs>,
+		);
 	};
 }
 
 // =============================================================================
-// Model Builder Class (Fluent API)
+// Model Definition Function
 // =============================================================================
 
 /**
- * Builder for creating models with typed context using fluent API.
- * Use `model<Context>("Name").define((t) => ...)` for typed resolvers.
+ * Define a model with fields.
+ *
+ * Models with `id` field are normalizable and cacheable.
+ * Models without `id` are pure types that can still have resolvers.
+ *
+ * @example
+ * ```typescript
+ * import { model, id, string, list, nullable } from '@sylphx/lens-core'
+ *
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   bio: nullable(string()),
+ *   posts: list(() => Post),
+ * })
+ * .resolve({
+ *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
+ * })
+ * ```
  */
-export class ModelBuilderClass<TContext, Name extends string = string> {
-	constructor(private readonly _name: Name) {}
-
-	/**
-	 * Define model fields with typed context.
-	 * The `t` builder provides typed context to resolve/subscribe methods.
-	 */
-	define<Fields extends EntityDefinition>(
-		builder: ContextualModelBuilder<Fields, TContext>,
-	): ModelDefChainable<Name, Fields, TContext> {
-		const contextualBuilder = createTypeBuilder<TContext>();
-		const fields = builder(contextualBuilder);
-		return createModelDefChainable<Name, Fields, TContext>(this._name, fields);
+// model<Context>() - returns factory for typed context
+export function model<TContext = unknown>(): ModelFactory<TContext>;
+// model("Name", { fields }) - plain object definition
+export function model<Name extends string, FieldDefs extends PlainFieldDefinition>(
+	name: Name,
+	fields: FieldDefs,
+): ModelDefChainable<Name, ProcessedFields<FieldDefs>, unknown>;
+export function model<
+	TContext = unknown,
+	Name extends string = string,
+	FieldDefs extends PlainFieldDefinition = PlainFieldDefinition,
+>(
+	nameOrNothing?: Name,
+	fields?: FieldDefs,
+): ModelFactory<TContext> | ModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext> {
+	// model<Context>() - returns factory
+	if (nameOrNothing === undefined) {
+		return createModelFactory<TContext>();
 	}
+
+	// model("Name", { fields }) - plain object definition
+	if (fields === undefined) {
+		throw new Error(
+			`model("${nameOrNothing}") requires fields. Use: model("${nameOrNothing}", { id: id(), ... })`,
+		);
+	}
+
+	const processedFields = processPlainFields(fields);
+	return createModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext>(
+		nameOrNothing,
+		processedFields as ProcessedFields<FieldDefs>,
+	);
+}
+
+/**
+ * Process plain field definitions into EntityDefinition.
+ * Converts field defs (scalars, model refs, list/nullable wrappers) to FieldType instances.
+ */
+function processPlainFields(fieldDefs: PlainFieldDefinition): EntityDefinition {
+	const result: EntityDefinition = {};
+	for (const [key, value] of Object.entries(fieldDefs)) {
+		result[key] = processFieldDef(value);
+	}
+	return result;
 }
 
 // =============================================================================

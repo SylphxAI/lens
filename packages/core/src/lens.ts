@@ -68,12 +68,7 @@ import type {
 import type { FieldBuilder, FieldDef, ResolverDef } from "./resolvers/index.js";
 import { resolver as createResolver } from "./resolvers/index.js";
 import type { EntityDef } from "./schema/define.js";
-import type {
-	ContextualModelBuilder,
-	ModelBuilderClass,
-	ModelDefChainable,
-	PlainFieldDefinition,
-} from "./schema/model.js";
+import type { ModelFactory } from "./schema/model.js";
 import { model as createModel } from "./schema/model.js";
 import type { EntityDefinition } from "./schema/types.js";
 
@@ -103,24 +98,9 @@ export interface LensQuery<TContext> {
 
 /**
  * Typed model factory function.
- * Creates models with pre-typed context.
+ * Creates models with pre-typed context using plain object fields.
  */
-export interface LensModel<TContext> {
-	/** Create model with builder function (recommended) */
-	<Name extends string, Fields extends EntityDefinition>(
-		name: Name,
-		builder: ContextualModelBuilder<Fields, TContext>,
-	): ModelDefChainable<Name, Fields, TContext>;
-
-	/** Create model with plain object fields */
-	<Name extends string, FieldDefs extends PlainFieldDefinition>(
-		name: Name,
-		fields: FieldDefs,
-	): ModelDefChainable<Name, EntityDefinition, TContext>;
-
-	/** Create model builder for fluent .define() API */
-	<Name extends string>(name: Name): ModelBuilderClass<TContext, Name>;
-}
+export type LensModel<TContext> = ModelFactory<TContext>;
 
 // =============================================================================
 // Plugin-Aware Mutation Builder Types

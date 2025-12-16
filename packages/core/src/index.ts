@@ -76,18 +76,14 @@ export {
 } from "./schema/create.js";
 
 // =============================================================================
-// Model Definition (Primary API - New)
+// Model Definition (Primary API)
 // =============================================================================
 
 export {
-	// Model factory
-	type ContextualModelBuilder,
 	type InferModelType,
 	isModelDef,
 	isNormalizableModel,
 	MODEL_SYMBOL,
-	type ModelBuilder,
-	ModelBuilderClass,
 	type ModelDef,
 	type ModelFactory,
 	model,
@@ -179,28 +175,13 @@ export {
 } from "./schema/collect.js";
 
 // =============================================================================
-// Entity & Schema Definition (Legacy - use model() instead)
+// Entity Definition (Internal - use model() for new code)
 // =============================================================================
 
 export {
-	/** @deprecated Use ContextualModelBuilder instead */
-	type ContextualEntityBuilder,
-	// Schema creation
 	createSchema,
-	/** @deprecated Use model() instead */
-	defineEntity,
-	/** @deprecated Use ModelBuilder instead */
-	type EntityBuilder,
-	/** @deprecated Use ModelBuilderClass instead */
-	EntityBuilder_,
 	type EntityDef,
-	/** @deprecated Use model() instead */
-	entity,
 	isEntityDef,
-	/** @deprecated Use model<TContext>() instead */
-	type TypedEntityFactory,
-	/** @deprecated Use model<TContext>() instead */
-	typedEntity,
 } from "./schema/define.js";
 
 // =============================================================================

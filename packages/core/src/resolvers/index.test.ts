@@ -7,6 +7,7 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { entity } from "../schema/define.js";
+import { id, string } from "../schema/fields.js";
 import { model } from "../schema/model.js";
 import { t } from "../schema/types.js";
 import {
@@ -983,10 +984,10 @@ describe("hasInlineResolvers()", () => {
 
 describe("createResolverFromEntity() with model chain methods", () => {
 	it("handles model with .resolve() chain", async () => {
-		const User = model("User", (t) => ({
-			id: t.id(),
-			name: t.string(),
-		})).resolve({
+		const User = model("User", {
+			id: id(),
+			name: string(),
+		}).resolve({
 			name: ({ source }) => (source as { name: string }).name.toUpperCase(),
 		});
 
@@ -1000,10 +1001,10 @@ describe("createResolverFromEntity() with model chain methods", () => {
 	});
 
 	it("handles model with .resolve().subscribe() chain (live mode)", () => {
-		const User = model("User", (t) => ({
-			id: t.id(),
-			name: t.string(),
-		}))
+		const User = model("User", {
+			id: id(),
+			name: string(),
+		})
 			.resolve({
 				name: ({ source }) => (source as { name: string }).name,
 			})
@@ -1024,10 +1025,10 @@ describe("createResolverFromEntity() with model chain methods", () => {
 	it("resolver and subscriber are both callable", async () => {
 		let subscriberCalled = false;
 
-		const User = model("User", (t) => ({
-			id: t.id(),
-			balance: t.string(),
-		}))
+		const User = model("User", {
+			id: id(),
+			balance: string(),
+		})
 			.resolve({
 				balance: ({ source }) => `$${(source as { balance: number }).balance}`,
 			})
