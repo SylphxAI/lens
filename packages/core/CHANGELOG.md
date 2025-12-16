@@ -1,5 +1,16 @@
 # @sylphx/lens-core
 
+## 4.0.0 (2025-12-16)
+
+### ♻️ Refactoring
+
+- 💥 **core:** remove deprecated APIs for v3.0 ([926b66c](https://github.com/SylphxAI/lens/commit/926b66cdccee8091667ea32e5ff40343efed8ce2))
+
+### 💥 Breaking Changes
+
+- **core:** remove deprecated APIs for v3.0 ([926b66c](https://github.com/SylphxAI/lens/commit/926b66cdccee8091667ea32e5ff40343efed8ce2))
+  Remove deprecated field subscription patterns
+
 ## 3.0.0 (2025-12-16)
 
 ### ♻️ Refactoring
