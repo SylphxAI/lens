@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 2.7.4 (2025-12-16)
+
+### 🐛 Bug Fixes
+
+- security hardening and code cleanup (#89) ([bb18d50](https://github.com/SylphxAI/lens/commit/bb18d500ac582c8f2a06b4e7bd8ddc84de4a63b8))
+
 ## 2.7.3 (2025-12-15)
 
 ### 🐛 Bug Fixes
