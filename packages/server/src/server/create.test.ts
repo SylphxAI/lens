@@ -1548,7 +1548,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
 			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
-			.subscribe(({ input: _input }) => ({ emit, onCleanup }) => {
+			.subscribe(({ args: _args }) => ({ emit, onCleanup }) => {
 				subscriberCalled = true;
 				capturedEmit = emit;
 				capturedOnCleanup = onCleanup;
@@ -1674,8 +1674,8 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 		const liveUser = query<TestContext>()
 			.input(z.object({ id: z.string() }))
 			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
-			.subscribe(({ input, ctx }) => ({ emit: _emit }) => {
-				receivedInput = input;
+			.subscribe(({ args, ctx }) => ({ emit: _emit }) => {
+				receivedInput = args;
 				receivedCtx = ctx;
 			});
 

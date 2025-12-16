@@ -127,9 +127,10 @@ export function direct<TApp extends LensServerInterface>(
 			if (isObservable(result)) {
 				// Get first value from Observable
 				return new Promise((resolve, reject) => {
-					const subscription = result.subscribe({
+					let subscription: { unsubscribe?: () => void } | undefined;
+					subscription = result.subscribe({
 						next: (value) => {
-							subscription.unsubscribe?.();
+							subscription?.unsubscribe?.();
 							resolve(value);
 						},
 						error: reject,
@@ -147,9 +148,10 @@ export function direct<TApp extends LensServerInterface>(
 			if (isObservable(result)) {
 				// Get first value from Observable
 				return new Promise((resolve, reject) => {
-					const subscription = result.subscribe({
+					let subscription: { unsubscribe?: () => void } | undefined;
+					subscription = result.subscribe({
 						next: (value) => {
-							subscription.unsubscribe?.();
+							subscription?.unsubscribe?.();
 							resolve(value);
 						},
 						error: reject,

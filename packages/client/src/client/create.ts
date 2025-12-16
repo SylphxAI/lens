@@ -26,7 +26,7 @@ import {
 	type Operation,
 	type OperationMeta,
 	type Result,
-	type Transport,
+	type TransportBase,
 } from "../transport/types.js";
 import type {
 	ExtractRouter,
@@ -113,7 +113,7 @@ function generateSubscriberId(): SubscriberId {
 }
 
 class ClientImpl {
-	private transport: Transport;
+	private transport: TransportBase;
 	private plugins: Plugin[];
 
 	/** Metadata from transport handshake (lazy loaded) */
@@ -177,10 +177,19 @@ class ClientImpl {
 			}
 		}
 
-		// Execute through transport
-		const resultOrObservable = this.transport.execute(processedOp);
+		// Execute through transport using capability methods
+		let resultOrObservable: Promise<Result> | Observable<Result>;
+		if (processedOp.type === "mutation" && "mutation" in this.transport) {
+			resultOrObservable = this.transport.mutation(processedOp);
+		} else if (processedOp.type === "subscription" && "subscription" in this.transport) {
+			resultOrObservable = this.transport.subscription(processedOp);
+		} else if ("query" in this.transport) {
+			resultOrObservable = this.transport.query(processedOp);
+		} else {
+			throw new Error(`Transport does not support ${processedOp.type} operations`);
+		}
 
-		// Handle Observable (from direct transport returning Observable)
+		// Handle Observable (from direct transport returning Observable for subscriptions)
 		let result: Result;
 		if (this.isObservable(resultOrObservable)) {
 			// Get first value from Observable
@@ -778,7 +787,13 @@ class ClientImpl {
 				meta: endpoint.mergedSelection ? { select: endpoint.mergedSelection } : {},
 			};
 
-			const resultOrObservable = this.transport.execute(op);
+			// Use subscription capability if available, fallback to query
+			const resultOrObservable =
+				"subscription" in this.transport
+					? this.transport.subscription(op)
+					: "query" in this.transport
+						? this.transport.query(op)
+						: Promise.reject(new Error("Transport does not support subscriptions"));
 
 			if (this.isObservable(resultOrObservable)) {
 				const subscription = resultOrObservable.subscribe({
@@ -882,8 +897,23 @@ class ClientImpl {
 		path: string,
 	): (descriptor?: { input?: unknown; select?: SelectionObject }) => unknown {
 		return (descriptor?: { input?: unknown; select?: SelectionObject }) => {
-			const input = descriptor?.input;
-			const select = descriptor?.select;
+			// Handle both old API (direct input) and new API ({ input, select })
+			let input: unknown;
+			let select: SelectionObject | undefined;
+
+			if (
+				descriptor &&
+				typeof descriptor === "object" &&
+				("input" in descriptor || "select" in descriptor)
+			) {
+				// New API: { input, select }
+				input = descriptor.input;
+				select = descriptor.select;
+			} else {
+				// Old API: direct input (backwards compatibility)
+				input = descriptor;
+				select = undefined;
+			}
 
 			// Delegate to executeQuery for all query functionality
 			const queryResult = this.executeQuery<unknown>(path, input, select);
@@ -1002,4 +1032,4 @@ export function createClient(config: LensClientConfig | TypedClientConfig<unknow
 }
 
 export type { Plugin } from "../transport/plugin.js";
-export type { Metadata, Operation, Result, Transport } from "../transport/types.js";
+export type { Metadata, Operation, Result, TransportBase } from "../transport/types.js";

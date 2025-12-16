@@ -17,7 +17,7 @@ import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 import type { LensServerInterface } from "../transport/direct.js";
 import { direct } from "../transport/direct.js";
-import type { Observable, Result, Transport } from "../transport/types";
+import type { Observable, QueryCapable, Result, SubscriptionCapable } from "../transport/types";
 import { createClient } from "./create";
 
 // =============================================================================
@@ -63,7 +63,7 @@ describe("Connection failure and retry", () => {
 		});
 
 		let connectCallCount = 0;
-		const mockTransport: Transport = {
+		const mockTransport: QueryCapable = {
 			connect: async () => {
 				connectCallCount++;
 				if (connectCallCount === 1) {
@@ -73,7 +73,23 @@ describe("Connection failure and retry", () => {
 				// Second call succeeds
 				return app.getMetadata();
 			},
-			execute: app.execute.bind(app),
+			query: async (op) => {
+				const result = app.execute(op);
+				// Handle Observable from app.execute
+				if (result && typeof result === "object" && "subscribe" in result) {
+					return new Promise((resolve, reject) => {
+						let sub: { unsubscribe?: () => void } | undefined;
+						sub = (result as any).subscribe({
+							next: (value: any) => {
+								sub?.unsubscribe?.();
+								resolve(value);
+							},
+							error: reject,
+						});
+					});
+				}
+				return result as any;
+			},
 		};
 
 		const client = createClient({
@@ -100,12 +116,28 @@ describe("Connection failure and retry", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),
 		});
 
-		const mockTransport: Transport = {
+		const mockTransport: QueryCapable = {
 			connect: async () => {
 				// Always fail initially, but client shouldn't throw
 				throw new Error("Initial connection failed");
 			},
-			execute: app.execute.bind(app),
+			query: async (op) => {
+				const result = app.execute(op);
+				// Handle Observable from app.execute
+				if (result && typeof result === "object" && "subscribe" in result) {
+					return new Promise((resolve, reject) => {
+						let sub: { unsubscribe?: () => void } | undefined;
+						sub = (result as any).subscribe({
+							next: (value: any) => {
+								sub?.unsubscribe?.();
+								resolve(value);
+							},
+							error: reject,
+						});
+					});
+				}
+				return result as any;
+			},
 		};
 
 		// Should not throw - client creation is synchronous
@@ -820,14 +852,33 @@ describe("createAccessor subscribe", () => {
 		});
 
 		let connectResolved = false;
-		const mockTransport: Transport = {
+		const mockTransport: SubscriptionCapable & QueryCapable = {
 			connect: async () => {
 				// Simulate slow connection
 				await new Promise((resolve) => setTimeout(resolve, 50));
 				connectResolved = true;
 				return app.getMetadata();
 			},
-			execute: app.execute.bind(app),
+			query: async (op) => {
+				const result = app.execute(op);
+				// Handle Observable from app.execute
+				if (result && typeof result === "object" && "subscribe" in result) {
+					return new Promise((resolve, reject) => {
+						let sub: { unsubscribe?: () => void } | undefined;
+						sub = (result as any).subscribe({
+							next: (value: any) => {
+								sub?.unsubscribe?.();
+								resolve(value);
+							},
+							error: reject,
+						});
+					});
+				}
+				return result as any;
+			},
+			subscription: (op) => {
+				return app.execute(op) as Observable<Result>;
+			},
 		};
 
 		const client = createClient({
@@ -1511,7 +1562,7 @@ describe("Edge Cases and Race Conditions", () => {
 					await connectPromise; // Wait for manual resolution
 					return mockApp.getMetadata();
 				},
-				execute: mockApp.execute,
+				subscription: mockApp.execute as (op: any) => Observable<Result>,
 			},
 		});
 
@@ -1691,7 +1742,30 @@ describe("Edge Cases and Race Conditions", () => {
 					}
 					return mockApp.getMetadata();
 				},
-				execute: mockApp.execute,
+				query: async () => {
+					const result = mockApp.execute();
+					return result as any;
+				},
+				subscription: () => {
+					const result = mockApp.execute();
+					// If result is a Promise, wrap it in Observable
+					if (result instanceof Promise) {
+						return {
+							subscribe: (observer: any) => {
+								result
+									.then((value) => {
+										observer.next?.(value);
+										observer.complete?.();
+									})
+									.catch((error) => {
+										observer.error?.(error);
+									});
+								return { unsubscribe: () => {} };
+							},
+						};
+					}
+					return result as Observable<Result>;
+				},
 			},
 		});
 

@@ -172,7 +172,7 @@ describe("HTTP + SSE Transport", () => {
 		});
 	});
 
-	describe("execute - query/mutation", () => {
+	describe("query/mutation", () => {
 		it("executes query via HTTP POST", async () => {
 			mockFetch = mock(() =>
 				Promise.resolve({
@@ -187,7 +187,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = await transport.execute({
+			const result = await transport.query({
 				id: "op-1",
 				path: "user.get",
 				type: "query",
@@ -222,7 +222,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = await transport.execute({
+			const result = await transport.mutation({
 				id: "op-2",
 				path: "user.update",
 				type: "mutation",
@@ -247,7 +247,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = await transport.execute({
+			const result = await transport.query({
 				id: "op-3",
 				path: "user.get",
 				type: "query",
@@ -275,7 +275,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			await transport.execute({
+			await transport.query({
 				id: "op-4",
 				path: "user.get",
 				type: "query",
@@ -286,7 +286,7 @@ describe("HTTP + SSE Transport", () => {
 		});
 	});
 
-	describe("execute - subscription", () => {
+	describe("subscription", () => {
 		it("creates EventSource for subscription", async () => {
 			const transport = httpSse({
 				url: "http://localhost:3000/api",
@@ -294,7 +294,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-1",
 				path: "user.watch",
 				type: "subscription",
@@ -326,7 +326,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-2",
 				path: "user.watch",
 				type: "subscription",
@@ -359,7 +359,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-3",
 				path: "user.watch",
 				type: "subscription",
@@ -386,7 +386,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-4",
 				path: "user.watch",
 				type: "subscription",
@@ -419,7 +419,7 @@ describe("HTTP + SSE Transport", () => {
 
 			expect(transport.getConnectionState()).toBe("disconnected");
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-5",
 				path: "user.watch",
 				type: "subscription",
@@ -442,7 +442,7 @@ describe("HTTP + SSE Transport", () => {
 				EventSource: MockEventSource as unknown as typeof EventSource,
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-6",
 				path: "user.watch",
 				type: "subscription",
@@ -468,13 +468,13 @@ describe("HTTP + SSE Transport", () => {
 			});
 
 			// Create multiple subscriptions
-			const result1 = transport.execute({
+			const result1 = transport.subscription({
 				id: "sub-7",
 				path: "user.watch",
 				type: "subscription",
 			}) as { subscribe: (observer: unknown) => { unsubscribe: () => void } };
 
-			const result2 = transport.execute({
+			const result2 = transport.subscription({
 				id: "sub-8",
 				path: "post.watch",
 				type: "subscription",
@@ -504,7 +504,7 @@ describe("HTTP + SSE Transport", () => {
 				retry: { enabled: false },
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-9",
 				path: "user.watch",
 				type: "subscription",

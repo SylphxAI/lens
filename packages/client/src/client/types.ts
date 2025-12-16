@@ -7,7 +7,7 @@
 import type { MutationDef, Observer, QueryDef, RouterDef, RouterRoutes } from "@sylphx/lens-core";
 import type { TypedTransport } from "../transport/direct.js";
 import type { Plugin } from "../transport/plugin.js";
-import type { Transport } from "../transport/types.js";
+import type { TransportBase } from "../transport/types.js";
 
 // =============================================================================
 // Map Types
@@ -91,7 +91,7 @@ export type SelectedType<T, S extends SelectionObject> = {
 /** Client configuration */
 export interface LensClientConfig<TApi = unknown> {
 	/** Transport for server communication (can be typed for inference) */
-	transport: Transport | TypedTransport<TApi>;
+	transport: TransportBase | TypedTransport<TApi>;
 	/** Plugins for request/response processing */
 	plugins?: Plugin[];
 }
