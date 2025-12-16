@@ -437,6 +437,7 @@ export {
 	type Lens,
 	type LensBuilder,
 	type LensConfig,
+	type LensModel,
 	type LensMutation,
 	type LensQuery,
 	type LensResolver,

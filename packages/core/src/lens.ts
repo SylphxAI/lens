@@ -1,7 +1,7 @@
 /**
  * @sylphx/lens-core - Unified Factory
  *
- * Single factory function that provides typed query, mutation, and resolver builders.
+ * Single factory function that provides typed model, query, mutation, and resolver builders.
  * Eliminates repetitive context typing across your codebase.
  *
  * @example
@@ -11,12 +11,13 @@
  * type AppContext = { db: DB; user: User };
  *
  * // Create all typed builders at once
- * const { query, mutation, resolver } = lens<AppContext>();
+ * const { model, query, mutation, resolver } = lens<AppContext>();
  *
- * // All operations now have typed context
- * const userResolver = resolver(User, (f) => ({
- *   id: f.expose('id'),
- *   posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts...),
+ * // Define models with typed context (no need to repeat AppContext!)
+ * const User = model("User", (t) => ({
+ *   id: t.id(),
+ *   name: t.string(),
+ *   posts: t.many(() => Post).resolve(({ parent, ctx }) => ctx.db.posts...),
  * }));
  *
  * const getUser = query()
@@ -33,7 +34,7 @@
  * import { lens, optimisticPlugin } from '@sylphx/lens-core';
  *
  * // With plugins - .optimistic() is type-safe
- * const { mutation } = lens<AppContext>({ plugins: [optimisticPlugin()] });
+ * const { model, mutation } = lens<AppContext>({ plugins: [optimisticPlugin()] });
  *
  * const updateUser = mutation()
  *   .input(z.object({ id: z.string(), name: z.string() }))
@@ -65,6 +66,13 @@ import type {
 import type { FieldBuilder, FieldDef, ResolverDef } from "./resolvers/index.js";
 import { resolver as createResolver } from "./resolvers/index.js";
 import type { EntityDef } from "./schema/define.js";
+import type {
+	ContextualModelBuilder,
+	ModelBuilderClass,
+	ModelDefChainable,
+	PlainFieldDefinition,
+} from "./schema/model.js";
+import { model as createModel } from "./schema/model.js";
 import type { EntityDefinition } from "./schema/types.js";
 
 // =============================================================================
@@ -89,6 +97,27 @@ export type LensResolver<TContext> = <
 export interface LensQuery<TContext> {
 	(): QueryBuilder<void, unknown, TContext>;
 	(name: string): QueryBuilder<void, unknown, TContext>;
+}
+
+/**
+ * Typed model factory function.
+ * Creates models with pre-typed context.
+ */
+export interface LensModel<TContext> {
+	/** Create model with builder function (recommended) */
+	<Name extends string, Fields extends EntityDefinition>(
+		name: Name,
+		builder: ContextualModelBuilder<Fields, TContext>,
+	): ModelDefChainable<Name, Fields, TContext>;
+
+	/** Create model with plain object fields */
+	<Name extends string, FieldDefs extends PlainFieldDefinition>(
+		name: Name,
+		fields: FieldDefs,
+	): ModelDefChainable<Name, EntityDefinition, TContext>;
+
+	/** Create model builder for fluent .define() API */
+	<Name extends string>(name: Name): ModelBuilderClass<TContext, Name>;
 }
 
 // =============================================================================
@@ -206,6 +235,11 @@ export interface LensMutation<TContext, TPlugins extends readonly PluginExtensio
  */
 export interface Lens<TContext> {
 	/**
+	 * Create a model with pre-typed context.
+	 */
+	model: LensModel<TContext>;
+
+	/**
 	 * Create a resolver with pre-typed context.
 	 */
 	resolver: LensResolver<TContext>;
@@ -229,6 +263,11 @@ export interface Lens<TContext> {
  * @typeParam TPlugins - Tuple of plugin extension types
  */
 export interface LensWithPlugins<TContext, TPlugins extends readonly PluginExtension[]> {
+	/**
+	 * Create a model with pre-typed context.
+	 */
+	model: LensModel<TContext>;
+
 	/**
 	 * Create a resolver with pre-typed context.
 	 */
@@ -372,6 +411,9 @@ export function lens<TContext>(config?: {
 	// Create typed resolver factory using curried form
 	const typedResolver = createResolver<TContext>();
 
+	// Create typed model factory - delegates to createModel with TContext baked in
+	const typedModel = createModel<TContext>() as LensModel<TContext>;
+
 	// Create mutation factory that returns plugin-aware builders
 	const createPluginMutation = (name?: string) => {
 		const base = createMutation<TContext>(name as string);
@@ -383,6 +425,7 @@ export function lens<TContext>(config?: {
 	const createWithPlugins = (
 		plugins: readonly RuntimePlugin<PluginExtension>[],
 	): LensWithPlugins<TContext, readonly PluginExtension[]> => ({
+		model: typedModel,
 		resolver: typedResolver as LensResolver<TContext>,
 		query: ((name?: string) => createQuery<TContext>(name as string)) as LensQuery<TContext>,
 		mutation: createPluginMutation as unknown as LensMutation<TContext, readonly PluginExtension[]>,
@@ -392,6 +435,7 @@ export function lens<TContext>(config?: {
 	// If no config or no plugins, return LensBuilder with withPlugins method
 	if (!config?.plugins || config.plugins.length === 0) {
 		return {
+			model: typedModel,
 			resolver: typedResolver as LensResolver<TContext>,
 			query: ((name?: string) => createQuery<TContext>(name as string)) as LensQuery<TContext>,
 			mutation: createPluginMutation as LensMutation<TContext, []>,

@@ -44,6 +44,17 @@ import type {
 	ModelDefWithResolvers,
 	ModelDefWithSubscribers,
 } from "./model-resolvers.js";
+
+// Re-export types needed by lens.ts
+export type {
+	FieldResolverMap,
+	FieldSubscriberMap,
+	ModelDefChainable,
+	ModelDefComplete,
+	ModelDefWithResolvers,
+	ModelDefWithSubscribers,
+} from "./model-resolvers.js";
+
 import {
 	createTypeBuilder,
 	type EntityDefinition,
