@@ -870,14 +870,17 @@ describe("field resolvers", () => {
 		type EmitFn = ((data: unknown) => void) & { merge: (partial: unknown) => void };
 		let capturedEmit: EmitFn | null = null;
 
-		const getAuthor = query<{ db: typeof mockDb; emit: EmitFn }>()
+		// Use .resolve().subscribe() pattern - emit comes through Publisher callback, NOT ctx
+		const getAuthor = query<{ db: typeof mockDb }>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
 			.resolve(({ input, ctx }) => {
-				capturedEmit = ctx.emit as EmitFn;
 				const author = ctx.db.authors.find((a) => a.id === input.id);
 				if (!author) throw new Error("Author not found");
 				return author;
+			})
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit as EmitFn;
 			});
 
 		const server = createApp({
@@ -1141,13 +1144,15 @@ describe("field resolvers", () => {
 		type EmitFn = (data: { id: string; name: string }) => void;
 		let capturedEmit: EmitFn | undefined;
 
-		// Query that captures emit for external use
+		// Use .resolve().subscribe() pattern - emit comes through Publisher callback
 		const liveQuery = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input, ctx }) => {
-				capturedEmit = ctx.emit as EmitFn;
+			.resolve(({ input }) => {
 				return { id: input.id, name: "Initial" };
+			})
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit as EmitFn;
 			});
 
 		const testRouter = router({ liveQuery });
@@ -1341,11 +1346,14 @@ describe("observable behavior", () => {
 		type EmitFn = (data: unknown) => void;
 		let capturedEmit: EmitFn | undefined;
 
+		// Use .resolve().subscribe() pattern - emit comes through Publisher callback
 		const liveQuery = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input, ctx }) => {
-				capturedEmit = ctx.emit as EmitFn;
+			.resolve(({ input }) => {
 				return { id: input.id, name: "Initial" };
+			})
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit as EmitFn;
 			});
 
 		const server = createApp({ queries: { liveQuery } });
@@ -1428,11 +1436,14 @@ describe("emit backpressure", () => {
 		type EmitFn = (data: unknown) => void;
 		let capturedEmit: EmitFn | undefined;
 
+		// Use .resolve().subscribe() pattern - emit comes through Publisher callback
 		const liveQuery = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input, ctx }) => {
-				capturedEmit = ctx.emit as EmitFn;
+			.resolve(({ input }) => {
 				return { id: input.id, count: 0 };
+			})
+			.subscribe(() => ({ emit }) => {
+				capturedEmit = emit as EmitFn;
 			});
 
 		const server = createApp({ queries: { liveQuery } });

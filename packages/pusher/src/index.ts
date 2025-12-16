@@ -147,6 +147,3 @@ export function createPusherBroadcaster(
 		await pusher.trigger(pusherChannel, "update", data);
 	};
 }
-
-// Legacy export for backwards compatibility
-export type { PusherClientLike as PusherLike };

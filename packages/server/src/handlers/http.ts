@@ -314,7 +314,7 @@ export function createHTTPHandler(
 			(pathname === operationPath || pathname === `${pathPrefix}/`)
 		) {
 			// Parse JSON body with proper error handling
-			let body: { operation?: string; path?: string; input?: unknown };
+			let body: { path?: string; input?: unknown };
 			try {
 				body = (await request.json()) as typeof body;
 			} catch {
@@ -328,9 +328,7 @@ export function createHTTPHandler(
 			}
 
 			try {
-				// Support both 'operation' and 'path' for backwards compatibility
-				const operationPath = body.operation ?? body.path;
-				if (!operationPath) {
+				if (!body.path) {
 					return new Response(JSON.stringify({ error: "Missing operation path" }), {
 						status: 400,
 						headers: {
@@ -342,7 +340,7 @@ export function createHTTPHandler(
 
 				const result = await firstValueFrom(
 					server.execute({
-						path: operationPath,
+						path: body.path,
 						input: body.input,
 					}),
 				);

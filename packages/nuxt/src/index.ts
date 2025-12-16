@@ -369,25 +369,3 @@ export type InferClient<TServer> = TServer extends LensServer
 			[key: string]: unknown;
 		}
 	: never;
-
-// =============================================================================
-// Legacy Exports (for backwards compatibility)
-// =============================================================================
-
-export type { LensClientConfig, MutationResult, QueryResult, Transport } from "@sylphx/lens-client";
-
-export { createClient, http, route, ws } from "@sylphx/lens-client";
-export {
-	LensClientKey,
-	type MutationFn,
-	provideLensClient,
-	type QueryInput,
-	type UseLazyQueryResult,
-	type UseMutationResult,
-	type UseQueryOptions,
-	type UseQueryResult,
-	useLazyQuery,
-	useLensClient,
-	useMutation,
-	useQuery,
-} from "@sylphx/lens-vue";

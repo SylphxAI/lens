@@ -183,7 +183,7 @@ function createFieldBuilder<
 				parent: unknown;
 				args: Record<string, never>;
 				ctx: FieldQueryContext<TContext>;
-			}) => fn({ source: parent as Parent, parent: parent as Parent, ctx });
+			}) => fn({ source: parent as Parent, ctx });
 
 			// Return ResolvedField with chainable .subscribe()
 			const resolvedField: ResolvedFieldChainable<
@@ -214,7 +214,7 @@ function createFieldBuilder<
 							parent: unknown;
 							args: Record<string, never>;
 							ctx: TContext;
-						}) => subscribeFn({ source: parent as Parent, parent: parent as Parent, ctx }),
+						}) => subscribeFn({ source: parent as Parent, ctx }),
 					};
 				},
 			};

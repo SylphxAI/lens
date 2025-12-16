@@ -16,7 +16,7 @@ import { datetime, enumType, id, int, lens, model, router, string } from "@sylph
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 import type { LensServerInterface } from "../transport/direct.js";
-import { inProcess } from "../transport/direct.js";
+import { direct } from "../transport/direct.js";
 import type { Observable, Result, Transport } from "../transport/types";
 import { createClient } from "./create";
 
@@ -154,7 +154,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.user.get({ id: "1" });
@@ -199,7 +199,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.user.get({ id: "1" });
@@ -242,7 +242,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.user.get({ id: "1" });
@@ -276,7 +276,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -303,7 +303,7 @@ describe("QueryResult.subscribe()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -361,7 +361,7 @@ describe("QueryResult.select()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// NOTE: The accessor doesn't have select(), but QueryResult does
@@ -390,7 +390,7 @@ describe("QueryResult.select()", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -434,7 +434,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.counter.watch();
@@ -473,7 +473,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.data.stream();
@@ -512,7 +512,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.stream.data();
@@ -538,7 +538,7 @@ describe("startSubscription", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -582,7 +582,7 @@ describe("startSubscription", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.counter.watch();
@@ -645,7 +645,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor = client.user.get({ id: "1" });
@@ -675,7 +675,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor = client.data();
@@ -708,7 +708,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor = client.update({ value: "test" });
@@ -738,7 +738,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor = client.data();
@@ -768,7 +768,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor = client.data();
@@ -793,7 +793,7 @@ describe("createAccessor subscribe", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor = client.data();
@@ -876,7 +876,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Use same input object to ensure same endpoint key
@@ -928,7 +928,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Subscriber A wants basic info
@@ -984,7 +984,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// First subscriber
@@ -1037,7 +1037,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// First subscriber wants all fields
@@ -1071,7 +1071,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const accessor1 = client.data({ select: { id: true } });
@@ -1112,7 +1112,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// First subscriber populates cache
@@ -1152,7 +1152,7 @@ describe("Query batching", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Store input object to ensure same endpoint key
@@ -1193,7 +1193,7 @@ describe("Query batching", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Execute queries for DIFFERENT endpoints (different input values)
@@ -1234,7 +1234,7 @@ describe("Query batching", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Multiple queries with different selections in same microtask
@@ -1263,7 +1263,7 @@ describe("Query batching", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Multiple queries to failing endpoint - use same input to ensure batching
@@ -1308,7 +1308,7 @@ describe("Stable QueryResult references", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Call twice with same parameters
@@ -1330,7 +1330,7 @@ describe("Stable QueryResult references", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Different selections should get different QueryResult
@@ -1358,7 +1358,7 @@ describe("Client stats", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		}) as unknown as { getStats: () => { endpointCount: number; totalObservers: number } };
 
 		// Subscribe to two different endpoints
@@ -1400,7 +1400,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -1432,7 +1432,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		try {
@@ -1456,7 +1456,7 @@ describe("Edge cases and error handling", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Execute multiple queries concurrently
@@ -1562,7 +1562,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		// First subscription with narrow selection
@@ -1595,7 +1595,7 @@ describe("Edge Cases and Race Conditions", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -1635,7 +1635,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.data.get();
@@ -1763,7 +1763,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.stream.watch();
@@ -1811,7 +1811,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.stream.watch();
@@ -1869,7 +1869,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		// Concurrent subscribes with different selections (before any completes)
@@ -1923,7 +1923,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.stream.watch();
@@ -1968,7 +1968,7 @@ describe("Edge Cases and Race Conditions", () => {
 		});
 
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		const result = client.data();
@@ -2017,7 +2017,7 @@ describe("Edge Cases and Race Conditions", () => {
 		};
 
 		const client = createClient({
-			transport: inProcess({ app: mockApp }),
+			transport: direct({ app: mockApp }),
 		});
 
 		const result = client.data.once();

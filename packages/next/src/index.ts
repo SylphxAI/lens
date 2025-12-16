@@ -408,53 +408,8 @@ function createUseMutation<TClient>(defaultClient: TClient) {
 // Type Inference
 // =============================================================================
 
-/** Infer client type from server */
 export type InferClient<TServer> = TServer extends LensServer
 	? {
 			[key: string]: unknown;
 		}
 	: never;
-
-// =============================================================================
-// Legacy Exports (for backwards compatibility)
-// =============================================================================
-
-export type { LensClientConfig, MutationResult, QueryResult, Transport } from "@sylphx/lens-client";
-
-// Re-export client utilities
-export { createClient, http, route, ws } from "@sylphx/lens-client";
-// Re-export React hooks and context
-export {
-	LensProvider,
-	type LensProviderProps,
-	type MutationSelector,
-	type QuerySelector,
-	type RouteSelector,
-	type UseLazyQueryResult,
-	type UseMutationResult,
-	type UseQueryOptions,
-	type UseQueryResult,
-	useLazyQuery,
-	useLensClient,
-	useMutation,
-	useQuery,
-} from "@sylphx/lens-react";
-
-// Legacy utilities
-export async function fetchQuery<T>(query: QueryResult<T>): Promise<T> {
-	return await query;
-}
-
-export interface DehydratedState {
-	queries: Record<string, unknown>;
-	timestamp: number;
-}
-
-export function dehydrate(data: Record<string, unknown>): DehydratedState {
-	return {
-		queries: data,
-		timestamp: Date.now(),
-	};
-}
-
-export { HydrationBoundary, useHydration } from "./hydration.js";

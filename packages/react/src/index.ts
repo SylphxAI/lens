@@ -25,10 +25,6 @@
  * ```
  */
 
-// =============================================================================
-// New API (v4) - Recommended
-// =============================================================================
-
 export {
 	createClient,
 	type MutationEndpoint,
@@ -39,25 +35,3 @@ export {
 	type QueryHookResult,
 	type TypedClient,
 } from "./create.js";
-
-// =============================================================================
-// Legacy API (v3) - Deprecated, will be removed in v3.0
-// =============================================================================
-
-export { LensProvider, type LensProviderProps, useLensClient } from "./context.js";
-
-export {
-	// Types
-	type MutationSelector,
-	type QuerySelector,
-	type RouteSelector,
-	type UseLazyQueryResult,
-	type UseMutationResult,
-	type UseQueryOptions,
-	type UseQueryResult,
-	// Query hooks
-	useLazyQuery,
-	// Mutation hook
-	useMutation,
-	useQuery,
-} from "./hooks.js";

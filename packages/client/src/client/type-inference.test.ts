@@ -3,14 +3,14 @@
  *
  * End-to-end tests for type inference from server to client.
  * Tests the full inference chain:
- *   app._types.router → inProcess() → TypedTransport → createClient() → typed methods
+ *   app._types.router → direct() → TypedTransport → createClient() → typed methods
  */
 
 import { describe, expect, it } from "bun:test";
 import { boolean, datetime, enumType, id, int, lens, model, nullable, router, string } from "@sylphx/lens-core";
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
-import { inProcess, type TypedTransport } from "../transport/direct.js";
+import { direct, type TypedTransport } from "../transport/direct.js";
 import { createClient } from "./create.js";
 
 // =============================================================================
@@ -113,11 +113,11 @@ describe("Server type inference", () => {
 });
 
 // =============================================================================
-// Test: inProcess Transport Type Inference
+// Test: direct Transport Type Inference
 // =============================================================================
 
-describe("inProcess transport type inference", () => {
-	it("inProcess() returns TypedTransport with server types", () => {
+describe("direct transport type inference", () => {
+	it("direct() returns TypedTransport with server types", () => {
 		const { query } = lens<TestContext>();
 
 		const app = createApp({
@@ -139,7 +139,7 @@ describe("inProcess transport type inference", () => {
 			}),
 		});
 
-		const transport = inProcess({ app });
+		const transport = direct({ app });
 
 		// Transport should have _api property (phantom type)
 		type TransportType = typeof transport;
@@ -182,7 +182,7 @@ describe("inProcess transport type inference", () => {
 			}),
 		});
 
-		const transport = inProcess({ app });
+		const transport = direct({ app });
 
 		// Extract the API type from transport
 		type TransportApi = (typeof transport)["_api"];
@@ -310,7 +310,7 @@ describe("createClient type inference", () => {
 	it("client methods are typed correctly from server router", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Query: client.user.get({ id }) returns User shape
@@ -335,7 +335,7 @@ describe("createClient type inference", () => {
 	it("client array query returns typed array", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Query: client.user.list() returns User[]
@@ -357,7 +357,7 @@ describe("createClient type inference", () => {
 	it("client query with input is typed correctly", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Query with input
@@ -369,7 +369,7 @@ describe("createClient type inference", () => {
 	it("client mutation returns typed result with data", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Mutation: client.user.create returns MutationResult<User>
@@ -392,7 +392,7 @@ describe("createClient type inference", () => {
 	it("client mutation with optimistic has correct types", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Mutation with .optimistic("merge")
@@ -410,7 +410,7 @@ describe("createClient type inference", () => {
 	it("nested router paths are typed correctly", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// Nested: client.post.get
@@ -430,7 +430,7 @@ describe("createClient type inference", () => {
 	it("different routes have different types", async () => {
 		const app = createTestServer();
 		const client = createClient({
-			transport: inProcess({ app }),
+			transport: direct({ app }),
 		});
 
 		// User has role field
@@ -471,7 +471,7 @@ describe("Type-level assertions", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ app }) });
+		const client = createClient({ transport: direct({ app }) });
 
 		// Extract types
 		type ClientType = typeof client;
@@ -501,7 +501,7 @@ describe("Type-level assertions", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ app }) });
+		const client = createClient({ transport: direct({ app }) });
 
 		type ListResult = Awaited<ReturnType<typeof client.data.list>>;
 
@@ -547,7 +547,7 @@ describe("Edge cases", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ app }) });
+		const client = createClient({ transport: direct({ app }) });
 
 		// Deep path should work
 		const user = await client.api.v1.users.profile.get({ userId: "1" });
@@ -572,7 +572,7 @@ describe("Edge cases", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ app }) });
+		const client = createClient({ transport: direct({ app }) });
 
 		// Should be callable without arguments
 		const health = (await client.health()) as { status: string; timestamp: number };
@@ -611,7 +611,7 @@ describe("Edge cases", () => {
 			context: () => ({ db: { users: new Map(), posts: new Map() }, currentUser: null }),
 		});
 
-		const client = createClient({ transport: inProcess({ app }) });
+		const client = createClient({ transport: direct({ app }) });
 
 		const user = await client.user({ id: "1" });
 		const post = await client.post({ id: "1" });

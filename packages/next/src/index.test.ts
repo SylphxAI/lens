@@ -14,7 +14,7 @@ const test = hasDom ? bunTest : bunTest.skip;
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement } from "react";
-import { createLensNext, type DehydratedState, dehydrate, fetchQuery } from "./index.js";
+import { createLensNext } from "./index.js";
 
 // Mock server for testing - returns Observable with Message format
 const createMockServer = () => ({
@@ -146,44 +146,6 @@ describe("handler", () => {
 
 		const response = await lens.handler(request);
 		expect(response.status).toBe(405);
-	});
-});
-
-describe("dehydrate", () => {
-	test("creates DehydratedState with correct shape", () => {
-		const data = { user: { id: "1", name: "Test" } };
-		const state = dehydrate(data);
-
-		expect(state.queries).toEqual(data);
-		expect(typeof state.timestamp).toBe("number");
-		expect(state.timestamp).toBeGreaterThan(0);
-	});
-
-	test("DehydratedState type is correct", () => {
-		const state: DehydratedState = {
-			queries: { key: "value" },
-			timestamp: Date.now(),
-		};
-
-		expect(state.queries).toBeDefined();
-		expect(state.timestamp).toBeDefined();
-	});
-});
-
-describe("fetchQuery", () => {
-	test("resolves query promise", async () => {
-		const mockQuery = {
-			then: (resolve: (value: string) => void) => {
-				resolve("test-data");
-				return Promise.resolve("test-data");
-			},
-			subscribe: () => () => {},
-			value: null,
-			select: () => mockQuery,
-		};
-
-		const result = await fetchQuery(mockQuery as any);
-		expect(result).toBe("test-data");
 	});
 });
 

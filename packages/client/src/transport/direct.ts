@@ -12,12 +12,12 @@
  */
 
 import type {
+	FullTransport,
 	LensServerInterface,
 	Metadata,
 	Observable,
 	Operation,
 	Result,
-	Transport,
 } from "./types.js";
 
 // =============================================================================
@@ -43,7 +43,7 @@ export interface DirectTransportOptions<TApp extends LensServerInterface = LensS
  * Transport with type marker for inference.
  * The _api property is a phantom type - never accessed at runtime.
  */
-export type TypedTransport<TApi = unknown> = Transport & {
+export type TypedTransport<TApi = unknown> = FullTransport & {
 	/** Type marker for API inference (phantom type - never accessed at runtime) */
 	readonly _api: TApi;
 };
@@ -99,6 +99,16 @@ export function direct<TApp extends LensServerInterface>(
 ): TypedTransport<ExtractServerTypes<TApp>> {
 	const { app } = options;
 
+	// Helper to check if result is Observable
+	const isObservable = (value: unknown): value is Observable<Result> => {
+		return (
+			value !== null &&
+			typeof value === "object" &&
+			"subscribe" in value &&
+			typeof (value as Observable<Result>).subscribe === "function"
+		);
+	};
+
 	// Cast to TypedTransport - _api is a phantom type, never accessed at runtime
 	return {
 		/**
@@ -110,37 +120,69 @@ export function direct<TApp extends LensServerInterface>(
 		},
 
 		/**
-		 * Execute operation directly on app.
+		 * Execute query operation directly on app.
+		 */
+		async query(op: Operation): Promise<Result> {
+			const result = app.execute(op);
+			if (isObservable(result)) {
+				// Get first value from Observable
+				return new Promise((resolve, reject) => {
+					const subscription = result.subscribe({
+						next: (value) => {
+							subscription.unsubscribe?.();
+							resolve(value);
+						},
+						error: reject,
+					});
+				});
+			}
+			return result;
+		},
+
+		/**
+		 * Execute mutation operation directly on app.
+		 */
+		async mutation(op: Operation): Promise<Result> {
+			const result = app.execute(op);
+			if (isObservable(result)) {
+				// Get first value from Observable
+				return new Promise((resolve, reject) => {
+					const subscription = result.subscribe({
+						next: (value) => {
+							subscription.unsubscribe?.();
+							resolve(value);
+						},
+						error: reject,
+					});
+				});
+			}
+			return result;
+		},
+
+		/**
+		 * Execute subscription operation directly on app.
 		 * Returns Observable for streaming support.
 		 */
-		execute(op: Operation): Promise<Result> | Observable<Result> {
-			return app.execute(op);
+		subscription(op: Operation): Observable<Result> {
+			const result = app.execute(op);
+			if (isObservable(result)) {
+				return result;
+			}
+			// Wrap Promise result in Observable
+			return {
+				subscribe: (observer) => {
+					(async () => {
+						try {
+							const value = await result;
+							observer.next?.(value);
+							observer.complete?.();
+						} catch (error) {
+							observer.error?.(error instanceof Error ? error : new Error(String(error)));
+						}
+					})();
+					return { unsubscribe: () => {} };
+				},
+			};
 		},
 	} as TypedTransport<ExtractServerTypes<TApp>>;
 }
-
-// =============================================================================
-// Legacy Aliases (Backwards Compatibility)
-// =============================================================================
-
-/**
- * @deprecated Use `direct` instead. Will be removed in next major version.
- *
- * @example
- * ```typescript
- * // Old (deprecated)
- * import { inProcess } from '@sylphx/lens-client';
- * const client = createClient({ transport: inProcess({ app }) });
- *
- * // New
- * import { direct } from '@sylphx/lens-client';
- * const client = createClient({ transport: direct({ app }) });
- * ```
- */
-export const inProcess: typeof direct = direct;
-
-/**
- * @deprecated Use `DirectTransportOptions` instead.
- */
-export type InProcessTransportOptions<TApp extends LensServerInterface = LensServerInterface> =
-	DirectTransportOptions<TApp>;

@@ -209,54 +209,6 @@ export type SubscriptionOnlyTransport = SubscriptionCapable;
 export type FullTransport = QueryCapable & MutationCapable & SubscriptionCapable;
 
 // =============================================================================
-// Legacy Transport Interface (backwards compatibility)
-// =============================================================================
-
-/**
- * Transport handles communication with server.
- *
- * Each transport is responsible for:
- * - Connecting to server and getting metadata (handshake)
- * - Executing operations
- * - Handling all operation types (query, mutation, subscription)
- *
- * @example
- * ```typescript
- * const httpTransport = http({ url: '/api' })
- * const metadata = await httpTransport.connect()
- * const result = await httpTransport.execute({ path: 'user.get', input: { id: '1' } })
- * ```
- *
- * @deprecated Use capability interfaces (QueryCapable, MutationCapable, SubscriptionCapable)
- * for type-safe transport composition. This interface is kept for backwards compatibility.
- */
-export interface Transport {
-	/**
-	 * Connect to server and get operation metadata.
-	 * Called once during client initialization.
-	 *
-	 * For route transport, this merges metadata from all child transports.
-	 */
-	connect(): Promise<Metadata>;
-
-	/**
-	 * Execute an operation.
-	 *
-	 * Returns Promise for query/mutation, Observable for subscription.
-	 * Each transport handles all operation types internally:
-	 * - HTTP uses polling for subscriptions
-	 * - WebSocket uses native streaming
-	 * - SSE uses EventSource
-	 */
-	execute(op: Operation): Promise<Result> | Observable<Result>;
-
-	/**
-	 * Optional: Close the transport connection.
-	 */
-	close?(): void;
-}
-
-// =============================================================================
 // Server Interface (for in-process transport)
 // =============================================================================
 
@@ -294,13 +246,6 @@ export function isMutationCapable(t: TransportBase): t is MutationCapable {
  */
 export function isSubscriptionCapable(t: TransportBase): t is SubscriptionCapable {
 	return "subscription" in t && typeof (t as SubscriptionCapable).subscription === "function";
-}
-
-/**
- * Check if transport is a legacy Transport (uses execute method).
- */
-export function isLegacyTransport(t: TransportBase): t is Transport {
-	return "execute" in t && typeof (t as Transport).execute === "function";
 }
 
 // =============================================================================

@@ -25,10 +25,6 @@
  * ```
  */
 
-// =============================================================================
-// New API (v4) - Recommended
-// =============================================================================
-
 export {
 	createClient,
 	type MutationEndpoint,
@@ -40,27 +36,14 @@ export {
 	type TypedClient,
 } from "./create.js";
 
-// =============================================================================
-// Legacy API (v3) - Deprecated
-// =============================================================================
-
-export { LensProvider, type LensProviderProps, useLensClient } from "./context.js";
-
-// =============================================================================
-// Reactive Primitives
-// =============================================================================
-
 export {
 	type CreateLazyQueryResult,
 	type CreateMutationResult,
 	type CreateQueryOptions,
 	type CreateQueryResult,
 	createLazyQuery,
-	// Mutation primitive
 	createMutation,
-	// Query primitives
 	createQuery,
 	type MutationFn,
-	// Types
 	type QueryInput,
 } from "./primitives.js";

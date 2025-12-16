@@ -25,10 +25,6 @@
  * ```
  */
 
-// =============================================================================
-// New API (v4) - Recommended
-// =============================================================================
-
 export {
 	createClient,
 	type MutationEndpoint,
@@ -39,24 +35,3 @@ export {
 	type QueryHookResult,
 	type TypedClient,
 } from "./create.js";
-
-// =============================================================================
-// Legacy API (v3) - Deprecated
-// =============================================================================
-
-export {
-	type MutationFn,
-	type QueryInput,
-	type UseLazyQueryResult,
-	type UseMutationResult,
-	type UseQueryOptions,
-	type UseQueryResult,
-	useLazyQuery,
-	useMutation,
-	useQuery,
-} from "./composables.js";
-export {
-	LensClientKey,
-	provideLensClient,
-	useLensClient,
-} from "./context.js";

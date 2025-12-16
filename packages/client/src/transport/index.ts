@@ -60,14 +60,12 @@ export type {
 	SubscriptionCapable,
 	SubscriptionOnlyTransport,
 	// Core types
-	Transport,
 	TransportBase,
 	Unsubscribable,
 } from "./types.js";
 
 // Type guard functions
 export {
-	isLegacyTransport,
 	isMutationCapable,
 	// Re-exported from core
 	isOptimisticDSL,
@@ -100,13 +98,7 @@ export {
 // =============================================================================
 
 // Direct (formerly In-Process)
-export {
-	type DirectTransportOptions,
-	direct,
-	// Legacy aliases (deprecated)
-	type InProcessTransportOptions,
-	inProcess,
-} from "./direct.js";
+export { type DirectTransportOptions, direct } from "./direct.js";
 
 // HTTP (atomic - query/mutation with polling fallback)
 export { type HttpServerTransportOptions, type HttpTransportOptions, http } from "./http.js";
@@ -115,20 +107,9 @@ export {
 	type HttpSseTransportInstance,
 	type HttpSseTransportOptions,
 	httpSse,
-	// Deprecated type aliases (for backward compatibility)
-	/** @deprecated Use `ConnectionState` from types instead */
-	type SseConnectionState,
 } from "./http-sse.js";
 // Route (composition helpers)
-export {
-	type RouteByTypeConfig,
-	type RouteConfig,
-	route,
-	// Legacy
-	routeByPath,
-	routeByType,
-	type TypeSafeRouteByTypeConfig,
-} from "./route.js";
+export { routeByType, type TypeSafeRouteByTypeConfig } from "./route.js";
 // SSE (atomic - subscriptions only, for composition)
 export { type SseTransportInstance, type SseTransportOptions, sse } from "./sse.js";
 

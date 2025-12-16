@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, mock } from "bun:test";
-import { route, routeByPath, routeByType } from "./route.js";
+import { routeByType } from "./route.js";
 import type { Observable, Result, Transport } from "./types.js";
 
 // =============================================================================

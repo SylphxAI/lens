@@ -74,7 +74,7 @@ describe("createHTTPHandler", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				operation: "getUser",
+				path: "getUser",
 				input: { id: "123" },
 			}),
 		});
@@ -97,7 +97,7 @@ describe("createHTTPHandler", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				operation: "createUser",
+				path: "createUser",
 				input: { name: "New User" },
 			}),
 		});
@@ -128,7 +128,7 @@ describe("createHTTPHandler", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				operation: "getUser",
+				path: "getUser",
 				input: { id: "456" },
 			}),
 		});
@@ -234,7 +234,7 @@ describe("createHTTPHandler", () => {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				operation: "unknownOperation",
+				path: "unknownOperation",
 				input: {},
 			}),
 		});

@@ -254,6 +254,9 @@ export class OperationLog {
 
 	/**
 	 * Remove oldest entry and update tracking.
+	 *
+	 * IMPORTANT: After entries.shift(), ALL indices must be decremented by 1
+	 * to maintain correctness of entityIndex lookups.
 	 */
 	private removeOldest(): void {
 		const removed = this.entries.shift();
@@ -261,21 +264,29 @@ export class OperationLog {
 
 		this.totalMemory -= removed.patchSize;
 
-		// Update oldest version for entity
-		const indices = this.entityIndex.get(removed.entityKey);
-		if (indices && indices.length > 0) {
-			// Remove first index (oldest)
-			indices.shift();
+		// CRITICAL FIX: Decrement ALL indices for ALL entities since array shifted
+		// Must happen BEFORE any index lookups to ensure correctness
+		for (const indices of this.entityIndex.values()) {
+			for (let i = 0; i < indices.length; i++) {
+				indices[i]--;
+			}
+		}
 
-			if (indices.length === 0) {
+		// Update oldest version for the removed entity
+		const removedEntityIndices = this.entityIndex.get(removed.entityKey);
+		if (removedEntityIndices && removedEntityIndices.length > 0) {
+			// Remove first index (oldest) for this entity
+			// After decrement above, this index is now -1, so shift() removes it
+			removedEntityIndices.shift();
+
+			if (removedEntityIndices.length === 0) {
 				// No more entries for this entity
 				this.entityIndex.delete(removed.entityKey);
 				this.oldestVersionIndex.delete(removed.entityKey);
 				this.newestVersionIndex.delete(removed.entityKey);
 			} else {
-				// Update oldest version to next entry
-				// Note: indices are now stale (off by 1) until rebuildIndices
-				const nextEntry = this.entries[indices[0] - 1]; // -1 because we shifted
+				// Update oldest version to next entry (indices already corrected)
+				const nextEntry = this.entries[removedEntityIndices[0]];
 				if (nextEntry) {
 					this.oldestVersionIndex.set(removed.entityKey, nextEntry.version);
 				}

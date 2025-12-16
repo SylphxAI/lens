@@ -640,7 +640,6 @@ class LensServerImpl<
 											// Get publisher function from subscriber
 											const publisher = liveQuery._subscriber({
 												args: cleanInput as never,
-												input: cleanInput as never, // Alias for backwards compatibility
 												ctx: context as TContext,
 											});
 											// Call publisher with emit/onCleanup callbacks

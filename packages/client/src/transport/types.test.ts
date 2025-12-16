@@ -11,12 +11,10 @@ import type {
 	QueryCapable,
 	RequestTransport,
 	SubscriptionCapable,
-	Transport,
 } from "./types.js";
 import {
 	getEffectiveOperationType,
 	hasAnySubscription,
-	isLegacyTransport,
 	isMutationCapable,
 	isQueryCapable,
 	isSubscriptionCapable,
@@ -81,13 +79,6 @@ function createFullTransport(): FullTransport {
 	};
 }
 
-function createLegacyTransport(): Transport {
-	return {
-		connect: async () => ({ version: "1.0.0", operations: {} }),
-		execute: async () => ({ data: "execute result" }),
-	};
-}
-
 // =============================================================================
 // Tests
 // =============================================================================
@@ -108,11 +99,6 @@ describe("Transport Capability Types", () => {
 			const transport = createSubscriptionOnlyTransport();
 			expect(isQueryCapable(transport)).toBe(false);
 		});
-
-		it("returns false for legacy transport", () => {
-			const transport = createLegacyTransport();
-			expect(isQueryCapable(transport)).toBe(false);
-		});
 	});
 
 	describe("isMutationCapable", () => {
@@ -128,11 +114,6 @@ describe("Transport Capability Types", () => {
 
 		it("returns false for query-only transport", () => {
 			const transport = createQueryOnlyTransport();
-			expect(isMutationCapable(transport)).toBe(false);
-		});
-
-		it("returns false for legacy transport", () => {
-			const transport = createLegacyTransport();
 			expect(isMutationCapable(transport)).toBe(false);
 		});
 	});
@@ -151,23 +132,6 @@ describe("Transport Capability Types", () => {
 		it("returns false for request transport", () => {
 			const transport = createRequestTransport();
 			expect(isSubscriptionCapable(transport)).toBe(false);
-		});
-
-		it("returns false for legacy transport", () => {
-			const transport = createLegacyTransport();
-			expect(isSubscriptionCapable(transport)).toBe(false);
-		});
-	});
-
-	describe("isLegacyTransport", () => {
-		it("returns true for legacy transport", () => {
-			const transport = createLegacyTransport();
-			expect(isLegacyTransport(transport)).toBe(true);
-		});
-
-		it("returns false for capability-based transport", () => {
-			const transport = createFullTransport();
-			expect(isLegacyTransport(transport)).toBe(false);
 		});
 	});
 

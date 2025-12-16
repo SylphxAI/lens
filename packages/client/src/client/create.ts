@@ -786,6 +786,15 @@ class ClientImpl {
 						if (isSnapshot(message)) {
 							this.distributeData(endpoint, message.data);
 						} else if (isOps(message)) {
+							// Must have baseline data before applying ops
+							if (endpoint.data === undefined) {
+								// Ops received before snapshot - protocol error or race condition
+								// Log warning and skip (server should send snapshot first)
+								console.warn(
+									`[Lens] Received ops message before snapshot for ${path}. Skipping update.`,
+								);
+								return;
+							}
 							try {
 								const newData = applyOps(endpoint.data, message.ops);
 								this.distributeData(endpoint, newData);
@@ -855,8 +864,11 @@ class ClientImpl {
 			return { data: response.data as TOutput };
 		}
 
-		// ops message - shouldn't happen for mutations
-		return { data: null as unknown as TOutput };
+		// ops message - shouldn't happen for mutations, they're one-shot
+		// This indicates a protocol error
+		throw new Error(
+			`Mutation received unexpected message type: ${response.$}. Mutations should return snapshot.`,
+		);
 	}
 
 	// =========================================================================
@@ -868,18 +880,10 @@ class ClientImpl {
 	 */
 	createAccessor(
 		path: string,
-	): (descriptor?: { input?: unknown; select?: SelectionObject } | unknown) => unknown {
-		return (descriptor?: { input?: unknown; select?: SelectionObject } | unknown) => {
-			// Backwards compatibility: detect legacy API (raw input without wrapper)
-			const isNewApi =
-				descriptor === undefined ||
-				descriptor === null ||
-				(typeof descriptor === "object" &&
-					descriptor !== null &&
-					("input" in descriptor || "select" in descriptor));
-
-			const input = isNewApi ? (descriptor as { input?: unknown })?.input : descriptor;
-			const select = isNewApi ? (descriptor as { select?: SelectionObject })?.select : undefined;
+	): (descriptor?: { input?: unknown; select?: SelectionObject }) => unknown {
+		return (descriptor?: { input?: unknown; select?: SelectionObject }) => {
+			const input = descriptor?.input;
+			const select = descriptor?.select;
 
 			// Delegate to executeQuery for all query functionality
 			const queryResult = this.executeQuery<unknown>(path, input, select);

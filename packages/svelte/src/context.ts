@@ -64,9 +64,3 @@ export function useLensClient<TRouter = any>(): LensClient<any, any> & TRouter {
 
 	return client as LensClient<any, any> & TRouter;
 }
-
-// Legacy aliases for backwards compatibility
-/** @deprecated Use provideLensClient instead */
-export const setLensClient: typeof provideLensClient = provideLensClient;
-/** @deprecated Use useLensClient instead */
-export const getLensClient: typeof useLensClient = useLensClient;

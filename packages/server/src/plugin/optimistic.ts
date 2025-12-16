@@ -224,7 +224,7 @@ function sugarToPipeline(
 						$do: "entity.delete",
 						$with: {
 							type: entity,
-							id: { id: $input("id") },
+							id: $input("id"), // Fixed: was incorrectly nested as { id: $input("id") }
 						},
 						$as: "result",
 					},

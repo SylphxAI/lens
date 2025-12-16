@@ -84,10 +84,9 @@ export type AnyQueryDef<TInput = void, TOutput = unknown, TContext = unknown> =
 // =============================================================================
 
 /** Publisher-based subscription resolver - returns Publisher */
-export type PublisherResolverFn<TInput, TOutput, TContext = unknown> = (ctx: {
-	input: TInput;
-	ctx: TContext;
-}) => Publisher<TOutput>;
+export type PublisherResolverFn<TInput, TOutput, TContext = unknown> = (
+	ctx: QueryResolverContext<TInput, TContext>,
+) => Publisher<TOutput>;
 
 // =============================================================================
 // Chainable Query Definition
@@ -106,9 +105,9 @@ export interface QueryDefChainable<TInput = void, TOutput = unknown, TContext = 
 	 * ```typescript
 	 * query()
 	 *   .input(z.object({ id: z.string() }))
-	 *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
-	 *   .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
-	 *     const unsub = pubsub.on(`user:${input.id}`, emit);
+	 *   .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
+	 *   .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
+	 *     const unsub = pubsub.on(`user:${args.id}`, emit);
 	 *     onCleanup(unsub);
 	 *   });
 	 * ```
@@ -245,7 +244,7 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
 			_input: inputSchema,
 			_output: outputSpec,
 			_brand: {} as { input: TInput; output: T },
-			_resolve: resolver as (ctx: { input: TInput; ctx: TContext }) => T | Promise<T>,
+			_resolve: resolver,
 			// Chainable subscribe - creates LiveQueryDef with Publisher pattern
 			subscribe(
 				subscribeFn: PublisherResolverFn<TInput, T, TContext>,
@@ -257,7 +256,7 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
 					_input: inputSchema,
 					_output: outputSpec,
 					_brand: {} as { input: TInput; output: T },
-					_resolve: resolver as (ctx: { input: TInput; ctx: TContext }) => T | Promise<T>,
+					_resolve: resolver,
 					_subscriber: subscribeFn,
 				};
 			},
@@ -276,10 +275,7 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
 			_input: this._inputSchema,
 			_output: this._outputSpec,
 			_brand: {} as { input: TInput; output: TOutput },
-			_resolve: fn as (ctx: {
-				input: TInput;
-				ctx: import("./types.js").EmitSubscriptionContext<TContext, TOutput>;
-			}) => void | Promise<void>,
+			_resolve: fn as any, // Deprecated method - type mismatch is expected
 		};
 	}
 
@@ -292,7 +288,7 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
 			_input: this._inputSchema,
 			_output: this._outputSpec,
 			_brand: {} as { input: TInput; output: TOutput },
-			_resolve: fn,
+			_resolve: fn as any, // Deprecated method - type mismatch is expected
 		};
 	}
 }

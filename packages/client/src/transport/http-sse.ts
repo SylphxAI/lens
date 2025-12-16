@@ -17,11 +17,11 @@
 import { DEFAULT_SSE_RETRY_CONFIG, SseConnectionManager } from "./sse-connection.js";
 import type {
 	ConnectionState,
+	FullTransport,
 	Metadata,
 	Observable,
 	Operation,
 	Result,
-	Transport,
 } from "./types.js";
 
 // =============================================================================
@@ -56,19 +56,9 @@ export interface HttpSseTransportOptions {
 }
 
 /**
- * @deprecated Use `HttpSseTransportOptions` instead
- */
-export type SseTransportOptions = HttpSseTransportOptions;
-
-/**
- * @deprecated Use `ConnectionState` from types.ts instead
- */
-export type SseConnectionState = ConnectionState;
-
-/**
  * HTTP + SSE transport instance with additional methods.
  */
-export interface HttpSseTransportInstance extends Transport {
+export interface HttpSseTransportInstance extends FullTransport {
 	/** Get current connection state */
 	getConnectionState(): ConnectionState;
 	/** Get active subscription count */
@@ -76,11 +66,6 @@ export interface HttpSseTransportInstance extends Transport {
 	/** Close all connections */
 	close(): void;
 }
-
-/**
- * @deprecated Use `HttpSseTransportInstance` instead
- */
-export type SseTransportInstance = HttpSseTransportInstance;
 
 // =============================================================================
 // HTTP + SSE Transport
@@ -196,14 +181,24 @@ export function httpSse(options: HttpSseTransportOptions): HttpSseTransportInsta
 		},
 
 		/**
-		 * Execute operation.
-		 * HTTP POST for query/mutation, SSE for subscription.
+		 * Execute query operation via HTTP POST.
 		 */
-		execute(op: Operation): Promise<Result> | Observable<Result> {
-			if (op.type === "subscription") {
-				return connectionManager.createSubscription(op);
-			}
+		query(op: Operation): Promise<Result> {
 			return executeHttp(op);
+		},
+
+		/**
+		 * Execute mutation operation via HTTP POST.
+		 */
+		mutation(op: Operation): Promise<Result> {
+			return executeHttp(op);
+		},
+
+		/**
+		 * Execute subscription operation via SSE.
+		 */
+		subscription(op: Operation): Observable<Result> {
+			return connectionManager.createSubscription(op);
 		},
 
 		/**

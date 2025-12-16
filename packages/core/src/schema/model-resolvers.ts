@@ -112,10 +112,8 @@ type InferFieldArgs<F> = F extends { _argsSchema: infer S }
  * ```
  */
 export type ModelFieldResolver<TSource, TArgs, TContext, TResult> = (params: {
-	/** Parent object being resolved (preferred) */
+	/** Source object being resolved */
 	source: TSource;
-	/** @deprecated Use `source` instead */
-	parent: TSource;
 	/** Field arguments (if any) */
 	args: TArgs;
 	/** Application context */
@@ -140,10 +138,8 @@ export type ModelFieldResolver<TSource, TArgs, TContext, TResult> = (params: {
  * ```
  */
 export type ModelFieldSubscriber<TSource, TArgs, TContext, TResult> = (params: {
-	/** Parent object being resolved (preferred) */
+	/** Source object being resolved */
 	source: TSource;
-	/** @deprecated Use `source` instead */
-	parent: TSource;
 	/** Field arguments (if any) */
 	args: TArgs;
 	/** Application context (pure, no emit/onCleanup) */

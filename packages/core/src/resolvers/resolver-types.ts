@@ -138,16 +138,12 @@ export type FieldLiveSubscribeFn<TParent, TArgs, TContext, TResult> = (
 /** Field resolver function without args for .resolve() */
 export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: FieldQueryContext<TContext>;
 }) => TResult | Promise<TResult>;
 
 /** Live field subscriber function without args - returns Publisher */
 export type FieldLiveSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
-	/** @deprecated Use `source` instead */
-	parent: TParent;
 	ctx: TContext;
 }) => Publisher<TResult>;
 

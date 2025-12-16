@@ -43,6 +43,26 @@ function makeKey(entity: string, entityId: string): EntityKey {
 }
 
 /**
+ * Stable JSON stringify that sorts object keys for consistent comparison.
+ * This ensures { a: 1, b: 2 } and { b: 2, a: 1 } produce the same string.
+ */
+function stableStringify(value: unknown): string {
+	if (value === null || typeof value !== "object") {
+		return JSON.stringify(value);
+	}
+
+	if (Array.isArray(value)) {
+		return `[${value.map(stableStringify).join(",")}]`;
+	}
+
+	const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
+	const pairs = sortedKeys.map(
+		(key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`,
+	);
+	return `{${pairs.join(",")}}`;
+}
+
+/**
  * Compute JSON Patch operations between two states.
  */
 function computePatch(
@@ -61,8 +81,8 @@ function computePatch(
 		if (!oldKeys.has(key)) {
 			// New field
 			patch.push({ op: "add", path: `/${key}`, value: newValue });
-		} else if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
-			// Changed field
+		} else if (stableStringify(oldValue) !== stableStringify(newValue)) {
+			// Changed field - use stable stringify for consistent comparison
 			patch.push({ op: "replace", path: `/${key}`, value: newValue });
 		}
 	}
@@ -79,9 +99,10 @@ function computePatch(
 
 /**
  * Hash entity state for change detection.
+ * Uses stable stringify to ensure consistent hashing regardless of key order.
  */
 function hashState(state: Record<string, unknown>): string {
-	return JSON.stringify(state);
+	return stableStringify(state);
 }
 
 /**

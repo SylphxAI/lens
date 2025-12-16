@@ -47,11 +47,7 @@ export {
 	// Transports
 	http,
 	httpSse,
-	// Legacy alias (deprecated)
-	type InProcessTransportOptions,
-	inProcess,
 	// Type guards
-	isLegacyTransport,
 	isMutationCapable,
 	isOptimisticDSL,
 	isQueryCapable,
@@ -68,13 +64,8 @@ export {
 	type QueryCapable,
 	type RequestTransport,
 	type Result,
-	type RouteByTypeConfig,
-	type RouteConfig,
 	// Route
-	route,
-	routeByPath,
 	routeByType,
-	type SseConnectionState,
 	type SseTransportInstance,
 	type SseTransportOptions,
 	type SubscriptionCapable,
@@ -82,7 +73,6 @@ export {
 	// SSE (atomic - subscriptions only)
 	sse,
 	// Types
-	type Transport,
 	type TransportBase,
 	type TypeSafeRouteByTypeConfig,
 	type Unsubscribable,

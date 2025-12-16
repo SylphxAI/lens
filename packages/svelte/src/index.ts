@@ -27,10 +27,6 @@
  * ```
  */
 
-// =============================================================================
-// New API (v4) - Recommended
-// =============================================================================
-
 export {
 	createClient,
 	type MutationEndpoint,
@@ -43,32 +39,3 @@ export {
 	type QueryStoreValue,
 	type TypedClient,
 } from "./create.js";
-
-// =============================================================================
-// Legacy API (v3) - Deprecated
-// =============================================================================
-
-export {
-	getLensClient,
-	// Context key
-	LENS_CLIENT_KEY,
-	// Context functions (recommended)
-	provideLensClient,
-	// Legacy aliases (deprecated)
-	setLensClient,
-	useLensClient,
-} from "./context.js";
-export {
-	type LazyQueryStore,
-	lazyQuery,
-	type MutationFn,
-	type MutationStore,
-	// Note: MutationStoreValue exported from create.js (new API)
-	mutation,
-	// Types
-	type QueryInput,
-	type QueryStore,
-	// Note: QueryStoreOptions, QueryStoreValue exported from create.js (new API)
-	// Store factories
-	query,
-} from "./stores.js";
