@@ -300,75 +300,76 @@ Lens uses **inline resolvers** - define models with their field resolution in on
 
 ### Define Models with Inline Resolvers ✅ Recommended
 
-Use the `model("Name", (t) => ({ ... }))` function for type-safe definitions with inline resolvers:
+Use the `model("Name", { ... })` function for type-safe definitions with inline resolvers:
 
 ```typescript
-import { model } from '@sylphx/lens-core'
+import { lens, id, string, int, boolean, date, list, nullable } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
 
 // User model with inline field resolvers
-const User = model<AppContext>("User", (t) => ({
+const User = model("User", {
   // Scalar fields
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  role: t.enum(["user", "admin"]),
-  createdAt: t.date(),
+  id: id(),
+  name: string(),
+  email: string(),
+  role: string(), // or use enum type
+  createdAt: date(),
 
   // Computed field
-  displayName: t.string().resolve(({ parent }) =>
-    `${parent.name} (${parent.role})`
-  ),
+  displayName: string(),
 
-  // Relation with arguments (GraphQL-style)
-  posts: t.many(() => Post)
-    .args(z.object({
-      first: z.number().default(10),
-      published: z.boolean().optional(),
-    }))
-    .resolve(({ parent, args, ctx }) =>
-      ctx.db.posts.findMany({
-        where: { authorId: parent.id, published: args.published },
-        take: args.first,
-      })
-    ),
+  // Relation (lazy reference)
+  posts: list(() => Post),
 
   // Computed with arguments
-  postsCount: t.int()
-    .args(z.object({ published: z.boolean().optional() }))
-    .resolve(({ parent, args, ctx }) =>
-      ctx.db.posts.count({
-        where: { authorId: parent.id, published: args.published },
-      })
-    ),
+  postsCount: int(),
 
   // Live field (real-time updates)
-  status: t.string()
-    .resolve(({ parent, ctx }) => ctx.getStatus(parent.id))
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${parent.id}`, emit)
-      onCleanup(unsub)
-    }),
-}))
+  status: string(),
+}).resolve({
+  displayName: ({ source }) =>
+    `${source.name} (${source.role})`,
 
-const Post = model<AppContext>("Post", (t) => ({
-  id: t.id(),
-  title: t.string(),
-  content: t.string(),
-  published: t.boolean(),
-  authorId: t.string(),
+  posts: ({ source, args, ctx }) =>
+    ctx.db.posts.findMany({
+      where: { authorId: source.id, published: args?.published },
+      take: args?.first ?? 10,
+    }),
+
+  postsCount: ({ source, args, ctx }) =>
+    ctx.db.posts.count({
+      where: { authorId: source.id, published: args?.published },
+    }),
+
+  status: {
+    resolve: ({ source, ctx }) => ctx.getStatus(source.id),
+    subscribe: ({ source, ctx }) => ({ emit, onCleanup }) => {
+      const unsub = ctx.pubsub.on(`status:${source.id}`, emit)
+      onCleanup(unsub)
+    },
+  },
+})
+
+const Post = model("Post", {
+  id: id(),
+  title: string(),
+  content: string(),
+  published: boolean(),
+  authorId: string(),
 
   // Lazy relation (avoids circular reference)
-  author: t.one(() => User).resolve(({ parent, ctx }) =>
-    ctx.db.users.find(parent.authorId)
-  ),
+  author: () => User,
 
   // Computed with arguments
-  excerpt: t.string()
-    .args(z.object({ length: z.number().default(100) }))
-    .resolve(({ parent, args }) =>
-      parent.content.slice(0, args.length) + "..."
-    ),
-}))
+  excerpt: string(),
+}).resolve({
+  author: ({ source, ctx }) =>
+    ctx.db.users.find(source.authorId),
+
+  excerpt: ({ source, args }) =>
+    source.content.slice(0, args?.length ?? 100) + "...",
+})
 ```
 
 ### Register with Server
@@ -390,49 +391,54 @@ const app = createApp({
 })
 ```
 
-### Legacy: Separate resolver() ⚠️ Deprecated
+### Legacy: Old API (t builder) ⚠️ Deprecated
 
-> **⚠️ Deprecated:** Use inline resolvers in entity definitions instead.
+> **⚠️ Deprecated:** Use the new API with plain objects and standalone field builders.
 
 ```typescript
-// ❌ DEPRECATED - separate resolver pattern
-import { lens } from '@sylphx/lens-core'
-const { resolver } = lens<AppContext>()
+// ❌ OLD API - model with (t) => builder pattern
+import { model } from '@sylphx/lens-core'
 
-const userResolver = resolver(User, (f) => ({
-  id: f.expose("id"),
-  posts: f.many(Post).resolve(...)
+const User = model<AppContext>("User", (t) => ({
+  id: t.id(),
+  name: t.string(),
+  posts: t.many(() => Post).resolve(({ parent, ctx }) => ...)
 }))
 
-// Need to pass resolvers array
-const app = createApp({
-  entities: { User },
-  resolvers: [userResolver],  // ❌ Not needed with inline resolvers
+// ✅ NEW API - plain object with standalone builders
+import { lens, id, string, list } from '@sylphx/lens-core'
+const { model } = lens<AppContext>()
+
+const User = model("User", {
+  id: id(),
+  name: string(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
 })
 ```
 
 ### Field Resolver Signature
 
 ```typescript
-// Full signature: ({ parent, args, ctx }) => result
-({ parent, args, ctx }: { parent: TParent; args: TArgs; ctx: TContext }) => TResult | Promise<TResult>
+// Full signature: ({ source, args, ctx }) => result
+({ source, args, ctx }: { source: TSource; args: TArgs; ctx: TContext }) => TResult | Promise<TResult>
 ```
 
-### Type Builder API (Model Fields)
+### Field Builder API
 
-| Method | Description | Example |
-|--------|-------------|---------|
-| `t.id()` | ID field | `id: t.id()` |
-| `t.string()` | String field | `name: t.string()` |
-| `t.int()` | Integer field | `age: t.int()` |
-| `t.boolean()` | Boolean field | `active: t.boolean()` |
-| `t.date()` | Date field | `createdAt: t.date()` |
-| `t.enum([...])` | Enum field | `role: t.enum(["user", "admin"])` |
-| `t.one(() => E)` | Singular relation | `author: t.one(() => User)` |
-| `t.many(() => E)` | Collection relation | `posts: t.many(() => Post)` |
-| `.args(schema)` | Add field arguments | `.args(z.object({ limit: z.number() }))` |
-| `.resolve(fn)` | Field resolver | `.resolve(({ parent, args, ctx }) => ...)` |
-| `.subscribe(fn)` | Live updates (Publisher) | `.subscribe(({ parent }) => ({ emit }) => ...)` |
+| Function | Description | Example |
+|----------|-------------|---------|
+| `id()` | ID field | `id: id()` |
+| `string()` | String field | `name: string()` |
+| `int()` | Integer field | `age: int()` |
+| `boolean()` | Boolean field | `active: boolean()` |
+| `date()` | Date field | `createdAt: date()` |
+| `list(() => E)` | Collection relation | `posts: list(() => Post)` |
+| `() => E` | Singular relation (lazy) | `author: () => User` |
+| `nullable(T)` | Nullable field | `email: nullable(string())` |
+| `.resolve({ field: fn })` | Field resolvers | `.resolve({ posts: ({ source, ctx }) => ... })` |
+| Field with subscribe | Live updates (Publisher) | `{ resolve: fn, subscribe: fn }` |
 
 ### GraphQL Comparison
 

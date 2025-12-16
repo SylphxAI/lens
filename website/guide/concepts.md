@@ -146,19 +146,25 @@ Lens uses a two-phase resolution pattern for optimal performance:
 - Updates stream over time
 
 ```typescript
+import { lens, id, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
 // Example: Live field with two-phase resolution
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const User = model('User', {
+  id: id(),
+  name: string(),
   // Phase 1: Get initial status (batchable)
   // Phase 2: Subscribe to updates
-  status: t.string()
-    .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      ctx.statusService.watch(parent.id, (s) => emit(s))
-      onCleanup(() => ctx.statusService.unwatch(parent.id))
-    })
-}))
+  status: string(),
+}).resolve({
+  status: ({ source, ctx }) => ctx.db.getStatus(source.id),
+}).subscribe({
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    ctx.statusService.watch(source.id, (s) => emit(s))
+    onCleanup(() => ctx.statusService.unwatch(source.id))
+  },
+})
 ```
 
 ## Publisher Pattern
@@ -166,14 +172,22 @@ const User = model('User', (t) => ({
 Subscriptions use the Publisher pattern where `emit` and `onCleanup` are passed via a callback:
 
 ```typescript
-.subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-  // Set up your subscription
-  const unsub = ctx.eventSource.on('change', (data) => {
-    emit(data)  // Push update to client
-  })
+import { lens } from '@sylphx/lens-core'
 
-  // Cleanup when client disconnects
-  onCleanup(() => unsub())
+const { model } = lens<AppContext>()
+
+model('Example', {
+  field: string(),
+}).subscribe({
+  field: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    // Set up your subscription
+    const unsub = ctx.eventSource.on('change', (data) => {
+      emit(data)  // Push update to client
+    })
+
+    // Cleanup when client disconnects
+    onCleanup(() => unsub())
+  },
 })
 ```
 

@@ -139,20 +139,30 @@ emit.update(1, updatedMessage)
 `emit` is typed based on field return type:
 
 ```typescript
-// Field returns User
-status: t.string()
-  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+import { lens, string, list } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+// Field returns string
+const User = model('User', {
+  status: string(),
+}).subscribe({
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
     emit('online')     // <Icon icon="lucide:check" class="inline-icon text-green" /> Valid
     emit(123)          // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error
     emit.push('item')  // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error (not an array)
-  })
+  },
+})
 
 // Field returns Message[]
-messages: t.many(() => Message)
-  .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
+const User2 = model('User', {
+  messages: list(() => Message),
+}).subscribe({
+  messages: ({ source, ctx }) => ({ emit, onCleanup }) => {
     emit.push(message)   // <Icon icon="lucide:check" class="inline-icon text-green" /> Valid
     emit('string')       // <Icon icon="lucide:x" class="inline-icon text-red" /> Type error
-  })
+  },
+})
 ```
 
 ## Operation-Level Emit
@@ -180,28 +190,33 @@ const streamChat = query()
 Use publisher callback in field subscriptions:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  messages: t.many(() => Message)
-    .resolve(({ parent, ctx }) =>
-      ctx.db.message.findMany({ where: { userId: parent.id } })
-    )
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`messages:${parent.id}`, (event) => {
-        switch (event.type) {
-          case 'new':
-            emit.push(event.message)
-            break
-          case 'delete':
-            emit.remove(event.index)
-            break
-          case 'update':
-            emit.update(event.index, event.message)
-            break
-        }
-      })
-      onCleanup(unsub)
-    }),
-}))
+import { lens, list } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  messages: list(() => Message),
+}).resolve({
+  messages: ({ source, ctx }) =>
+    ctx.db.message.findMany({ where: { userId: source.id } }),
+}).subscribe({
+  messages: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`messages:${source.id}`, (event) => {
+      switch (event.type) {
+        case 'new':
+          emit.push(event.message)
+          break
+        case 'delete':
+          emit.remove(event.index)
+          break
+        case 'update':
+          emit.update(event.index, event.message)
+          break
+      }
+    })
+    onCleanup(unsub)
+  },
+})
 ```
 
 ## Batching

@@ -14,7 +14,7 @@ bun add @sylphx/lens-server
 
 ```typescript
 import { createApp, createHandler } from "@sylphx/lens-server";
-import { model, lens, router, list, nullable } from "@sylphx/lens-core";
+import { lens, id, string, list, nullable, router } from "@sylphx/lens-core";
 import { z } from "zod";
 
 // Define context type
@@ -23,24 +23,25 @@ interface AppContext {
   user: User | null;
 }
 
-// Define models with inline resolvers
-const User = model<AppContext>("User", (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.db.posts.filter(p => p.authorId === parent.id)
-  ),
-}));
-
-const Post = model<AppContext>("Post", (t) => ({
-  id: t.id(),
-  title: t.string(),
-  authorId: t.string(),
-}));
-
 // Create typed builders
-const { query, mutation } = lens<AppContext>();
+const { model, query, mutation } = lens<AppContext>();
+
+// Define models with inline resolvers
+const User = model("User", {
+  id: id(),
+  name: string(),
+  email: string(),
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) =>
+    ctx.db.posts.filter(p => p.authorId === source.id)
+});
+
+const Post = model("Post", {
+  id: id(),
+  title: string(),
+  authorId: string(),
+});
 
 // Define operations
 const appRouter = router({
@@ -84,12 +85,18 @@ Bun.serve({ port: 3000, fetch: handler });
 
 ```typescript
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
-import { model, lens, router } from "@sylphx/lens-core";
+import { lens, id, string, router } from "@sylphx/lens-core";
 import { entity as e, temp, now } from "@sylphx/reify";
 
 // Enable optimistic plugin
-const { query, mutation, plugins } = lens<AppContext>()
+const { model, query, mutation, plugins } = lens<AppContext>()
   .withPlugins([optimisticPlugin()]);
+
+const Message = model("Message", {
+  id: id(),
+  content: string(),
+  createdAt: string(),
+});
 
 const appRouter = router({
   user: {
@@ -126,7 +133,7 @@ const app = createApp({
 ### Live Queries
 
 ```typescript
-const { query } = lens<AppContext>();
+// query comes from lens<AppContext>() above
 
 // Live query with Publisher pattern
 const watchUser = query()

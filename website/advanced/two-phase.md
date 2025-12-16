@@ -41,18 +41,25 @@ field.resolve(({ ctx }) => {
 Separate initial resolution from subscription:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  status: t.string()
-    // Phase 1: Initial value (batchable)
-    .resolve(({ parent, ctx }) =>
-      ctx.cache.get(`status:${parent.id}`)
-    )
-    // Phase 2: Subscribe to updates (fire-and-forget)
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${parent.id}`, emit)
+import { lens, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  status: string(),
+})
+  // Phase 1: Initial value (batchable)
+  .resolve({
+    status: ({ source, ctx }) =>
+      ctx.cache.get(`status:${source.id}`),
+  })
+  // Phase 2: Subscribe to updates (fire-and-forget)
+  .subscribe({
+    status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+      const unsub = ctx.pubsub.on(`status:${source.id}`, emit)
       onCleanup(unsub)
-    }),
-}))
+    },
+  })
 ```
 
 ## How It Works
@@ -150,42 +157,47 @@ Why this pattern?
 ## Complete Example
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+import { lens, id, string, int } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
 
   // Simple resolved field (no live updates)
-  fullName: t.string().resolve(({ parent }) =>
-    `${parent.firstName} ${parent.lastName}`
-  ),
+  fullName: string(),
 
   // Live field with two-phase resolution
-  unreadCount: t.int()
-    // Phase 1: Get current count (batchable)
-    .resolve(async ({ parent, ctx }) => {
-      return ctx.loaders.unreadCount.load(parent.id)
-    })
-    // Phase 2: Subscribe to changes
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const handler = (count: number) => emit(count)
-
-      ctx.notifications.on(`unread:${parent.id}`, handler)
-
-      onCleanup(() => {
-        ctx.notifications.off(`unread:${parent.id}`, handler)
-      })
-    }),
+  unreadCount: int(),
 
   // Another live field
-  onlineStatus: t.enum(['online', 'away', 'offline'])
-    .resolve(({ parent, ctx }) =>
-      ctx.presence.getStatus(parent.id)
-    )
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.presence.watch(parent.id, emit)
-      onCleanup(unsub)
-    }),
-}))
+  onlineStatus: string(),
+}).resolve({
+  fullName: ({ source }) =>
+    `${source.firstName} ${source.lastName}`,
+  // Phase 1: Get current count (batchable)
+  unreadCount: async ({ source, ctx }) => {
+    return ctx.loaders.unreadCount.load(source.id)
+  },
+  onlineStatus: ({ source, ctx }) =>
+    ctx.presence.getStatus(source.id),
+}).subscribe({
+  // Phase 2: Subscribe to changes
+  unreadCount: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const handler = (count: number) => emit(count)
+
+    ctx.notifications.on(`unread:${source.id}`, handler)
+
+    onCleanup(() => {
+      ctx.notifications.off(`unread:${source.id}`, handler)
+    })
+  },
+  onlineStatus: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.presence.watch(source.id, emit)
+    onCleanup(unsub)
+  },
+})
 ```
 
 ## Performance Comparison
@@ -262,36 +274,60 @@ describe('User.unreadCount', () => {
 ### From Subscription-Only
 
 ```typescript
+import { lens, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
 // Before
-status: t.string().subscribe(async ({ emit }) => {
-  const initial = await getStatus()
-  emit(initial)
-  onChange(emit)
+const User1 = model('User', {
+  status: string(),
+}).subscribe({
+  status: async ({ emit }) => {
+    const initial = await getStatus()
+    emit(initial)
+    onChange(emit)
+  },
 })
 
 // After
-status: t.string()
-  .resolve(({ ctx }) => getStatus())
-  .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+const User2 = model('User', {
+  status: string(),
+}).resolve({
+  status: ({ ctx }) => getStatus(),
+}).subscribe({
+  status: ({ ctx }) => ({ emit, onCleanup }) => {
     const unsub = onChange(emit)
     onCleanup(unsub)
-  })
+  },
+})
 ```
 
 ### From Mixed Resolve
 
 ```typescript
+import { lens, string } from '@sylphx/lens-core'
+
+const { model } = lens<AppContext>()
+
 // Before
-status: t.string().resolve(async ({ ctx }) => {
-  const value = await getStatus()
-  ctx.emit(value)  // Mixing concerns
-  return value
+const User1 = model('User', {
+  status: string(),
+}).resolve({
+  status: async ({ ctx }) => {
+    const value = await getStatus()
+    ctx.emit(value)  // Mixing concerns
+    return value
+  },
 })
 
 // After
-status: t.string()
-  .resolve(({ ctx }) => getStatus())
-  .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+const User2 = model('User', {
+  status: string(),
+}).resolve({
+  status: ({ ctx }) => getStatus(),
+}).subscribe({
+  status: ({ ctx }) => ({ emit, onCleanup }) => {
     // Separate subscription logic
-  })
+  },
+})
 ```
