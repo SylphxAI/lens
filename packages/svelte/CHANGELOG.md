@@ -1,5 +1,11 @@
 # @sylphx/lens-svelte
 
+## 2.4.10 (2025-12-16)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 2.13.0
+
 ## 2.4.9 (2025-12-16)
 
 ### 📦 Dependencies
