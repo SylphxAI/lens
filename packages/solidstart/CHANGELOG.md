@@ -1,5 +1,10 @@
 # @sylphx/lens-solidstart
 
+## 2.1.12 (2025-12-16)
+
+Update dependencies to v3.0.1
+
+
 ## 2.1.11 (2025-12-16)
 
 ### 📦 Dependencies

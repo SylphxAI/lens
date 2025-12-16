@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 (2025-12-16)
+
+Update dependencies to v3.0.1
+
+
 ## 1.1.0 (2025-12-11)
 
 Add model chain methods .resolve() and .subscribe()

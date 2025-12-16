@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.9 (2025-12-16)
+
+Update dependencies to v3.0.1
+
+
 ## 1.1.8 (2025-12-16)
 
 ### 📦 Dependencies

@@ -1,5 +1,10 @@
 # @sylphx/lens-svelte
 
+## 2.4.12 (2025-12-16)
+
+Update dependencies to v3.0.1
+
+
 ## 2.4.11 (2025-12-16)
 
 ### 📦 Dependencies

@@ -1,5 +1,10 @@
 # @sylphx/lens-next
 
+## 2.3.12 (2025-12-16)
+
+Update dependencies to v3.0.1
+
+
 ## 2.3.11 (2025-12-16)
 
 ### 📦 Dependencies

@@ -1,5 +1,13 @@
 # @sylphx/lens-vue
 
+## 2.4.14 (2025-12-16)
+
+Update dependencies to v3.0.1
+
+### 🔧 Chores
+
+- skip deprecated versions for client, react, vue, solid, preact ([92e297f](https://github.com/SylphxAI/lens/commit/92e297f01a32682e41a4c281d405d3a8432fdc3e))
+
 ## 2.4.11 (2025-12-16)
 
 ### 📦 Dependencies
