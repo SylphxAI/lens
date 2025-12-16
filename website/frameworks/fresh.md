@@ -14,14 +14,18 @@ import { createClient, http } from "npm:@sylphx/lens-client"
 
 ```typescript
 // server/router.ts
-import { router, query, mutation, model } from "npm:@sylphx/lens-server"
+import { lens, id, string, router } from "npm:@sylphx/lens-core"
 import { z } from "npm:zod"
 
-const User = model('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-}))
+type AppContext = { db: Database }
+
+const { model, query, mutation } = lens<AppContext>()
+
+const User = model('User', {
+  id: id(),
+  name: string(),
+  email: string(),
+})
 
 export const appRouter = router({
   user: {

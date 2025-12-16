@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { lens } from '@sylphx/lens-core';
+ * import { lens, id, string, list } from '@sylphx/lens-core';
  *
  * type AppContext = { db: DB; user: User };
  *
@@ -14,11 +14,13 @@
  * const { model, query, mutation, resolver } = lens<AppContext>();
  *
  * // Define models with typed context (no need to repeat AppContext!)
- * const User = model("User", (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   posts: t.many(() => Post).resolve(({ parent, ctx }) => ctx.db.posts...),
- * }));
+ * const User = model("User", {
+ *   id: id(),
+ *   name: string(),
+ *   posts: list(() => Post),
+ * }).resolve({
+ *   posts: ({ source, ctx }) => ctx.db.posts.filter(...)
+ * });
  *
  * const getUser = query()
  *   .input(z.object({ id: z.string() }))
