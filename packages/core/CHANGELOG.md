@@ -1,5 +1,22 @@
 # @sylphx/lens-core
 
+## 3.0.0 (2025-12-16)
+
+### ♻️ Refactoring
+
+- **core:** clean up API inconsistencies ([e93d8d2](https://github.com/SylphxAI/lens/commit/e93d8d27dc4a271bb8786182b29a37cc02e9866b))
+- 💥 **core:** unify list/nullable for fields and return types ([ecc6b27](https://github.com/SylphxAI/lens/commit/ecc6b275868285e9d9a16bc640f2b2b01525de19))
+
+### 📚 Documentation
+
+- update all documentation to new model API ([ca400aa](https://github.com/SylphxAI/lens/commit/ca400aad2bfa2aadf5f3c2bc7f7dea6ddd87d5e4))
+- update documentation to use new Lens model API ([510cb08](https://github.com/SylphxAI/lens/commit/510cb08149822240cff25edd1018a2345c32e443))
+
+### 💥 Breaking Changes
+
+- **core:** unify list/nullable for fields and return types ([ecc6b27](https://github.com/SylphxAI/lens/commit/ecc6b275868285e9d9a16bc640f2b2b01525de19))
+  Unified list() and nullable() functions
+
 ## 2.13.0 (2025-12-16)
 
 ### ✨ Features

@@ -1,5 +1,9 @@
 # @sylphx/lens-fresh
 
+## 2.1.11 (2025-12-16)
+
+No notable changes.
+
 ## 2.1.10 (2025-12-16)
 
 No notable changes.
