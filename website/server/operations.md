@@ -242,20 +242,23 @@ if (result.error) {
 ## Complete Example
 
 ```typescript
-import { router, query, mutation, model } from '@sylphx/lens-server'
+import { router, lens, id, string, boolean, date, optional } from '@sylphx/lens-server'
 import { z } from 'zod'
 
+const { model, query, mutation } = lens<AppContext>()
+
 // Model definition
-const Post = model('Post', (t) => ({
-  id: t.id(),
-  title: t.string(),
-  content: t.string().optional(),
-  published: t.boolean(),
-  createdAt: t.date(),
-  author: t.one(() => User).resolve(({ parent, ctx }) =>
-    ctx.db.user.find(parent.authorId)
-  ),
-}))
+const Post = model('Post', {
+  id: id(),
+  title: string(),
+  content: optional(string()),
+  published: boolean(),
+  createdAt: date(),
+  author: () => User,
+}).resolve({
+  author: ({ source, ctx }) =>
+    ctx.db.user.find(source.authorId),
+})
 
 // Operations
 export const postRouter = router({

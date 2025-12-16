@@ -82,15 +82,19 @@ const getUser = query<AppContext>()
 Pass context type to model:
 
 ```typescript
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const { model } = lens<AppContext>()
 
-  posts: t.many(() => Post).resolve(({ parent, ctx }) => {
+const User = model('User', {
+  id: id(),
+  name: string(),
+
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) => {
     // ctx is typed as AppContext
-    return ctx.db.post.findMany({ where: { authorId: parent.id } })
-  }),
-}))
+    return ctx.db.post.findMany({ where: { authorId: source.id } })
+  },
+})
 ```
 
 ## Authentication
@@ -181,14 +185,15 @@ export const createContext = async (req: Request): Promise<AppContext> => {
 
 ```typescript
 // Using loaders
-const User = model<AppContext>('User', (t) => ({
-  id: t.id(),
-  name: t.string(),
+const User = model('User', {
+  id: id(),
+  name: string(),
 
-  posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-    ctx.loaders.postsByAuthor.load(parent.id)
-  ),
-}))
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) =>
+    ctx.loaders.postsByAuthor.load(source.id),
+})
 ```
 
 ## Request Info
@@ -271,18 +276,22 @@ export const createContext = async (req: Request): Promise<AppContext> => ({
 ```
 
 ```typescript
+const { model, mutation } = lens<AppContext>()
+
 // Subscribe to events
-const User = model<AppContext>('User', (t) => ({
-  status: t.string()
-    .resolve(({ parent, ctx }) => ctx.db.getStatus(parent.id))
-    .subscribe(({ parent, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`user:${parent.id}:status`, emit)
-      onCleanup(unsub)
-    }),
-}))
+const User = model('User', {
+  status: string(),
+}).resolve({
+  status: ({ source, ctx }) => ctx.db.getStatus(source.id),
+}).subscribe({
+  status: ({ source, ctx }) => ({ emit, onCleanup }) => {
+    const unsub = ctx.pubsub.on(`user:${source.id}:status`, emit)
+    onCleanup(unsub)
+  },
+})
 
 // Publish events
-const updateStatus = mutation<AppContext>()
+const updateStatus = mutation()
   .input(z.object({ status: z.string() }))
   .resolve(async ({ input, ctx }) => {
     await ctx.db.user.update({
@@ -334,14 +343,20 @@ createApp({
 
 ```typescript
 // ✅ Good: Batched with DataLoader
-posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-  ctx.loaders.postsByAuthor.load(parent.id)
-)
+const User = model('User', {
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) =>
+    ctx.loaders.postsByAuthor.load(source.id),
+})
 
 // ⚠️ Less efficient: Individual queries
-posts: t.many(() => Post).resolve(({ parent, ctx }) =>
-  ctx.db.post.findMany({ where: { authorId: parent.id } })
-)
+const User = model('User', {
+  posts: list(() => Post),
+}).resolve({
+  posts: ({ source, ctx }) =>
+    ctx.db.post.findMany({ where: { authorId: source.id } }),
+})
 ```
 
 ### 4. Keep Context Lightweight
