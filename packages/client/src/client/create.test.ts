@@ -12,7 +12,7 @@
 // @ts-nocheck - Runtime tests with dynamic client types
 
 import { describe, expect, it } from "bun:test";
-import { entity, lens, router, t } from "@sylphx/lens-core";
+import { datetime, enumType, id, int, lens, model, router, string } from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 import type { LensServerInterface } from "../transport/direct.js";
@@ -24,20 +24,20 @@ import { createClient } from "./create";
 // Test Entities
 // =============================================================================
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	role: t.enum(["user", "admin"]),
-	createdAt: t.date(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	role: enumType(["user", "admin"]),
+	createdAt: datetime(),
 });
 
-const _Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	viewCount: t.int(),
-	authorId: t.string(),
+const _Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	viewCount: int(),
+	authorId: string(),
 });
 
 interface TestContext {

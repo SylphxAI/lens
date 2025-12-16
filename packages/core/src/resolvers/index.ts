@@ -810,6 +810,60 @@ export function createResolverFromEntity<
 		}
 	}
 
+	// Add computed fields from _fieldResolvers that don't exist in entity.fields
+	// These are resolver-only fields (e.g., displayPrice defined only in .resolve())
+	for (const [fieldName, modelResolver] of Object.entries(modelResolvers)) {
+		if (fields[fieldName]) continue; // Already handled above
+
+		const modelSubscriber = modelSubscribers[fieldName];
+
+		if (modelSubscriber) {
+			// LIVE MODE: Both resolver and subscriber
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "live" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
+					return modelResolver({ source: parent, parent, args: {}, ctx });
+				},
+				_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
+					return modelSubscriber({ source: parent, parent, args: {}, ctx });
+				},
+			};
+		} else {
+			// RESOLVE MODE: Only resolver
+			fields[fieldName] = {
+				_kind: "resolved" as const,
+				_mode: "resolve" as const,
+				_returnType: undefined,
+				_argsSchema: null,
+				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
+					return modelResolver({ source: parent, parent, args: {}, ctx });
+				},
+			};
+		}
+	}
+
+	// Add subscriber-only fields from _fieldSubscribers that don't exist in entity.fields
+	for (const [fieldName, modelSubscriber] of Object.entries(modelSubscribers)) {
+		if (fields[fieldName]) continue; // Already handled above
+
+		// LIVE MODE (subscriber-only): Field exposed from parent, with live updates
+		fields[fieldName] = {
+			_kind: "resolved" as const,
+			_mode: "live" as const,
+			_returnType: undefined,
+			_argsSchema: null,
+			_resolver: ({ parent }: { parent: unknown }) => {
+				return (parent as Record<string, unknown>)[fieldName];
+			},
+			_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
+				return modelSubscriber({ source: parent, parent, args: {}, ctx });
+			},
+		};
+	}
+
 	return new ResolverDefImpl(entity, fields) as ResolverDef<
 		TEntity,
 		Record<string, FieldDef<any, any, TContext>>,

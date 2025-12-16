@@ -9,40 +9,40 @@
 
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { createClient, inProcess } from "@sylphx/lens-client";
-import { entity, lens, router, t } from "@sylphx/lens-core";
+import { model, id, string, boolean, datetime, enumType, nullable, int, json, lens, router } from "@sylphx/lens-core";
 import { z } from "zod";
 
 // =============================================================================
-// 1. Define Entities with Full Type Information
+// 1. Define Models with Full Type Information
 // =============================================================================
 
-console.log("📦 Defining entities...\n");
+console.log("📦 Defining models...\n");
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	role: t.enum(["user", "admin", "moderator"]),
-	bio: t.string().optional(),
-	createdAt: t.date(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	role: enumType(["user", "admin", "moderator"]),
+	bio: nullable(string()),
+	createdAt: datetime(),
 });
 
-const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	published: t.boolean(),
-	authorId: t.string(),
-	viewCount: t.int(),
-	tags: t.object<string[]>(),
+const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	published: boolean(),
+	authorId: string(),
+	viewCount: int(),
+	tags: json<string[]>(),
 });
 
-const Comment = entity("Comment", {
-	id: t.id(),
-	text: t.string(),
-	postId: t.string(),
-	authorId: t.string(),
-	likes: t.int(),
+const Comment = model("Comment", {
+	id: id(),
+	text: string(),
+	postId: string(),
+	authorId: string(),
+	likes: int(),
 });
 
 // =============================================================================
@@ -372,7 +372,7 @@ async function demonstrateTypeInference() {
 	console.log();
 
 	// Example 6: Different entity types have different shapes
-	console.log("6️⃣ Different entities have different types");
+	console.log("6️⃣ Different models have different types");
 	console.log("-".repeat(40));
 
 	const post = await client.post.get({ id: "1" });

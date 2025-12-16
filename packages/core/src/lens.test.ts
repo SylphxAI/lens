@@ -7,23 +7,23 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { lens } from "./lens.js";
-import { entity } from "./schema/define.js";
-import { t } from "./schema/types.js";
+import { id, string } from "./schema/fields.js";
+import { model } from "./schema/model.js";
 
 // =============================================================================
 // Test Fixtures
 // =============================================================================
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
 });
 
-const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	authorId: t.string(),
+const Post = model("Post", {
+	id: id(),
+	title: string(),
+	authorId: string(),
 });
 
 interface TestContext {

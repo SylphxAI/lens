@@ -13,17 +13,21 @@
 import { describe, expect, it } from "bun:test";
 import {
 	applyOps,
-	entity,
+	boolean,
 	firstValueFrom,
+	float,
+	id,
 	isError,
 	isOps,
 	isSnapshot,
 	type Message,
+	model,
 	mutation,
+	nullable,
 	query,
 	resolver,
 	router,
-	t,
+	string,
 } from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
@@ -76,10 +80,10 @@ function createResultsCollector() {
 // Test Entities
 // =============================================================================
 
-const User = entity("User", {
-	id: z.string(),
-	name: z.string(),
-	email: z.string().optional(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: nullable(string()),
 });
 
 // =============================================================================
@@ -531,17 +535,17 @@ describe("type inference", () => {
 
 describe("field resolvers", () => {
 	// Test entities for field resolver tests
-	const Author = entity("Author", {
-		id: t.id(),
-		name: t.string(),
+	const Author = model("Author", {
+		id: id(),
+		name: string(),
 	});
 
-	const Post = entity("Post", {
-		id: t.id(),
-		title: t.string(),
-		content: t.string(),
-		published: t.boolean(),
-		authorId: t.string(),
+	const Post = model("Post", {
+		id: id(),
+		title: string(),
+		content: string(),
+		published: boolean(),
+		authorId: string(),
 	});
 
 	// Mock data
@@ -678,10 +682,10 @@ describe("field resolvers", () => {
 
 	it("supports nested input at multiple levels", async () => {
 		// Comment entity for deeper nesting
-		const Comment = entity("Comment", {
-			id: t.id(),
-			body: t.string(),
-			postId: t.string(),
+		const Comment = model("Comment", {
+			id: id(),
+			body: string(),
+			postId: string(),
 		});
 
 		const mockDbWithComments = {
@@ -824,15 +828,15 @@ describe("field resolvers", () => {
 		// Emits forward commands to client - no re-resolution on server.
 		let postsResolverCallCount = 0;
 
-		const Author = entity("Author", {
-			id: t.id(),
-			name: t.string(),
+		const Author = model("Author", {
+			id: id(),
+			name: string(),
 		});
 
-		const Post = entity("Post", {
-			id: t.id(),
-			title: t.string(),
-			authorId: t.string(),
+		const Post = model("Post", {
+			id: id(),
+			title: string(),
+			authorId: string(),
 		});
 
 		const mockDb = {
@@ -924,15 +928,15 @@ describe("field resolvers", () => {
 		let cleanupCalled = false;
 		let resolverReceivedOnCleanup = false;
 
-		const Author = entity("Author", {
-			id: t.id(),
-			name: t.string(),
+		const Author = model("Author", {
+			id: id(),
+			name: string(),
 		});
 
-		const Post = entity("Post", {
-			id: t.id(),
-			title: t.string(),
-			authorId: t.string(),
+		const Post = model("Post", {
+			id: id(),
+			title: string(),
+			authorId: string(),
 		});
 
 		const mockDb = {
@@ -1008,15 +1012,15 @@ describe("field resolvers", () => {
 
 	it("field-level emit sends update command (stateless)", async () => {
 		// STATELESS: Field emit sends update command with field path prefix
-		const Author = entity("Author", {
-			id: t.id(),
-			name: t.string(),
+		const Author = model("Author", {
+			id: id(),
+			name: string(),
 		});
 
-		const Post = entity("Post", {
-			id: t.id(),
-			title: t.string(),
-			authorId: t.string(),
+		const Post = model("Post", {
+			id: id(),
+			title: string(),
+			authorId: string(),
 		});
 
 		const mockDb = {
@@ -1180,15 +1184,15 @@ describe("field resolvers", () => {
 		// .resolve() handles initial data (batchable)
 		// .subscribe() handles live updates (fire-and-forget)
 
-		const Author = entity("Author", {
-			id: t.id(),
-			name: t.string(),
+		const Author = model("Author", {
+			id: id(),
+			name: string(),
 		});
 
-		const Post = entity("Post", {
-			id: t.id(),
-			title: t.string(),
-			authorId: t.string(),
+		const Post = model("Post", {
+			id: id(),
+			title: string(),
+			authorId: string(),
 		});
 
 		const mockDb = {
@@ -1511,16 +1515,17 @@ describe("observable error handling", () => {
 // =============================================================================
 
 describe("Unified Entity Definition", () => {
-	describe("auto-converts entities with inline resolvers", () => {
-		it("creates resolver from entity with inline .resolve()", async () => {
-			// Entity with inline resolver - no separate resolver() needed
-			const Product = entity("Product", (t) => ({
-				id: t.id(),
-				name: t.string(),
-				price: t.float(),
-				// Computed field with inline resolver
-				displayPrice: t.string().resolve(({ parent }) => `$${(parent as { price: number }).price.toFixed(2)}`),
-			}));
+	describe("auto-converts models with .resolve() chain", () => {
+		it("creates resolver from model with .resolve() chain", async () => {
+			// Model with chained resolver - no separate resolver() needed
+			const Product = model("Product", {
+				id: id(),
+				name: string(),
+				price: float(),
+			}).resolve({
+				// Computed field with resolver
+				displayPrice: ({ source }) => `$${(source as { price: number }).price.toFixed(2)}`,
+			});
 
 			const getProduct = query()
 				.input(z.object({ id: z.string() }))
@@ -1531,7 +1536,7 @@ describe("Unified Entity Definition", () => {
 					price: 19.99,
 				}));
 
-			// No resolvers array needed! Server auto-detects inline resolvers
+			// No resolvers array needed! Server auto-detects model resolvers
 			const server = createApp({
 				entities: { Product },
 				queries: { getProduct },
@@ -1551,14 +1556,16 @@ describe("Unified Entity Definition", () => {
 			});
 		});
 
-		it("explicit resolver takes priority over inline resolver", async () => {
-			// Entity with inline resolver
-			const Item = entity("Item", (t) => ({
-				id: t.id(),
-				label: t.string().resolve(() => "inline-label"),
-			}));
+		it("explicit resolver takes priority over model resolver", async () => {
+			// Model with chained resolver
+			const Item = model("Item", {
+				id: id(),
+				label: string(),
+			}).resolve({
+				label: () => "inline-label",
+			});
 
-			// Explicit resolver overrides inline
+			// Explicit resolver overrides model resolver
 			const itemResolver = resolver(Item, (f) => ({
 				id: f.expose("id"),
 				label: f.string().resolve(() => "explicit-label"),
@@ -1567,7 +1574,7 @@ describe("Unified Entity Definition", () => {
 			const getItem = query()
 				.input(z.object({ id: z.string() }))
 				.returns(Item)
-				.resolve(({ input }) => ({ id: input.id }));
+				.resolve(({ input }) => ({ id: input.id, label: "source-label" }));
 
 			const server = createApp({
 				entities: { Item },
@@ -1584,16 +1591,17 @@ describe("Unified Entity Definition", () => {
 
 			expect(result.data).toEqual({
 				id: "item-1",
-				label: "explicit-label", // From explicit resolver, not inline
+				label: "explicit-label", // From explicit resolver, not model resolver
 			});
 		});
 
-		it("includes inline resolver fields in metadata", () => {
-			const Task = entity("Task", (t) => ({
-				id: t.id(),
-				title: t.string(),
-				status: t.string().resolve(({ parent }) => parent.status),
-			}));
+		it("includes model resolver fields in metadata", () => {
+			const Task = model("Task", {
+				id: id(),
+				title: string(),
+			}).resolve({
+				status: ({ source }) => (source as { title: string }).title.toUpperCase(),
+			});
 
 			const server = createApp({
 				entities: { Task },
@@ -1607,11 +1615,11 @@ describe("Unified Entity Definition", () => {
 			expect(metadata.entities.Task.status).toBe("resolve");
 		});
 
-		it("skips entities without inline resolvers", () => {
-			// Plain entity without inline resolvers
-			const SimpleUser = entity("SimpleUser", {
-				id: t.id(),
-				name: t.string(),
+		it("skips models without resolvers", () => {
+			// Plain model without resolvers
+			const SimpleUser = model("SimpleUser", {
+				id: id(),
+				name: string(),
 			});
 
 			const server = createApp({
@@ -1620,7 +1628,7 @@ describe("Unified Entity Definition", () => {
 			});
 
 			const metadata = server.getMetadata();
-			// No resolver created for entities without inline resolvers
+			// No resolver created for models without .resolve()
 			expect(metadata.entities.SimpleUser).toBeUndefined();
 		});
 	});
@@ -2032,9 +2040,9 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 describe("scalar field subscription with emit.delta()", () => {
 	it("provides emit.delta() for string field subscriptions", async () => {
 		// UserWithBio - bio field is not provided by query, resolved by field resolver
-		const UserWithBio = entity("UserWithBio", {
-			id: t.id(),
-			name: t.string(),
+		const UserWithBio = model("UserWithBio", {
+			id: id(),
+			name: string(),
 		});
 
 		let capturedEmit: {
@@ -2096,9 +2104,9 @@ describe("scalar field subscription with emit.delta()", () => {
 
 	it("emit.delta() sends delta command (stateless)", async () => {
 		// UserWithContent - content field resolved by field resolver
-		const UserWithContent = entity("UserWithContent", {
-			id: t.id(),
-			name: t.string(),
+		const UserWithContent = model("UserWithContent", {
+			id: id(),
+			name: string(),
 		});
 
 		let capturedEmit: {

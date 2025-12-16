@@ -7,8 +7,8 @@
 import type {
 	AnyQueryDef,
 	ContextValue,
-	EntityDef,
 	InferRouterContext,
+	ModelDef,
 	MutationDef,
 	Observable,
 	OptimisticDSL,
@@ -49,7 +49,7 @@ export interface SelectionObject {
 // =============================================================================
 
 /** Entity map type */
-export type EntitiesMap = Record<string, EntityDef<string, any>>;
+export type EntitiesMap = Record<string, ModelDef<string, any>>;
 
 /** Queries map type */
 export type QueriesMap = Record<string, AnyQueryDef<unknown, unknown>>;

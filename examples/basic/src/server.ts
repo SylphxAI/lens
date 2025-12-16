@@ -1,7 +1,7 @@
 /**
  * Example Lens Server
  */
-import { entity, t, lens, router } from "@sylphx/lens-core";
+import { model, id, string, boolean, datetime, lens, router } from "@sylphx/lens-core";
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 
@@ -9,20 +9,20 @@ import { z } from "zod";
 // Entities
 // =============================================================================
 
-export const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	createdAt: t.date(),
+export const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	createdAt: datetime(),
 });
 
-export const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	published: t.boolean(),
-	authorId: t.string(),
-	createdAt: t.date(),
+export const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	published: boolean(),
+	authorId: string(),
+	createdAt: datetime(),
 });
 
 // =============================================================================

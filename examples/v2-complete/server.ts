@@ -3,63 +3,63 @@
  *
  * Demonstrates:
  * - lens<AppContext>() factory for typed builders
- * - Entity definitions (scalar fields only)
+ * - Model definitions (scalar fields only)
  * - resolver() pattern with pure values (functional)
  * - Field arguments with .args(schema).resolve((parent, args, ctx) => ...)
  * - Relations with f.one() and f.many()
  */
 
-import { entity, t, router, lens } from "@sylphx/lens-core";
+import { model, id, string, boolean, datetime, enumType, nullable, router, lens } from "@sylphx/lens-core";
 import { entity as e, temp, ref, now, branch } from "@sylphx/reify";
-// Note: `e` is the Reify entity helper, `entity` is the Lens entity definition builder
+// Note: `e` is the Reify entity helper, `model` is the Lens model definition builder
 import { createApp, createHandler, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 
 // =============================================================================
-// Entities (scalar fields only - no circular reference issues)
+// Models (scalar fields only - no circular reference issues)
 // =============================================================================
 
-export const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	role: t.enum(["user", "admin", "vip"]),
-	avatar: t.string().optional(),
-	createdAt: t.date(),
+export const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	role: enumType(["user", "admin", "vip"]),
+	avatar: nullable(string()),
+	createdAt: datetime(),
 });
 
-export const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	published: t.boolean(),
-	authorId: t.string(),  // FK to User
-	updatedAt: t.date().optional(),
-	createdAt: t.date(),
+export const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	published: boolean(),
+	authorId: string(),  // FK to User
+	updatedAt: nullable(datetime()),
+	createdAt: datetime(),
 });
 
-export const Comment = entity("Comment", {
-	id: t.id(),
-	content: t.string(),
-	postId: t.string(),    // FK to Post
-	authorId: t.string(),  // FK to User
-	createdAt: t.date(),
+export const Comment = model("Comment", {
+	id: id(),
+	content: string(),
+	postId: string(),    // FK to Post
+	authorId: string(),  // FK to User
+	createdAt: datetime(),
 });
 
 // For UDSL demo
-export const Session = entity("Session", {
-	id: t.id(),
-	title: t.string(),
-	userId: t.string(),
-	createdAt: t.date(),
+export const Session = model("Session", {
+	id: id(),
+	title: string(),
+	userId: string(),
+	createdAt: datetime(),
 });
 
-export const Message = entity("Message", {
-	id: t.id(),
-	sessionId: t.string(),
-	role: t.enum(["user", "assistant"]),
-	content: t.string(),
-	createdAt: t.date(),
+export const Message = model("Message", {
+	id: id(),
+	sessionId: string(),
+	role: enumType(["user", "assistant"]),
+	content: string(),
+	createdAt: datetime(),
 });
 
 // =============================================================================
@@ -365,7 +365,7 @@ const chatRouter = router({
 	 * - Client executes pipeline against cache for instant feedback
 	 * - Server executes same pipeline against Prisma for persistence
 	 *
-	 * 🔥 NEW: Callback pattern with automatic type inference!
+	 * Callback pattern with automatic type inference!
 	 * The `input` parameter is fully typed from .input() schema.
 	 */
 	send: mutation()
@@ -376,27 +376,27 @@ const chatRouter = router({
 			userId: z.string(),
 		}))
 		.returns(Message)
-		// 🔥 Callback with typed input AND typed entity operations!
+		// Callback with typed input AND typed entity operations!
 		.optimistic(({ input }) => [
 			// Step 1: Create or update session
-			// TypeScript knows: input.sessionId is string | undefined ✅
+			// TypeScript knows: input.sessionId is string | undefined
 			branch(input.sessionId)
 				.then(e.update(Session, { id: input.sessionId!, title: input.title ?? "Chat" }))
 				.else(e.create(Session, {
 					id: temp(),
 					title: input.title ?? "New Chat",
-					userId: input.userId,  // TypeScript knows: string ✅
+					userId: input.userId,  // TypeScript knows: string
 					createdAt: now(),
 				}))
 				.as("session"),
 
 			// Step 2: Create message (references session from step 1)
-			// e.create(Message, {...}) is fully type-checked! 🎉
+			// e.create(Message, {...}) is fully type-checked!
 			e.create(Message, {
 				id: temp(),
 				sessionId: ref("session").id,
-				role: "user",           // ✅ TypeScript knows: "user" | "assistant"
-				content: input.content, // ✅ TypeScript knows: string
+				role: "user",           // TypeScript knows: "user" | "assistant"
+				content: input.content, // TypeScript knows: string
 				createdAt: now(),
 			}).as("message"),
 		])
@@ -474,7 +474,7 @@ if (import.meta.main) {
 	});
 
 	console.log(`
-🔭 Lens Server running on http://localhost:${PORT}
+Lens Server running on http://localhost:${PORT}
 
 Endpoints:
   POST /              → queries & mutations
@@ -485,6 +485,6 @@ Routes:
   user.whoami, user.get, user.search, user.update, user.bulkPromote
   post.get, post.trending, post.create, post.update, post.publish
   comment.add
-  chat.send (🔥 Reify Pipeline with typed callback)
+  chat.send (Reify Pipeline with typed callback)
 `);
 }

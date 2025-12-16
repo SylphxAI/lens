@@ -23,18 +23,17 @@ import {
 	createResolverFromEntity,
 	type Emit,
 	type EmitCommand,
-	type EntityDef,
 	flattenRouter,
 	hashValue,
 	hasInlineResolvers,
 	type InferRouterContext,
-	isEntityDef,
 	isLiveQueryDef,
 	isModelDef,
 	isMutationDef,
 	isQueryDef,
 	type LiveQueryDef,
 	type Message,
+	type ModelDef,
 	mergeModelCollections,
 	type Observable,
 	type ResolverDef,
@@ -163,12 +162,11 @@ class LensServerImpl<
 			}
 		}
 
-		// Convert Map to Record for entities (supports both EntityDef and ModelDef)
+		// Convert Map to Record for entities
 		const entities: EntitiesMap = {};
 		for (const [name, model] of mergedModels) {
-			// Both ModelDef and EntityDef work as EntitiesMap values
-			if (isEntityDef(model) || isModelDef(model)) {
-				entities[name] = model as EntityDef<string, any>;
+			if (isModelDef(model)) {
+				entities[name] = model as ModelDef<string, any>;
 			}
 		}
 		this.entities = entities;
@@ -247,10 +245,9 @@ class LensServerImpl<
 			}
 		}
 
-		// 2. Auto-convert entities/models with inline resolvers (if not already in map)
+		// 2. Auto-convert models with inline resolvers (if not already in map)
 		for (const [name, entity] of Object.entries(entities)) {
-			// Support both EntityDef and ModelDef
-			if (!isEntityDef(entity) && !isModelDef(entity)) continue;
+			if (!isModelDef(entity)) continue;
 			if (resolverMap.has(name)) continue; // Explicit resolver takes priority
 
 			// Check if entity/model has inline resolvers
@@ -722,21 +719,6 @@ class LensServerImpl<
 			const args = nestedInputs?.get(currentPath) ?? {};
 			const hasArgs = Object.keys(args).length > 0;
 
-			// Skip if value already exists
-			const existingValue = result[field];
-			if (existingValue !== undefined) {
-				result[field] = await this.resolveEntityFields(
-					existingValue,
-					nestedInputs,
-					context,
-					currentPath,
-					onCleanup,
-					createFieldEmit,
-					visited,
-				);
-				continue;
-			}
-
 			// Resolve the field based on mode
 			// ADR-002: Two-Phase Field Resolution
 			const fieldMode = resolverDef.getFieldMode(field);
@@ -868,7 +850,7 @@ class LensServerImpl<
 		let bestMatch: { name: string; score: number } | undefined;
 
 		for (const [name, def] of Object.entries(this.entities)) {
-			if (!isEntityDef(def)) continue;
+			if (!isModelDef(def)) continue;
 
 			const score = this.getEntityMatchScore(obj, def);
 			// Require at least 50% field match to avoid false positives
@@ -887,7 +869,7 @@ class LensServerImpl<
 	 */
 	private getEntityMatchScore(
 		obj: Record<string, unknown>,
-		entityDef: EntityDef<string, any>,
+		entityDef: ModelDef<string, any>,
 	): number {
 		const fieldNames = Object.keys(entityDef.fields);
 		if (fieldNames.length === 0) return 0;

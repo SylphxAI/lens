@@ -11,14 +11,7 @@
 
 export {
 	ArrayType,
-	BelongsToType,
 	BooleanType,
-	// Context-aware type builder
-	type ContextualField,
-	// Custom scalar types (deprecated aliases)
-	CustomType,
-	type CustomTypeDefinition,
-	createTypeBuilder,
 	DateTimeType,
 	DecimalType,
 	type DefaultType,
@@ -29,51 +22,24 @@ export {
 	// Base classes
 	FieldType,
 	FloatType,
-	HasManyType,
-	// Relation types
-	HasOneType,
 	// Scalar types
 	IdType,
 	IntType,
-	isHasManyType,
 	// Type guards
-	isRelationType,
 	isScalarType,
 	// Type helpers
 	type NullableType,
 	ObjectType,
-	type RelationBrand,
-	// Custom scalar types (new names)
+	// Custom scalar types
 	ScalarType,
 	type ScalarTypeDefinition,
 	type SchemaDefinition,
 	StringType,
 	TimestampType,
-	type TypeBuilder,
-	// Type builders
-	t,
 } from "./schema/types.js";
 
-// =============================================================================
-// Schema Creation
-// =============================================================================
-
-export {
-	type EntityMeta,
-	// Metadata types
-	type RelationMeta,
-	// Schema class
-	Schema,
-	type SchemaEntities,
-	// Type helpers
-	type SchemaEntity,
-	type SchemaSelect,
-	type SchemaSelected,
-	// Errors
-	SchemaValidationError,
-	// Validation types
-	type ValidatedSchemaDefinition,
-} from "./schema/create.js";
+// Note: Schema class and createSchema removed in v3.0
+// Use model() with plain objects instead
 
 // =============================================================================
 // Model Definition (Primary API)
@@ -150,18 +116,8 @@ export {
 	type ScalarFieldsOnly,
 } from "./schema/model-resolvers.js";
 
-// =============================================================================
-// Legacy Wrapper Aliases (for backward compatibility)
-// =============================================================================
-
-export {
-	isListWrapper,
-	isNullableWrapper,
-	// Legacy aliases - prefer ListDef/NullableDef from fields.js
-	type ListWrapper,
-	type NullableWrapper,
-	type UnwrapModel,
-} from "./schema/wrappers.js";
+// Note: Legacy wrapper aliases removed in v3.0
+// Use ListDef/NullableDef from fields.js instead
 
 // =============================================================================
 // Model Collection Utilities
@@ -174,15 +130,8 @@ export {
 	mergeModelCollections,
 } from "./schema/collect.js";
 
-// =============================================================================
-// Entity Definition (Internal - use model() for new code)
-// =============================================================================
-
-export {
-	createSchema,
-	type EntityDef,
-	isEntityDef,
-} from "./schema/define.js";
+// Note: createSchema, EntityDef, isEntityDef removed in v3.0
+// Use model() with plain objects instead
 
 // =============================================================================
 // Type Inference

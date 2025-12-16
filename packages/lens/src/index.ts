@@ -6,12 +6,13 @@
  *
  * @example
  * ```typescript
- * import { entity, query, mutation, t } from '@sylphx/lens';
+ * import { model, query, mutation, id, string } from '@sylphx/lens';
+ * import { z } from 'zod';
  *
- * export const User = entity({
- *   id: t.id(),
- *   name: t.string(),
- *   email: t.string(),
+ * export const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   email: string(),
  * });
  *
  * export const getUser = query()

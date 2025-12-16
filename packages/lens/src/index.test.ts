@@ -5,31 +5,46 @@
 import { describe, expect, test } from "bun:test";
 
 // Re-exports from core
-import { entity, mutation, query, resolver, scalar, t } from "./index.js";
+import {
+	bigint,
+	boolean,
+	bytes,
+	datetime,
+	enumType,
+	float,
+	id,
+	int,
+	json,
+	list,
+	model,
+	mutation,
+	object,
+	query,
+	resolver,
+	scalar,
+	string,
+} from "./index.js";
 
 describe("@sylphx/lens", () => {
 	describe("core re-exports", () => {
-		test("t type builders exist", () => {
-			expect(t.id).toBeDefined();
-			expect(t.string).toBeDefined();
-			expect(t.int).toBeDefined();
-			expect(t.float).toBeDefined();
-			expect(t.boolean).toBeDefined();
-			expect(t.datetime).toBeDefined();
-			expect(t.date).toBeDefined();
-			expect(t.decimal).toBeDefined();
-			expect(t.bigint).toBeDefined();
-			expect(t.bytes).toBeDefined();
-			expect(t.json).toBeDefined();
-			expect(t.enum).toBeDefined();
-			expect(t.object).toBeDefined();
-			expect(t.array).toBeDefined();
-			expect(t.custom).toBeDefined();
+		test("field builder functions exist", () => {
+			expect(id).toBeDefined();
+			expect(string).toBeDefined();
+			expect(int).toBeDefined();
+			expect(float).toBeDefined();
+			expect(boolean).toBeDefined();
+			expect(datetime).toBeDefined();
+			expect(bigint).toBeDefined();
+			expect(bytes).toBeDefined();
+			expect(json).toBeDefined();
+			expect(enumType).toBeDefined();
+			expect(object).toBeDefined();
+			expect(list).toBeDefined();
 		});
 
-		test("entity function exists", () => {
-			expect(entity).toBeDefined();
-			expect(typeof entity).toBe("function");
+		test("model function exists", () => {
+			expect(model).toBeDefined();
+			expect(typeof model).toBe("function");
 		});
 
 		test("operation builders exist", () => {
@@ -48,42 +63,33 @@ describe("@sylphx/lens", () => {
 		});
 	});
 
-	describe("new type builders", () => {
-		test("t.date() creates DateType", () => {
-			const dateType = t.date();
-			expect(dateType._type).toBe("date");
+	describe("field type builders", () => {
+		test("datetime() creates DateTimeType", () => {
+			const dateType = datetime();
+			expect(dateType._type).toBe("datetime");
 		});
 
-		test("t.bigint() creates BigIntType", () => {
-			const bigintType = t.bigint();
+		test("bigint() creates BigIntType", () => {
+			const bigintType = bigint();
 			expect(bigintType._type).toBe("bigint");
 		});
 
-		test("t.bytes() creates BytesType", () => {
-			const bytesType = t.bytes();
+		test("bytes() creates BytesType", () => {
+			const bytesType = bytes();
 			expect(bytesType._type).toBe("bytes");
 		});
 
-		test("t.json() creates JsonType", () => {
-			const jsonType = t.json();
+		test("json() creates JsonType", () => {
+			const jsonType = json();
 			expect(jsonType._type).toBe("json");
 		});
 	});
 
-	describe("modifiers", () => {
-		test(".nullable() works", () => {
-			const type = t.string().nullable();
-			expect(type.isNullable()).toBe(true);
-		});
-
-		test(".optional() works", () => {
-			const type = t.string().optional();
-			expect(type.isOptional()).toBe(true);
-		});
-
-		test(".default() works", () => {
-			const type = t.string().default("test");
-			expect(type.getDefault()).toBe("test");
+	describe("field wrappers", () => {
+		test("list() works", () => {
+			const type = list(string());
+			expect(type).toBeDefined();
+			expect(type._inner).toBeDefined();
 		});
 	});
 });

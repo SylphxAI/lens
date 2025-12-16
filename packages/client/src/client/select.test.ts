@@ -15,7 +15,20 @@
 // @ts-nocheck - Runtime tests with dynamic client types
 
 import { describe, expect, it } from "bun:test";
-import { entity, lens, router, t } from "@sylphx/lens-core";
+import {
+	boolean,
+	datetime,
+	enumType,
+	id,
+	int,
+	lens,
+	list,
+	model,
+	nullable,
+	object,
+	router,
+	string,
+} from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 import { inProcess } from "../transport/direct.js";
@@ -26,25 +39,25 @@ import { createClient } from "./create";
 // Test Entities
 // =============================================================================
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	age: t.int().nullable(),
-	role: t.enum(["user", "admin", "guest"]),
-	isActive: t.boolean(),
-	metadata: t.object<{ theme: string; language: string; notifications: boolean }>(),
-	tags: t.array(t.string()),
-	createdAt: t.date(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	age: nullable(int()),
+	role: enumType(["user", "admin", "guest"]),
+	isActive: boolean(),
+	metadata: object<{ theme: string; language: string; notifications: boolean }>(),
+	tags: list(string()),
+	createdAt: datetime(),
 });
 
-const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	published: t.boolean(),
-	viewCount: t.int(),
-	authorId: t.string(),
+const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	published: boolean(),
+	viewCount: int(),
+	authorId: string(),
 });
 
 interface TestContext {

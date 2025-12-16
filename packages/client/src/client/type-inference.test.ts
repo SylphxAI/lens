@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { entity, lens, router, t } from "@sylphx/lens-core";
+import { boolean, datetime, enumType, id, int, lens, model, nullable, router, string } from "@sylphx/lens-core";
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 import { inProcess, type TypedTransport } from "../transport/direct.js";
@@ -17,29 +17,29 @@ import { createClient } from "./create.js";
 // Test Entities
 // =============================================================================
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	role: t.enum(["user", "admin", "moderator"]),
-	bio: t.string().optional(),
-	createdAt: t.date(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	role: enumType(["user", "admin", "moderator"]),
+	bio: nullable(string()),
+	createdAt: datetime(),
 });
 
-const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	published: t.boolean(),
-	authorId: t.string(),
-	viewCount: t.int(),
+const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	published: boolean(),
+	authorId: string(),
+	viewCount: int(),
 });
 
-const _Comment = entity("Comment", {
-	id: t.id(),
-	text: t.string(),
-	postId: t.string(),
-	authorId: t.string(),
+const _Comment = model("Comment", {
+	id: id(),
+	text: string(),
+	postId: string(),
+	authorId: string(),
 });
 
 // =============================================================================

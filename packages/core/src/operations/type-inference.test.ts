@@ -9,37 +9,37 @@
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
 import { lens } from "../lens.js";
-import { entity } from "../schema/define.js";
-import { t } from "../schema/types.js";
+import { boolean, datetime, enumType, id, int, nullable, string } from "../schema/fields.js";
+import { model } from "../schema/model.js";
 import { type InferReturnType, mutation, query, router } from "./index.js";
 
 // =============================================================================
 // Test Entities
 // =============================================================================
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
-	role: t.enum(["user", "admin", "vip"]),
-	avatar: t.string().optional(),
-	createdAt: t.date(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
+	role: enumType(["user", "admin", "vip"] as const),
+	avatar: nullable(string()),
+	createdAt: datetime(),
 });
 
-const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	published: t.boolean(),
-	authorId: t.string(),
-	viewCount: t.int(),
+const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	published: boolean(),
+	authorId: string(),
+	viewCount: int(),
 });
 
-const Comment = entity("Comment", {
-	id: t.id(),
-	text: t.string(),
-	postId: t.string(),
-	authorId: t.string(),
+const Comment = model("Comment", {
+	id: id(),
+	text: string(),
+	postId: string(),
+	authorId: string(),
 });
 
 // =============================================================================

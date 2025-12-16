@@ -13,7 +13,7 @@ import {
 	type Result,
 	type TypedTransport,
 } from "@sylphx/lens-client";
-import { entity, firstValueFrom, isObservable, lens, router, t } from "@sylphx/lens-core";
+import { firstValueFrom, id, isObservable, lens, model, router, string } from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 
@@ -217,10 +217,10 @@ type Assert<T extends true> = T;
 
 describe("inProcess type inference", () => {
 	// Test entities
-	const User = entity("User", {
-		id: t.id(),
-		name: t.string(),
-		email: t.string(),
+	const User = model("User", {
+		id: id(),
+		name: string(),
+		email: string(),
 	});
 
 	interface TestContext {

@@ -9,7 +9,6 @@ import { isMutationDef, type MutationDef } from "../operations/mutation.js";
 // Import operation types
 import { type AnyQueryDef, isQueryDef } from "../operations/query.js";
 import { flattenRouter, type RouterDef } from "../router/index.js";
-import { type EntityDef, isEntityDef } from "./define.js";
 import { isModelDef, type ModelDef } from "./model.js";
 import type { EntityDefinition } from "./types.js";
 import {
@@ -20,20 +19,15 @@ import {
 } from "./wrappers.js";
 
 /**
- * Any definition that could be a model (EntityDef or ModelDef)
- */
-type AnyModelLike = EntityDef<string, EntityDefinition> | ModelDef<string, EntityDefinition>;
-
-/**
  * Map of collected models by name
  */
-export type CollectedModels = Map<string, AnyModelLike>;
+export type CollectedModels = Map<string, ModelDef<string, EntityDefinition>>;
 
 /**
  * Unwrap a return spec to get the underlying model.
  * Handles: Model, nullable(Model), list(Model), nullable(list(Model))
  */
-function unwrapReturnSpec(spec: unknown): AnyModelLike | undefined {
+function unwrapReturnSpec(spec: unknown): ModelDef<string, EntityDefinition> | undefined {
 	if (!spec) return undefined;
 
 	// Unwrap nullable
@@ -51,13 +45,9 @@ function unwrapReturnSpec(spec: unknown): AnyModelLike | undefined {
 		return unwrapReturnSpec(spec[0]);
 	}
 
-	// Check if it's a model/entity
+	// Check if it's a model
 	if (isModelDef(spec)) {
 		return spec as ModelDef<string, EntityDefinition>;
-	}
-
-	if (isEntityDef(spec)) {
-		return spec as EntityDef<string, EntityDefinition>;
 	}
 
 	// Legacy Record<string, Entity> - collect all values
@@ -76,7 +66,7 @@ function collectFromRecord(spec: Record<string, unknown>, collected: CollectedMo
 	for (const value of Object.values(spec)) {
 		const model = unwrapReturnSpec(value);
 		if (model) {
-			const name = isModelDef(model) ? model._name : (model as EntityDef)._name;
+			const name = model._name;
 			if (name && !collected.has(name)) {
 				collected.set(name, model);
 			}
@@ -94,7 +84,7 @@ function collectFromOperation(def: AnyQueryDef | MutationDef, collected: Collect
 	// Try to unwrap as single model
 	const model = unwrapReturnSpec(output);
 	if (model) {
-		const name = isModelDef(model) ? model._name : (model as EntityDef)._name;
+		const name = model._name;
 		if (name && !collected.has(name)) {
 			collected.set(name, model);
 		}
@@ -114,7 +104,6 @@ function collectFromOperation(def: AnyQueryDef | MutationDef, collected: Collect
  * Collect all models from a router definition.
  *
  * Traverses the router tree and extracts models from all operation return types.
- * Supports both new model() and legacy entity() definitions.
  *
  * @example
  * ```typescript
@@ -183,7 +172,11 @@ export function collectModelsFromOperations(
  * Later collections take priority over earlier ones.
  */
 export function mergeModelCollections(
-	...collections: (CollectedModels | Record<string, AnyModelLike> | undefined)[]
+	...collections: (
+		| CollectedModels
+		| Record<string, ModelDef<string, EntityDefinition>>
+		| undefined
+	)[]
 ): CollectedModels {
 	const merged: CollectedModels = new Map();
 

@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from "bun:test";
 import { z } from "zod";
-import { entity } from "../schema/define.js";
-import { t } from "../schema/types.js";
+import { id, string } from "../schema/fields.js";
+import { model } from "../schema/model.js";
 import {
 	flattenRouter,
 	isMutationDef,
@@ -28,17 +28,17 @@ import {
 // Test Fixtures
 // =============================================================================
 
-const User = entity("User", {
-	id: t.id(),
-	name: t.string(),
-	email: t.string(),
+const User = model("User", {
+	id: id(),
+	name: string(),
+	email: string(),
 });
 
-const Post = entity("Post", {
-	id: t.id(),
-	title: t.string(),
-	content: t.string(),
-	authorId: t.string(),
+const Post = model("Post", {
+	id: id(),
+	title: string(),
+	content: string(),
+	authorId: string(),
 });
 
 // =============================================================================
@@ -217,10 +217,10 @@ describe("mutation() builder", () => {
 	});
 
 	it("supports multi-entity returns", () => {
-		const Notification = entity("Notification", {
-			id: t.id(),
-			userId: t.string(),
-			message: t.string(),
+		const Notification = model("Notification", {
+			id: id(),
+			userId: string(),
+			message: string(),
 		});
 
 		const promoteUsers = mutation()
