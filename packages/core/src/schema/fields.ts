@@ -179,12 +179,6 @@ export const LIST_SYMBOL: unique symbol = Symbol("lens:list");
 /** Symbol to identify nullable types */
 export const NULLABLE_SYMBOL: unique symbol = Symbol("lens:nullable");
 
-// Legacy aliases for backward compatibility
-/** @deprecated Use LIST_SYMBOL instead */
-export const LIST_FIELD_SYMBOL: typeof LIST_SYMBOL = LIST_SYMBOL;
-/** @deprecated Use NULLABLE_SYMBOL instead */
-export const NULLABLE_FIELD_SYMBOL: typeof NULLABLE_SYMBOL = NULLABLE_SYMBOL;
-
 // =============================================================================
 // List Type (unified for fields and return types)
 // =============================================================================
@@ -198,16 +192,10 @@ export interface ListDef<T> {
 	_inner: T;
 }
 
-/** @deprecated Use ListDef instead */
-export type ListFieldDef<T> = ListDef<T>;
-
 /** Check if value is a ListDef */
 export function isListDef(value: unknown): value is ListDef<unknown> {
 	return typeof value === "object" && value !== null && LIST_SYMBOL in value;
 }
-
-/** @deprecated Use isListDef instead */
-export const isListFieldDef: typeof isListDef = isListDef;
 
 /**
  * List/array type.
@@ -247,16 +235,10 @@ export interface NullableDef<T> {
 	_inner: T;
 }
 
-/** @deprecated Use NullableDef instead */
-export type NullableFieldDef<T> = NullableDef<T>;
-
 /** Check if value is a NullableDef */
 export function isNullableDef(value: unknown): value is NullableDef<unknown> {
 	return typeof value === "object" && value !== null && NULLABLE_SYMBOL in value;
 }
-
-/** @deprecated Use isNullableDef instead */
-export const isNullableFieldDef: typeof isNullableDef = isNullableDef;
 
 /**
  * Nullable type.

@@ -13,8 +13,8 @@ import {
 	float,
 	id,
 	int,
-	isListFieldDef,
-	isNullableFieldDef,
+	isListDef,
+	isNullableDef,
 	json,
 	list,
 	nullable,
@@ -443,9 +443,9 @@ describe("model() with plain object definition", () => {
 			expect(Tags.fields.scores).toBeDefined();
 		});
 
-		it("list helper creates ListFieldDef", () => {
+		it("list helper creates ListDef", () => {
 			const listDef = list(string());
-			expect(isListFieldDef(listDef)).toBe(true);
+			expect(isListDef(listDef)).toBe(true);
 		});
 	});
 
@@ -462,9 +462,9 @@ describe("model() with plain object definition", () => {
 			expect(Profile.fields.avatar).toBeDefined();
 		});
 
-		it("nullable helper creates NullableFieldDef", () => {
+		it("nullable helper creates NullableDef", () => {
 			const nullableDef = nullable(string());
-			expect(isNullableFieldDef(nullableDef)).toBe(true);
+			expect(isNullableDef(nullableDef)).toBe(true);
 		});
 
 		it("supports nullable list", () => {

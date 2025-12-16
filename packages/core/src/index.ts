@@ -118,26 +118,16 @@ export {
 	isLazyRef,
 	// Type guards
 	isListDef,
-	isListFieldDef,
 	isNullableDef,
-	isNullableFieldDef,
 	json,
-	// Legacy aliases (deprecated)
-	LIST_FIELD_SYMBOL,
-	// =========================================================================
-	// Unified list/nullable (works for BOTH model fields AND return types)
-	// =========================================================================
 	// Symbols
 	LIST_SYMBOL,
 	// Types
 	type ListDef,
-	type ListFieldDef,
-	// Functions - ONE list(), ONE nullable() for everything
+	// Functions
 	list,
-	NULLABLE_FIELD_SYMBOL,
 	NULLABLE_SYMBOL,
 	type NullableDef,
-	type NullableFieldDef,
 	nullable,
 	object,
 	processFieldDef,
@@ -312,7 +302,6 @@ export {
 
 export {
 	type AnyProcedure,
-	// Query types (new)
 	type AnyQueryDef,
 	flattenRouter,
 	type InferRouterClient,
@@ -326,9 +315,6 @@ export {
 	isRouterDef,
 	isSubscribedQueryDef,
 	isTempId,
-	// Context types
-	type LensContext,
-	type LensContextExtensions,
 	type LiveQueryDef,
 	// Types
 	type MutationDef,
@@ -347,8 +333,6 @@ export {
 	type QueryMode,
 	type QueryResultType,
 	query,
-	type ResolverContext,
-	type ResolverFn,
 	type ReturnSpec,
 	type RouterDef,
 	type RouterRoutes,
@@ -356,7 +340,6 @@ export {
 	router,
 	type SubscribedQueryDef,
 	tempId,
-	type ZodLikeSchema,
 } from "./operations/index.js";
 
 // =============================================================================
@@ -371,9 +354,9 @@ export {
 	type FieldBuilder,
 	type FieldDef,
 	type FieldEmit,
-	type FieldLiveContext,
+	type FieldQueryContext,
+	type FieldResolveParams,
 	type FieldResolverContext,
-	type FieldResolverParams,
 	hasInlineResolvers,
 	type InferResolverOutput,
 	type InferResolverSelected,

@@ -1592,9 +1592,7 @@ describe("Unified Entity Definition", () => {
 			const Task = entity("Task", (t) => ({
 				id: t.id(),
 				title: t.string(),
-				status: t.string().subscribe(({ ctx }) => {
-					ctx.emit("pending");
-				}),
+				status: t.string().resolve(({ parent }) => parent.status),
 			}));
 
 			const server = createApp({
@@ -1606,7 +1604,7 @@ describe("Unified Entity Definition", () => {
 			expect(metadata.entities.Task).toBeDefined();
 			expect(metadata.entities.Task.id).toBe("exposed");
 			expect(metadata.entities.Task.title).toBe("exposed");
-			expect(metadata.entities.Task.status).toBe("subscribe");
+			expect(metadata.entities.Task.status).toBe("resolve");
 		});
 
 		it("skips entities without inline resolvers", () => {

@@ -15,45 +15,38 @@ import type { ListWrapper, NullableWrapper } from "../schema/wrappers.js";
 import type { Prettify } from "../utils/types.js";
 
 // =============================================================================
-// Schema Types
+// Input Schema Types
 // =============================================================================
 
 /**
- * Zod-like schema interface (minimal subset we need)
- * @deprecated Use model() instead of Zod for .returns()
+ * Zod-like schema interface for input validation.
+ * Compatible with Zod, Valibot, Arktype, and other schema libraries.
  */
 export interface ZodLikeSchema<T = unknown> {
-	parse: (data: unknown) => T;
-	safeParse: (data: unknown) => { success: true; data: T } | { success: false; error: unknown };
-	_output: T;
+	parse(data: unknown): T;
+	_output?: T;
 }
+
+// =============================================================================
+// Schema Types
+// =============================================================================
 
 /** Any model-like definition (EntityDef or ModelDef) */
 type AnyModelDef = EntityDef<string, EntityDefinition> | ModelDef<string, EntityDefinition>;
 
 /**
- * Return type specification (new unified API)
+ * Return type specification
  * - ModelDef: Model definition (recommended)
- * - EntityDef: Entity definition (legacy, still supported)
+ * - EntityDef: Entity definition
  * - nullable(Model): Nullable model
  * - list(Model): Array of models
  * - nullable(list(Model)): Nullable array
- *
- * @deprecated patterns:
- * - [EntityDef]: Use list(Model) instead
- * - ZodLikeSchema: Use model() instead
- * - Record: Use model() with inline fields instead
  */
 export type ReturnSpec =
-	// New API (preferred)
 	| AnyModelDef
 	| NullableWrapper<AnyModelDef>
 	| ListWrapper<AnyModelDef>
-	| NullableWrapper<ListWrapper<AnyModelDef>>
-	// Legacy API (deprecated but supported)
-	| [EntityDef<string, EntityDefinition>]
-	| ZodLikeSchema<unknown>
-	| Record<string, EntityDef<string, EntityDefinition> | [EntityDef<string, EntityDefinition>]>;
+	| NullableWrapper<ListWrapper<AnyModelDef>>;
 
 // =============================================================================
 // Type Inference
@@ -77,7 +70,6 @@ type InferModelFromFields<F extends EntityDefinition> = Prettify<
 
 /**
  * Infer TypeScript type from return spec.
- * Handles both new (model, nullable, list) and legacy ([Entity], Zod) APIs.
  */
 export type InferReturnType<R extends ReturnSpec> =
 	// Nullable wrapper
@@ -104,28 +96,13 @@ export type InferReturnType<R extends ReturnSpec> =
 				: Model extends ModelDef<string, infer F>
 					? InferModelFromFields<F>[]
 					: never
-			: // ModelDef (new)
+			: // ModelDef
 				R extends ModelDef<string, infer F>
 				? InferModelFromFields<F>
-				: // EntityDef (legacy)
+				: // EntityDef
 					R extends EntityDef<string, infer F>
 					? InferModelFromFields<F>
-					: // Legacy: [EntityDef] array syntax
-						R extends [EntityDef<string, infer F>]
-						? InferModelFromFields<F>[]
-						: // Legacy: ZodLikeSchema
-							R extends ZodLikeSchema<infer T>
-							? T
-							: // Legacy: Record multi-return
-								R extends Record<string, unknown>
-								? {
-										[K in keyof R]: R[K] extends [EntityDef<string, infer F>]
-											? InferModelFromFields<F>[]
-											: R[K] extends EntityDef<string, infer F2>
-												? InferModelFromFields<F2>
-												: unknown;
-									}
-								: never;
+					: never;
 
 // =============================================================================
 // Context Types
@@ -162,15 +139,6 @@ export interface GeneratorContextExtensions {
 }
 
 /**
- * @deprecated Use specific context types instead.
- * Legacy context extensions - kept for backwards compatibility.
- */
-export interface LensContextExtensions<TOutput = unknown> {
-	emit: Emit<TOutput>;
-	onCleanup: (fn: () => void) => () => void;
-}
-
-/**
  * Context for query resolvers (return value).
  * No emit or onCleanup - queries are one-shot.
  */
@@ -188,11 +156,6 @@ export type EmitSubscriptionContext<TContext, TOutput = unknown> = TContext &
  * Has onCleanup but no emit (yield IS the emit).
  */
 export type GeneratorSubscriptionContext<TContext> = TContext & GeneratorContextExtensions;
-
-/**
- * @deprecated Use QueryContext, EmitSubscriptionContext, or GeneratorSubscriptionContext.
- */
-export type LensContext<TContext, TOutput = unknown> = TContext & LensContextExtensions<TOutput>;
 
 // =============================================================================
 // Resolver Context Types
@@ -237,14 +200,6 @@ export interface GeneratorResolverContext<TInput = unknown, TContext = unknown> 
 	ctx: GeneratorSubscriptionContext<TContext>;
 }
 
-/**
- * @deprecated Use QueryResolverContext, EmitResolverContext, or GeneratorResolverContext.
- */
-export interface ResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
-	input: TInput;
-	ctx: LensContext<TContext, TOutput>;
-}
-
 // =============================================================================
 // Resolver Function Types
 // =============================================================================
@@ -265,11 +220,13 @@ export type GeneratorResolverFn<TInput, TOutput, TContext = unknown> = (
 ) => AsyncGenerator<TOutput>;
 
 /**
- * @deprecated Use QueryResolverFn, EmitResolverFn, or GeneratorResolverFn.
+ * Generic resolver function for mutations.
+ * Receives typed input and context, returns output.
  */
-export type ResolverFn<TInput, TOutput, TContext = unknown> = (
-	ctx: ResolverContext<TInput, TOutput, TContext>,
-) => TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;
+export type ResolverFn<TInput, TOutput, TContext = unknown> = (ctx: {
+	input: TInput;
+	ctx: TContext;
+}) => TOutput | Promise<TOutput>;
 
 // =============================================================================
 // Optimistic DSL Types
