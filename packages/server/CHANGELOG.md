@@ -1,5 +1,16 @@
 # @sylphx/lens-server
 
+## 3.0.0 (2025-12-16)
+
+### ♻️ Refactoring
+
+- 💥 **core:** v3.0 - remove deprecated APIs and unify types ([a3e8d79](https://github.com/SylphxAI/lens/commit/a3e8d79f9db246918fe4ea21ba65cf82bde46b82))
+
+### 💥 Breaking Changes
+
+- **core:** v3.0 - remove deprecated APIs and unify types ([a3e8d79](https://github.com/SylphxAI/lens/commit/a3e8d79f9db246918fe4ea21ba65cf82bde46b82))
+  Major API cleanup for v3.0
+
 ## 2.14.3 (2025-12-16)
 
 ### 📦 Dependencies
