@@ -132,6 +132,23 @@ export type FieldLiveSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	ctx: TContext;
 }) => Publisher<TResult>;
 
+/**
+ * Plain function resolver - simple arrow function without builder API.
+ * Used for inline field resolvers in resolver definitions.
+ *
+ * @example
+ * ```typescript
+ * resolver(User, (t) => ({
+ *   id: t.expose("id"),
+ *   displayName: ({ source }) => `${source.firstName}`,  // plain function
+ * }))
+ * ```
+ */
+export type PlainFieldResolver<TSource, TContext, TResult> = (params: {
+	source: TSource;
+	ctx: FieldQueryContext<TContext>;
+}) => TResult | Promise<TResult>;
+
 // =============================================================================
 // Field Definition Types
 // =============================================================================
@@ -199,6 +216,27 @@ export type FieldDef<T = unknown, TArgs = unknown, TContext = FieldResolverConte
 	| ResolvedField<T, TArgs, TContext>
 	| LiveField<T, TArgs, TContext>;
 
+/**
+ * Any field definition - can be plain function OR builder result.
+ * Used as return type for resolver() builder callback.
+ *
+ * Plain functions are automatically wrapped as ResolvedField internally.
+ *
+ * @example
+ * ```typescript
+ * resolver(User, (t) => ({
+ *   id: t.expose("id"),                                    // ExposedField
+ *   displayName: ({ source }) => `${source.firstName}`,  // PlainFieldResolver
+ *   posts: t.args(z.object({...})).resolve(...),         // ResolvedField
+ * }))
+ * ```
+ */
+export type AnyFieldDef<TContext = unknown> =
+	| PlainFieldResolver<any, TContext, any>
+	| ExposedField<any>
+	| ResolvedField<any, any, TContext>
+	| LiveField<any, any, TContext>;
+
 // =============================================================================
 // Field Builder Types
 // =============================================================================
@@ -238,81 +276,6 @@ export interface ResolvedFieldChainable<
 	): LiveField<T, TArgs, TContext>;
 }
 
-/** Scalar field builder with args method */
-export interface ScalarFieldBuilder<T, TParent, TContext> {
-	/** Add field arguments (GraphQL-style) */
-	args<TArgs extends z.ZodRawShape>(
-		schema: z.ZodObject<TArgs>,
-	): ScalarFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext>;
-
-	/**
-	 * Define how to resolve this field (returns value, no emit/onCleanup).
-	 * Use for computed fields that derive from parent data.
-	 *
-	 * Can optionally chain .subscribe() for live updates:
-	 * @example
-	 * ```typescript
-	 * status: f.string()
-	 *   .resolve(({ ctx }) => getStatus())
-	 *   .subscribe(({ ctx, emit }) => watch((s) => emit(s)))
-	 * ```
-	 */
-	resolve(
-		fn: FieldResolveFnNoArgs<TParent, TContext, T>,
-	): ResolvedFieldChainable<T, Record<string, never>, TParent, TContext>;
-
-	/** Make the field nullable */
-	nullable(): ScalarFieldBuilder<T | null, TParent, TContext>;
-}
-
-/** Scalar field builder with args already defined */
-export interface ScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
-	/**
-	 * Define how to resolve this field with args (returns value).
-	 * Can optionally chain .subscribe() for live updates.
-	 */
-	resolve(
-		fn: FieldResolveFn<TParent, TArgs, TContext, T>,
-	): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
-
-	/** Make the field nullable */
-	nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>;
-}
-
-/** Relation field builder with args method */
-export interface RelationFieldBuilder<T, TParent, TContext> {
-	/** Add field arguments (GraphQL-style) */
-	args<TArgs extends z.ZodRawShape>(
-		schema: z.ZodObject<TArgs>,
-	): RelationFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext>;
-
-	/**
-	 * Define how to resolve this relation (returns value, no emit/onCleanup).
-	 * Use for relations that derive from parent data.
-	 * Can optionally chain .subscribe() for live updates.
-	 */
-	resolve(
-		fn: FieldResolveFnNoArgs<TParent, TContext, T>,
-	): ResolvedFieldChainable<T, Record<string, never>, TParent, TContext>;
-
-	/** Make the relation nullable */
-	nullable(): RelationFieldBuilder<T | null, TParent, TContext>;
-}
-
-/** Relation field builder with args already defined */
-export interface RelationFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
-	/**
-	 * Define how to resolve this relation with args (returns value).
-	 * Can optionally chain .subscribe() for live updates.
-	 */
-	resolve(
-		fn: FieldResolveFn<TParent, TArgs, TContext, T>,
-	): ResolvedFieldChainable<T, TArgs, TParent, TContext>;
-
-	/** Make the relation nullable */
-	nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>;
-}
-
 /** Check if a field is optional */
 export type IsOptionalField<T> = T extends { _optional: true } ? true : false;
 
@@ -333,7 +296,31 @@ export type InferParent<E extends EntityDefinition> = {
 	[K in OptionalFieldKeys<E>]?: E[K] extends FieldType ? InferScalar<E[K]> : never;
 };
 
-/** Field builder for an entity */
+/** Field builder with args already defined */
+export interface FieldBuilderWithArgs<TParent, TArgs, TContext> {
+	/**
+	 * Define how to resolve this field with args (returns value).
+	 * Can optionally chain .subscribe() for live updates.
+	 */
+	resolve<TResult>(
+		fn: FieldResolveFn<TParent, TArgs, TContext, TResult>,
+	): ResolvedFieldChainable<TResult, TArgs, TParent, TContext>;
+}
+
+/**
+ * Simplified field builder for an entity.
+ * Types are now defined in the Model, so builder only handles resolution.
+ *
+ * Use plain functions for simple computed fields:
+ * ```typescript
+ * resolver(User, (t) => ({
+ *   id: t.expose('id'),                                 // expose source field
+ *   displayName: ({ source }) => `${source.firstName}`, // plain function
+ *   posts: t.args(z.object({ limit: z.number() }))     // with args
+ *     .resolve(({ source, args, ctx }) => ...)
+ * }))
+ * ```
+ */
 export interface FieldBuilder<
 	TEntity extends EntityDef<string, EntityDefinition>,
 	TContext = FieldResolverContext,
@@ -344,9 +331,9 @@ export interface FieldBuilder<
 	 *
 	 * @example
 	 * ```typescript
-	 * resolver(User, (f) => ({
-	 *   id: f.expose('id'),     // expose parent.id
-	 *   name: f.expose('name'), // expose parent.name
+	 * resolver(User, (t) => ({
+	 *   id: t.expose('id'),     // expose parent.id
+	 *   name: t.expose('name'), // expose parent.name
 	 * }));
 	 * ```
 	 */
@@ -354,77 +341,40 @@ export interface FieldBuilder<
 		fieldName: K,
 	): ExposedField<InferScalar<TEntity["fields"][K]>>;
 
-	// Scalar type builders
-
-	/** String field */
-	string(): ScalarFieldBuilder<string, InferParent<TEntity["fields"]>, TContext>;
-
-	/** Integer field */
-	int(): ScalarFieldBuilder<number, InferParent<TEntity["fields"]>, TContext>;
-
-	/** Float field */
-	float(): ScalarFieldBuilder<number, InferParent<TEntity["fields"]>, TContext>;
-
-	/** Boolean field */
-	boolean(): ScalarFieldBuilder<boolean, InferParent<TEntity["fields"]>, TContext>;
-
-	/** DateTime field */
-	datetime(): ScalarFieldBuilder<Date, InferParent<TEntity["fields"]>, TContext>;
-
-	/** Date field */
-	date(): ScalarFieldBuilder<Date, InferParent<TEntity["fields"]>, TContext>;
-
 	/**
-	 * JSON/object field with custom type T.
-	 * Use for JSON fields that need .resolve().
+	 * Add field arguments (GraphQL-style).
+	 * Chain with .resolve() for computed fields with arguments.
 	 *
 	 * @example
 	 * ```typescript
-	 * resolver(Session, (f) => ({
-	 *   status: f.json<SessionStatus>()
-	 *     .resolve(({ source, ctx }) => ctx.db.getStatus(source.id))
-	 *     .subscribe(({ source, ctx }) => ({ emit }) => {
-	 *       ctx.statusService.watch(source.id, emit);
-	 *     }),
+	 * resolver(User, (t) => ({
+	 *   posts: t
+	 *     .args(z.object({ limit: z.number().default(10) }))
+	 *     .resolve(({ source, args, ctx }) => ctx.db.posts.filter(...).slice(0, args.limit)),
 	 * }));
 	 * ```
 	 */
-	json<T = unknown>(): ScalarFieldBuilder<T, InferParent<TEntity["fields"]>, TContext>;
-
-	// Relation type builders
+	args<TArgs extends z.ZodRawShape>(
+		schema: z.ZodObject<TArgs>,
+	): FieldBuilderWithArgs<InferParent<TEntity["fields"]>, z.infer<z.ZodObject<TArgs>>, TContext>;
 
 	/**
-	 * One-to-one or many-to-one relation (returns single entity)
+	 * Define a computed field resolver (no args).
+	 * For simple computed fields, prefer using a plain function instead:
+	 * `displayName: ({ source }) => ...`
 	 *
 	 * @example
 	 * ```typescript
-	 * resolver(Post, (f) => ({
-	 *   author: f.one(User).resolve((post, ctx) =>
-	 *     ctx.loaders.user.load(post.authorId)
-	 *   ),
+	 * resolver(User, (t) => ({
+	 *   displayName: t.resolve(({ source }) => `${source.firstName} ${source.lastName}`),
 	 * }));
 	 * ```
 	 */
-	one<Target extends EntityDef<string, EntityDefinition>>(
-		target: Target,
-	): RelationFieldBuilder<InferParent<Target["fields"]>, InferParent<TEntity["fields"]>, TContext>;
-
-	/**
-	 * One-to-many relation (returns array of entities)
-	 *
-	 * @example
-	 * ```typescript
-	 * resolver(User, (f) => ({
-	 *   posts: f.many(Post).resolve((user, ctx) =>
-	 *     ctx.loaders.post.loadByAuthorId(user.id)
-	 *   ),
-	 * }));
-	 * ```
-	 */
-	many<Target extends EntityDef<string, EntityDefinition>>(
-		target: Target,
-	): RelationFieldBuilder<
-		InferParent<Target["fields"]>[],
+	resolve<TResult>(
+		fn: FieldResolveFnNoArgs<InferParent<TEntity["fields"]>, TContext, TResult>,
+	): ResolvedFieldChainable<
+		TResult,
+		Record<string, never>,
 		InferParent<TEntity["fields"]>,
 		TContext
 	>;

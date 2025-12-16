@@ -88,6 +88,13 @@ export type {
 export { isMutationDef, isOperationDef, MutationBuilderImpl, mutation } from "./mutation.js";
 
 // =============================================================================
+// Subscription
+// =============================================================================
+
+export type { SubscriptionBuilder, SubscriptionDef } from "./subscription.js";
+export { isSubscriptionDef, SubscriptionBuilderImpl, subscription } from "./subscription.js";
+
+// =============================================================================
 // Operations Factory
 // =============================================================================
 
@@ -182,4 +189,5 @@ export {
 	type RouterDef,
 	type RouterRoutes,
 	router,
+	type SubscriptionResultType,
 } from "../router/index.js";

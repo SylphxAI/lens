@@ -100,20 +100,14 @@ export {
 	type UnwrapType,
 } from "./schema/fields.js";
 
-export {
+export type {
 	// Model resolver types
-	type FieldResolverMap,
-	type FieldSubscriberMap,
-	hasFieldResolvers,
-	hasFieldSubscribers,
-	type InferModelSource,
-	type ModelDefChainable,
-	type ModelDefComplete,
-	type ModelDefWithResolvers,
-	type ModelDefWithSubscribers,
-	type ModelFieldResolver,
-	type ModelFieldSubscriber,
-	type ScalarFieldsOnly,
+	FieldResolverMap,
+	FieldSubscriberMap,
+	InferModelSource,
+	ModelFieldResolver,
+	ModelFieldSubscriber,
+	ScalarFieldsOnly,
 } from "./schema/model-resolvers.js";
 
 // Note: Legacy wrapper aliases removed in v3.0
@@ -244,6 +238,7 @@ export {
 	isQueryDef,
 	isRouterDef,
 	isSubscribedQueryDef,
+	isSubscriptionDef,
 	isTempId,
 	type LiveQueryDef,
 	// Types
@@ -269,6 +264,11 @@ export {
 	resetTempIdCounter,
 	router,
 	type SubscribedQueryDef,
+	type SubscriptionBuilder,
+	type SubscriptionDef,
+	type SubscriptionResultType,
+	// Subscription operation
+	subscription,
 	tempId,
 } from "./operations/index.js";
 

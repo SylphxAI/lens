@@ -15,6 +15,7 @@ import type {
 	QueryDef,
 	Resolvers,
 	RouterDef,
+	SubscriptionDef,
 } from "@sylphx/lens-core";
 import type { PluginManager, ServerPlugin } from "../plugin/types.js";
 
@@ -56,6 +57,9 @@ export type QueriesMap = Record<string, AnyQueryDef<unknown, unknown>>;
 
 /** Mutations map type */
 export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
+
+/** Subscriptions map type */
+export type SubscriptionsMap = Record<string, SubscriptionDef<unknown, unknown>>;
 
 // =============================================================================
 // Operation Metadata
@@ -238,16 +242,24 @@ export interface LensServer {
 import type { FieldType } from "@sylphx/lens-core";
 
 export type InferInput<T> =
-	T extends QueryDef<infer I, any> ? I : T extends MutationDef<infer I, any> ? I : never;
+	T extends QueryDef<infer I, any>
+		? I
+		: T extends MutationDef<infer I, any>
+			? I
+			: T extends SubscriptionDef<infer I, any>
+				? I
+				: never;
 
 export type InferOutput<T> =
 	T extends QueryDef<any, infer O>
 		? O
 		: T extends MutationDef<any, infer O>
 			? O
-			: T extends FieldType<infer F>
-				? F
-				: never;
+			: T extends SubscriptionDef<any, infer O>
+				? O
+				: T extends FieldType<infer F>
+					? F
+					: never;
 
 export type InferApi<T> = T extends { _types: infer Types } ? Types : never;
 

@@ -20,7 +20,7 @@ const User = model("User", {
 	email: string(),
 });
 
-const Post = model("Post", {
+const _Post = model("Post", {
 	id: id(),
 	title: string(),
 	authorId: string(),
@@ -77,11 +77,12 @@ describe("lens()", () => {
 	it("resolver with context access in resolve function", async () => {
 		const { resolver } = lens<TestContext>();
 
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => {
-				return Array.from(ctx.db.posts.values()).filter((p) => p.authorId === parent.id);
-			}),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			// Use plain function for relations (new API)
+			posts: ({ source, ctx }) => {
+				return Array.from(ctx.db.posts.values()).filter((p) => p.authorId === source.id);
+			},
 		}));
 
 		const user = { id: "1", name: "Alice", email: "alice@test.com" };
@@ -128,12 +129,13 @@ describe("lens()", () => {
 		const { resolver, query, mutation } = lens<TestContext>();
 
 		// All these should compile with TestContext
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			posts: f.many(Post).resolve(({ ctx }) => {
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			// Plain function for relations (new API)
+			posts: ({ ctx }) => {
 				// ctx is TestContext
 				return Array.from(ctx.db.posts.values());
-			}),
+			},
 		}));
 
 		const getUser = query()
@@ -161,15 +163,13 @@ describe("lens()", () => {
 	it("resolver with field arguments", async () => {
 		const { resolver } = lens<TestContext>();
 
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			posts: f
-				.many(Post)
-				.args(z.object({ limit: z.number().default(10) }))
-				.resolve(({ parent, args, ctx }) => {
-					const posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === parent.id);
-					return posts.slice(0, args.limit);
-				}),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			// Use builder pattern for fields with args (new API)
+			posts: t.args(z.object({ limit: z.number().default(10) })).resolve(({ source, args, ctx }) => {
+				const posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === source.id);
+				return posts.slice(0, args.limit);
+			}),
 		}));
 
 		const user = { id: "1", name: "Alice", email: "alice@test.com" };

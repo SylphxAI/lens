@@ -16,10 +16,6 @@
  *   posts: list(() => Post),
  *   profile: Profile,  // direct model reference
  * })
- * .resolve({
- *   posts: ({ source, ctx }) =>
- *     ctx.db.posts.filter(p => p.authorId === source.id)
- * })
  * ```
  */
 
@@ -27,24 +23,6 @@ import type { EntityMarker } from "@sylphx/standard-entity";
 import type { FieldDef } from "./fields.js";
 import { processFieldDef } from "./fields.js";
 import type { InferEntity } from "./infer.js";
-import type {
-	FieldResolverMap,
-	FieldSubscriberMap,
-	ModelDefChainable,
-	ModelDefComplete,
-	ModelDefWithResolvers,
-	ModelDefWithSubscribers,
-} from "./model-resolvers.js";
-
-// Re-export types needed by lens.ts
-export type {
-	FieldResolverMap,
-	FieldSubscriberMap,
-	ModelDefChainable,
-	ModelDefComplete,
-	ModelDefWithResolvers,
-	ModelDefWithSubscribers,
-} from "./model-resolvers.js";
 
 import type { EntityDefinition, FieldType } from "./types.js";
 
@@ -141,18 +119,18 @@ type ProcessedFields<T extends PlainFieldDefinition> = {
  * });
  * ```
  */
-export type ModelFactory<TContext> = <Name extends string, FieldDefs extends PlainFieldDefinition>(
+export type ModelFactory<_TContext> = <Name extends string, FieldDefs extends PlainFieldDefinition>(
 	name: Name,
 	fields: FieldDefs,
-) => ModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext>;
+) => ModelDef<Name, ProcessedFields<FieldDefs>>;
 
 function createModelFactory<TContext>(): ModelFactory<TContext> {
 	return <Name extends string, FieldDefs extends PlainFieldDefinition>(
 		name: Name,
 		fields: FieldDefs,
-	): ModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext> => {
+	): ModelDef<Name, ProcessedFields<FieldDefs>> => {
 		const processedFields = processPlainFields(fields);
-		return createModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext>(
+		return createModelDef<Name, ProcessedFields<FieldDefs>>(
 			name,
 			processedFields as ProcessedFields<FieldDefs>,
 		);
@@ -167,7 +145,7 @@ function createModelFactory<TContext>(): ModelFactory<TContext> {
  * Define a model with fields.
  *
  * Models with `id` field are normalizable and cacheable.
- * Models without `id` are pure types that can still have resolvers.
+ * Models without `id` are pure types.
  *
  * @example
  * ```typescript
@@ -179,9 +157,6 @@ function createModelFactory<TContext>(): ModelFactory<TContext> {
  *   bio: nullable(string()),
  *   posts: list(() => Post),
  * })
- * .resolve({
- *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
- * })
  * ```
  */
 // model<Context>() - returns factory for typed context
@@ -190,7 +165,7 @@ export function model<TContext = unknown>(): ModelFactory<TContext>;
 export function model<Name extends string, FieldDefs extends PlainFieldDefinition>(
 	name: Name,
 	fields: FieldDefs,
-): ModelDefChainable<Name, ProcessedFields<FieldDefs>, unknown>;
+): ModelDef<Name, ProcessedFields<FieldDefs>>;
 export function model<
 	TContext = unknown,
 	Name extends string = string,
@@ -198,7 +173,7 @@ export function model<
 >(
 	nameOrNothing?: Name,
 	fields?: FieldDefs,
-): ModelFactory<TContext> | ModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext> {
+): ModelFactory<TContext> | ModelDef<Name, ProcessedFields<FieldDefs>> {
 	// model<Context>() - returns factory
 	if (nameOrNothing === undefined) {
 		return createModelFactory<TContext>();
@@ -212,7 +187,7 @@ export function model<
 	}
 
 	const processedFields = processPlainFields(fields);
-	return createModelDefChainable<Name, ProcessedFields<FieldDefs>, TContext>(
+	return createModelDef<Name, ProcessedFields<FieldDefs>>(
 		nameOrNothing,
 		processedFields as ProcessedFields<FieldDefs>,
 	);
@@ -235,12 +210,12 @@ function processPlainFields(fieldDefs: PlainFieldDefinition): EntityDefinition {
 // =============================================================================
 
 /**
- * Create a model definition with chain methods for field resolvers/subscribers.
+ * Create a model definition.
  */
-function createModelDefChainable<Name extends string, Fields extends EntityDefinition, TContext>(
+function createModelDef<Name extends string, Fields extends EntityDefinition>(
 	name: Name,
 	fields: Fields,
-): ModelDefChainable<Name, Fields, TContext> {
+): ModelDef<Name, Fields> {
 	// Check if model has an id field
 	const hasId = "id" in fields;
 
@@ -254,57 +229,9 @@ function createModelDefChainable<Name extends string, Fields extends EntityDefin
 			name: name,
 			type: undefined as unknown, // Phantom type - not used at runtime
 		},
-
-		/**
-		 * Define field resolvers for this model.
-		 * Source type is automatically inferred from scalar fields.
-		 */
-		resolve<R extends FieldResolverMap<Fields, TContext>>(
-			this: ModelDefChainable<Name, Fields, TContext>,
-			resolvers: R,
-		): ModelDefWithResolvers<Name, Fields, R, TContext> {
-			const result = {
-				...this,
-				_fieldResolvers: resolvers,
-				subscribe<S extends FieldSubscriberMap<Fields, TContext>>(
-					subscribers: S,
-				): ModelDefComplete<Name, Fields, R, S, TContext> {
-					return {
-						...this,
-						_fieldResolvers: resolvers,
-						_fieldSubscribers: subscribers,
-					} as ModelDefComplete<Name, Fields, R, S, TContext>;
-				},
-			};
-			return result as ModelDefWithResolvers<Name, Fields, R, TContext>;
-		},
-
-		/**
-		 * Define field subscribers without resolvers.
-		 * Useful for purely live fields.
-		 */
-		subscribe<S extends FieldSubscriberMap<Fields, TContext>>(
-			this: ModelDefChainable<Name, Fields, TContext>,
-			subscribers: S,
-		): ModelDefWithSubscribers<Name, Fields, S, TContext> {
-			const result = {
-				...this,
-				_fieldSubscribers: subscribers,
-				resolve<R extends FieldResolverMap<Fields, TContext>>(
-					resolvers: R,
-				): ModelDefComplete<Name, Fields, R, S, TContext> {
-					return {
-						...this,
-						_fieldResolvers: resolvers,
-						_fieldSubscribers: subscribers,
-					} as ModelDefComplete<Name, Fields, R, S, TContext>;
-				},
-			};
-			return result as ModelDefWithSubscribers<Name, Fields, S, TContext>;
-		},
 	};
 
-	return modelDef as ModelDefChainable<Name, Fields, TContext>;
+	return modelDef as ModelDef<Name, Fields>;
 }
 
 // =============================================================================

@@ -3,10 +3,10 @@
  *
  * Demonstrates:
  * - lens<AppContext>() factory for typed builders
- * - Model definitions (scalar fields only)
+ * - Model definitions (scalar fields only - schema is SSOT)
  * - resolver() pattern with pure values (functional)
- * - Field arguments with .args(schema).resolve((parent, args, ctx) => ...)
- * - Relations with f.one() and f.many()
+ * - Field arguments with .args(schema).resolve(({ source, args, ctx }) => ...)
+ * - Plain function resolvers for simple computed fields: ({ source, ctx }) => ...
  */
 
 import { model, id, string, boolean, datetime, enumType, nullable, router, lens } from "@sylphx/lens-core";
@@ -106,91 +106,88 @@ const { query, mutation, resolver, plugins } = lens<AppContext>().withPlugins([
 // =============================================================================
 
 // User resolver - defines which fields are exposed and how relations are resolved
-const userResolver = resolver(User, (f) => ({
-	id: f.expose("id"),
-	name: f.expose("name"),
-	email: f.expose("email"),
-	role: f.expose("role"),
-	avatar: f.expose("avatar"),
-	createdAt: f.expose("createdAt"),
+const userResolver = resolver(User, (t) => ({
+	id: t.expose("id"),
+	name: t.expose("name"),
+	email: t.expose("email"),
+	role: t.expose("role"),
+	avatar: t.expose("avatar"),
+	createdAt: t.expose("createdAt"),
 	// Relation with field arguments (GraphQL-style)
-	posts: f
-		.many(Post)
+	// New API: use t.args().resolve() without type annotations
+	posts: t
 		.args(
 			z.object({
 				first: z.number().default(10),
 				published: z.boolean().optional(),
 			}),
 		)
-		.resolve(({ parent, args, ctx }) => {
-			let posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === parent.id);
+		.resolve(({ source, args, ctx }) => {
+			let posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === source.id);
 			if (args.published !== undefined) {
 				posts = posts.filter((p) => p.published === args.published);
 			}
 			return posts.slice(0, args.first);
 		}),
 	// Relation with limit arg
-	comments: f
-		.many(Comment)
+	comments: t
 		.args(z.object({ first: z.number().default(10) }))
-		.resolve(({ parent, args, ctx }) =>
+		.resolve(({ source, args, ctx }) =>
 			Array.from(ctx.db.comments.values())
-				.filter((c) => c.authorId === parent.id)
+				.filter((c) => c.authorId === source.id)
 				.slice(0, args.first)
 		),
 }));
 
 // Post resolver
-const postResolver = resolver(Post, (f) => ({
-	id: f.expose("id"),
-	title: f.expose("title"),
-	content: f.expose("content"),
-	published: f.expose("published"),
-	updatedAt: f.expose("updatedAt"),
-	createdAt: f.expose("createdAt"),
-	// Computed field with args
-	excerpt: f
-		.string()
+const postResolver = resolver(Post, (t) => ({
+	id: t.expose("id"),
+	title: t.expose("title"),
+	content: t.expose("content"),
+	published: t.expose("published"),
+	updatedAt: t.expose("updatedAt"),
+	createdAt: t.expose("createdAt"),
+	// Computed field with args - use t.args().resolve() without type annotations
+	excerpt: t
 		.args(z.object({ length: z.number().default(100) }))
-		.resolve(({ parent, args }) => {
-			const text = parent.content;
+		.resolve(({ source, args }) => {
+			const text = source.content;
 			if (text.length <= args.length) return text;
 			return text.slice(0, args.length) + "...";
 		}),
-	// Relation: Post.author (belongsTo - FK on Post)
-	author: f.one(User).resolve(({ parent, ctx }) => {
-		const author = ctx.db.users.get(parent.authorId);
-		if (!author) throw new Error(`Author not found: ${parent.authorId}`);
+	// Relation: Post.author (belongsTo - FK on Post) - plain function resolver
+	author: ({ source, ctx }) => {
+		const author = ctx.db.users.get(source.authorId);
+		if (!author) throw new Error(`Author not found: ${source.authorId}`);
 		return author;
-	}),
+	},
 	// Relation with field arguments
-	comments: f
-		.many(Comment)
+	comments: t
 		.args(z.object({ first: z.number().default(10) }))
-		.resolve(({ parent, args, ctx }) =>
+		.resolve(({ source, args, ctx }) =>
 			Array.from(ctx.db.comments.values())
-				.filter((c) => c.postId === parent.id)
+				.filter((c) => c.postId === source.id)
 				.slice(0, args.first)
 		),
 }));
 
 // Comment resolver
-const commentResolver = resolver(Comment, (f) => ({
-	id: f.expose("id"),
-	content: f.expose("content"),
-	createdAt: f.expose("createdAt"),
-	// Relation: Comment.author (belongsTo - FK on Comment)
-	author: f.one(User).resolve(({ parent, ctx }) => {
-		const author = ctx.db.users.get(parent.authorId);
-		if (!author) throw new Error(`Author not found: ${parent.authorId}`);
+const commentResolver = resolver(Comment, (t) => ({
+	id: t.expose("id"),
+	content: t.expose("content"),
+	createdAt: t.expose("createdAt"),
+	// Relation: Comment.author (belongsTo - FK on Comment) - plain function resolver
+	author: ({ source, ctx }) => {
+		const author = ctx.db.users.get(source.authorId);
+		if (!author) throw new Error(`Author not found: ${source.authorId}`);
 		return author;
-	}),
-	// Relation: Comment.post (belongsTo - FK on Comment)
-	post: f.one(Post).resolve(({ parent, ctx }) => {
-		const post = ctx.db.posts.get(parent.postId);
-		if (!post) throw new Error(`Post not found: ${parent.postId}`);
+	},
+	// Relation: Comment.post (belongsTo - FK on Comment) - plain function resolver
+	post: ({ source, ctx }) => {
+		const post = ctx.db.posts.get(source.postId);
+		if (!post) throw new Error(`Post not found: ${source.postId}`);
 		return post;
-	}),
+	},
 }));
 
 // =============================================================================

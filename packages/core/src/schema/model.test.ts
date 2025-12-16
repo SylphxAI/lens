@@ -25,7 +25,9 @@ import {
 	timestamp,
 } from "./fields.js";
 import { isModelDef, isNormalizableModel, MODEL_SYMBOL, model } from "./model.js";
-import { hasFieldResolvers, hasFieldSubscribers } from "./model-resolvers.js";
+
+// NOTE: hasFieldResolvers, hasFieldSubscribers removed as model().resolve() chain was deprecated
+// Use standalone resolver() function instead (see ADR-003)
 
 describe("model()", () => {
 	describe("basic definition", () => {
@@ -288,78 +290,9 @@ describe("model() with plain object definition", () => {
 		});
 	});
 
-	describe("chain methods", () => {
-		it("supports .resolve() chain", () => {
-			const Post = model("Post", {
-				id: id(),
-				title: string(),
-			});
-
-			const User = model("User", {
-				id: id(),
-				name: string(),
-				posts: list(() => Post),
-			}).resolve({
-				posts: ({ source }) => {
-					void source.id; // Access source
-					return [];
-				},
-			});
-
-			expect(User._name).toBe("User");
-			expect(hasFieldResolvers(User)).toBe(true);
-		});
-
-		it("supports .subscribe() chain", () => {
-			const User = model("User", {
-				id: id(),
-				name: string(),
-			}).subscribe({
-				name:
-					({ source }) =>
-					({ emit, onCleanup }) => {
-						void source.id;
-						emit("test");
-						onCleanup(() => {});
-					},
-			});
-
-			expect(User._name).toBe("User");
-			expect(hasFieldSubscribers(User)).toBe(true);
-		});
-
-		it("supports .resolve().subscribe() chain", () => {
-			const Post = model("Post", {
-				id: id(),
-				title: string(),
-			});
-
-			const User = model("User", {
-				id: id(),
-				name: string(),
-				posts: list(() => Post),
-			})
-				.resolve({
-					posts: ({ source }) => {
-						void source.id;
-						return [];
-					},
-				})
-				.subscribe({
-					name:
-						({ source }) =>
-						({ emit, onCleanup }) => {
-							void source.id;
-							emit("test");
-							onCleanup(() => {});
-						},
-				});
-
-			expect(User._name).toBe("User");
-			expect(hasFieldResolvers(User)).toBe(true);
-			expect(hasFieldSubscribers(User)).toBe(true);
-		});
-	});
+	// NOTE: "chain methods" tests for model().resolve() and .subscribe() were removed
+	// as these APIs were deprecated in favor of standalone resolver() function.
+	// See ADR-003 for the new design.
 
 	describe("type guards", () => {
 		it("isModelDef returns true for plain object models", () => {

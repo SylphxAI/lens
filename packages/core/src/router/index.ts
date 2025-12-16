@@ -20,18 +20,19 @@
  * ```
  */
 
-import type { AnyQueryDef, MutationDef, QueryDef } from "../operations/index.js";
-import { isMutationDef, isQueryDef } from "../operations/index.js";
+import type { AnyQueryDef, MutationDef, QueryDef, SubscriptionDef } from "../operations/index.js";
+import { isMutationDef, isQueryDef, isSubscriptionDef } from "../operations/index.js";
 import type { UnionToIntersection } from "../utils/types.js";
 
 // =============================================================================
 // Types
 // =============================================================================
 
-/** Any procedure (query or mutation) */
+/** Any procedure (query, mutation, or subscription) */
 export type AnyProcedure =
 	| AnyQueryDef<unknown, unknown, unknown>
-	| MutationDef<unknown, unknown, unknown>;
+	| MutationDef<unknown, unknown, unknown>
+	| SubscriptionDef<unknown, unknown, unknown>;
 
 /** Router routes - can contain procedures or nested routers */
 export type RouterRoutes = {
@@ -58,7 +59,9 @@ type ExtractProcedureContext<T> =
 		? C
 		: T extends MutationDef<unknown, unknown, infer C>
 			? C
-			: unknown;
+			: T extends SubscriptionDef<unknown, unknown, infer C>
+				? C
+				: unknown;
 
 /**
  * Extract context from router's explicit context or from its routes
@@ -186,8 +189,8 @@ export function flattenRouter(routerDef: RouterDef, prefix = ""): Map<string, An
 				for (const [nestedPath, procedure] of nested) {
 					result.set(nestedPath, procedure);
 				}
-			} else if (isQueryDef(value) || isMutationDef(value)) {
-				// It's a procedure (query or mutation)
+			} else if (isQueryDef(value) || isMutationDef(value) || isSubscriptionDef(value)) {
+				// It's a procedure (query, mutation, or subscription)
 				result.set(path, value);
 			} else if (value && typeof value === "object" && !Array.isArray(value)) {
 				// Plain nested object - recursively process
@@ -229,6 +232,17 @@ export interface MutationResultType<T> {
 	rollback?: () => void;
 }
 
+/**
+ * Subscription result type (async iterable of events)
+ * Matches the client's Subscription interface
+ */
+export interface SubscriptionResultType<T> {
+	/** Subscribe to events */
+	subscribe(callback: (data: T) => void): () => void;
+	/** Async iterator interface */
+	[Symbol.asyncIterator](): AsyncIterator<T>;
+}
+
 /** Infer the client type from a router definition */
 export type InferRouterClient<TRouter extends RouterDef> =
 	TRouter extends RouterDef<infer TRoutes>
@@ -247,6 +261,13 @@ export type InferRouterClient<TRouter extends RouterDef> =
 									_brand: { input: infer TInput; output: infer TOutput };
 								}
 							? (input: TInput) => Promise<MutationResultType<TOutput>>
-							: never;
+							: TRoutes[K] extends {
+										_type: "subscription";
+										_brand: { input: infer TInput; output: infer TOutput };
+									}
+								? TInput extends void
+									? () => SubscriptionResultType<TOutput>
+									: (input: TInput) => SubscriptionResultType<TOutput>
+								: never;
 			}
 		: never;

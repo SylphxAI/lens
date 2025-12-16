@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { firstValueFrom, id, isError, isSnapshot, list, model, mutation, query, string } from "@sylphx/lens-core";
+import { firstValueFrom, id, isError, isSnapshot, model, mutation, query, resolver, string } from "@sylphx/lens-core";
 import { z } from "zod";
 import { optimisticPlugin } from "../plugin/optimistic.js";
 import { createApp } from "../server/create.js";
@@ -323,15 +323,21 @@ describe("E2E - Entity Resolvers", () => {
 			{ id: "post-2", title: "Second Post", content: "More content", authorId: "user-1" },
 		];
 
-		// Define User model with posts relation
-		const UserWithPosts = model("User", {
+		// Define User model
+		const UserWithPosts = model("UserWithPosts", {
 			id: id(),
 			name: string(),
 			email: string(),
-			posts: list(() => Post),
-		}).resolve({
-			posts: ({ source }) => posts.filter((p) => p.authorId === source.id),
 		});
+
+		// Define resolver with posts relation (new API)
+		const userResolver = resolver(UserWithPosts, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			// Plain function for relations
+			posts: ({ source }) => posts.filter((p) => p.authorId === source.id),
+		}));
 
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
@@ -343,8 +349,9 @@ describe("E2E - Entity Resolvers", () => {
 			});
 
 		const server = createApp({
-			entities: { User: UserWithPosts, Post },
+			entities: { UserWithPosts, Post },
 			queries: { getUser },
+			resolvers: [userResolver],
 			context: () => ({}),
 		});
 
@@ -368,25 +375,16 @@ describe("E2E - Entity Resolvers", () => {
 
 		expect(isSnapshot(result)).toBe(true);
 		if (isSnapshot(result)) {
-			// TODO: Inline resolvers with model() plain object API not working yet
-			// The model has _fieldResolvers but they're not being executed
-			// expect(result.data).toMatchObject({
-			// 	id: "user-1",
-			// 	name: "Alice",
-			// 	posts: [
-			// 		{ id: "post-1", title: "Hello World" },
-			// 		{ id: "post-2", title: "Second Post" },
-			// 	],
-			// });
-			// For now, just verify the base fields work
-			expect(result.data).toHaveProperty("id", "user-1");
+			// Verify base fields and posts work with new resolver() API
 			expect(result.data).toHaveProperty("name", "Alice");
+			expect((result.data as any).posts).toHaveLength(2);
+			expect((result.data as any).posts[0]).toHaveProperty("title", "Hello World");
 		}
 	});
 
 	it("handles DataLoader batching for entity resolvers", async () => {
 		// Track batch calls
-		let _batchCallCount = 0;
+		let batchCallCount = 0;
 
 		const users = [
 			{ id: "user-1", name: "Alice" },
@@ -398,25 +396,31 @@ describe("E2E - Entity Resolvers", () => {
 			{ id: "post-2", title: "Post 2", authorId: "user-2" },
 		];
 
-		// Define User model with posts relation
-		const UserWithPosts = model("User", {
+		// Define User model
+		const UserBatched = model("UserBatched", {
 			id: id(),
 			name: string(),
-			posts: list(() => Post),
-		}).resolve({
-			posts: ({ source }) => {
-				_batchCallCount++;
-				return posts.filter((p) => p.authorId === source.id);
-			},
 		});
 
+		// Define resolver with posts relation (new API)
+		const userResolver = resolver(UserBatched, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			// Plain function for relations
+			posts: ({ source }) => {
+				batchCallCount++;
+				return posts.filter((p) => p.authorId === source.id);
+			},
+		}));
+
 		const getUsers = query()
-			.returns([UserWithPosts])
+			.returns([UserBatched])
 			.resolve(() => users);
 
 		const server = createApp({
-			entities: { User: UserWithPosts, Post },
+			entities: { UserBatched, Post },
 			queries: { getUsers },
+			resolvers: [userResolver],
 			context: () => ({}),
 		});
 
@@ -439,10 +443,12 @@ describe("E2E - Entity Resolvers", () => {
 
 		expect(isSnapshot(result)).toBe(true);
 		if (isSnapshot(result)) {
-			// TODO: Inline resolvers with model() plain object API not working yet
-			// expect(batchCallCount).toBeGreaterThanOrEqual(2);
-			// For now, just verify the query works
+			// Should batch calls - with DataLoader we get 2 calls (one per user)
+			expect(batchCallCount).toBeGreaterThanOrEqual(2);
 			expect(result.data).toHaveLength(2);
+			// Verify posts are resolved
+			expect((result.data as any)[0].posts).toHaveLength(1);
+			expect((result.data as any)[1].posts).toHaveLength(1);
 		}
 	});
 });

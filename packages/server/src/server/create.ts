@@ -31,6 +31,7 @@ import {
 	isModelDef,
 	isMutationDef,
 	isQueryDef,
+	isSubscriptionDef,
 	type LiveQueryDef,
 	type Message,
 	type ModelDef,
@@ -38,6 +39,7 @@ import {
 	type Observable,
 	type ResolverDef,
 	type RouterDef,
+	type SubscriptionDef,
 	toOps,
 	valuesEqual,
 } from "@sylphx/lens-core";
@@ -62,6 +64,7 @@ import type {
 	ServerConfigLegacy,
 	ServerConfigWithInferredContext,
 	ServerMetadata,
+	SubscriptionsMap,
 } from "./types.js";
 
 // Re-export types
@@ -86,6 +89,7 @@ export type {
 	ServerConfigLegacy,
 	ServerConfigWithInferredContext,
 	ServerMetadata,
+	SubscriptionsMap,
 	WebSocketLike,
 } from "./types.js";
 
@@ -109,11 +113,13 @@ type ResolverMap = Map<string, ResolverDef<any, any, any>>;
 class LensServerImpl<
 	Q extends QueriesMap = QueriesMap,
 	M extends MutationsMap = MutationsMap,
+	S extends SubscriptionsMap = SubscriptionsMap,
 	TContext extends ContextValue = ContextValue,
 > implements LensServer
 {
 	private queries: Q;
 	private mutations: M;
+	private subscriptions: S;
 	private entities: EntitiesMap;
 	private resolverMap?: ResolverMap | undefined;
 	private contextFactory: (req?: unknown) => TContext | Promise<TContext>;
@@ -123,11 +129,14 @@ class LensServerImpl<
 	private loaders = new Map<string, DataLoader<unknown, unknown>>();
 	private pluginManager: PluginManager;
 
-	constructor(config: LensServerConfig<TContext> & { queries?: Q; mutations?: M }) {
+	constructor(
+		config: LensServerConfig<TContext> & { queries?: Q; mutations?: M; subscriptions?: S },
+	) {
 		const queries: QueriesMap = { ...(config.queries ?? {}) };
 		const mutations: MutationsMap = { ...(config.mutations ?? {}) };
+		const subscriptions: SubscriptionsMap = { ...(config.subscriptions ?? {}) };
 
-		// Flatten router into queries/mutations
+		// Flatten router into queries/mutations/subscriptions
 		if (config.router) {
 			const flattened = flattenRouter(config.router);
 			for (const [path, procedure] of flattened) {
@@ -135,12 +144,15 @@ class LensServerImpl<
 					queries[path] = procedure;
 				} else if (isMutationDef(procedure)) {
 					mutations[path] = procedure;
+				} else if (isSubscriptionDef(procedure)) {
+					subscriptions[path] = procedure;
 				}
 			}
 		}
 
 		this.queries = queries as Q;
 		this.mutations = mutations as M;
+		this.subscriptions = subscriptions as S;
 
 		// Build entities map (priority: explicit config > router > resolvers)
 		// Auto-track models from router return types (new behavior)
@@ -206,6 +218,11 @@ class LensServerImpl<
 				(def as { _name?: string })._name = name;
 			}
 		}
+		for (const [name, def] of Object.entries(this.subscriptions)) {
+			if (def && typeof def === "object") {
+				(def as { _name?: string })._name = name;
+			}
+		}
 	}
 
 	private validateDefinitions(): void {
@@ -217,6 +234,11 @@ class LensServerImpl<
 		for (const [name, def] of Object.entries(this.mutations)) {
 			if (!isMutationDef(def)) {
 				throw new Error(`Invalid mutation definition: ${name}`);
+			}
+		}
+		for (const [name, def] of Object.entries(this.subscriptions)) {
+			if (!isSubscriptionDef(def)) {
+				throw new Error(`Invalid subscription definition: ${name}`);
 			}
 		}
 	}
@@ -312,8 +334,9 @@ class LensServerImpl<
 		// Check if operation exists
 		const isQuery = !!this.queries[path];
 		const isMutation = !!this.mutations[path];
+		const isSubscription = !!this.subscriptions[path];
 
-		if (!isQuery && !isMutation) {
+		if (!isQuery && !isMutation && !isSubscription) {
 			return {
 				subscribe: (observer) => {
 					observer.next?.({
@@ -327,7 +350,103 @@ class LensServerImpl<
 			};
 		}
 
+		// Subscriptions are handled differently - they only emit events (no initial data)
+		if (isSubscription) {
+			return this.executeSubscription(path, input);
+		}
+
 		return this.executeAsObservable(path, input, isQuery);
+	}
+
+	/**
+	 * Execute subscription and return Observable.
+	 * Subscriptions only emit events - no initial data fetch.
+	 */
+	private executeSubscription(path: string, input: unknown): Observable<LensResult> {
+		return {
+			subscribe: (observer) => {
+				let cancelled = false;
+				const cleanups: (() => void)[] = [];
+
+				(async () => {
+					try {
+						const def = this.subscriptions[path] as SubscriptionDef<unknown, unknown, TContext>;
+						if (!def) {
+							observer.next?.({
+								$: "error",
+								error: `Subscription not found: ${path}`,
+								code: "NOT_FOUND",
+							} as Message);
+							observer.complete?.();
+							return;
+						}
+
+						// Validate input
+						if (def._input && input !== undefined) {
+							const result = def._input.safeParse(input);
+							if (!result.success) {
+								observer.next?.({
+									$: "error",
+									error: `Invalid input: ${JSON.stringify(result.error)}`,
+									code: "VALIDATION_ERROR",
+								} as Message);
+								observer.complete?.();
+								return;
+							}
+						}
+
+						const context = await this.contextFactory();
+						const subscriber = def._subscriber;
+
+						if (!subscriber) {
+							observer.next?.({
+								$: "error",
+								error: `Subscription ${path} has no subscriber`,
+								code: "NO_SUBSCRIBER",
+							} as Message);
+							observer.complete?.();
+							return;
+						}
+
+						// Get the publisher function
+						const publisher = subscriber({ input, ctx: context });
+
+						// Call publisher with emit/onCleanup callbacks
+						if (publisher) {
+							publisher({
+								emit: (data) => {
+									if (cancelled) return;
+									// Emit snapshot message for each event
+									observer.next?.({ $: "snapshot", data } as Message);
+								},
+								onCleanup: (fn) => {
+									cleanups.push(fn);
+									return fn;
+								},
+							});
+						}
+
+						// Note: Subscriptions stay open until unsubscribed
+						// They do NOT call observer.complete() automatically
+					} catch (error) {
+						if (!cancelled) {
+							const errMsg = error instanceof Error ? error.message : String(error);
+							observer.next?.({ $: "error", error: errMsg, code: "INTERNAL_ERROR" } as Message);
+							observer.complete?.();
+						}
+					}
+				})();
+
+				return {
+					unsubscribe: () => {
+						cancelled = true;
+						for (const fn of cleanups) {
+							fn();
+						}
+					},
+				};
+			},
+		};
 	}
 
 	/**
@@ -981,6 +1100,21 @@ class LensServerImpl<
 			this.pluginManager.runEnhanceOperationMeta({
 				path: name,
 				type: "mutation",
+				meta: meta as unknown as Record<string, unknown>,
+				definition: def,
+			});
+			setNested(name, meta);
+		}
+
+		for (const [name, def] of Object.entries(this.subscriptions)) {
+			const returnType = getReturnTypeName(def._output);
+			const meta: OperationMeta = { type: "subscription" };
+			if (returnType) {
+				meta.returnType = returnType;
+			}
+			this.pluginManager.runEnhanceOperationMeta({
+				path: name,
+				type: "subscription",
 				meta: meta as unknown as Record<string, unknown>,
 				definition: def,
 			});

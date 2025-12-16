@@ -1,7 +1,9 @@
 /**
  * @sylphx/lens-core - Field Resolvers Tests
  *
- * Tests for resolver() function with field builder pattern.
+ * Tests for resolver() function with the new simplified API.
+ * Uses plain functions for computed fields: ({ source, ctx }) => ...
+ * Uses t.args().resolve() for fields with arguments.
  */
 
 import { describe, expect, it } from "bun:test";
@@ -36,7 +38,7 @@ const Post = model("Post", {
 	authorId: string(),
 });
 
-const Comment = model("Comment", {
+const _Comment = model("Comment", {
 	id: id(),
 	content: string(),
 	postId: string(),
@@ -77,9 +79,9 @@ const mockCtx: MockContext = {
 
 describe("resolver()", () => {
 	it("creates a resolver definition with exposed fields", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
 		expect(userResolver.entity._name).toBe("User");
@@ -89,10 +91,10 @@ describe("resolver()", () => {
 	});
 
 	it("getFieldNames returns all field names", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			email: f.expose("email"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
 		}));
 
 		const names = userResolver.getFieldNames();
@@ -103,9 +105,9 @@ describe("resolver()", () => {
 	});
 
 	it("isExposed returns true for exposed fields", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
 		expect(userResolver.isExposed("id")).toBe(true);
@@ -119,9 +121,9 @@ describe("resolver()", () => {
 
 describe("Field resolution", () => {
 	it("resolves exposed fields from parent", async () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -132,10 +134,11 @@ describe("Field resolution", () => {
 		expect(name).toBe("John");
 	});
 
-	it("resolves computed scalar fields", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
+	it("resolves computed fields with plain functions", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			// Plain function resolver - new API
+			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
 
 		const parent = mockDb.users[0];
@@ -144,10 +147,11 @@ describe("Field resolution", () => {
 		expect(avatar).toBe("https://cdn.example.com/john-avatar");
 	});
 
-	it("resolves relation fields with f.many()", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
+	it("resolves relation fields with plain functions", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			// Plain function for relations - new API
+			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 		}));
 
 		const parent = mockDb.users[0];
@@ -157,10 +161,11 @@ describe("Field resolution", () => {
 		expect((posts as any[])[0].title).toBe("Hello");
 	});
 
-	it("resolves relation fields with f.one()", async () => {
-		const postResolver = resolver<MockContext>()(Post, (f) => ({
-			id: f.expose("id"),
-			author: f.one(User).resolve(({ parent, ctx }) => ctx.db.users.find((u) => u.id === parent.authorId)!),
+	it("resolves one-to-one relations with plain functions", async () => {
+		const postResolver = resolver<MockContext>()(Post, (t) => ({
+			id: t.expose("id"),
+			// Plain function for one-to-one relation
+			author: ({ source, ctx }) => ctx.db.users.find((u) => u.id === source.authorId)!,
 		}));
 
 		const parent = mockDb.posts[0];
@@ -170,10 +175,11 @@ describe("Field resolution", () => {
 	});
 
 	it("resolveAll resolves all fields", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			// Plain function resolver
+			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
 
 		const parent = mockDb.users[0];
@@ -185,10 +191,10 @@ describe("Field resolution", () => {
 	});
 
 	it("resolveAll respects select parameter", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			email: f.expose("email"),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -205,13 +211,14 @@ describe("Field resolution", () => {
 // =============================================================================
 
 describe("Async resolution", () => {
-	it("handles async resolvers", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			posts: f.many(Post).resolve(async ({ parent, ctx }) => {
+	it("handles async plain function resolvers", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			// Async plain function
+			posts: async ({ source, ctx }) => {
 				await new Promise((r) => setTimeout(r, 1));
-				return ctx.db.posts.filter((p) => p.authorId === parent.id);
-			}),
+				return ctx.db.posts.filter((p) => p.authorId === source.id);
+			},
 		}));
 
 		const parent = mockDb.users[0];
@@ -227,19 +234,21 @@ describe("Async resolution", () => {
 
 describe("Type guards", () => {
 	it("isExposedField identifies exposed fields", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			avatar: f.string().resolve(() => ""),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			// Plain function is wrapped internally
+			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
 
 		expect(isExposedField(userResolver.fields.id)).toBe(true);
+		// Plain functions are wrapped as resolved fields
 		expect(isExposedField(userResolver.fields.avatar)).toBe(false);
 	});
 
 	it("isResolvedField identifies resolved fields", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			avatar: f.string().resolve(() => ""),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
 
 		expect(isResolvedField(userResolver.fields.id)).toBe(false);
@@ -247,8 +256,8 @@ describe("Type guards", () => {
 	});
 
 	it("isResolverDef identifies resolver definitions", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
 		}));
 
 		expect(isResolverDef(userResolver)).toBe(true);
@@ -263,18 +272,18 @@ describe("Type guards", () => {
 
 describe("Complex scenarios", () => {
 	it("handles multiple entities with relations", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
-			comments: f.many(Comment).resolve(({ parent, ctx }) => ctx.db.comments.filter((c) => c.authorId === parent.id)),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
+			comments: ({ source, ctx }) => ctx.db.comments.filter((c) => c.authorId === source.id),
 		}));
 
-		const postResolver = resolver<MockContext>()(Post, (f) => ({
-			id: f.expose("id"),
-			title: f.expose("title"),
-			author: f.one(User).resolve(({ parent, ctx }) => ctx.db.users.find((u) => u.id === parent.authorId)!),
-			comments: f.many(Comment).resolve(({ parent, ctx }) => ctx.db.comments.filter((c) => c.postId === parent.id)),
+		const postResolver = resolver<MockContext>()(Post, (t) => ({
+			id: t.expose("id"),
+			title: t.expose("title"),
+			author: ({ source, ctx }) => ctx.db.users.find((u) => u.id === source.authorId)!,
+			comments: ({ source, ctx }) => ctx.db.comments.filter((c) => c.postId === source.id),
 		}));
 
 		// Test User.posts
@@ -292,12 +301,9 @@ describe("Complex scenarios", () => {
 	});
 
 	it("supports nullable relation fields", async () => {
-		const postResolver = resolver<MockContext>()(Post, (f) => ({
-			id: f.expose("id"),
-			author: f
-				.one(User)
-				.nullable()
-				.resolve(({ parent, ctx }) => ctx.db.users.find((u) => u.id === parent.authorId) ?? null),
+		const postResolver = resolver<MockContext>()(Post, (t) => ({
+			id: t.expose("id"),
+			author: ({ source, ctx }) => ctx.db.users.find((u) => u.id === source.authorId) ?? null,
 		}));
 
 		const post = { ...mockDb.posts[0], authorId: "nonexistent" };
@@ -312,19 +318,18 @@ describe("Complex scenarios", () => {
 // =============================================================================
 
 describe("Field arguments", () => {
-	it("resolves field with args using .args() builder", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			posts: f
-				.many(Post)
+	it("resolves field with args using t.args().resolve()", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			posts: t
 				.args(
 					z.object({
 						limit: z.number().default(10),
 						published: z.boolean().optional(),
 					}),
 				)
-				.resolve(({ parent, args, ctx }) => {
-					let posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+				.resolve(({ source, args, ctx }) => {
+					let posts = ctx.db.posts.filter((p) => p.authorId === source.id);
 					if (args.published !== undefined) {
 						posts = posts.filter((p) => p.published === args.published);
 					}
@@ -348,13 +353,12 @@ describe("Field arguments", () => {
 		expect((publishedPosts as any[])[0].title).toBe("Hello");
 	});
 
-	it("resolves scalar field with args", async () => {
-		const postResolver = resolver<MockContext>()(Post, (f) => ({
-			id: f.expose("id"),
-			excerpt: f
-				.string()
+	it("resolves computed field with args", async () => {
+		const postResolver = resolver<MockContext>()(Post, (t) => ({
+			id: t.expose("id"),
+			excerpt: t
 				.args(z.object({ length: z.number().default(100) }))
-				.resolve(({ parent, args }) => `${parent.content.slice(0, args.length)}...`),
+				.resolve(({ source, args }) => `${source.content.slice(0, args.length)}...`),
 		}));
 
 		const parent = mockDb.posts[0]; // content = "World"
@@ -369,12 +373,9 @@ describe("Field arguments", () => {
 	});
 
 	it("getArgsSchema returns schema for field with args", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			posts: f
-				.many(Post)
-				.args(z.object({ limit: z.number() }))
-				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			posts: t.args(z.object({ limit: z.number() })).resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
 
 		expect(userResolver.getArgsSchema("id")).toBeNull();
@@ -382,10 +383,9 @@ describe("Field arguments", () => {
 	});
 
 	it("validates args against schema", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			posts: f
-				.many(Post)
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			posts: t
 				.args(z.object({ limit: z.number().min(1).max(100) }))
 				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
@@ -404,8 +404,8 @@ describe("Field arguments", () => {
 
 describe("Edge cases and error handling", () => {
 	it("throws error for non-existent field", async () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -416,13 +416,12 @@ describe("Edge cases and error handling", () => {
 	});
 
 	it("resolveAll with object-style select (name + args)", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: t
 				.args(z.object({ limit: z.number().default(10) }))
-				.resolve(({ parent, args, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id).slice(0, args.limit)),
+				.resolve(({ source, args, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id).slice(0, args.limit)),
 		}));
 
 		const parent = mockDb.users[0];
@@ -437,9 +436,9 @@ describe("Edge cases and error handling", () => {
 	});
 
 	it("resolveAll ignores non-existent fields in select", async () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -450,8 +449,8 @@ describe("Edge cases and error handling", () => {
 	});
 
 	it("getArgsSchema returns null for non-existent field", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
 		}));
 
 		expect(userResolver.getArgsSchema("nonexistent")).toBeNull();
@@ -459,14 +458,14 @@ describe("Edge cases and error handling", () => {
 });
 
 // =============================================================================
-// Test: Additional Field Builders
+// Test: Computed Fields (New API)
 // =============================================================================
 
-describe("Additional field builders", () => {
-	it("int field builder works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			postCount: f.int().resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id).length),
+describe("Computed fields with new API", () => {
+	it("int-returning computed field works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			postCount: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id).length,
 		}));
 
 		const parent = mockDb.users[0];
@@ -474,14 +473,14 @@ describe("Additional field builders", () => {
 		expect(count).toBe(2);
 	});
 
-	it("float field builder works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			avgPostLength: f.float().resolve(({ parent, ctx }) => {
-				const posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+	it("float-returning computed field works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			avgPostLength: ({ source, ctx }) => {
+				const posts = ctx.db.posts.filter((p) => p.authorId === source.id);
 				const totalLength = posts.reduce((sum, p) => sum + p.content.length, 0);
 				return totalLength / posts.length;
-			}),
+			},
 		}));
 
 		const parent = mockDb.users[0];
@@ -489,12 +488,10 @@ describe("Additional field builders", () => {
 		expect(avg).toBe(4); // (5 + 3) / 2 = 4 (World + Bar)
 	});
 
-	it("boolean field builder works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			hasPublishedPosts: f
-				.boolean()
-				.resolve(({ parent, ctx }) => ctx.db.posts.some((p) => p.authorId === parent.id && p.published)),
+	it("boolean-returning computed field works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			hasPublishedPosts: ({ source, ctx }) => ctx.db.posts.some((p) => p.authorId === source.id && p.published),
 		}));
 
 		const parent = mockDb.users[0];
@@ -502,10 +499,10 @@ describe("Additional field builders", () => {
 		expect(hasPublished).toBe(true);
 	});
 
-	it("datetime field builder works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			createdAt: f.datetime().resolve(() => new Date("2024-01-15")),
+	it("date-returning computed field works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			createdAt: () => new Date("2024-01-15"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -513,24 +510,10 @@ describe("Additional field builders", () => {
 		expect(date).toBeInstanceOf(Date);
 	});
 
-	it("date field builder works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			birthDate: f.date().resolve(() => new Date("1990-05-20")),
-		}));
-
-		const parent = mockDb.users[0];
-		const date = await userResolver.resolveField("birthDate", parent, {}, mockCtx);
-		expect(date).toBeInstanceOf(Date);
-	});
-
-	it("nullable scalar field builder works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			nickname: f
-				.string()
-				.nullable()
-				.resolve(({ parent }) => (parent.name === "John" ? "Johnny" : null)),
+	it("nullable computed field works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			nickname: ({ source }) => (source.name === "John" ? "Johnny" : null),
 		}));
 
 		const parent1 = mockDb.users[0];
@@ -543,18 +526,14 @@ describe("Additional field builders", () => {
 		expect(nick2).toBeNull();
 	});
 
-	it("nullable scalar field with args works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			nickname: f
-				.string()
-				.args(z.object({ uppercase: z.boolean().default(false) }))
-				.nullable()
-				.resolve(({ parent, args }) => {
-					if (parent.name !== "John") return null;
-					const nick = "Johnny";
-					return args.uppercase ? nick.toUpperCase() : nick;
-				}),
+	it("computed field with args works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			nickname: t.args(z.object({ uppercase: z.boolean().default(false) })).resolve(({ source, args }) => {
+				if (source.name !== "John") return null;
+				const nick = "Johnny";
+				return args.uppercase ? nick.toUpperCase() : nick;
+			}),
 		}));
 
 		const parent = mockDb.users[0];
@@ -565,20 +544,16 @@ describe("Additional field builders", () => {
 		expect(nick2).toBe("JOHNNY");
 	});
 
-	it("nullable relation field with args works", async () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			latestPost: f
-				.one(Post)
-				.args(z.object({ published: z.boolean().default(false) }))
-				.nullable()
-				.resolve(({ parent, args, ctx }) => {
-					const posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
-					if (args.published) {
-						return posts.find((p) => p.published) ?? null;
-					}
-					return posts[0] ?? null;
-				}),
+	it("relation field with args works", async () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			latestPost: t.args(z.object({ published: z.boolean().default(false) })).resolve(({ source, args, ctx }) => {
+				const posts = ctx.db.posts.filter((p) => p.authorId === source.id);
+				if (args.published) {
+					return posts.find((p) => p.published) ?? null;
+				}
+				return posts[0] ?? null;
+			}),
 		}));
 
 		const parent = mockDb.users[0];
@@ -594,14 +569,14 @@ describe("Additional field builders", () => {
 
 describe("toResolverMap()", () => {
 	it("converts resolver array to map", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
-		const postResolver = resolver(Post, (f) => ({
-			id: f.expose("id"),
-			title: f.expose("title"),
+		const postResolver = resolver(Post, (t) => ({
+			id: t.expose("id"),
+			title: t.expose("title"),
 		}));
 
 		const map = toResolverMap([userResolver, postResolver]);
@@ -630,20 +605,20 @@ describe("toResolverMap()", () => {
 
 describe("Subscription detection", () => {
 	it("isSubscription returns false for exposed fields", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
 		expect(userResolver.isSubscription("id")).toBe(false);
 		expect(userResolver.isSubscription("name")).toBe(false);
 	});
 
-	it("isSubscription returns false for .resolve() fields", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
-			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
+	it("isSubscription returns false for plain function fields", () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
+			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 		}));
 
 		expect(userResolver.isSubscription("id")).toBe(false);
@@ -652,8 +627,8 @@ describe("Subscription detection", () => {
 	});
 
 	it("isSubscription returns false for non-existent field", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
 		}));
 
 		expect(userResolver.isSubscription("nonexistent")).toBe(false);
@@ -666,20 +641,20 @@ describe("Subscription detection", () => {
 
 describe("getFieldMode()", () => {
 	it("returns 'exposed' for exposed fields", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 		}));
 
 		expect(userResolver.getFieldMode("id")).toBe("exposed");
 		expect(userResolver.getFieldMode("name")).toBe("exposed");
 	});
 
-	it("returns 'resolve' for .resolve() fields", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			avatar: f.string().resolve(({ parent, ctx }) => ctx.cdn.getAvatar(parent.avatarKey)),
-			posts: f.many(Post).resolve(({ parent, ctx }) => ctx.db.posts.filter((p) => p.authorId === parent.id)),
+	it("returns 'resolve' for plain function fields", () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
+			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 		}));
 
 		expect(userResolver.getFieldMode("id")).toBe("exposed");
@@ -688,20 +663,17 @@ describe("getFieldMode()", () => {
 	});
 
 	it("returns null for non-existent field", () => {
-		const userResolver = resolver(User, (f) => ({
-			id: f.expose("id"),
+		const userResolver = resolver(User, (t) => ({
+			id: t.expose("id"),
 		}));
 
 		expect(userResolver.getFieldMode("nonexistent")).toBeNull();
 	});
 
 	it("works with fields that have args", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			posts: f
-				.many(Post)
-				.args(z.object({ limit: z.number() }))
-				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			posts: t.args(z.object({ limit: z.number() })).resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
 
 		expect(userResolver.getFieldMode("posts")).toBe("resolve");
@@ -709,37 +681,36 @@ describe("getFieldMode()", () => {
 });
 
 // =============================================================================
-// Test: f.json<T>() typed JSON field builder
+// Test: JSON typed field
 // =============================================================================
 
-describe("f.json<T>()", () => {
+describe("JSON typed computed field", () => {
 	interface SessionStatus {
 		isActive: boolean;
 		text: string;
 	}
 
-	it("supports .resolve() with typed JSON", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			sessionStatus: f.json<SessionStatus>().resolve(() => ({
+	it("supports plain function returning JSON object", () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			sessionStatus: (): SessionStatus => ({
 				isActive: true,
 				text: "Working",
-			})),
+			}),
 		}));
 
 		expect(userResolver.getFieldMode("sessionStatus")).toBe("resolve");
 	});
 
-	it("supports .args() with typed JSON", () => {
-		const userResolver = resolver<MockContext>()(User, (f) => ({
-			id: f.expose("id"),
-			statusWithArgs: f
-				.json<SessionStatus>()
-				.args(z.object({ detailed: z.boolean() }))
-				.resolve(({ args }) => ({
+	it("supports .args() with JSON return type", () => {
+		const userResolver = resolver<MockContext>()(User, (t) => ({
+			id: t.expose("id"),
+			statusWithArgs: t.args(z.object({ detailed: z.boolean() })).resolve(
+				({ args }): SessionStatus => ({
 					isActive: true,
 					text: args.detailed ? "Working on task" : "Working",
-				})),
+				}),
+			),
 		}));
 
 		expect(userResolver.getFieldMode("statusWithArgs")).toBe("resolve");
@@ -814,127 +785,6 @@ describe("hasInlineResolvers()", () => {
 		expect(hasInlineResolvers(PlainUser)).toBe(false);
 	});
 
-	it("returns true for model with .resolve() chain", () => {
-		const UserWithResolve = model("UserWithResolve", {
-			id: id(),
-			name: string(),
-		}).resolve({
-			displayName: ({ source }) => (source as { name: string }).name.toUpperCase(),
-		});
-
-		expect(hasInlineResolvers(UserWithResolve)).toBe(true);
-	});
-
-	it("returns true for model with .subscribe() chain", () => {
-		const UserWithSubscribe = model("UserWithSubscribe", {
-			id: id(),
-			name: string(),
-		}).subscribe({
-			name:
-				() =>
-				({ emit }) => {
-					emit("test");
-				},
-		});
-
-		expect(hasInlineResolvers(UserWithSubscribe)).toBe(true);
-	});
-
-	it("returns true for model with .resolve().subscribe() chain", () => {
-		const UserWithBoth = model("UserWithBoth", {
-			id: id(),
-			name: string(),
-		})
-			.resolve({
-				name: ({ source }) => (source as { name: string }).name,
-			})
-			.subscribe({
-				name:
-					() =>
-					({ emit }) => {
-						emit("test");
-					},
-			});
-
-		expect(hasInlineResolvers(UserWithBoth)).toBe(true);
-	});
-});
-
-describe("createResolverFromEntity() with model chain methods", () => {
-	it("handles model with .resolve() chain", async () => {
-		const UserModel = model("User", {
-			id: id(),
-			name: string(),
-		}).resolve({
-			displayName: ({ source }) => (source as { name: string }).name.toUpperCase(),
-		});
-
-		const resolverDef = createResolverFromEntity(UserModel);
-
-		expect(resolverDef.getFieldMode("id")).toBe("exposed");
-		expect(resolverDef.getFieldMode("name")).toBe("exposed");
-		expect(resolverDef.getFieldMode("displayName")).toBe("resolve");
-
-		const result = await resolverDef.resolveField("displayName", { id: "1", name: "john" }, {}, {});
-		expect(result).toBe("JOHN");
-	});
-
-	it("handles model with .resolve().subscribe() chain (live mode)", () => {
-		const UserModel = model("User", {
-			id: id(),
-			name: string(),
-		})
-			.resolve({
-				status: ({ source }) => (source as { name: string }).name,
-			})
-			.subscribe({
-				status:
-					() =>
-					({ emit }) => {
-						emit("test");
-					},
-			});
-
-		const resolverDef = createResolverFromEntity(UserModel);
-
-		expect(resolverDef.getFieldMode("id")).toBe("exposed");
-		expect(resolverDef.getFieldMode("name")).toBe("exposed");
-		expect(resolverDef.getFieldMode("status")).toBe("live");
-	});
-
-	it("resolver and subscriber are both callable", async () => {
-		let subscriberCalled = false;
-
-		const UserModel = model("User", {
-			id: id(),
-			balance: string(),
-		})
-			.resolve({
-				formattedBalance: ({ source }) => `$${(source as { balance: number }).balance}`,
-			})
-			.subscribe({
-				formattedBalance:
-					() =>
-					({ emit }) => {
-						subscriberCalled = true;
-						emit("$100");
-					},
-			});
-
-		const resolverDef = createResolverFromEntity(UserModel);
-
-		// Test resolver
-		const resolved = await resolverDef.resolveField("formattedBalance", { id: "1", balance: 50 }, {}, {});
-		expect(resolved).toBe("$50");
-
-		// Test subscriber via subscribeField (returns publisher for "live" mode)
-		const parent = { id: "1", balance: 50 };
-		const publisher = resolverDef.subscribeField("formattedBalance", parent, {}, {});
-		expect(publisher).not.toBeNull();
-		expect(typeof publisher).toBe("function");
-
-		// Execute publisher
-		publisher!({ emit: () => {}, onCleanup: () => {} });
-		expect(subscriberCalled).toBe(true);
-	});
+	// Note: model().resolve() chain was removed in v3.0
+	// Use standalone resolver(Model, ...) instead
 });

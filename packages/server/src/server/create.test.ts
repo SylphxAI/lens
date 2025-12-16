@@ -15,7 +15,6 @@ import {
 	applyOps,
 	boolean,
 	firstValueFrom,
-	float,
 	id,
 	isError,
 	isOps,
@@ -566,19 +565,19 @@ describe("field resolvers", () => {
 
 	it("resolves field with nested input args (like GraphQL)", async () => {
 		// Define field resolver with args (like GraphQL)
-		const authorResolver = resolver<TestContext>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
+		const authorResolver = resolver<TestContext>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			// New API: t.args().resolve() without type method
+			posts: t
 				.args(
 					z.object({
 						limit: z.number().optional(),
 						published: z.boolean().optional(),
 					}),
 				)
-				.resolve(({ parent, args, ctx }) => {
-					let posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
+				.resolve(({ source, args, ctx }) => {
+					let posts = ctx.db.posts.filter((p) => p.authorId === source.id);
 					if (args.published !== undefined) {
 						posts = posts.filter((p) => p.published === args.published);
 					}
@@ -638,13 +637,14 @@ describe("field resolvers", () => {
 	it("passes context to field resolvers", async () => {
 		let capturedContext: TestContext | null = null;
 
-		const authorResolver = resolver<TestContext>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => {
+		const authorResolver = resolver<TestContext>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			// Plain function for relations (new API)
+			posts: ({ source, ctx }) => {
 				capturedContext = ctx;
-				return ctx.db.posts.filter((p) => p.authorId === parent.id);
-			}),
+				return ctx.db.posts.filter((p) => p.authorId === source.id);
+			},
 		}));
 
 		const getAuthor = query<TestContext>()
@@ -699,34 +699,28 @@ describe("field resolvers", () => {
 
 		type CtxWithComments = { db: typeof mockDbWithComments };
 
-		const postResolver = resolver<CtxWithComments>()(Post, (f) => ({
-			id: f.expose("id"),
-			title: f.expose("title"),
-			comments: f
-				.many(Comment)
-				.args(z.object({ limit: z.number().optional() }))
-				.resolve(({ parent, args, ctx }) => {
-					let comments = ctx.db.comments.filter((c) => c.postId === parent.id);
-					if (args.limit !== undefined) {
-						comments = comments.slice(0, args.limit);
-					}
-					return comments;
-				}),
+		const postResolver = resolver<CtxWithComments>()(Post, (t) => ({
+			id: t.expose("id"),
+			title: t.expose("title"),
+			comments: t.args(z.object({ limit: z.number().optional() })).resolve(({ source, args, ctx }) => {
+				let comments = ctx.db.comments.filter((c) => c.postId === source.id);
+				if (args.limit !== undefined) {
+					comments = comments.slice(0, args.limit);
+				}
+				return comments;
+			}),
 		}));
 
-		const authorResolver = resolver<CtxWithComments>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
-				.args(z.object({ limit: z.number().optional() }))
-				.resolve(({ parent, args, ctx }) => {
-					let posts = ctx.db.posts.filter((p) => p.authorId === parent.id);
-					if (args.limit !== undefined) {
-						posts = posts.slice(0, args.limit);
-					}
-					return posts;
-				}),
+		const authorResolver = resolver<CtxWithComments>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: t.args(z.object({ limit: z.number().optional() })).resolve(({ source, args, ctx }) => {
+				let posts = ctx.db.posts.filter((p) => p.authorId === source.id);
+				if (args.limit !== undefined) {
+					posts = posts.slice(0, args.limit);
+				}
+				return posts;
+			}),
 		}));
 
 		const getAuthor = query<CtxWithComments>()
@@ -777,15 +771,12 @@ describe("field resolvers", () => {
 	});
 
 	it("works without nested input (default args)", async () => {
-		const authorResolver = resolver<TestContext>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
-				.args(z.object({ limit: z.number().default(10) }))
-				.resolve(({ parent, args, ctx }) => {
-					return ctx.db.posts.filter((p) => p.authorId === parent.id).slice(0, args.limit);
-				}),
+		const authorResolver = resolver<TestContext>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: t.args(z.object({ limit: z.number().default(10) })).resolve(({ source, args, ctx }) => {
+				return ctx.db.posts.filter((p) => p.authorId === source.id).slice(0, args.limit);
+			}),
 		}));
 
 		const getAuthor = query<TestContext>()
@@ -847,13 +838,14 @@ describe("field resolvers", () => {
 			],
 		};
 
-		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f.many(Post).resolve(({ parent, ctx }) => {
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			// Plain function for relations (new API)
+			posts: ({ source, ctx }) => {
 				postsResolverCallCount++;
-				return ctx.db.posts.filter((p) => p.authorId === parent.id);
-			}),
+				return ctx.db.posts.filter((p) => p.authorId === source.id);
+			},
 		}));
 
 		type EmitFn = ((data: unknown) => void) & { merge: (partial: unknown) => void };
@@ -947,14 +939,13 @@ describe("field resolvers", () => {
 		// Use .resolve().subscribe() to get onCleanup access
 		// Per ADR-002: .resolve() alone is pure/batchable, no emit/onCleanup
 		// .resolve().subscribe() gives initial value + subscription capabilities
-		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
-				.resolve(({ parent, ctx }) => {
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: t
+				.resolve(({ source, ctx }) => {
 					// Initial resolution (batchable, no emit/onCleanup)
-					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+					return ctx.db.posts.filter((p) => p.authorId === source.id);
 				})
 				.subscribe(() => ({ onCleanup }) => {
 					// Publisher pattern: emit/onCleanup come from callback, not ctx
@@ -1037,14 +1028,13 @@ describe("field resolvers", () => {
 		// Use .resolve().subscribe() to get emit access
 		// Per ADR-002: .resolve() alone is pure/batchable, no emit/onCleanup
 		// .resolve().subscribe() gives initial value + subscription capabilities
-		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
-				.resolve(({ parent, ctx }) => {
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: t
+				.resolve(({ source, ctx }) => {
 					// Initial resolution (batchable, no emit)
-					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+					return ctx.db.posts.filter((p) => p.authorId === source.id);
 				})
 				.subscribe(() => ({ emit, onCleanup }) => {
 					// Publisher pattern: emit/onCleanup come from callback
@@ -1208,16 +1198,15 @@ describe("field resolvers", () => {
 		let subscribeCallCount = 0;
 		let capturedFieldEmit: ((value: unknown) => void) | undefined;
 
-		// Use .resolve().subscribe() pattern
-		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
-			posts: f
-				.many(Post)
-				.resolve(({ parent, ctx }) => {
+		// Use .resolve().subscribe() pattern (new API - no type method)
+		const authorResolver = resolver<{ db: typeof mockDb }>()(Author, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
+			posts: t
+				.resolve(({ source, ctx }) => {
 					// Phase 1: Initial resolution (batchable, no emit/onCleanup)
 					resolveCallCount++;
-					return ctx.db.posts.filter((p) => p.authorId === parent.id);
+					return ctx.db.posts.filter((p) => p.authorId === source.id);
 				})
 				.subscribe(() => ({ emit, onCleanup }) => {
 					// Phase 2: Publisher pattern - emit/onCleanup from callback
@@ -1511,128 +1500,10 @@ describe("observable error handling", () => {
 });
 
 // =============================================================================
-// Unified Entity Definition (ADR-001) - Auto Resolver Conversion
+// NOTE: "Unified Entity Definition" tests for model().resolve() chain removed
+// as the chain API was deprecated in favor of standalone resolver() function.
+// See ADR-003 for the new design.
 // =============================================================================
-
-describe("Unified Entity Definition", () => {
-	describe("auto-converts models with .resolve() chain", () => {
-		it("creates resolver from model with .resolve() chain", async () => {
-			// Model with chained resolver - no separate resolver() needed
-			const Product = model("Product", {
-				id: id(),
-				name: string(),
-				price: float(),
-			}).resolve({
-				// Computed field with resolver
-				displayPrice: ({ source }) => `$${(source as { price: number }).price.toFixed(2)}`,
-			});
-
-			const getProduct = query()
-				.input(z.object({ id: z.string() }))
-				.returns(Product)
-				.resolve(({ input }) => ({
-					id: input.id,
-					name: "Test Product",
-					price: 19.99,
-				}));
-
-			// No resolvers array needed! Server auto-detects model resolvers
-			const server = createApp({
-				entities: { Product },
-				queries: { getProduct },
-			});
-
-			const result = await firstValueFrom(
-				server.execute({
-					path: "getProduct",
-					input: { id: "prod-1", $select: { id: true, name: true, displayPrice: true } },
-				}),
-			);
-
-			expect(result.data).toEqual({
-				id: "prod-1",
-				name: "Test Product",
-				displayPrice: "$19.99",
-			});
-		});
-
-		it("explicit resolver takes priority over model resolver", async () => {
-			// Model with chained resolver
-			const Item = model("Item", {
-				id: id(),
-				label: string(),
-			}).resolve({
-				label: () => "inline-label",
-			});
-
-			// Explicit resolver overrides model resolver
-			const itemResolver = resolver(Item, (f) => ({
-				id: f.expose("id"),
-				label: f.string().resolve(() => "explicit-label"),
-			}));
-
-			const getItem = query()
-				.input(z.object({ id: z.string() }))
-				.returns(Item)
-				.resolve(({ input }) => ({ id: input.id, label: "source-label" }));
-
-			const server = createApp({
-				entities: { Item },
-				queries: { getItem },
-				resolvers: [itemResolver], // Explicit resolver takes priority
-			});
-
-			const result = await firstValueFrom(
-				server.execute({
-					path: "getItem",
-					input: { id: "item-1", $select: { id: true, label: true } },
-				}),
-			);
-
-			expect(result.data).toEqual({
-				id: "item-1",
-				label: "explicit-label", // From explicit resolver, not model resolver
-			});
-		});
-
-		it("includes model resolver fields in metadata", () => {
-			const Task = model("Task", {
-				id: id(),
-				title: string(),
-			}).resolve({
-				status: ({ source }) => (source as { title: string }).title.toUpperCase(),
-			});
-
-			const server = createApp({
-				entities: { Task },
-				queries: {},
-			});
-
-			const metadata = server.getMetadata();
-			expect(metadata.entities.Task).toBeDefined();
-			expect(metadata.entities.Task.id).toBe("exposed");
-			expect(metadata.entities.Task.title).toBe("exposed");
-			expect(metadata.entities.Task.status).toBe("resolve");
-		});
-
-		it("skips models without resolvers", () => {
-			// Plain model without resolvers
-			const SimpleUser = model("SimpleUser", {
-				id: id(),
-				name: string(),
-			});
-
-			const server = createApp({
-				entities: { SimpleUser },
-				queries: {},
-			});
-
-			const metadata = server.getMetadata();
-			// No resolver created for models without .resolve()
-			expect(metadata.entities.SimpleUser).toBeUndefined();
-		});
-	});
-});
 
 // =============================================================================
 // Operation-Level .resolve().subscribe() Tests (LiveQueryDef)
@@ -2050,14 +1921,13 @@ describe("scalar field subscription with emit.delta()", () => {
 			delta?: (operations: { position: number; insert: string }[]) => void;
 		} | null = null;
 
-		const userResolver = resolver(UserWithBio, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(UserWithBio, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 			// bio is a computed field with resolve + subscribe
-			bio: f
-				.string()
+			bio: t
 				.resolve(() => "Initial bio")
-				.subscribe((_params) => ({ emit, onCleanup }) => {
+				.subscribe(() => ({ emit, onCleanup }) => {
 					capturedEmit = emit as typeof capturedEmit;
 					onCleanup(() => {});
 				}),
@@ -2114,14 +1984,13 @@ describe("scalar field subscription with emit.delta()", () => {
 			delta?: (operations: { position: number; insert: string }[]) => void;
 		} | null = null;
 
-		const userResolver = resolver(UserWithContent, (f) => ({
-			id: f.expose("id"),
-			name: f.expose("name"),
+		const userResolver = resolver(UserWithContent, (t) => ({
+			id: t.expose("id"),
+			name: t.expose("name"),
 			// content is a computed field with resolve + subscribe
-			content: f
-				.string()
+			content: t
 				.resolve(() => "Hello")
-				.subscribe((_params) => ({ emit, onCleanup }) => {
+				.subscribe(() => ({ emit, onCleanup }) => {
 					capturedEmit = emit as typeof capturedEmit;
 					onCleanup(() => {});
 				}),

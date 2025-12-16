@@ -53,6 +53,7 @@ import type { EntityDefinition } from "../schema/types.js";
 import type {
 	ExposedField,
 	FieldBuilder,
+	FieldBuilderWithArgs,
 	FieldDef,
 	FieldLiveSubscribeFn,
 	FieldLiveSubscribeFnNoArgs,
@@ -63,20 +64,17 @@ import type {
 	InferParent,
 	LiveField,
 	Publisher,
-	RelationFieldBuilder,
-	RelationFieldBuilderWithArgs,
 	ResolvedField,
 	ResolvedFieldChainable,
 	ResolverDef,
 	Resolvers,
-	ScalarFieldBuilder,
-	ScalarFieldBuilderWithArgs,
 } from "./resolver-types.js";
 
 // Re-export types for external use
 export type {
 	ExposedField,
 	FieldBuilder,
+	FieldBuilderWithArgs,
 	FieldDef,
 	FieldEmit,
 	FieldLiveSubscribeFn,
@@ -93,15 +91,11 @@ export type {
 	LiveField,
 	OnCleanup,
 	Publisher,
-	RelationFieldBuilder,
-	RelationFieldBuilderWithArgs,
 	ResolvedField,
 	ResolvedFieldChainable,
 	ResolverDef,
 	ResolverFields,
 	Resolvers,
-	ScalarFieldBuilder,
-	ScalarFieldBuilderWithArgs,
 	SubscriptionCallbacks,
 } from "./resolver-types.js";
 
@@ -109,218 +103,52 @@ export type {
 // Implementation
 // =============================================================================
 
-/** Create a scalar field builder with args */
-function createScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
+/** Create a field builder with args */
+function createFieldBuilderWithArgs<TParent, TArgs, TContext>(
 	argsSchema: z.ZodType<TArgs>,
-): ScalarFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
+): FieldBuilderWithArgs<TParent, TArgs, TContext> {
 	return {
-		resolve(
-			fn: FieldResolveFn<TParent, TArgs, TContext, T>,
-		): ResolvedFieldChainable<T, TArgs, TParent, TContext> {
-			const resolver = fn as (params: {
+		resolve<TResult>(
+			fn: FieldResolveFn<TParent, TArgs, TContext, TResult>,
+		): ResolvedFieldChainable<TResult, TArgs, TParent, TContext> {
+			// Wrap to translate parent -> source for user-facing API
+			const resolver = ({
+				parent,
+				args,
+				ctx,
+			}: {
 				parent: unknown;
 				args: TArgs;
 				ctx: FieldQueryContext<TContext>;
-			}) => T | Promise<T>;
+			}) => fn({ source: parent as TParent, args, ctx });
 
 			// Return ResolvedField with chainable .subscribe()
-			const resolvedField: ResolvedFieldChainable<T, TArgs, TParent, TContext> = {
+			const resolvedField: ResolvedFieldChainable<TResult, TArgs, TParent, TContext> = {
 				_kind: "resolved",
 				_mode: "resolve",
-				_returnType: undefined as T,
+				_returnType: undefined as TResult,
 				_argsSchema: argsSchema,
 				_resolver: resolver,
 				// Chainable subscribe - creates LiveField with Publisher pattern
 				subscribe(
-					subscribeFn: FieldLiveSubscribeFn<TParent, TArgs, TContext, T>,
-				): LiveField<T, TArgs, TContext> {
+					subscribeFn: FieldLiveSubscribeFn<TParent, TArgs, TContext, TResult>,
+				): LiveField<TResult, TArgs, TContext> {
 					return {
 						_kind: "resolved",
 						_mode: "live",
-						_returnType: undefined as T,
+						_returnType: undefined as TResult,
 						_argsSchema: argsSchema,
 						_resolver: resolver,
-						_subscriber: subscribeFn as (params: {
-							parent: unknown;
-							args: TArgs;
-							ctx: TContext;
-						}) => Publisher<T>,
+						// Wrap to translate parent -> source for user-facing API
+						_subscriber: ({ parent, args, ctx }: { parent: unknown; args: TArgs; ctx: TContext }) =>
+							subscribeFn({ source: parent as TParent, args, ctx }),
 					};
 				},
 			};
 			return resolvedField;
 		},
-		nullable(): ScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
-			return createScalarFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>(argsSchema);
-		},
-	};
-}
-
-/** Create a scalar field builder */
-function createScalarFieldBuilder<T, TParent, TContext>(): ScalarFieldBuilder<
-	T,
-	TParent,
-	TContext
-> {
-	return {
-		args<TArgs extends z.ZodRawShape>(
-			schema: z.ZodObject<TArgs>,
-		): ScalarFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext> {
-			return createScalarFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext>(
-				schema,
-			);
-		},
-		resolve(
-			fn: FieldResolveFnNoArgs<TParent, TContext, T>,
-		): ResolvedFieldChainable<T, Record<string, never>, TParent, TContext> {
-			const resolver = ({
-				parent,
-				ctx,
-			}: {
-				parent: unknown;
-				args: Record<string, never>;
-				ctx: FieldQueryContext<TContext>;
-			}) => fn({ source: parent as TParent, parent: parent as TParent, ctx });
-
-			// Return ResolvedField with chainable .subscribe()
-			const resolvedField: ResolvedFieldChainable<T, Record<string, never>, TParent, TContext> = {
-				_kind: "resolved",
-				_mode: "resolve",
-				_returnType: undefined as T,
-				_argsSchema: null,
-				_resolver: resolver,
-				// Chainable subscribe - creates LiveField with Publisher pattern
-				subscribe(
-					subscribeFn: FieldLiveSubscribeFnNoArgs<TParent, TContext, T>,
-				): LiveField<T, Record<string, never>, TContext> {
-					return {
-						_kind: "resolved",
-						_mode: "live",
-						_returnType: undefined as T,
-						_argsSchema: null,
-						_resolver: resolver,
-						_subscriber: ({
-							parent,
-							ctx,
-						}: {
-							parent: unknown;
-							args: Record<string, never>;
-							ctx: TContext;
-						}) => subscribeFn({ source: parent as TParent, parent: parent as TParent, ctx }),
-					};
-				},
-			};
-			return resolvedField;
-		},
-		nullable(): ScalarFieldBuilder<T | null, TParent, TContext> {
-			return createScalarFieldBuilder<T | null, TParent, TContext>();
-		},
-	};
-}
-
-/** Create a relation field builder with args */
-function createRelationFieldBuilderWithArgs<T, TParent, TArgs, TContext>(
-	argsSchema: z.ZodType<TArgs>,
-): RelationFieldBuilderWithArgs<T, TParent, TArgs, TContext> {
-	return {
-		resolve(
-			fn: FieldResolveFn<TParent, TArgs, TContext, T>,
-		): ResolvedFieldChainable<T, TArgs, TParent, TContext> {
-			const resolver = fn as (params: {
-				parent: unknown;
-				args: TArgs;
-				ctx: FieldQueryContext<TContext>;
-			}) => T | Promise<T>;
-
-			const resolvedField: ResolvedFieldChainable<T, TArgs, TParent, TContext> = {
-				_kind: "resolved",
-				_mode: "resolve",
-				_returnType: undefined as T,
-				_argsSchema: argsSchema,
-				_resolver: resolver,
-				// Chainable subscribe - creates LiveField with Publisher pattern
-				subscribe(
-					subscribeFn: FieldLiveSubscribeFn<TParent, TArgs, TContext, T>,
-				): LiveField<T, TArgs, TContext> {
-					return {
-						_kind: "resolved",
-						_mode: "live",
-						_returnType: undefined as T,
-						_argsSchema: argsSchema,
-						_resolver: resolver,
-						_subscriber: subscribeFn as (params: {
-							parent: unknown;
-							args: TArgs;
-							ctx: TContext;
-						}) => Publisher<T>,
-					};
-				},
-			};
-			return resolvedField;
-		},
-		nullable(): RelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext> {
-			return createRelationFieldBuilderWithArgs<T | null, TParent, TArgs, TContext>(argsSchema);
-		},
-	};
-}
-
-/** Create a relation field builder */
-function createRelationFieldBuilder<T, TParent, TContext>(): RelationFieldBuilder<
-	T,
-	TParent,
-	TContext
-> {
-	return {
-		args<TArgs extends z.ZodRawShape>(
-			schema: z.ZodObject<TArgs>,
-		): RelationFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext> {
-			return createRelationFieldBuilderWithArgs<T, TParent, z.infer<z.ZodObject<TArgs>>, TContext>(
-				schema,
-			);
-		},
-		resolve(
-			fn: FieldResolveFnNoArgs<TParent, TContext, T>,
-		): ResolvedFieldChainable<T, Record<string, never>, TParent, TContext> {
-			const resolver = ({
-				parent,
-				ctx,
-			}: {
-				parent: unknown;
-				args: Record<string, never>;
-				ctx: FieldQueryContext<TContext>;
-			}) => fn({ source: parent as TParent, parent: parent as TParent, ctx });
-
-			const resolvedField: ResolvedFieldChainable<T, Record<string, never>, TParent, TContext> = {
-				_kind: "resolved",
-				_mode: "resolve",
-				_returnType: undefined as T,
-				_argsSchema: null,
-				_resolver: resolver,
-				// Chainable subscribe - creates LiveField with Publisher pattern
-				subscribe(
-					subscribeFn: FieldLiveSubscribeFnNoArgs<TParent, TContext, T>,
-				): LiveField<T, Record<string, never>, TContext> {
-					return {
-						_kind: "resolved",
-						_mode: "live",
-						_returnType: undefined as T,
-						_argsSchema: null,
-						_resolver: resolver,
-						_subscriber: ({
-							parent,
-							ctx,
-						}: {
-							parent: unknown;
-							args: Record<string, never>;
-							ctx: TContext;
-						}) => subscribeFn({ source: parent as TParent, parent: parent as TParent, ctx }),
-					};
-				},
-			};
-			return resolvedField;
-		},
-		nullable(): RelationFieldBuilder<T | null, TParent, TContext> {
-			return createRelationFieldBuilder<T | null, TParent, TContext>();
+		nullable() {
+			return createFieldBuilderWithArgs<TParent, TArgs, TContext>(argsSchema);
 		},
 	};
 }
@@ -343,53 +171,58 @@ function createFieldBuilder<
 			};
 		},
 
-		string(): ScalarFieldBuilder<string, Parent, TContext> {
-			return createScalarFieldBuilder<string, Parent, TContext>();
+		args<TArgs extends z.ZodRawShape>(
+			schema: z.ZodObject<TArgs>,
+		): FieldBuilderWithArgs<Parent, z.infer<z.ZodObject<TArgs>>, TContext> {
+			return createFieldBuilderWithArgs<Parent, z.infer<z.ZodObject<TArgs>>, TContext>(schema);
 		},
 
-		int(): ScalarFieldBuilder<number, Parent, TContext> {
-			return createScalarFieldBuilder<number, Parent, TContext>();
-		},
+		resolve<TResult>(
+			fn: FieldResolveFnNoArgs<Parent, TContext, TResult>,
+		): ResolvedFieldChainable<TResult, Record<string, never>, Parent, TContext> {
+			const resolver = ({
+				parent,
+				ctx,
+			}: {
+				parent: unknown;
+				args: Record<string, never>;
+				ctx: FieldQueryContext<TContext>;
+			}) => fn({ source: parent as Parent, parent: parent as Parent, ctx });
 
-		float(): ScalarFieldBuilder<number, Parent, TContext> {
-			return createScalarFieldBuilder<number, Parent, TContext>();
-		},
-
-		boolean(): ScalarFieldBuilder<boolean, Parent, TContext> {
-			return createScalarFieldBuilder<boolean, Parent, TContext>();
-		},
-
-		datetime(): ScalarFieldBuilder<Date, Parent, TContext> {
-			return createScalarFieldBuilder<Date, Parent, TContext>();
-		},
-
-		date(): ScalarFieldBuilder<Date, Parent, TContext> {
-			return createScalarFieldBuilder<Date, Parent, TContext>();
-		},
-
-		/**
-		 * Create a JSON/object field builder with custom type T.
-		 * Use for JSON fields that need .resolve() or .subscribe().
-		 *
-		 * @example
-		 * status: f.json<SessionStatus>().subscribe(({ ctx }) => {
-		 *   ctx.emit({ isActive: true, text: "Working..." });
-		 * }),
-		 */
-		json<T = unknown>(): ScalarFieldBuilder<T, Parent, TContext> {
-			return createScalarFieldBuilder<T, Parent, TContext>();
-		},
-
-		one<Target extends EntityDef<string, EntityDefinition>>(
-			_target: Target,
-		): RelationFieldBuilder<InferParent<Target["fields"]>, Parent, TContext> {
-			return createRelationFieldBuilder<InferParent<Target["fields"]>, Parent, TContext>();
-		},
-
-		many<Target extends EntityDef<string, EntityDefinition>>(
-			_target: Target,
-		): RelationFieldBuilder<InferParent<Target["fields"]>[], Parent, TContext> {
-			return createRelationFieldBuilder<InferParent<Target["fields"]>[], Parent, TContext>();
+			// Return ResolvedField with chainable .subscribe()
+			const resolvedField: ResolvedFieldChainable<
+				TResult,
+				Record<string, never>,
+				Parent,
+				TContext
+			> = {
+				_kind: "resolved",
+				_mode: "resolve",
+				_returnType: undefined as TResult,
+				_argsSchema: null,
+				_resolver: resolver,
+				// Chainable subscribe - creates LiveField with Publisher pattern
+				subscribe(
+					subscribeFn: FieldLiveSubscribeFnNoArgs<Parent, TContext, TResult>,
+				): LiveField<TResult, Record<string, never>, TContext> {
+					return {
+						_kind: "resolved",
+						_mode: "live",
+						_returnType: undefined as TResult,
+						_argsSchema: null,
+						_resolver: resolver,
+						_subscriber: ({
+							parent,
+							ctx,
+						}: {
+							parent: unknown;
+							args: Record<string, never>;
+							ctx: TContext;
+						}) => subscribeFn({ source: parent as Parent, parent: parent as Parent, ctx }),
+					};
+				},
+			};
+			return resolvedField;
 		},
 	};
 }
@@ -607,6 +440,30 @@ export function resolver<TContext = FieldResolverContext>(
 			entity: TEntity,
 			builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any, any>>,
 	  ) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>) {
+	// Helper to wrap plain functions into ResolvedField
+	const wrapPlainFunctions = (
+		fields: Record<string, any>,
+	): Record<string, FieldDef<any, any, any>> => {
+		const result: Record<string, FieldDef<any, any, any>> = {};
+		for (const [key, value] of Object.entries(fields)) {
+			if (typeof value === "function" && !("_kind" in value)) {
+				// Plain function - wrap as ResolvedField
+				result[key] = {
+					_kind: "resolved" as const,
+					_mode: "resolve" as const,
+					_returnType: undefined,
+					_argsSchema: null,
+					_resolver: ({ parent, ctx }: { parent: unknown; args: any; ctx: any }) =>
+						value({ source: parent, parent, ctx }),
+				};
+			} else {
+				// Already a FieldDef (expose, resolved, live)
+				result[key] = value;
+			}
+		}
+		return result;
+	};
+
 	// Curried call: resolver<Context>()
 	if (entityOrNothing === undefined) {
 		return <TEntity extends EntityDef<string, EntityDefinition>>(
@@ -614,15 +471,19 @@ export function resolver<TContext = FieldResolverContext>(
 			builderFn: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
 		): ResolverDef<TEntity, Record<string, FieldDef<any, any>>, TContext> => {
 			const fieldBuilder = createFieldBuilder<TEntity, TContext>();
-			const fields = builderFn(fieldBuilder);
-			return new ResolverDefImpl(entity, fields);
+			const rawFields = builderFn(fieldBuilder);
+			const fields = wrapPlainFunctions(rawFields);
+			const resolverDef = new ResolverDefImpl(entity, fields);
+			return resolverDef;
 		};
 	}
 
 	// Direct call: resolver(Entity, builder)
 	const fieldBuilder = createFieldBuilder<any, TContext>();
-	const fields = builder!(fieldBuilder);
-	return new ResolverDefImpl(entityOrNothing, fields);
+	const rawFields = builder!(fieldBuilder);
+	const fields = wrapPlainFunctions(rawFields);
+	const resolverDef = new ResolverDefImpl(entityOrNothing, fields);
+	return resolverDef;
 }
 
 // =============================================================================

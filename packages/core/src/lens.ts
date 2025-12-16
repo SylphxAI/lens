@@ -56,9 +56,14 @@ import type {
 	QueryBuilder,
 	ResolverFn,
 	ReturnSpec,
+	SubscriptionBuilder,
 	ZodLikeSchema,
 } from "./operations/index.js";
-import { mutation as createMutation, query as createQuery } from "./operations/index.js";
+import {
+	mutation as createMutation,
+	query as createQuery,
+	subscription as createSubscription,
+} from "./operations/index.js";
 import type {
 	ExtractPluginExtensions,
 	HasPlugin,
@@ -94,6 +99,14 @@ export type LensResolver<TContext> = <
 export interface LensQuery<TContext> {
 	(): QueryBuilder<void, unknown, TContext>;
 	(name: string): QueryBuilder<void, unknown, TContext>;
+}
+
+/**
+ * Typed subscription factory function
+ */
+export interface LensSubscription<TContext> {
+	(): SubscriptionBuilder<void, unknown, TContext>;
+	(name: string): SubscriptionBuilder<void, unknown, TContext>;
 }
 
 /**
@@ -236,6 +249,11 @@ export interface Lens<TContext> {
 	 * No plugin methods available (use lens({ plugins }) to enable).
 	 */
 	mutation: LensMutation<TContext, []>;
+
+	/**
+	 * Create a subscription with pre-typed context.
+	 */
+	subscription: LensSubscription<TContext>;
 }
 
 /**
@@ -264,6 +282,11 @@ export interface LensWithPlugins<TContext, TPlugins extends readonly PluginExten
 	 * Create a mutation with pre-typed context and plugin methods.
 	 */
 	mutation: LensMutation<TContext, TPlugins>;
+
+	/**
+	 * Create a subscription with pre-typed context.
+	 */
+	subscription: LensSubscription<TContext>;
 
 	/**
 	 * Runtime plugins for use with createApp().
@@ -411,6 +434,8 @@ export function lens<TContext>(config?: {
 		resolver: typedResolver as LensResolver<TContext>,
 		query: ((name?: string) => createQuery<TContext>(name as string)) as LensQuery<TContext>,
 		mutation: createPluginMutation as unknown as LensMutation<TContext, readonly PluginExtension[]>,
+		subscription: ((name?: string) =>
+			createSubscription<TContext>(name as string)) as LensSubscription<TContext>,
 		plugins: plugins as unknown as RuntimePlugin[],
 	});
 
@@ -421,6 +446,8 @@ export function lens<TContext>(config?: {
 			resolver: typedResolver as LensResolver<TContext>,
 			query: ((name?: string) => createQuery<TContext>(name as string)) as LensQuery<TContext>,
 			mutation: createPluginMutation as LensMutation<TContext, []>,
+			subscription: ((name?: string) =>
+				createSubscription<TContext>(name as string)) as LensSubscription<TContext>,
 			withPlugins: createWithPlugins as LensBuilder<TContext>["withPlugins"],
 		} as LensBuilder<TContext>;
 	}
