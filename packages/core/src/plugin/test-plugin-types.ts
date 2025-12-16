@@ -38,7 +38,7 @@ const m1 = withoutPlugin
 m1.optimistic;
 
 // But .resolve() should work
-m1.resolve(({ input, ctx: _ctx }) => ({ id: input.id }));
+m1.resolve(({ input, ctx: _ctx }) => ({ id: input.id }) as any);
 
 // =============================================================================
 // Test 3: WITH plugin - .optimistic() SHOULD be available

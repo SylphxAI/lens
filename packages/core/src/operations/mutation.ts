@@ -31,9 +31,10 @@ export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unk
 	/** Optimistic update DSL (declarative, serializable for client) */
 	_optimistic?: OptimisticDSL | undefined;
 	/** Method syntax for bivariance - allows flexible context types */
-	_resolve(
-		ctx: import("./types.js").ResolverContext<TInput, TOutput, TContext>,
-	): TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;
+	_resolve(ctx: {
+		input: TInput;
+		ctx: TContext;
+	}): TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;
 }
 
 // =============================================================================

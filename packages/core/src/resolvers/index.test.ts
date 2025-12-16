@@ -82,12 +82,15 @@ describe("resolver()", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.entity._name).toBe("User");
 		expect(userResolver.hasField("id")).toBe(true);
 		expect(userResolver.hasField("name")).toBe(true);
-		expect(userResolver.hasField("email")).toBe(false);
+		expect(userResolver.hasField("email")).toBe(true);
+		expect(userResolver.hasField("avatarKey")).toBe(true);
 	});
 
 	it("getFieldNames returns all field names", () => {
@@ -95,23 +98,39 @@ describe("resolver()", () => {
 			id: t.expose("id"),
 			name: t.expose("name"),
 			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		const names = userResolver.getFieldNames();
 		expect(names).toContain("id");
 		expect(names).toContain("name");
 		expect(names).toContain("email");
-		expect(names).toHaveLength(3);
+		expect(names).toContain("avatarKey");
+		expect(names).toHaveLength(4);
 	});
 
 	it("isExposed returns true for exposed fields", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.isExposed("id")).toBe(true);
 		expect(userResolver.isExposed("name")).toBe(true);
+		expect(userResolver.isExposed("email")).toBe(true);
+		expect(userResolver.isExposed("avatarKey")).toBe(true);
+	});
+
+	it("throws error when resolver is missing fields", () => {
+		expect(() =>
+			resolver(User, (t) => ({
+				id: t.expose("id"),
+				name: t.expose("name"),
+				// email and avatarKey missing
+			})),
+		).toThrow("Missing fields: email, avatarKey");
 	});
 });
 
@@ -124,6 +143,8 @@ describe("Field resolution", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -137,6 +158,9 @@ describe("Field resolution", () => {
 	it("resolves computed fields with plain functions", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			// Plain function resolver - new API
 			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
@@ -150,6 +174,9 @@ describe("Field resolution", () => {
 	it("resolves relation fields with plain functions", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			// Plain function for relations - new API
 			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 		}));
@@ -164,6 +191,9 @@ describe("Field resolution", () => {
 	it("resolves one-to-one relations with plain functions", async () => {
 		const postResolver = resolver<MockContext>()(Post, (t) => ({
 			id: t.expose("id"),
+			title: t.expose("title"),
+			content: t.expose("content"),
+			authorId: t.expose("authorId"),
 			// Plain function for one-to-one relation
 			author: ({ source, ctx }) => ctx.db.users.find((u) => u.id === source.authorId)!,
 		}));
@@ -178,6 +208,8 @@ describe("Field resolution", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			// Plain function resolver
 			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
@@ -195,6 +227,7 @@ describe("Field resolution", () => {
 			id: t.expose("id"),
 			name: t.expose("name"),
 			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -214,6 +247,9 @@ describe("Async resolution", () => {
 	it("handles async plain function resolvers", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			// Async plain function
 			posts: async ({ source, ctx }) => {
 				await new Promise((r) => setTimeout(r, 1));
@@ -236,6 +272,9 @@ describe("Type guards", () => {
 	it("isExposedField identifies exposed fields", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			// Plain function is wrapped internally
 			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
@@ -248,6 +287,9 @@ describe("Type guards", () => {
 	it("isResolvedField identifies resolved fields", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 		}));
 
@@ -258,6 +300,9 @@ describe("Type guards", () => {
 	it("isResolverDef identifies resolver definitions", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(isResolverDef(userResolver)).toBe(true);
@@ -275,6 +320,8 @@ describe("Complex scenarios", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 			comments: ({ source, ctx }) => ctx.db.comments.filter((c) => c.authorId === source.id),
 		}));
@@ -282,6 +329,8 @@ describe("Complex scenarios", () => {
 		const postResolver = resolver<MockContext>()(Post, (t) => ({
 			id: t.expose("id"),
 			title: t.expose("title"),
+			content: t.expose("content"),
+			authorId: t.expose("authorId"),
 			author: ({ source, ctx }) => ctx.db.users.find((u) => u.id === source.authorId)!,
 			comments: ({ source, ctx }) => ctx.db.comments.filter((c) => c.postId === source.id),
 		}));
@@ -303,6 +352,9 @@ describe("Complex scenarios", () => {
 	it("supports nullable relation fields", async () => {
 		const postResolver = resolver<MockContext>()(Post, (t) => ({
 			id: t.expose("id"),
+			title: t.expose("title"),
+			content: t.expose("content"),
+			authorId: t.expose("authorId"),
 			author: ({ source, ctx }) => ctx.db.users.find((u) => u.id === source.authorId) ?? null,
 		}));
 
@@ -321,6 +373,9 @@ describe("Field arguments", () => {
 	it("resolves field with args using t.args().resolve()", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			posts: t
 				.args(
 					z.object({
@@ -356,6 +411,9 @@ describe("Field arguments", () => {
 	it("resolves computed field with args", async () => {
 		const postResolver = resolver<MockContext>()(Post, (t) => ({
 			id: t.expose("id"),
+			title: t.expose("title"),
+			content: t.expose("content"),
+			authorId: t.expose("authorId"),
 			excerpt: t
 				.args(z.object({ length: z.number().default(100) }))
 				.resolve(({ source, args }) => `${source.content.slice(0, args.length)}...`),
@@ -375,6 +433,9 @@ describe("Field arguments", () => {
 	it("getArgsSchema returns schema for field with args", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			posts: t.args(z.object({ limit: z.number() })).resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
 
@@ -385,6 +446,9 @@ describe("Field arguments", () => {
 	it("validates args against schema", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			posts: t
 				.args(z.object({ limit: z.number().min(1).max(100) }))
 				.resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
@@ -406,6 +470,9 @@ describe("Edge cases and error handling", () => {
 	it("throws error for non-existent field", async () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -419,6 +486,8 @@ describe("Edge cases and error handling", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			posts: t
 				.args(z.object({ limit: z.number().default(10) }))
 				.resolve(({ source, args, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id).slice(0, args.limit)),
@@ -439,6 +508,8 @@ describe("Edge cases and error handling", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		const parent = mockDb.users[0];
@@ -451,6 +522,9 @@ describe("Edge cases and error handling", () => {
 	it("getArgsSchema returns null for non-existent field", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.getArgsSchema("nonexistent")).toBeNull();
@@ -465,6 +539,9 @@ describe("Computed fields with new API", () => {
 	it("int-returning computed field works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			postCount: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id).length,
 		}));
 
@@ -476,6 +553,9 @@ describe("Computed fields with new API", () => {
 	it("float-returning computed field works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			avgPostLength: ({ source, ctx }) => {
 				const posts = ctx.db.posts.filter((p) => p.authorId === source.id);
 				const totalLength = posts.reduce((sum, p) => sum + p.content.length, 0);
@@ -491,6 +571,9 @@ describe("Computed fields with new API", () => {
 	it("boolean-returning computed field works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			hasPublishedPosts: ({ source, ctx }) => ctx.db.posts.some((p) => p.authorId === source.id && p.published),
 		}));
 
@@ -502,6 +585,9 @@ describe("Computed fields with new API", () => {
 	it("date-returning computed field works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			createdAt: () => new Date("2024-01-15"),
 		}));
 
@@ -513,6 +599,9 @@ describe("Computed fields with new API", () => {
 	it("nullable computed field works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			nickname: ({ source }) => (source.name === "John" ? "Johnny" : null),
 		}));
 
@@ -529,6 +618,9 @@ describe("Computed fields with new API", () => {
 	it("computed field with args works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			nickname: t.args(z.object({ uppercase: z.boolean().default(false) })).resolve(({ source, args }) => {
 				if (source.name !== "John") return null;
 				const nick = "Johnny";
@@ -547,6 +639,9 @@ describe("Computed fields with new API", () => {
 	it("relation field with args works", async () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			latestPost: t.args(z.object({ published: z.boolean().default(false) })).resolve(({ source, args, ctx }) => {
 				const posts = ctx.db.posts.filter((p) => p.authorId === source.id);
 				if (args.published) {
@@ -572,11 +667,15 @@ describe("toResolverMap()", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		const postResolver = resolver(Post, (t) => ({
 			id: t.expose("id"),
 			title: t.expose("title"),
+			content: t.expose("content"),
+			authorId: t.expose("authorId"),
 		}));
 
 		const map = toResolverMap([userResolver, postResolver]);
@@ -608,6 +707,8 @@ describe("Subscription detection", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.isSubscription("id")).toBe(false);
@@ -617,6 +718,9 @@ describe("Subscription detection", () => {
 	it("isSubscription returns false for plain function fields", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 		}));
@@ -629,6 +733,9 @@ describe("Subscription detection", () => {
 	it("isSubscription returns false for non-existent field", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.isSubscription("nonexistent")).toBe(false);
@@ -644,6 +751,8 @@ describe("getFieldMode()", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.getFieldMode("id")).toBe("exposed");
@@ -653,6 +762,9 @@ describe("getFieldMode()", () => {
 	it("returns 'resolve' for plain function fields", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
 			posts: ({ source, ctx }) => ctx.db.posts.filter((p) => p.authorId === source.id),
 		}));
@@ -665,6 +777,9 @@ describe("getFieldMode()", () => {
 	it("returns null for non-existent field", () => {
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 		}));
 
 		expect(userResolver.getFieldMode("nonexistent")).toBeNull();
@@ -673,6 +788,9 @@ describe("getFieldMode()", () => {
 	it("works with fields that have args", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			posts: t.args(z.object({ limit: z.number() })).resolve(({ args, ctx }) => ctx.db.posts.slice(0, args.limit)),
 		}));
 
@@ -693,6 +811,9 @@ describe("JSON typed computed field", () => {
 	it("supports plain function returning JSON object", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			sessionStatus: (): SessionStatus => ({
 				isActive: true,
 				text: "Working",
@@ -705,6 +826,9 @@ describe("JSON typed computed field", () => {
 	it("supports .args() with JSON return type", () => {
 		const userResolver = resolver<MockContext>()(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
+			avatarKey: t.expose("avatarKey"),
 			statusWithArgs: t.args(z.object({ detailed: z.boolean() })).resolve(
 				({ args }): SessionStatus => ({
 					isActive: true,

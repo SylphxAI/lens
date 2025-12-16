@@ -45,7 +45,7 @@ export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown>
 	_mode?: "query";
 	/** Method syntax for bivariance - allows flexible context types */
 	_resolve?(
-		ctx: import("./types.js").ResolverContext<TInput, TOutput, TContext>,
+		ctx: import("./types.js").QueryResolverContext<TInput, TContext>,
 	): TOutput | Promise<TOutput> | AsyncGenerator<TOutput> | void | Promise<void>;
 }
 

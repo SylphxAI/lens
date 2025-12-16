@@ -145,6 +145,7 @@ const postResolver = resolver(Post, (t) => ({
 	title: t.expose("title"),
 	content: t.expose("content"),
 	published: t.expose("published"),
+	authorId: t.expose("authorId"),
 	updatedAt: t.expose("updatedAt"),
 	createdAt: t.expose("createdAt"),
 	// Computed field with args - use t.args().resolve() without type annotations
@@ -175,6 +176,8 @@ const postResolver = resolver(Post, (t) => ({
 const commentResolver = resolver(Comment, (t) => ({
 	id: t.expose("id"),
 	content: t.expose("content"),
+	postId: t.expose("postId"),
+	authorId: t.expose("authorId"),
 	createdAt: t.expose("createdAt"),
 	// Relation: Comment.author (belongsTo - FK on Comment) - plain function resolver
 	author: ({ source, ctx }) => {

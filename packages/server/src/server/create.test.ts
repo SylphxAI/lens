@@ -19,6 +19,7 @@ import {
 	isError,
 	isOps,
 	isSnapshot,
+	list,
 	type Message,
 	model,
 	mutation,
@@ -681,15 +682,33 @@ describe("field resolvers", () => {
 	});
 
 	it("supports nested input at multiple levels", async () => {
-		// Comment entity for deeper nesting
+		// Local models with relation fields for this test
 		const Comment = model("Comment", {
 			id: id(),
 			body: string(),
 			postId: string(),
 		});
 
+		// Post with comments relation
+		const LocalPost = model("LocalPost", {
+			id: id(),
+			title: string(),
+			comments: list(() => Comment),
+		});
+
+		// Author with posts relation
+		const LocalAuthor = model("LocalAuthor", {
+			id: id(),
+			name: string(),
+			posts: list(() => LocalPost),
+		});
+
 		const mockDbWithComments = {
-			...mockDb,
+			authors: [{ id: "a1", name: "Author 1" }],
+			posts: [
+				{ id: "p1", title: "Post 1", authorId: "a1" },
+				{ id: "p2", title: "Post 2", authorId: "a1" },
+			],
 			comments: [
 				{ id: "c1", body: "Comment 1", postId: "p1" },
 				{ id: "c2", body: "Comment 2", postId: "p1" },
@@ -699,7 +718,7 @@ describe("field resolvers", () => {
 
 		type CtxWithComments = { db: typeof mockDbWithComments };
 
-		const postResolver = resolver<CtxWithComments>()(Post, (t) => ({
+		const postResolver = resolver<CtxWithComments>()(LocalPost, (t) => ({
 			id: t.expose("id"),
 			title: t.expose("title"),
 			comments: t.args(z.object({ limit: z.number().optional() })).resolve(({ source, args, ctx }) => {
@@ -711,7 +730,7 @@ describe("field resolvers", () => {
 			}),
 		}));
 
-		const authorResolver = resolver<CtxWithComments>()(Author, (t) => ({
+		const authorResolver = resolver<CtxWithComments>()(LocalAuthor, (t) => ({
 			id: t.expose("id"),
 			name: t.expose("name"),
 			posts: t.args(z.object({ limit: z.number().optional() })).resolve(({ source, args, ctx }) => {
@@ -725,7 +744,7 @@ describe("field resolvers", () => {
 
 		const getAuthor = query<CtxWithComments>()
 			.input(z.object({ id: z.string() }))
-			.returns(Author)
+			.returns(LocalAuthor)
 			.resolve(({ input, ctx }) => {
 				const author = ctx.db.authors.find((a) => a.id === input.id);
 				if (!author) throw new Error("Author not found");
@@ -733,7 +752,7 @@ describe("field resolvers", () => {
 			});
 
 		const server = createApp({
-			entities: { Author, Post, Comment },
+			entities: { LocalAuthor, LocalPost, Comment },
 			queries: { getAuthor },
 			resolvers: [authorResolver, postResolver],
 			context: () => ({ db: mockDbWithComments }),

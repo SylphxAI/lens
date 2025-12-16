@@ -21,7 +21,6 @@
 
 import type { EntityMarker } from "@sylphx/standard-entity";
 import type { FieldDef } from "./fields.js";
-import { processFieldDef } from "./fields.js";
 import type { InferEntity } from "./infer.js";
 
 import type { EntityDefinition, FieldType } from "./types.js";
@@ -198,11 +197,9 @@ export function model<
  * Converts field defs (scalars, model refs, list/nullable wrappers) to FieldType instances.
  */
 function processPlainFields(fieldDefs: PlainFieldDefinition): EntityDefinition {
-	const result: EntityDefinition = {};
-	for (const [key, value] of Object.entries(fieldDefs)) {
-		result[key] = processFieldDef(value);
-	}
-	return result;
+	// FieldDef includes FieldType, so we can use the values directly
+	// Cast through unknown since FieldDef is a union that includes FieldType
+	return fieldDefs as unknown as EntityDefinition;
 }
 
 // =============================================================================

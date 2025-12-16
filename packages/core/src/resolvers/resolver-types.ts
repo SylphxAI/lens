@@ -6,9 +6,24 @@
 
 import type { z } from "zod";
 import type { Emit } from "../emit/index.js";
-import type { EntityDef } from "../schema/define.js";
 import type { InferScalar } from "../schema/infer.js";
 import type { EntityDefinition, FieldType } from "../schema/types.js";
+
+// =============================================================================
+// Entity Type Aliases
+// =============================================================================
+
+/**
+ * Any entity-like definition (EntityDef or ModelDef).
+ * Uses structural typing to accept both types without exactOptionalPropertyTypes issues.
+ */
+export type AnyEntityLike<
+	Name extends string = string,
+	Fields extends Record<string, unknown> = Record<string, unknown>,
+> = {
+	readonly _name: Name | undefined;
+	readonly fields: Fields;
+};
 
 // =============================================================================
 // Context Type (passed to resolvers)
@@ -123,12 +138,16 @@ export type FieldLiveSubscribeFn<TParent, TArgs, TContext, TResult> = (
 /** Field resolver function without args for .resolve() */
 export type FieldResolveFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
+	/** @deprecated Use `source` instead */
+	parent: TParent;
 	ctx: FieldQueryContext<TContext>;
 }) => TResult | Promise<TResult>;
 
 /** Live field subscriber function without args - returns Publisher */
 export type FieldLiveSubscribeFnNoArgs<TParent, TContext, TResult> = (params: {
 	source: TParent;
+	/** @deprecated Use `source` instead */
+	parent: TParent;
 	ctx: TContext;
 }) => Publisher<TResult>;
 
@@ -296,6 +315,12 @@ export type InferParent<E extends EntityDefinition> = {
 	[K in OptionalFieldKeys<E>]?: E[K] extends FieldType ? InferScalar<E[K]> : never;
 };
 
+/**
+ * Infer parent type from any fields (permissive version).
+ * Used for field builders where exact field types aren't critical.
+ */
+export type InferParentAny<E> = E extends EntityDefinition ? InferParent<E> : any;
+
 /** Field builder with args already defined */
 export interface FieldBuilderWithArgs<TParent, TArgs, TContext> {
 	/**
@@ -321,10 +346,7 @@ export interface FieldBuilderWithArgs<TParent, TArgs, TContext> {
  * }))
  * ```
  */
-export interface FieldBuilder<
-	TEntity extends EntityDef<string, EntityDefinition>,
-	TContext = FieldResolverContext,
-> {
+export interface FieldBuilder<TEntity extends AnyEntityLike, TContext = FieldResolverContext> {
 	/**
 	 * Expose a field from the parent entity directly.
 	 * The field must exist in the entity definition.
@@ -337,9 +359,7 @@ export interface FieldBuilder<
 	 * }));
 	 * ```
 	 */
-	expose<K extends keyof TEntity["fields"] & string>(
-		fieldName: K,
-	): ExposedField<InferScalar<TEntity["fields"][K]>>;
+	expose<K extends keyof TEntity["fields"] & string>(fieldName: K): ExposedField<unknown>;
 
 	/**
 	 * Add field arguments (GraphQL-style).
@@ -356,7 +376,7 @@ export interface FieldBuilder<
 	 */
 	args<TArgs extends z.ZodRawShape>(
 		schema: z.ZodObject<TArgs>,
-	): FieldBuilderWithArgs<InferParent<TEntity["fields"]>, z.infer<z.ZodObject<TArgs>>, TContext>;
+	): FieldBuilderWithArgs<InferParentAny<TEntity["fields"]>, z.infer<z.ZodObject<TArgs>>, TContext>;
 
 	/**
 	 * Define a computed field resolver (no args).
@@ -371,11 +391,11 @@ export interface FieldBuilder<
 	 * ```
 	 */
 	resolve<TResult>(
-		fn: FieldResolveFnNoArgs<InferParent<TEntity["fields"]>, TContext, TResult>,
+		fn: FieldResolveFnNoArgs<InferParentAny<TEntity["fields"]>, TContext, TResult>,
 	): ResolvedFieldChainable<
 		TResult,
 		Record<string, never>,
-		InferParent<TEntity["fields"]>,
+		InferParentAny<TEntity["fields"]>,
 		TContext
 	>;
 }
@@ -392,7 +412,7 @@ export type ResolverFields<TContext = FieldResolverContext> = Record<
 
 /** Resolver definition for an entity */
 export interface ResolverDef<
-	TEntity extends EntityDef<string, EntityDefinition> = EntityDef<string, EntityDefinition>,
+	TEntity extends AnyEntityLike = AnyEntityLike,
 	TFields extends Record<string, FieldDef<any, any, any>> = Record<string, FieldDef<any, any, any>>,
 	TContext = FieldResolverContext,
 > {
@@ -430,7 +450,7 @@ export interface ResolverDef<
 	 */
 	resolveField<K extends keyof TFields>(
 		name: K,
-		parent: InferParent<TEntity["fields"]>,
+		parent: InferParentAny<TEntity["fields"]>,
 		args: Record<string, unknown>,
 		ctx: FieldQueryContext<TContext>,
 	): Promise<unknown>;
@@ -441,14 +461,14 @@ export interface ResolverDef<
 	 */
 	subscribeField<K extends keyof TFields>(
 		name: K,
-		parent: InferParent<TEntity["fields"]>,
+		parent: InferParentAny<TEntity["fields"]>,
 		args: Record<string, unknown>,
 		ctx: TContext,
 	): Publisher<unknown> | null;
 
 	/** Resolve all fields for a parent with args per field */
 	resolveAll(
-		parent: InferParent<TEntity["fields"]>,
+		parent: InferParentAny<TEntity["fields"]>,
 		ctx: TContext,
 		select?: Array<{ name: string; args?: Record<string, unknown> }> | string[],
 	): Promise<Record<string, unknown>>;

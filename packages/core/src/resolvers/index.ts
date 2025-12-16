@@ -47,10 +47,9 @@
  */
 
 import type { z } from "zod";
-import type { EntityDef } from "../schema/define.js";
-import type { InferScalar } from "../schema/infer.js";
-import type { EntityDefinition } from "../schema/types.js";
 import type {
+	AnyEntityLike,
+	AnyFieldDef,
 	ExposedField,
 	FieldBuilder,
 	FieldBuilderWithArgs,
@@ -61,7 +60,6 @@ import type {
 	FieldResolveFn,
 	FieldResolveFnNoArgs,
 	FieldResolverContext,
-	InferParent,
 	LiveField,
 	Publisher,
 	ResolvedField,
@@ -72,6 +70,7 @@ import type {
 
 // Re-export types for external use
 export type {
+	AnyEntityLike,
 	ExposedField,
 	FieldBuilder,
 	FieldBuilderWithArgs,
@@ -123,9 +122,9 @@ function createFieldBuilderWithArgs<TParent, TArgs, TContext>(
 			}) => fn({ source: parent as TParent, args, ctx });
 
 			// Return ResolvedField with chainable .subscribe()
-			const resolvedField: ResolvedFieldChainable<TResult, TArgs, TParent, TContext> = {
-				_kind: "resolved",
-				_mode: "resolve",
+			const resolvedField = {
+				_kind: "resolved" as const,
+				_mode: "resolve" as const,
 				_returnType: undefined as TResult,
 				_argsSchema: argsSchema,
 				_resolver: resolver,
@@ -144,30 +143,27 @@ function createFieldBuilderWithArgs<TParent, TArgs, TContext>(
 							subscribeFn({ source: parent as TParent, args, ctx }),
 					};
 				},
-			};
+			} as ResolvedFieldChainable<TResult, TArgs, TParent, TContext>;
 			return resolvedField;
-		},
-		nullable() {
-			return createFieldBuilderWithArgs<TParent, TArgs, TContext>(argsSchema);
 		},
 	};
 }
 
 /** Create a field builder for an entity */
 function createFieldBuilder<
-	TEntity extends EntityDef<string, EntityDefinition>,
+	TEntity extends AnyEntityLike,
 	TContext = FieldResolverContext,
 >(): FieldBuilder<TEntity, TContext> {
-	type Parent = InferParent<TEntity["fields"]>;
+	// Use any for internal implementation to avoid type constraints
+	// The external FieldBuilder interface uses InferParentAny for proper typing
+	type Parent = any;
 
 	return {
-		expose<K extends keyof TEntity["fields"] & string>(
-			fieldName: K,
-		): ExposedField<InferScalar<TEntity["fields"][K]>> {
+		expose<K extends keyof TEntity["fields"] & string>(fieldName: K): ExposedField<any> {
 			return {
 				_kind: "exposed",
 				_fieldName: fieldName,
-				_type: undefined as InferScalar<TEntity["fields"][K]>,
+				_type: undefined as any,
 			};
 		},
 
@@ -229,7 +225,7 @@ function createFieldBuilder<
 
 /** Resolver definition implementation */
 class ResolverDefImpl<
-	TEntity extends EntityDef<string, EntityDefinition>,
+	TEntity extends AnyEntityLike,
 	TFields extends Record<string, FieldDef<any, any, any>>,
 	TContext = FieldResolverContext,
 > implements ResolverDef<TEntity, TFields, TContext>
@@ -288,7 +284,7 @@ class ResolverDefImpl<
 
 	async resolveField<K extends keyof TFields>(
 		name: K,
-		parent: InferParent<TEntity["fields"]>,
+		parent: unknown,
 		args: Record<string, unknown>,
 		ctx: FieldQueryContext<TContext>,
 	): Promise<unknown> {
@@ -315,7 +311,7 @@ class ResolverDefImpl<
 
 	subscribeField<K extends keyof TFields>(
 		name: K,
-		parent: InferParent<TEntity["fields"]>,
+		parent: unknown,
 		args: Record<string, unknown>,
 		ctx: TContext,
 	): Publisher<unknown> | null {
@@ -349,7 +345,7 @@ class ResolverDefImpl<
 	}
 
 	async resolveAll(
-		parent: InferParent<TEntity["fields"]>,
+		parent: unknown,
 		ctx: TContext,
 		select?: Array<{ name: string; args?: Record<string, unknown> }> | string[],
 	): Promise<Record<string, unknown>> {
@@ -415,31 +411,33 @@ class ResolverDefImpl<
  * }));
  * ```
  */
-export function resolver<TContext = FieldResolverContext>(): <
-	TEntity extends EntityDef<string, EntityDefinition>,
-	TFields extends Record<string, FieldDef<any, any, TContext>>,
->(
-	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => TFields,
-) => ResolverDef<TEntity, TFields, TContext>;
+/**
+ * Structural type for resolver entity parameter.
+ * Accepts both EntityDef and ModelDef without strict constraint issues.
+ */
+type ResolverEntity = {
+	readonly _name: string | undefined;
+	readonly fields: Record<string, unknown>;
+};
 
-export function resolver<
-	TEntity extends EntityDef<string, EntityDefinition>,
-	TFields extends Record<string, FieldDef<any, any, FieldResolverContext>>,
->(
+export function resolver<TContext = FieldResolverContext>(): <TEntity extends ResolverEntity>(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, FieldResolverContext>) => TFields,
-): ResolverDef<TEntity, TFields, FieldResolverContext>;
+	builder: (f: FieldBuilder<TEntity, TContext>) => {
+		[K in keyof TEntity["fields"]]: AnyFieldDef<TContext>;
+	},
+) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>;
+
+export function resolver<TEntity extends ResolverEntity>(
+	entity: TEntity,
+	builder: (f: FieldBuilder<TEntity, FieldResolverContext>) => {
+		[K in keyof TEntity["fields"]]: AnyFieldDef<FieldResolverContext>;
+	},
+): ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, FieldResolverContext>;
 
 export function resolver<TContext = FieldResolverContext>(
-	entityOrNothing?: EntityDef<string, EntityDefinition>,
-	builder?: (f: FieldBuilder<any, TContext>) => Record<string, FieldDef<any, any, any>>,
-):
-	| ResolverDef<any, Record<string, FieldDef<any, any, any>>, TContext>
-	| (<TEntity extends EntityDef<string, EntityDefinition>>(
-			entity: TEntity,
-			builder: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any, any>>,
-	  ) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>) {
+	entityOrNothing?: AnyEntityLike,
+	builder?: (f: FieldBuilder<any, TContext>) => Record<string, unknown>,
+): unknown {
 	// Helper to wrap plain functions into ResolvedField
 	const wrapPlainFunctions = (
 		fields: Record<string, any>,
@@ -464,17 +462,31 @@ export function resolver<TContext = FieldResolverContext>(
 		return result;
 	};
 
+	// Validate that resolver covers all entity fields
+	const validateFields = (entity: AnyEntityLike, fields: Record<string, unknown>): void => {
+		const entityFields = Object.keys(entity.fields);
+		const resolverFields = Object.keys(fields);
+		const missingFields = entityFields.filter((f) => !resolverFields.includes(f));
+
+		if (missingFields.length > 0) {
+			throw new Error(
+				`resolver(${entity._name}): Missing fields: ${missingFields.join(", ")}. ` +
+					`All model fields must have a resolver (use t.expose() for passthrough fields).`,
+			);
+		}
+	};
+
 	// Curried call: resolver<Context>()
 	if (entityOrNothing === undefined) {
-		return <TEntity extends EntityDef<string, EntityDefinition>>(
+		return <TEntity extends AnyEntityLike>(
 			entity: TEntity,
-			builderFn: (f: FieldBuilder<TEntity, TContext>) => Record<string, FieldDef<any, any>>,
-		): ResolverDef<TEntity, Record<string, FieldDef<any, any>>, TContext> => {
+			builderFn: (f: FieldBuilder<TEntity, TContext>) => Record<string, unknown>,
+		) => {
 			const fieldBuilder = createFieldBuilder<TEntity, TContext>();
 			const rawFields = builderFn(fieldBuilder);
 			const fields = wrapPlainFunctions(rawFields);
-			const resolverDef = new ResolverDefImpl(entity, fields);
-			return resolverDef;
+			validateFields(entity, fields);
+			return new ResolverDefImpl(entity, fields);
 		};
 	}
 
@@ -482,8 +494,8 @@ export function resolver<TContext = FieldResolverContext>(
 	const fieldBuilder = createFieldBuilder<any, TContext>();
 	const rawFields = builder!(fieldBuilder);
 	const fields = wrapPlainFunctions(rawFields);
-	const resolverDef = new ResolverDefImpl(entityOrNothing, fields);
-	return resolverDef;
+	validateFields(entityOrNothing, fields);
+	return new ResolverDefImpl(entityOrNothing, fields);
 }
 
 // =============================================================================
@@ -573,7 +585,7 @@ export function isResolverDef(value: unknown): value is ResolverDef {
  * ```
  */
 export function createResolverFromEntity<
-	TEntity extends EntityDef<string, EntityDefinition>,
+	TEntity extends AnyEntityLike,
 	TContext = FieldResolverContext,
 >(entity: TEntity): ResolverDef<TEntity, Record<string, FieldDef<any, any, TContext>>, TContext> {
 	const fields: Record<string, FieldDef<any, any, TContext>> = {};
@@ -756,7 +768,7 @@ export function createResolverFromEntity<
  * hasInlineResolvers(Session); // true
  * ```
  */
-export function hasInlineResolvers(entity: EntityDef<string, EntityDefinition>): boolean {
+export function hasInlineResolvers(entity: AnyEntityLike): boolean {
 	// Check for model-level resolvers/subscribers (new API)
 	const model = entity as {
 		_fieldResolvers?: Record<string, unknown>;

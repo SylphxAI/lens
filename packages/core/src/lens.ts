@@ -72,26 +72,39 @@ import type {
 } from "./plugin/types.js";
 import type { FieldBuilder, FieldDef, ResolverDef } from "./resolvers/index.js";
 import { resolver as createResolver } from "./resolvers/index.js";
-import type { EntityDef } from "./schema/define.js";
 import type { ModelFactory } from "./schema/model.js";
 import { model as createModel } from "./schema/model.js";
-import type { EntityDefinition } from "./schema/types.js";
 
 // =============================================================================
 // Lens Factory Types
 // =============================================================================
 
 /**
- * Typed resolver factory function.
- * Uses TFields generic to preserve exact field types from the builder.
+ * Structural type for resolver entity parameter.
+ * Matches both EntityDef and ModelDef.
  */
-export type LensResolver<TContext> = <
-	TEntity extends EntityDef<string, EntityDefinition>,
-	TFields extends Record<string, FieldDef<any, any, TContext>>,
->(
+type ResolverEntity = {
+	readonly _name: string | undefined;
+	readonly fields: Record<string, unknown>;
+};
+
+/**
+ * Any field definition for resolver.
+ */
+type AnyResolverFieldDef<TContext> =
+	| FieldDef<any, any, TContext>
+	| ((params: { source: any; ctx: TContext }) => any);
+
+/**
+ * Typed resolver factory function.
+ * Enforces that ALL entity fields must have a resolver.
+ */
+export type LensResolver<TContext> = <TEntity extends ResolverEntity>(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => TFields,
-) => ResolverDef<TEntity, TFields, TContext>;
+	builder: (f: FieldBuilder<TEntity, TContext>) => {
+		[K in keyof TEntity["fields"]]: AnyResolverFieldDef<TContext>;
+	},
+) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>;
 
 /**
  * Typed query factory function

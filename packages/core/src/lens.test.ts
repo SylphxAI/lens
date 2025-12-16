@@ -79,6 +79,8 @@ describe("lens()", () => {
 
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
 			// Use plain function for relations (new API)
 			posts: ({ source, ctx }) => {
 				return Array.from(ctx.db.posts.values()).filter((p) => p.authorId === source.id);
@@ -131,6 +133,8 @@ describe("lens()", () => {
 		// All these should compile with TestContext
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
 			// Plain function for relations (new API)
 			posts: ({ ctx }) => {
 				// ctx is TestContext
@@ -165,6 +169,8 @@ describe("lens()", () => {
 
 		const userResolver = resolver(User, (t) => ({
 			id: t.expose("id"),
+			name: t.expose("name"),
+			email: t.expose("email"),
 			// Use builder pattern for fields with args (new API)
 			posts: t.args(z.object({ limit: z.number().default(10) })).resolve(({ source, args, ctx }) => {
 				const posts = Array.from(ctx.db.posts.values()).filter((p) => p.authorId === source.id);
@@ -189,6 +195,8 @@ describe("lens()", () => {
 
 		const userResolver = resolver(User, (f) => ({
 			id: f.expose("id"),
+			name: f.expose("name"),
+			email: f.expose("email"),
 		}));
 
 		const getUser = query()

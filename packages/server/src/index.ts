@@ -45,8 +45,6 @@ export {
 	type QueryDef,
 	// Operations
 	query,
-	type ResolverContext,
-	type ResolverFn,
 	type RouterDef,
 	type RouterRoutes,
 	router,

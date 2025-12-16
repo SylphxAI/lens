@@ -95,7 +95,7 @@ function collectFromOperation(def: AnyQueryDef | MutationDef, collected: Collect
 	if (typeof output === "object" && output !== null && !Array.isArray(output)) {
 		// Skip if it's a wrapper or zod schema
 		if (!isNullableWrapper(output) && !isListWrapper(output) && !("parse" in output)) {
-			collectFromRecord(output as Record<string, unknown>, collected);
+			collectFromRecord(output as unknown as Record<string, unknown>, collected);
 		}
 	}
 }

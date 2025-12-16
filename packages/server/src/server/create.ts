@@ -383,15 +383,29 @@ class LensServerImpl<
 
 						// Validate input
 						if (def._input && input !== undefined) {
-							const result = def._input.safeParse(input);
-							if (!result.success) {
-								observer.next?.({
-									$: "error",
-									error: `Invalid input: ${JSON.stringify(result.error)}`,
-									code: "VALIDATION_ERROR",
-								} as Message);
-								observer.complete?.();
-								return;
+							if (def._input.safeParse) {
+								const result = def._input.safeParse(input);
+								if (!result.success) {
+									observer.next?.({
+										$: "error",
+										error: `Invalid input: ${JSON.stringify(result.error)}`,
+										code: "VALIDATION_ERROR",
+									} as Message);
+									observer.complete?.();
+									return;
+								}
+							} else {
+								try {
+									def._input.parse(input);
+								} catch (e) {
+									observer.next?.({
+										$: "error",
+										error: `Invalid input: ${e instanceof Error ? e.message : String(e)}`,
+										code: "VALIDATION_ERROR",
+									} as Message);
+									observer.complete?.();
+									return;
+								}
 							}
 						}
 
@@ -413,12 +427,17 @@ class LensServerImpl<
 
 						// Call publisher with emit/onCleanup callbacks
 						if (publisher) {
+							// Create a proper Emit instance for subscriptions
+							const emit = createEmit((command: EmitCommand) => {
+								if (cancelled) return;
+								// For subscriptions, emit full value as snapshot
+								if (command.type === "full") {
+									observer.next?.({ $: "snapshot", data: command.data } as Message);
+								}
+							}, "scalar");
+
 							publisher({
-								emit: (data) => {
-									if (cancelled) return;
-									// Emit snapshot message for each event
-									observer.next?.({ $: "snapshot", data } as Message);
-								},
+								emit,
 								onCleanup: (fn) => {
 									cleanups.push(fn);
 									return fn;
@@ -507,15 +526,29 @@ class LensServerImpl<
 
 						// Validate input
 						if (def._input && cleanInput !== undefined) {
-							const result = def._input.safeParse(cleanInput);
-							if (!result.success) {
-								observer.next?.({
-									$: "error",
-									error: `Invalid input: ${JSON.stringify(result.error)}`,
-									code: "VALIDATION_ERROR",
-								} as Message);
-								observer.complete?.();
-								return;
+							if (def._input.safeParse) {
+								const result = def._input.safeParse(cleanInput);
+								if (!result.success) {
+									observer.next?.({
+										$: "error",
+										error: `Invalid input: ${JSON.stringify(result.error)}`,
+										code: "VALIDATION_ERROR",
+									} as Message);
+									observer.complete?.();
+									return;
+								}
+							} else {
+								try {
+									def._input.parse(cleanInput);
+								} catch (e) {
+									observer.next?.({
+										$: "error",
+										error: `Invalid input: ${e instanceof Error ? e.message : String(e)}`,
+										code: "VALIDATION_ERROR",
+									} as Message);
+									observer.complete?.();
+									return;
+								}
 							}
 						}
 
@@ -564,7 +597,7 @@ class LensServerImpl<
 								: undefined;
 
 							const lensContext = { ...context, emit, onCleanup };
-							const result = resolver({ args: cleanInput, input: cleanInput, ctx: lensContext });
+							const result = resolver({ input: cleanInput, ctx: lensContext } as any);
 
 							if (isAsyncIterable(result)) {
 								// Streaming: emit each yielded value
@@ -606,8 +639,8 @@ class LensServerImpl<
 										try {
 											// Get publisher function from subscriber
 											const publisher = liveQuery._subscriber({
-												args: cleanInput as never, // Preferred parameter name
-												input: cleanInput as never, // Deprecated alias for backwards compatibility
+												args: cleanInput as never,
+												input: cleanInput as never, // Alias for backwards compatibility
 												ctx: context as TContext,
 											});
 											// Call publisher with emit/onCleanup callbacks
@@ -886,34 +919,6 @@ class LensServerImpl<
 				} catch {
 					result[field] = null;
 				}
-			} else if (fieldMode === "subscribe") {
-				// SUBSCRIBE MODE (legacy): Call resolver with ctx.emit/ctx.onCleanup
-				// Legacy mode - resolver handles both initial value and updates via ctx.emit
-				try {
-					result[field] = null;
-					if (createFieldEmit && onCleanup) {
-						try {
-							const fieldEmit = createFieldEmit(currentPath);
-							if (fieldEmit) {
-								// Build legacy ctx with emit/onCleanup
-								const legacyCtx = {
-									...(context ?? {}),
-									emit: fieldEmit,
-									onCleanup: (fn: () => void) => {
-										onCleanup(fn);
-										return fn;
-									},
-								};
-								// Call legacy subscription method
-								resolverDef.subscribeFieldLegacy(field, obj, args, legacyCtx);
-							}
-						} catch {
-							// Subscription errors are handled via emit, ignore here
-						}
-					}
-				} catch {
-					result[field] = null;
-				}
 			} else {
 				// RESOLVE MODE: One-shot resolution (batchable)
 				try {
@@ -1179,7 +1184,7 @@ export function createApp<
 >(
 	config: LensServerConfig<TContext> & { queries?: Q; mutations?: M },
 ): LensServer & { _types: { queries: Q; mutations: M; context: TContext } } {
-	const server = new LensServerImpl(config) as LensServerImpl<Q, M, TContext>;
+	const server = new LensServerImpl(config) as LensServerImpl<Q, M, SubscriptionsMap, TContext>;
 	return server as unknown as LensServer & {
 		_types: { queries: Q; mutations: M; context: TContext };
 	};
