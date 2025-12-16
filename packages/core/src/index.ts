@@ -111,26 +111,41 @@ export {
 	float,
 	// Type inference
 	type InferFieldDefType,
+	type IsList,
+	type IsNullable,
 	id,
 	int,
+	isLazyRef,
 	// Type guards
+	isListDef,
 	isListFieldDef,
+	isNullableDef,
 	isNullableFieldDef,
 	json,
-	// Internal (for advanced use)
+	// Legacy aliases (deprecated)
 	LIST_FIELD_SYMBOL,
-	// List/Nullable field types
+	// =========================================================================
+	// Unified list/nullable (works for BOTH model fields AND return types)
+	// =========================================================================
+	// Symbols
+	LIST_SYMBOL,
+	// Types
+	type ListDef,
 	type ListFieldDef,
-	// Field wrappers
-	list as listField,
+	// Functions - ONE list(), ONE nullable() for everything
+	list,
 	NULLABLE_FIELD_SYMBOL,
+	NULLABLE_SYMBOL,
+	type NullableDef,
 	type NullableFieldDef,
-	nullable as nullableField,
+	nullable,
 	object,
 	processFieldDef,
 	scalar,
 	string,
 	timestamp,
+	// Utility types
+	type UnwrapType,
 } from "./schema/fields.js";
 
 export {
@@ -150,25 +165,15 @@ export {
 } from "./schema/model-resolvers.js";
 
 // =============================================================================
-// Return Type Wrappers
+// Legacy Wrapper Aliases (for backward compatibility)
 // =============================================================================
 
 export {
-	// Utility types
-	type IsList,
-	type IsNullable,
-	// Type guards
 	isListWrapper,
 	isNullableWrapper,
-	// Symbols
-	LIST_SYMBOL,
-	// Types
+	// Legacy aliases - prefer ListDef/NullableDef from fields.js
 	type ListWrapper,
-	// Wrappers
-	list,
-	NULLABLE_SYMBOL,
 	type NullableWrapper,
-	nullable,
 	type UnwrapModel,
 } from "./schema/wrappers.js";
 
