@@ -89,22 +89,22 @@ export interface QueryStoreOptions {
  *   import { client } from './client';
  *
  *   // Static query
- *   const userStore = query(client.user.get({ input: { id: '123' } }));
+ *   const userStore = query(client.user.get({ args: { id: '123' } }));
  *
  *   // Reactive query using Svelte's $: syntax (creates new store on change)
  *   export let userId: string;
- *   $: userQuery = query(client.user.get({ input: { id: userId } }));
+ *   $: userQuery = query(client.user.get({ args: { id: userId } }));
  *
  *   // Reactive query using derived store (recommended for complex reactivity)
  *   import { writable } from 'svelte/store';
  *   const userIdStore = writable('123');
  *   const reactiveStore = query(
- *     derived(userIdStore, $id => client.user.get({ input: { id: $id } }))
+ *     derived(userIdStore, $id => client.user.get({ args: { id: $id } }))
  *   );
  *
  *   // Conditional query (null when condition not met)
  *   $: sessionStore = query(
- *     sessionId ? client.session.get({ input: { id: sessionId } }) : null
+ *     sessionId ? client.session.get({ args: { id: sessionId } }) : null
  *   );
  * </script>
  *
@@ -314,7 +314,7 @@ export type LazyQueryStore<T> = Readable<QueryStoreValue<T>> & {
  *
  *   // Lazy query with accessor - reads searchTerm at execute() time
  *   const searchStore = lazyQuery(
- *     () => client.search.users({ input: { query: searchTerm } })
+ *     () => client.search.users({ args: { query: searchTerm } })
  *   );
  *
  *   async function handleSearch() {
@@ -324,7 +324,7 @@ export type LazyQueryStore<T> = Readable<QueryStoreValue<T>> & {
  *
  *   // Conditional query (null when condition not met)
  *   const sessionStore = lazyQuery(
- *     () => sessionId ? client.session.get({ input: { id: sessionId } }) : null
+ *     () => sessionId ? client.session.get({ args: { id: sessionId } }) : null
  *   );
  * </script>
  *
