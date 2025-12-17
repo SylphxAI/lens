@@ -14,7 +14,7 @@ bun add @sylphx/lens-server
 
 ```typescript
 import { createApp, createHandler } from "@sylphx/lens-server";
-import { lens, id, string, list, nullable, router } from "@sylphx/lens-core";
+import { model, id, string, list, nullable, router, resolver, lens } from "@sylphx/lens-core";
 import { z } from "zod";
 
 // Define context type
@@ -23,18 +23,11 @@ interface AppContext {
   user: User | null;
 }
 
-// Create typed builders
-const { model, query, mutation } = lens<AppContext>();
-
-// Define models with inline resolvers
+// Define models (schema only)
 const User = model("User", {
   id: id(),
   name: string(),
   email: string(),
-  posts: list(() => Post),
-}).resolve({
-  posts: ({ source, ctx }) =>
-    ctx.db.posts.filter(p => p.authorId === source.id)
 });
 
 const Post = model("Post", {
@@ -43,33 +36,53 @@ const Post = model("Post", {
   authorId: string(),
 });
 
+// Define resolvers (implementation)
+const { resolver, query, mutation } = lens<AppContext>();
+
+const userResolver = resolver(User, (t) => ({
+  id: t.expose('id'),
+  name: t.expose('name'),
+  email: t.expose('email'),
+  posts: ({ source, ctx }) =>
+    ctx.db.posts.filter(p => p.authorId === source.id),
+}));
+
+const postResolver = resolver(Post, (t) => ({
+  id: t.expose('id'),
+  title: t.expose('title'),
+  authorId: t.expose('authorId'),
+  author: ({ source, ctx }) => ctx.db.users.get(source.authorId)!,
+}));
+
 // Define operations
 const appRouter = router({
   user: {
     get: query()
-      .input(z.object({ id: z.string() }))
+      .args(z.object({ id: z.string() }))
       .returns(User)
-      .resolve(({ input, ctx }) => ctx.db.users.get(input.id)!),
+      .resolve(({ args, ctx }) => ctx.db.users.get(args.id)!),
 
     find: query()
-      .input(z.object({ email: z.string() }))
-      .returns(nullable(User))  // User | null
-      .resolve(({ input, ctx }) => ctx.db.users.findByEmail(input.email)),
+      .args(z.object({ email: z.string() }))
+      .returns(nullable(User))
+      .resolve(({ args, ctx }) => ctx.db.users.findByEmail(args.email)),
 
     list: query()
-      .returns(list(User))  // User[]
+      .returns(list(User))
       .resolve(({ ctx }) => ctx.db.users.findMany()),
 
     update: mutation()
-      .input(z.object({ id: z.string(), name: z.string() }))
+      .args(z.object({ id: z.string(), name: z.string() }))
       .returns(User)
-      .resolve(({ input, ctx }) => ctx.db.users.update(input)),
+      .resolve(({ args, ctx }) => ctx.db.users.update(args)),
   },
 });
 
-// Create server - models auto-tracked from router!
+// Create server with models and resolvers
 const app = createApp({
-  router: appRouter,  // Models extracted from .returns()
+  router: appRouter,
+  entities: { User, Post },
+  resolvers: [userResolver, postResolver],
   context: () => ({
     db: database,
     user: getCurrentUser(),
@@ -89,43 +102,39 @@ import { lens, id, string, router } from "@sylphx/lens-core";
 import { entity as e, temp, now } from "@sylphx/reify";
 
 // Enable optimistic plugin
-const { model, query, mutation, plugins } = lens<AppContext>()
+const { mutation, plugins } = lens<AppContext>()
   .withPlugins([optimisticPlugin()]);
-
-const Message = model("Message", {
-  id: id(),
-  content: string(),
-  createdAt: string(),
-});
 
 const appRouter = router({
   user: {
     // Sugar syntax
     update: mutation()
-      .input(z.object({ id: z.string(), name: z.string() }))
+      .args(z.object({ id: z.string(), name: z.string() }))
       .returns(User)
-      .optimistic("merge")  // Instant UI update
-      .resolve(({ input, ctx }) => ctx.db.users.update(input)),
+      .optimistic("merge")
+      .resolve(({ args, ctx }) => ctx.db.users.update(args)),
   },
   message: {
     // Reify DSL (multi-entity)
     send: mutation()
-      .input(z.object({ content: z.string(), userId: z.string() }))
+      .args(z.object({ content: z.string(), userId: z.string() }))
       .returns(Message)
-      .optimistic(({ input }) => [
+      .optimistic(({ args }) => [
         e.create(Message, {
           id: temp(),
-          content: input.content,
+          content: args.content,
           createdAt: now(),
         }),
       ])
-      .resolve(({ input, ctx }) => ctx.db.messages.create(input)),
+      .resolve(({ args, ctx }) => ctx.db.messages.create(args)),
   },
 });
 
 const app = createApp({
   router: appRouter,
-  plugins,  // Include optimistic plugin
+  entities: { User, Message },
+  resolvers: [userResolver, messageResolver],
+  plugins,
   context: () => ({ ... }),
 });
 ```
@@ -133,15 +142,13 @@ const app = createApp({
 ### Live Queries
 
 ```typescript
-// query comes from lens<AppContext>() above
-
 // Live query with Publisher pattern
 const watchUser = query()
-  .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => ctx.db.users.get(input.id)!)  // Initial value
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+  .args(z.object({ id: z.string() }))
+  .resolve(({ args, ctx }) => ctx.db.users.get(args.id)!)
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
     // Publisher callback - emit/onCleanup passed here
-    const unsub = ctx.db.users.onChange(input.id, (user) => {
+    const unsub = ctx.db.users.onChange(args.id, (user) => {
       emit(user);  // Push update to clients
     });
     onCleanup(unsub);  // Cleanup on disconnect
@@ -177,11 +184,14 @@ Bun.serve({
 
 ```typescript
 createApp({
-  // Required (at least one)
+  // Required
   router: RouterDef,           // Namespaced operations
 
-  // Optional (models auto-tracked from router!)
-  entities: EntitiesMap,       // Explicit models (optional, for overrides)
+  // Entities & Resolvers
+  entities: EntitiesMap,       // Models for normalization
+  resolvers: ResolverDef[],    // Field resolvers array
+
+  // Optional
   plugins: ServerPlugin[],     // Server plugins (optimistic, clientState, etc.)
   context: () => TContext,     // Context factory
   logger: LensLogger,          // Logging (default: silent)
@@ -189,44 +199,15 @@ createApp({
 });
 ```
 
-## Auto-tracking Models
-
-Models are automatically collected from router return types:
-
-```typescript
-// These models are auto-tracked:
-const appRouter = router({
-  user: {
-    get: query().returns(User).resolve(...),     // User tracked
-    list: query().returns(list(User)).resolve(...), // User tracked
-    find: query().returns(nullable(User)).resolve(...), // User tracked
-  },
-  post: {
-    get: query().returns(Post).resolve(...),     // Post tracked
-  },
-});
-
-// No need to pass entities explicitly
-const app = createApp({
-  router: appRouter,  // User and Post auto-collected
-});
-
-// Or override/add explicit models
-const app = createApp({
-  router: appRouter,
-  entities: { User, Post, ExtraModel },  // Explicit takes priority
-});
-```
-
 ## Optimistic Update Strategies
 
 | Strategy | Description | Example |
 |----------|-------------|---------|
-| `"merge"` | Merge input into entity | `.optimistic("merge")` |
+| `"merge"` | Merge args into entity | `.optimistic("merge")` |
 | `"create"` | Create with temp ID | `.optimistic("create")` |
 | `"delete"` | Mark entity deleted | `.optimistic("delete")` |
 | `{ merge: {...} }` | Merge with extra fields | `.optimistic({ merge: { status: "pending" } })` |
-| Reify DSL | Multi-entity operations | `.optimistic(({ input }) => [...])` |
+| Reify DSL | Multi-entity operations | `.optimistic(({ args }) => [...])` |
 
 ## License
 

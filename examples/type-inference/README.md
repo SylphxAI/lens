@@ -9,7 +9,7 @@ app._types.router → inProcess({ app }) → TypedTransport → createClient() �
 ## What This Example Shows
 
 1. **Model Type Inference**: How `.returns(Model)` provides full type inference
-2. **Query Type Inference**: How query input/output types flow through the chain
+2. **Query Type Inference**: How query args/output types flow through the chain
 3. **Mutation Type Inference**: How mutation types work with optimistic updates
 4. **End-to-End Safety**: How the client automatically gets correct types from server
 
@@ -22,16 +22,18 @@ bun run examples/type-inference/demo.ts
 
 ## Key Patterns
 
-### 1. Define Models with `model()` and `t`
+### 1. Define Models with `model()`
 
 ```typescript
-const User = model<AppContext>("User", (t) => ({
-  id: t.id(),
-  name: t.string(),
-  email: t.string(),
-  role: t.enum(["user", "admin"]),
-  bio: t.string().optional(),
-}));
+import { model, id, string, enumType, nullable } from '@sylphx/lens-core'
+
+const User = model("User", {
+  id: id(),
+  name: string(),
+  email: string(),
+  role: enumType(["user", "admin"]),
+  bio: nullable(string()),
+});
 ```
 
 ### 2. Use `lens<Context>()` for Typed Builders
@@ -42,17 +44,17 @@ interface AppContext {
   currentUser: User | null;
 }
 
-const { query, mutation } = lens<AppContext>();
+const { query, mutation, resolver } = lens<AppContext>();
 ```
 
 ### 3. Chain `.returns(Entity)` for Output Types
 
 ```typescript
 const getUser = query()
-  .input(z.object({ id: z.string() }))
+  .args(z.object({ id: z.string() }))
   .returns(User)  // ← This sets the output type!
-  .resolve(({ input, ctx }) => {
-    const user = ctx.db.users.get(input.id);
+  .resolve(({ args, ctx }) => {
+    const user = ctx.db.users.get(args.id);
     if (!user) throw new Error("Not found");
     return user;  // TypeScript knows this must match User shape
   });

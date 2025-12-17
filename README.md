@@ -296,59 +296,26 @@ The server automatically selects optimal transfer strategies:
 
 ## Model Definition & Field Resolution
 
-Lens uses **inline resolvers** - define models with their field resolution in one place.
+Lens separates **schema** (model) from **implementation** (resolver):
+- `model()` → Pure schema definition (types only)
+- `resolver()` → Field resolution implementation
 
-### Define Models with Inline Resolvers ✅ Recommended
+### Define Models (Schema)
 
-Use the `model("Name", { ... })` function for type-safe definitions with inline resolvers:
+Use `model("Name", { ... })` to define the data shape. Models contain only scalar fields:
 
 ```typescript
-import { lens, id, string, int, boolean, date, list, nullable } from '@sylphx/lens-core'
+import { model, id, string, int, boolean, datetime, enumType, nullable, list, resolver, lens } from '@sylphx/lens-core'
+import { z } from 'zod'
 
-const { model } = lens<AppContext>()
-
-// User model with inline field resolvers
+// Models define scalar fields only (data shape from DB)
 const User = model("User", {
-  // Scalar fields
   id: id(),
   name: string(),
   email: string(),
-  role: string(), // or use enum type
-  createdAt: date(),
-
-  // Computed field
-  displayName: string(),
-
-  // Relation (lazy reference)
-  posts: list(() => Post),
-
-  // Computed with arguments
-  postsCount: int(),
-
-  // Live field (real-time updates)
-  status: string(),
-}).resolve({
-  displayName: ({ source }) =>
-    `${source.name} (${source.role})`,
-
-  posts: ({ source, args, ctx }) =>
-    ctx.db.posts.findMany({
-      where: { authorId: source.id, published: args?.published },
-      take: args?.first ?? 10,
-    }),
-
-  postsCount: ({ source, args, ctx }) =>
-    ctx.db.posts.count({
-      where: { authorId: source.id, published: args?.published },
-    }),
-
-  status: {
-    resolve: ({ source, ctx }) => ctx.getStatus(source.id),
-    subscribe: ({ source, ctx }) => ({ emit, onCleanup }) => {
-      const unsub = ctx.pubsub.on(`status:${source.id}`, emit)
-      onCleanup(unsub)
-    },
-  },
+  role: enumType(["user", "admin", "vip"]),
+  avatar: nullable(string()),
+  createdAt: datetime(),
 })
 
 const Post = model("Post", {
@@ -356,65 +323,94 @@ const Post = model("Post", {
   title: string(),
   content: string(),
   published: boolean(),
-  authorId: string(),
-
-  // Lazy relation (avoids circular reference)
-  author: () => User,
-
-  // Computed with arguments
-  excerpt: string(),
-}).resolve({
-  author: ({ source, ctx }) =>
-    ctx.db.users.find(source.authorId),
-
-  excerpt: ({ source, args }) =>
-    source.content.slice(0, args?.length ?? 100) + "...",
+  authorId: string(),  // FK to User
+  updatedAt: nullable(datetime()),
+  createdAt: datetime(),
 })
+```
+
+### Define Resolvers (Implementation)
+
+Use `resolver(Model, (t) => ({...}))` to define how fields are resolved. Every model field must have a resolver:
+
+```typescript
+const { resolver } = lens<AppContext>()
+
+// User resolver - defines field exposure and computed fields/relations
+const userResolver = resolver(User, (t) => ({
+  // Expose scalar fields directly from source data
+  id: t.expose('id'),
+  name: t.expose('name'),
+  email: t.expose('email'),
+  role: t.expose('role'),
+  avatar: t.expose('avatar'),
+  createdAt: t.expose('createdAt'),
+
+  // Computed field - plain function
+  displayName: ({ source }) => `${source.name} (${source.role})`,
+
+  // Relation with arguments - use t.args().resolve()
+  posts: t
+    .args(z.object({
+      first: z.number().default(10),
+      published: z.boolean().optional(),
+    }))
+    .resolve(({ source, args, ctx }) => {
+      let posts = ctx.db.posts.filter(p => p.authorId === source.id)
+      if (args.published !== undefined) {
+        posts = posts.filter(p => p.published === args.published)
+      }
+      return posts.slice(0, args.first)
+    }),
+
+  // Live field with Publisher pattern
+  status: t.resolve(({ source, ctx }) => ctx.getStatus(source.id))
+    .subscribe(({ source, ctx }) => ({ emit, onCleanup }) => {
+      const unsub = ctx.pubsub.on(`status:${source.id}`, emit)
+      onCleanup(unsub)
+    }),
+}))
+
+// Post resolver
+const postResolver = resolver(Post, (t) => ({
+  id: t.expose('id'),
+  title: t.expose('title'),
+  content: t.expose('content'),
+  published: t.expose('published'),
+  authorId: t.expose('authorId'),
+  updatedAt: t.expose('updatedAt'),
+  createdAt: t.expose('createdAt'),
+
+  // Relation - plain function resolver
+  author: ({ source, ctx }) => {
+    const author = ctx.db.users.get(source.authorId)
+    if (!author) throw new Error(`Author not found: ${source.authorId}`)
+    return author
+  },
+
+  // Computed field with arguments
+  excerpt: t
+    .args(z.object({ length: z.number().default(100) }))
+    .resolve(({ source, args }) => {
+      const text = source.content
+      if (text.length <= args.length) return text
+      return text.slice(0, args.length) + "..."
+    }),
+}))
 ```
 
 ### Register with Server
 
-Models are **auto-tracked** from router return types - no need for explicit `entities` config:
+Pass models, resolvers, and router to `createApp`:
 
 ```typescript
-// New: Models auto-collected from .returns()
-const app = createApp({
-  router: appRouter,  // Models extracted from query/mutation return types
-  context: () => ({ db }),
-})
+import { createApp } from '@sylphx/lens-server'
 
-// Or explicitly (optional, for additional models not in returns)
 const app = createApp({
   router: appRouter,
-  entities: { User, Post },  // Optional: explicit models
+  entities: { User, Post },                      // Models for normalization
+  resolvers: [userResolver, postResolver],       // Field resolvers array
   context: () => ({ db }),
-})
-```
-
-### Legacy: Old API (t builder) ⚠️ Deprecated
-
-> **⚠️ Deprecated:** Use the new API with plain objects and standalone field builders.
-
-```typescript
-// ❌ OLD API - model with (t) => builder pattern
-import { model } from '@sylphx/lens-core'
-
-const User = model<AppContext>("User", (t) => ({
-  id: t.id(),
-  name: t.string(),
-  posts: t.many(() => Post).resolve(({ parent, ctx }) => ...)
-}))
-
-// ✅ NEW API - plain object with standalone builders
-import { lens, id, string, list } from '@sylphx/lens-core'
-const { model } = lens<AppContext>()
-
-const User = model("User", {
-  id: id(),
-  name: string(),
-  posts: list(() => Post),
-}).resolve({
-  posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id)
 })
 ```
 
@@ -433,12 +429,19 @@ const User = model("User", {
 | `string()` | String field | `name: string()` |
 | `int()` | Integer field | `age: int()` |
 | `boolean()` | Boolean field | `active: boolean()` |
-| `date()` | Date field | `createdAt: date()` |
+| `datetime()` | DateTime field | `createdAt: datetime()` |
+| `enumType([...])` | Enum field | `role: enumType(["user", "admin"])` |
 | `list(() => E)` | Collection relation | `posts: list(() => Post)` |
-| `() => E` | Singular relation (lazy) | `author: () => User` |
 | `nullable(T)` | Nullable field | `email: nullable(string())` |
-| `.resolve({ field: fn })` | Field resolvers | `.resolve({ posts: ({ source, ctx }) => ... })` |
-| Field with subscribe | Live updates (Publisher) | `{ resolve: fn, subscribe: fn }` |
+
+### Resolver Builder API
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `t.expose('field')` | Pass through from source | `id: t.expose('id')` |
+| `({ source, ctx }) => ...` | Plain function resolver | `avatar: ({ source, ctx }) => ctx.cdn.url(source.avatarKey)` |
+| `t.args(schema).resolve(fn)` | Field with arguments | `posts: t.args(z.object({...})).resolve(...)` |
+| `t.resolve(fn).subscribe(fn)` | Live field (Publisher pattern) | `status: t.resolve(...).subscribe(...)` |
 
 ### GraphQL Comparison
 
@@ -937,14 +940,14 @@ import { entity, pipe, temp, ref, now, branch, inc, push } from '@sylphx/reify';
 
 const sendMessagePipeline = pipe(({ args }) => [
   // Step 1: Conditional upsert - create or update session
-  branch(input.sessionId)
+  branch(args.sessionId)
     .then(entity.update('Session', {
-      id: input.sessionId,
+      id: args.sessionId,
       updatedAt: now()
     }))
     .else(entity.create('Session', {
       id: temp(),
-      title: input.title,
+      title: args.title,
       createdAt: now()
     }))
     .as('session'),
@@ -960,7 +963,7 @@ const sendMessagePipeline = pipe(({ args }) => [
 
   // Step 3: Update user stats with operators
   entity.update('User', {
-    id: input.userId,
+    id: args.userId,
     messageCount: inc(1),          // Increment by 1
     tags: push('active'),          // Append to array
     lastActiveAt: now(),
@@ -1177,7 +1180,7 @@ export const createUser = mutation<{ db: PrismaClient; user: User | null }>()
 // Only uses ctx.cache
 export const getCached = query<{ cache: RedisClient }>()
   .args(z.object({ key: z.string() }))
-  .resolve(({ args, ctx }) => ctx.cache.get(input.key))
+  .resolve(({ args, ctx }) => ctx.cache.get(args.key))
 ```
 
 ```typescript
@@ -1531,8 +1534,8 @@ const getUser = query().resolve(({ args }) => {
 })
 
 const updateUser = mutation().resolve(({ args }) => {
-  manager.emit("User", args.id, input.data)  // Pushes to all subscribers
-  return input.data
+  manager.emit("User", args.id, args.data)  // Pushes to all subscribers
+  return args.data
 })
 ```
 
