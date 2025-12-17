@@ -396,18 +396,19 @@ type ResolverEntity = {
 };
 
 /**
- * Helper type to enforce exact field keys in resolver.
- * Extra fields not in the model will cause a type error.
+ * Helper type for resolver field requirements.
+ * - All model fields MUST be present (enforced)
+ * - Extra computed/relation fields are ALLOWED (not in model)
+ *
+ * Model = scalar fields (data shape)
+ * Resolver = all fields including computed/relations
  */
-type ExactResolverFields<
+type ResolverFieldRequirements<
 	TEntity extends ResolverEntity,
 	TFields extends Record<string, unknown>,
 	TContext,
 > = TFields & {
-	// Force extra keys to be `never`, causing type error if present
-	[K in Exclude<keyof TFields, keyof TEntity["fields"]>]: never;
-} & {
-	// Ensure all model fields are present
+	// Ensure all model fields are present with correct types
 	[K in keyof TEntity["fields"]]: AnyFieldDef<TContext>;
 };
 
@@ -416,7 +417,7 @@ export function resolver<TContext = FieldResolverContext>(): <
 	TFields extends { [K in keyof TEntity["fields"]]: AnyFieldDef<TContext> },
 >(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => ExactResolverFields<TEntity, TFields, TContext>,
+	builder: (f: FieldBuilder<TEntity, TContext>) => ResolverFieldRequirements<TEntity, TFields, TContext>,
 ) => ResolverDef<TEntity, TFields, TContext>;
 
 export function resolver<
@@ -426,7 +427,7 @@ export function resolver<
 	entity: TEntity,
 	builder: (
 		f: FieldBuilder<TEntity, FieldResolverContext>,
-	) => ExactResolverFields<TEntity, TFields, FieldResolverContext>,
+	) => ResolverFieldRequirements<TEntity, TFields, FieldResolverContext>,
 ): ResolverDef<TEntity, TFields, FieldResolverContext>;
 
 export function resolver<TContext = FieldResolverContext>(

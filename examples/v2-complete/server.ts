@@ -9,14 +9,15 @@
  * - Plain function resolvers for simple computed fields: ({ source, ctx }) => ...
  */
 
-import { model, id, string, boolean, datetime, enumType, nullable, router, lens } from "@sylphx/lens-core";
+import { model, id, string, boolean, datetime, enumType, nullable, list, router, lens } from "@sylphx/lens-core";
 import { entity as e, temp, ref, now, branch } from "@sylphx/reify";
 // Note: `e` is the Reify entity helper, `model` is the Lens model definition builder
 import { createApp, createHandler, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 
 // =============================================================================
-// Models (scalar fields only - no circular reference issues)
+// Models (scalar fields only - data shape from DB)
+// Computed fields and relations are defined in resolvers
 // =============================================================================
 
 export const User = model("User", {

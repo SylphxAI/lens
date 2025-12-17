@@ -401,15 +401,12 @@ export interface FieldBuilder<TEntity extends AnyEntityLike, TContext = FieldRes
 // =============================================================================
 
 /** Resolver fields definition */
-export type ResolverFields<TContext = FieldResolverContext> = Record<
-	string,
-	FieldDef<unknown, TContext>
->;
+export type ResolverFields<TContext = FieldResolverContext> = Record<string, AnyFieldDef<TContext>>;
 
 /** Resolver definition for an entity */
 export interface ResolverDef<
 	TEntity extends AnyEntityLike = AnyEntityLike,
-	TFields extends Record<string, FieldDef<any, any, any>> = Record<string, FieldDef<any, any, any>>,
+	TFields extends Record<string, AnyFieldDef<any>> = Record<string, AnyFieldDef<any>>,
 	TContext = FieldResolverContext,
 > {
 	/** The entity this resolver is for */
