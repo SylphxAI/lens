@@ -17,7 +17,7 @@
  *   .input(z.object({ id: z.string(), name: z.string() }))
  *   .returns(User)
  *   .optimistic('merge')  // ✅ Type-safe
- *   .resolve(({ input }) => db.user.update(input));
+ *   .resolve(({ args }) => db.user.update(args));
  *
  * const server = createApp({ router, plugins });
  * ```
@@ -151,7 +151,7 @@ interface ReifyPipeline {
  * Sugar syntax:
  * - "merge" → entity.update with input fields
  * - "create" → entity.create from output
- * - "delete" → entity.delete by input.id
+ * - "delete" → entity.delete by args.id
  *
  * Returns the original value if already a Pipeline.
  *
@@ -176,7 +176,7 @@ function sugarToPipeline(
 
 	switch (sugar) {
 		case "merge": {
-			// entity.update('Entity', { id: input.id, ...fields })
+			// entity.update('Entity', { id: args.id, ...fields })
 			const updateData: Record<string, unknown> = {
 				type: entity,
 				id: $input("id"),
@@ -217,7 +217,7 @@ function sugarToPipeline(
 			return pipeline as unknown as Pipeline;
 		}
 		case "delete": {
-			// entity.delete('Entity', { id: input.id })
+			// entity.delete('Entity', { id: args.id })
 			const pipeline: ReifyPipeline = {
 				$pipe: [
 					{
@@ -298,7 +298,7 @@ export type OptimisticPlugin = OptimisticPluginMarker & ServerPlugin;
  *   .input(z.object({ id: z.string(), name: z.string() }))
  *   .returns(User)
  *   .optimistic('merge')
- *   .resolve(({ input }) => db.user.update(input));
+ *   .resolve(({ args }) => db.user.update(args));
  *
  * const server = createApp({ router, plugins });
  * ```

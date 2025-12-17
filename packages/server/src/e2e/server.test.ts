@@ -70,8 +70,8 @@ describe("E2E - Basic Operations", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => {
-				const user = mockUsers.find((u) => u.id === input.id);
+			.resolve(({ args }) => {
+				const user = mockUsers.find((u) => u.id === args.id);
 				if (!user) throw new Error("User not found");
 				return user;
 			});
@@ -98,10 +98,10 @@ describe("E2E - Basic Operations", () => {
 		const createUser = mutation()
 			.input(z.object({ name: z.string(), email: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({
+			.resolve(({ args }) => ({
 				id: "user-new",
-				name: input.name,
-				email: input.email,
+				name: args.name,
+				email: args.email,
 				status: "offline",
 			}));
 
@@ -242,8 +242,8 @@ describe("E2E - Selection", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => {
-				const user = mockUsers.find((u) => u.id === input.id);
+			.resolve(({ args }) => {
+				const user = mockUsers.find((u) => u.id === args.id);
 				if (!user) throw new Error("User not found");
 				return user;
 			});
@@ -280,7 +280,7 @@ describe("E2E - Selection", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id)!);
+			.resolve(({ args }) => mockUsers.find((u) => u.id === args.id)!);
 
 		const server = createApp({
 			entities: { User },
@@ -342,8 +342,8 @@ describe("E2E - Entity Resolvers", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(UserWithPosts)
-			.resolve(({ input }) => {
-				const user = users.find((u) => u.id === input.id);
+			.resolve(({ args }) => {
+				const user = users.find((u) => u.id === args.id);
 				if (!user) throw new Error("Not found");
 				return user;
 			});
@@ -462,12 +462,12 @@ describe("E2E - Metadata", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => mockUsers.find((u) => u.id === input.id)!);
+			.resolve(({ args }) => mockUsers.find((u) => u.id === args.id)!);
 
 		const createUser = mutation()
 			.input(z.object({ name: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({ id: "new", name: input.name, email: "", status: "" }));
+			.resolve(({ args }) => ({ id: "new", name: args.name, email: "", status: "" }));
 
 		const server = createApp({
 			entities: { User },
@@ -491,7 +491,7 @@ describe("E2E - Metadata", () => {
 		const updateUser = mutation()
 			.input(z.object({ id: z.string(), name: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({ ...mockUsers[0], name: input.name }));
+			.resolve(({ args }) => ({ ...mockUsers[0], name: args.name }));
 
 		const deleteUser = mutation()
 			.input(z.object({ id: z.string() }))

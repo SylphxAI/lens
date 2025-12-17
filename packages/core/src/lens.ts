@@ -194,20 +194,20 @@ export interface LensMutationBuilderWithReturnsAndOptimistic<TInput, TOutput, TC
 	extends MutationBuilderWithReturns2<TInput, TOutput, TContext> {
 	/**
 	 * Define optimistic update behavior with typed callback.
-	 * The callback receives `{ input }` with the input type inferred from `.input()`.
+	 * The callback receives `{ args }` with the args type inferred from `.input()`.
 	 *
-	 * @param callback - Callback that receives typed input and returns step builders
+	 * @param callback - Callback that receives typed args and returns step builders
 	 * @returns Builder with .resolve() method
 	 *
 	 * @example
 	 * ```typescript
-	 * .optimistic(({ input }) => [
-	 *   e.update(User, { id: input.id, name: input.name }),
+	 * .optimistic(({ args }) => [
+	 *   e.update(User, { id: args.id, name: args.name }),
 	 * ])
 	 * ```
 	 */
 	optimistic(
-		callback: (ctx: { input: TInput }) => StepBuilder[],
+		callback: (ctx: { args: TInput }) => StepBuilder[],
 	): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
 
 	/**
@@ -218,8 +218,8 @@ export interface LensMutationBuilderWithReturnsAndOptimistic<TInput, TOutput, TC
 	 *
 	 * @example
 	 * ```typescript
-	 * .optimistic("merge")  // Merge input with existing entity
-	 * .optimistic("create") // Create new entity from input
+	 * .optimistic("merge")  // Merge args with existing entity
+	 * .optimistic("create") // Create new entity from args
 	 * .optimistic({ merge: { published: true } }) // Merge specific fields
 	 * ```
 	 */

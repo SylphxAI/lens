@@ -311,7 +311,7 @@ describe("direct type inference", () => {
 					create: mutation()
 						.input(z.object({ name: z.string(), email: z.string() }))
 						.returns(User)
-						.resolve(({ input }) => ({ id: "new", ...input })),
+						.resolve(({ args }) => ({ id: "new", ...args })),
 				}),
 			});
 
@@ -380,7 +380,7 @@ describe("direct type inference", () => {
 						create: mutation()
 							.input(z.object({ name: z.string(), email: z.string() }))
 							.returns(User)
-							.resolve(({ input }) => ({ id: "new", ...input })),
+							.resolve(({ args }) => ({ id: "new", ...args })),
 					}),
 					posts: router({
 						trending: query().resolve(() => []),
@@ -414,7 +414,7 @@ describe("direct type inference", () => {
 						.resolve(() => ({ id: "1", name: "John", email: "john@test.com" })),
 					setData: mutation()
 						.input(z.object({ id: z.string(), value: z.string() }))
-						.resolve(({ input }) => ({ updated: input.id })),
+						.resolve(({ args }) => ({ updated: args.id })),
 				}),
 				context: () => ({ db: new Map() }),
 			});
@@ -451,16 +451,16 @@ describe("direct type inference", () => {
 						get: query()
 							.input(z.object({ id: z.string() }))
 							.returns(User)
-							.resolve(({ input }) => {
-								const user = db.get(input.id);
+							.resolve(({ args }) => {
+								const user = db.get(args.id);
 								if (!user) throw new Error("Not found");
 								return user;
 							}),
 						create: mutation()
 							.input(z.object({ name: z.string(), email: z.string() }))
 							.returns(User)
-							.resolve(({ input }) => {
-								const user = { id: String(db.size + 1), ...input };
+							.resolve(({ args }) => {
+								const user = { id: String(db.size + 1), ...args };
 								db.set(user.id, user);
 								return user;
 							}),

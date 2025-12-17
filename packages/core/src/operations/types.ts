@@ -169,7 +169,7 @@ export type GeneratorSubscriptionContext<TContext> = TContext & GeneratorContext
  */
 export interface QueryResolverContext<TInput = unknown, TContext = unknown> {
 	/**
-	 * Parsed and validated input.
+	 * Parsed and validated arguments.
 	 * @example
 	 * ```typescript
 	 * .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
@@ -185,7 +185,7 @@ export interface QueryResolverContext<TInput = unknown, TContext = unknown> {
  * ctx has emit and onCleanup.
  */
 export interface EmitResolverContext<TInput = unknown, TOutput = unknown, TContext = unknown> {
-	/** Parsed and validated input */
+	/** Parsed and validated arguments */
 	args: TInput;
 	/** Context with emit and onCleanup */
 	ctx: EmitSubscriptionContext<TContext, TOutput>;
@@ -196,7 +196,7 @@ export interface EmitResolverContext<TInput = unknown, TOutput = unknown, TConte
  * ctx has onCleanup but no emit.
  */
 export interface GeneratorResolverContext<TInput = unknown, TContext = unknown> {
-	/** Parsed and validated input */
+	/** Parsed and validated arguments */
 	args: TInput;
 	/** Context with onCleanup only */
 	ctx: GeneratorSubscriptionContext<TContext>;
@@ -223,10 +223,10 @@ export type GeneratorResolverFn<TInput, TOutput, TContext = unknown> = (
 
 /**
  * Generic resolver function for mutations.
- * Receives typed input and context, returns output.
+ * Receives typed arguments and context, returns output.
  */
 export type ResolverFn<TInput, TOutput, TContext = unknown> = (ctx: {
-	input: TInput;
+	args: TInput;
 	ctx: TContext;
 }) => TOutput | Promise<TOutput>;
 
@@ -261,9 +261,9 @@ export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
 
 /** Context passed to optimistic callback for type inference */
 export interface OptimisticContext<TInput> {
-	/** Typed input - inferred from .input() schema */
-	input: TInput;
+	/** Typed arguments - inferred from .input() schema */
+	args: TInput;
 }
 
-/** Optimistic callback that receives typed input and returns step builders */
+/** Optimistic callback that receives typed arguments and returns step builders */
 export type OptimisticCallback<TInput> = (ctx: OptimisticContext<TInput>) => StepBuilder[];

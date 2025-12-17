@@ -241,16 +241,16 @@ const userRouter = router({
 		}))
 		.returns(User)
 		.optimistic("merge")
-		.resolve(({ input, ctx }) => {
-			const user = ctx.db.users.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const user = ctx.db.users.get(args.id);
 			if (!user) throw new Error("User not found");
 			const updated = {
 				...user,
-				...(input.name && { name: input.name }),
-				...(input.email && { email: input.email }),
-				...(input.avatar && { avatar: input.avatar }),
+				...(args.name && { name: args.name }),
+				...(args.email && { email: args.email }),
+				...(args.avatar && { avatar: args.avatar }),
 			};
-			ctx.db.users.set(input.id, updated);
+			ctx.db.users.set(args.id, updated);
 			return updated;
 		}),
 
@@ -259,12 +259,12 @@ const userRouter = router({
 			userIds: z.array(z.string()),
 			newRole: z.enum(["user", "admin", "vip"]),
 		}))
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			let count = 0;
-			for (const id of input.userIds) {
+			for (const id of args.userIds) {
 				const user = ctx.db.users.get(id);
 				if (user) {
-					ctx.db.users.set(id, { ...user, role: input.newRole });
+					ctx.db.users.set(id, { ...user, role: args.newRole });
 					count++;
 				}
 			}
@@ -296,11 +296,11 @@ const postRouter = router({
 		.input(z.object({ title: z.string(), content: z.string() }))
 		.returns(Post)
 		.optimistic("create")
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			const id = String(ctx.db.posts.size + 1);
 			const post = {
 				id,
-				...input,
+				...args,
 				published: false,
 				authorId: ctx.currentUser?.id ?? "unknown",
 				updatedAt: null,
@@ -318,16 +318,16 @@ const postRouter = router({
 		}))
 		.returns(Post)
 		.optimistic("merge")
-		.resolve(({ input, ctx }) => {
-			const post = ctx.db.posts.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const post = ctx.db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			const updated = {
 				...post,
-				...(input.title && { title: input.title }),
-				...(input.content && { content: input.content }),
+				...(args.title && { title: args.title }),
+				...(args.content && { content: args.content }),
 				updatedAt: new Date(),
 			};
-			ctx.db.posts.set(input.id, updated);
+			ctx.db.posts.set(args.id, updated);
 			return updated;
 		}),
 
@@ -335,11 +335,11 @@ const postRouter = router({
 		.input(z.object({ id: z.string() }))
 		.returns(Post)
 		.optimistic({ merge: { published: true } })
-		.resolve(({ input, ctx }) => {
-			const post = ctx.db.posts.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const post = ctx.db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			const updated = { ...post, published: true, updatedAt: new Date() };
-			ctx.db.posts.set(input.id, updated);
+			ctx.db.posts.set(args.id, updated);
 			return updated;
 		}),
 });
@@ -349,11 +349,11 @@ const commentRouter = router({
 		.input(z.object({ postId: z.string(), content: z.string() }))
 		.returns(Comment)
 		.optimistic("create")
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			const id = String(ctx.db.comments.size + 1);
 			const comment = {
 				id,
-				...input,
+				...args,
 				authorId: ctx.currentUser?.id ?? "unknown",
 				createdAt: new Date(),
 			};
@@ -375,7 +375,7 @@ const chatRouter = router({
 	 * - Server executes same pipeline against Prisma for persistence
 	 *
 	 * Callback pattern with automatic type inference!
-	 * The `input` parameter is fully typed from .input() schema.
+	 * The `args` parameter is fully typed from .input() schema.
 	 */
 	send: mutation()
 		.input(z.object({
@@ -385,16 +385,16 @@ const chatRouter = router({
 			userId: z.string(),
 		}))
 		.returns(Message)
-		// Callback with typed input AND typed entity operations!
-		.optimistic(({ input }) => [
+		// Callback with typed args AND typed entity operations!
+		.optimistic(({ args }) => [
 			// Step 1: Create or update session
-			// TypeScript knows: input.sessionId is string | undefined
-			branch(input.sessionId)
-				.then(e.update(Session, { id: input.sessionId!, title: input.title ?? "Chat" }))
+			// TypeScript knows: args.sessionId is string | undefined
+			branch(args.sessionId)
+				.then(e.update(Session, { id: args.sessionId!, title: args.title ?? "Chat" }))
 				.else(e.create(Session, {
 					id: temp(),
-					title: input.title ?? "New Chat",
-					userId: input.userId,  // TypeScript knows: string
+					title: args.title ?? "New Chat",
+					userId: args.userId,  // TypeScript knows: string
 					createdAt: now(),
 				}))
 				.as("session"),
@@ -405,21 +405,21 @@ const chatRouter = router({
 				id: temp(),
 				sessionId: ref("session").id,
 				role: "user",           // TypeScript knows: "user" | "assistant"
-				content: input.content, // TypeScript knows: string
+				content: args.content, // TypeScript knows: string
 				createdAt: now(),
 			}).as("message"),
 		])
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			// Server-side execution (in real app, this would use Prisma)
-			let sessionId = input.sessionId;
+			let sessionId = args.sessionId;
 
 			// Create session if needed
 			if (!sessionId) {
 				sessionId = String(ctx.db.sessions.size + 1);
 				ctx.db.sessions.set(sessionId, {
 					id: sessionId,
-					title: input.title ?? "New Chat",
-					userId: input.userId,
+					title: args.title ?? "New Chat",
+					userId: args.userId,
 					createdAt: new Date(),
 				});
 			}
@@ -430,7 +430,7 @@ const chatRouter = router({
 				id: messageId,
 				sessionId,
 				role: "user" as const,
-				content: input.content,
+				content: args.content,
 				createdAt: new Date(),
 			};
 			ctx.db.messages.set(messageId, message);

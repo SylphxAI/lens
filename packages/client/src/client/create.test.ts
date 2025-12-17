@@ -175,8 +175,8 @@ describe("QueryResult.subscribe()", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							return user;
 						}),
@@ -220,8 +220,8 @@ describe("QueryResult.subscribe()", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							return user;
 						}),
@@ -263,8 +263,8 @@ describe("QueryResult.subscribe()", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							return user;
 						}),
@@ -382,8 +382,8 @@ describe("QueryResult.select()", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							return user;
 						}),
@@ -666,8 +666,8 @@ describe("createAccessor subscribe", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							return user;
 						}),
@@ -915,8 +915,8 @@ describe("Field merging and selection merging", () => {
 			router: router({
 				user: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input }) => ({
-						id: input.id,
+					.resolve(({ args }) => ({
+						id: args.id,
 						name: "Alice",
 						email: "alice@example.com",
 						phone: "555-1234",
@@ -1021,10 +1021,10 @@ describe("Field merging and selection merging", () => {
 			router: router({
 				data: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input }) => {
+					.resolve(({ args }) => {
 						queryCallCount++;
 						return {
-							id: input.id,
+							id: args.id,
 							fieldA: "valueA",
 							fieldB: "valueB",
 							fieldC: "valueC",
@@ -1195,8 +1195,8 @@ describe("Query batching", () => {
 			router: router({
 				item: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input }) => {
-						return { id: input.id, name: `Item ${input.id}` };
+					.resolve(({ args }) => {
+						return { id: args.id, name: `Item ${args.id}` };
 					}),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),
@@ -1235,9 +1235,9 @@ describe("Query batching", () => {
 			router: router({
 				item: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input }) => {
+					.resolve(({ args }) => {
 						executeCallCount++;
-						return { id: input.id, name: `Item ${input.id}` };
+						return { id: args.id, name: `Item ${args.id}` };
 					}),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),
@@ -1501,7 +1501,7 @@ describe("Edge cases and error handling", () => {
 			router: router({
 				data: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input }) => ({ id: input.id, value: Math.random() })),
+					.resolve(({ args }) => ({ id: args.id, value: Math.random() })),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),
 		});

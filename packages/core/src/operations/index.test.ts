@@ -60,7 +60,7 @@ describe("query() builder", () => {
 		const getUserById = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" }));
+			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
 		expect(getUserById._type).toBe("query");
 		expect(getUserById._input).toBeDefined();
@@ -117,10 +117,10 @@ describe("query() builder", () => {
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(async ({ input }) => mockDb.user.findUnique({ where: { id: input.id } }));
+			.resolve(async ({ args }) => mockDb.user.findUnique({ where: { id: args.id } }));
 
 		const result = await getUser._resolve!({
-			input: { id: "123" },
+			args: { id: "123" },
 			ctx: {
 				emit: (() => {}) as never,
 				onCleanup: () => () => {},
@@ -139,10 +139,10 @@ describe("mutation() builder", () => {
 		const createPost = mutation()
 			.input(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
-			.resolve(({ input }) => ({
+			.resolve(({ args }) => ({
 				id: "1",
-				title: input.title,
-				content: input.content,
+				title: args.title,
+				content: args.content,
 				authorId: "user-1",
 			}));
 
@@ -157,10 +157,10 @@ describe("mutation() builder", () => {
 			.input(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
 			.optimistic("create")
-			.resolve(({ input }) => ({
+			.resolve(({ args }) => ({
 				id: "real-id",
-				title: input.title,
-				content: input.content,
+				title: args.title,
+				content: args.content,
 				authorId: "user-1",
 			}));
 
@@ -173,9 +173,9 @@ describe("mutation() builder", () => {
 			.input(z.object({ id: z.string(), title: z.string() }))
 			.returns(Post)
 			.optimistic({ merge: { updatedAt: "now" } })
-			.resolve(({ input }) => ({
-				id: input.id,
-				title: input.title,
+			.resolve(({ args }) => ({
+				id: args.id,
+				title: args.title,
 				content: "content",
 				authorId: "user-1",
 			}));
@@ -198,10 +198,10 @@ describe("mutation() builder", () => {
 		const createPost = mutation()
 			.input(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
-			.resolve(async ({ input }) => mockDb.post.create({ data: input }));
+			.resolve(async ({ args }) => mockDb.post.create({ data: args }));
 
 		const result = await createPost._resolve({
-			input: { title: "Hello", content: "World" },
+			args: { title: "Hello", content: "World" },
 			ctx: {
 				emit: (() => {}) as never,
 				onCleanup: () => () => {},
@@ -225,9 +225,9 @@ describe("mutation() builder", () => {
 		const promoteUsers = mutation()
 			.input(z.object({ userIds: z.array(z.string()), role: z.string() }))
 			.returns({ users: [User], notifications: [Notification] })
-			.resolve(({ input }) => ({
-				users: input.userIds.map((id) => ({ id, name: "User", email: "user@example.com" })),
-				notifications: input.userIds.map((id) => ({
+			.resolve(({ args }) => ({
+				users: args.userIds.map((id) => ({ id, name: "User", email: "user@example.com" })),
+				notifications: args.userIds.map((id) => ({
 					id: `notif-${id}`,
 					userId: id,
 					message: "Promoted!",
@@ -290,7 +290,7 @@ describe("Type guards", () => {
 		const m = mutation()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" }));
+			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
 		expect(isMutationDef(m)).toBe(true);
 		expect(isMutationDef({})).toBe(false);
@@ -304,7 +304,7 @@ describe("Type guards", () => {
 		const m = mutation()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" }));
+			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
 		expect(isOperationDef(q)).toBe(true);
 		expect(isOperationDef(m)).toBe(true);
@@ -333,7 +333,7 @@ describe("Streaming support", () => {
 
 		// Execute and collect results
 		const generator = streamingQuery._resolve!({
-			input: undefined,
+			args: undefined,
 			ctx: {
 				emit: (() => {}) as never,
 				onCleanup: () => () => {},
@@ -361,7 +361,7 @@ describe("Input validation", () => {
 		const _getUser = query()
 			.input(schema)
 			.returns(User)
-			.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" }));
+			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
 		// Valid input
 		const result = schema.safeParse({ id: "123" });
@@ -384,21 +384,21 @@ describe("router() builder", () => {
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(User)
-					.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" })),
+					.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" })),
 				list: query()
 					.returns([User])
 					.resolve(() => []),
 				create: mutation()
 					.input(z.object({ name: z.string(), email: z.string() }))
 					.returns(User)
-					.resolve(({ input }) => ({ id: "1", ...input })),
+					.resolve(({ args }) => ({ id: "1", ...args })),
 			}),
 			post: router({
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(Post)
-					.resolve(({ input }) => ({
-						id: input.id,
+					.resolve(({ args }) => ({
+						id: args.id,
 						title: "Title",
 						content: "Content",
 						authorId: "1",
@@ -432,18 +432,18 @@ describe("router() builder", () => {
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(User)
-					.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" })),
+					.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" })),
 				create: mutation()
 					.input(z.object({ name: z.string(), email: z.string() }))
 					.returns(User)
-					.resolve(({ input }) => ({ id: "1", ...input })),
+					.resolve(({ args }) => ({ id: "1", ...args })),
 			}),
 			post: router({
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(Post)
-					.resolve(({ input }) => ({
-						id: input.id,
+					.resolve(({ args }) => ({
+						id: args.id,
 						title: "Title",
 						content: "Content",
 						authorId: "1",
@@ -502,7 +502,7 @@ describe("router() builder", () => {
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(User)
-					.resolve(({ input }) => ({ id: input.id, name: "John", email: "john@example.com" })),
+					.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" })),
 			}),
 		});
 
@@ -576,17 +576,17 @@ describe("operations() factory", () => {
 		// query() should return a typed builder
 		const getUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input, ctx }) => {
+			.resolve(({ args, ctx }) => {
 				// ctx is AppContext - this compiles only if types are correct
-				const user = ctx.db.users.get(input.id);
-				return user ?? { id: input.id, name: "Unknown", email: "" };
+				const user = ctx.db.users.get(args.id);
+				return user ?? { id: args.id, name: "Unknown", email: "" };
 			});
 
 		// mutation() should return a typed builder
 		const createUser = mutation()
 			.input(z.object({ name: z.string(), email: z.string() }))
-			.resolve(({ input, ctx }) => {
-				const user = { id: "new", ...input };
+			.resolve(({ args, ctx }) => {
+				const user = { id: "new", ...args };
 				ctx.db.users.set(user.id, user);
 				return user;
 			});
@@ -602,7 +602,7 @@ describe("operations() factory", () => {
 
 		const namedMutation = mutation("createUser")
 			.input(z.object({ name: z.string() }))
-			.resolve(({ input }) => ({ id: "1", name: input.name }));
+			.resolve(({ args }) => ({ id: "1", name: args.name }));
 
 		expect(namedQuery._name).toBe("getUsers");
 		expect(namedMutation._name).toBe("createUser");
@@ -622,7 +622,7 @@ describe("operations() factory", () => {
 		});
 
 		const result = await whoami._resolve!({
-			input: undefined,
+			args: undefined,
 			ctx: {
 				userId: "user-1",
 				permissions: ["read", "write"],
@@ -713,12 +713,12 @@ describe("Optimistic callback with input proxy", () => {
 		const createPost = mutation()
 			.input(z.object({ title: z.string(), content: z.string(), authorId: z.string() }))
 			.returns(Post)
-			.optimistic(({ input }) => {
+			.optimistic(({ args }) => {
 				// Simulate building steps with input references
 				// The proxy should intercept property access and return { $input: 'propName' }
-				const titleRef = input.title;
-				const contentRef = input.content;
-				const authorIdRef = input.authorId;
+				const titleRef = args.title;
+				const contentRef = args.content;
+				const authorIdRef = args.authorId;
 
 				// Create mock StepBuilder that returns these references
 				return [
@@ -738,11 +738,11 @@ describe("Optimistic callback with input proxy", () => {
 					},
 				] as unknown as never[];
 			})
-			.resolve(({ input }) => ({
+			.resolve(({ args }) => ({
 				id: "real-id",
-				title: input.title,
-				content: input.content,
-				authorId: input.authorId,
+				title: args.title,
+				content: args.content,
+				authorId: args.authorId,
 				published: false,
 				viewCount: 0,
 			}));
@@ -761,9 +761,9 @@ describe("Optimistic callback with input proxy", () => {
 		const complexMutation = mutation()
 			.input(z.object({ userId: z.string(), postId: z.string() }))
 			.returns(Post)
-			.optimistic(({ input }) => {
-				const userIdRef = input.userId;
-				const postIdRef = input.postId;
+			.optimistic(({ args }) => {
+				const userIdRef = args.userId;
+				const postIdRef = args.postId;
 
 				return [
 					{
@@ -782,12 +782,12 @@ describe("Optimistic callback with input proxy", () => {
 					},
 				] as unknown as never[];
 			})
-			.resolve(({ input }) => ({
-				id: input.postId,
+			.resolve(({ args }) => ({
+				id: args.postId,
 				title: "Title",
 				content: "Content",
 				published: true,
-				authorId: input.userId,
+				authorId: args.userId,
 				viewCount: 0,
 			}));
 
@@ -799,9 +799,9 @@ describe("Optimistic callback with input proxy", () => {
 		const mutation1 = mutation()
 			.input(z.object({ data: z.object({ name: z.string(), email: z.string() }) }))
 			.returns(User)
-			.optimistic(({ input }) => {
+			.optimistic(({ args }) => {
 				// Access nested properties
-				const dataRef = input.data;
+				const dataRef = args.data;
 
 				return [
 					{
@@ -836,8 +836,8 @@ describe("Named operations", () => {
 		const namedQuery = query("getUserById")
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({
-				id: input.id,
+			.resolve(({ args }) => ({
+				id: args.id,
 				name: "John",
 				email: "john@example.com",
 				role: "user" as const,
@@ -852,9 +852,9 @@ describe("Named operations", () => {
 		const namedMutation = mutation("createUser")
 			.input(z.object({ name: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => ({
+			.resolve(({ args }) => ({
 				id: "1",
-				name: input.name,
+				name: args.name,
 				email: "john@example.com",
 				role: "user" as const,
 				createdAt: new Date(),
@@ -884,8 +884,8 @@ describe("Named operations", () => {
 			.input(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic("merge")
-			.resolve(({ input }) => ({
-				id: input.id,
+			.resolve(({ args }) => ({
+				id: args.id,
 				title: "Title",
 				content: "Content",
 				published: true,
@@ -924,7 +924,7 @@ describe("Query minimal configuration", () => {
 		const getTime = query().resolve(() => ({ timestamp: Date.now() }));
 
 		const result = await getTime._resolve!({
-			input: undefined,
+			args: undefined,
 			ctx: {
 				emit: (() => {}) as never,
 				onCleanup: () => () => {},
@@ -944,7 +944,7 @@ describe("Mutation without returns()", () => {
 	it("mutation can resolve directly after input()", () => {
 		const deleteSomething = mutation()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ deleted: true, id: input.id }));
+			.resolve(({ args }) => ({ deleted: true, id: args.id }));
 
 		expect(deleteSomething._type).toBe("mutation");
 		expect(deleteSomething._input).toBeDefined();
@@ -954,14 +954,14 @@ describe("Mutation without returns()", () => {
 	it("executes mutation without returns()", async () => {
 		const performAction = mutation()
 			.input(z.object({ action: z.string() }))
-			.resolve(async ({ input }) => ({
+			.resolve(async ({ args }) => ({
 				success: true,
-				action: input.action,
+				action: args.action,
 				timestamp: Date.now(),
 			}));
 
 		const result = await performAction._resolve({
-			input: { action: "test" },
+			args: { action: "test" },
 			ctx: {
 				emit: (() => {}) as never,
 				onCleanup: () => () => {},
@@ -1063,8 +1063,8 @@ describe("Optimistic DSL patterns", () => {
 			.input(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic("merge")
-			.resolve(({ input }) => ({
-				id: input.id,
+			.resolve(({ args }) => ({
+				id: args.id,
 				title: "Title",
 				content: "Content",
 				published: true,
@@ -1081,8 +1081,8 @@ describe("Optimistic DSL patterns", () => {
 			.input(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic("delete")
-			.resolve(({ input }) => ({
-				id: input.id,
+			.resolve(({ args }) => ({
+				id: args.id,
 				title: "",
 				content: "",
 				published: false,
@@ -1099,8 +1099,8 @@ describe("Optimistic DSL patterns", () => {
 			.input(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic({ merge: { published: true, updatedAt: Date.now() } })
-			.resolve(({ input }) => ({
-				id: input.id,
+			.resolve(({ args }) => ({
+				id: args.id,
 				title: "Title",
 				content: "Content",
 				published: true,
@@ -1127,8 +1127,8 @@ describe("Optimistic DSL patterns", () => {
 			.input(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic(pipeline as never)
-			.resolve(({ input }) => ({
-				id: input.id,
+			.resolve(({ args }) => ({
+				id: args.id,
 				title: "Title",
 				content: "Content",
 				published: true,
@@ -1158,11 +1158,11 @@ describe("operations() factory context handling", () => {
 		const complexQuery = query("complexOp")
 			.input(z.object({ key: z.string() }))
 			.returns(User)
-			.resolve(({ input, ctx }) => {
-				ctx.logger.log(`Querying ${input.key}`);
-				const cached = ctx.cache.get(input.key);
+			.resolve(({ args, ctx }) => {
+				ctx.logger.log(`Querying ${args.key}`);
+				const cached = ctx.cache.get(args.key);
 				if (!cached) {
-					ctx.db.query(`SELECT * FROM users WHERE key = '${input.key}'`);
+					ctx.db.query(`SELECT * FROM users WHERE key = '${args.key}'`);
 				}
 				return {
 					id: "1",
@@ -1177,12 +1177,12 @@ describe("operations() factory context handling", () => {
 			.input(z.object({ id: z.string(), data: z.string() }))
 			.returns(User)
 			.optimistic("merge")
-			.resolve(({ input, ctx }) => {
-				ctx.logger.log(`Mutating ${input.id}`);
-				ctx.cache.set(input.id, input.data);
+			.resolve(({ args, ctx }) => {
+				ctx.logger.log(`Mutating ${args.id}`);
+				ctx.cache.set(args.id, args.data);
 				return {
-					id: input.id,
-					name: input.data,
+					id: args.id,
+					name: args.data,
 					email: "john@example.com",
 					role: "user" as const,
 					createdAt: new Date(),

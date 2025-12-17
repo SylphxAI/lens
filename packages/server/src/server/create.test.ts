@@ -93,8 +93,8 @@ const User = model("User", {
 const getUser = query()
 	.input(z.object({ id: z.string() }))
 	.returns(User)
-	.resolve(({ input }) => ({
-		id: input.id,
+	.resolve(({ args }) => ({
+		id: args.id,
 		name: "Test User",
 		email: "test@example.com",
 	}));
@@ -107,18 +107,18 @@ const getUsers = query().resolve(() => [
 const createUser = mutation()
 	.input(z.object({ name: z.string(), email: z.string().optional() }))
 	.returns(User)
-	.resolve(({ input }) => ({
+	.resolve(({ args }) => ({
 		id: "new-id",
-		name: input.name,
-		email: input.email,
+		name: args.name,
+		email: args.email,
 	}));
 
 const updateUser = mutation()
 	.input(z.object({ id: z.string(), name: z.string().optional() }))
 	.returns(User)
-	.resolve(({ input }) => ({
-		id: input.id,
-		name: input.name ?? "Updated",
+	.resolve(({ args }) => ({
+		id: args.id,
+		name: args.name ?? "Updated",
 	}));
 
 const deleteUser = mutation()
@@ -592,8 +592,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<TestContext>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -651,8 +651,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<TestContext>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -745,8 +745,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<CtxWithComments>()
 			.input(z.object({ id: z.string() }))
 			.returns(LocalAuthor)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -801,8 +801,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<TestContext>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -874,8 +874,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<{ db: typeof mockDb }>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			})
@@ -983,8 +983,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<{ db: typeof mockDb }>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -1072,8 +1072,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<{ db: typeof mockDb }>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -1148,8 +1148,8 @@ describe("field resolvers", () => {
 		const liveQuery = query()
 			.input(z.object({ id: z.string() }))
 			.returns(User)
-			.resolve(({ input }) => {
-				return { id: input.id, name: "Initial" };
+			.resolve(({ args }) => {
+				return { id: args.id, name: "Initial" };
 			})
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit as EmitFn;
@@ -1246,8 +1246,8 @@ describe("field resolvers", () => {
 		const getAuthor = query<{ db: typeof mockDb }>()
 			.input(z.object({ id: z.string() }))
 			.returns(Author)
-			.resolve(({ input, ctx }) => {
-				const author = ctx.db.authors.find((a) => a.id === input.id);
+			.resolve(({ args, ctx }) => {
+				const author = ctx.db.authors.find((a) => a.id === args.id);
 				if (!author) throw new Error("Author not found");
 				return author;
 			});
@@ -1325,7 +1325,7 @@ describe("observable behavior", () => {
 	it("delivers initial result immediately for queries", async () => {
 		const simpleQuery = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Test" }));
+			.resolve(({ args }) => ({ id: args.id, name: "Test" }));
 
 		const server = createApp({ queries: { simpleQuery } });
 
@@ -1349,8 +1349,8 @@ describe("observable behavior", () => {
 		// Use .resolve().subscribe() pattern - emit comes through Publisher callback
 		const liveQuery = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => {
-				return { id: input.id, name: "Initial" };
+			.resolve(({ args }) => {
+				return { id: args.id, name: "Initial" };
 			})
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit as EmitFn;
@@ -1382,7 +1382,7 @@ describe("observable behavior", () => {
 	it("delivers mutation result via observable", async () => {
 		const testMutation = mutation()
 			.input(z.object({ name: z.string() }))
-			.resolve(({ input }) => ({ id: "new", name: input.name }));
+			.resolve(({ args }) => ({ id: "new", name: args.name }));
 
 		const server = createApp({ mutations: { testMutation } });
 
@@ -1404,9 +1404,9 @@ describe("observable behavior", () => {
 
 		const simpleQuery = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => {
+			.resolve(({ args }) => {
 				resolverCalls++;
-				return { id: input.id };
+				return { id: args.id };
 			});
 
 		const server = createApp({ queries: { simpleQuery } });
@@ -1439,8 +1439,8 @@ describe("emit backpressure", () => {
 		// Use .resolve().subscribe() pattern - emit comes through Publisher callback
 		const liveQuery = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => {
-				return { id: input.id, count: 0 };
+			.resolve(({ args }) => {
+				return { id: args.id, count: 0 };
 			})
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit as EmitFn;
@@ -1547,7 +1547,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(({ args: _args }) => ({ emit, onCleanup }) => {
 				subscriberCalled = true;
 				capturedEmit = emit;
@@ -1587,7 +1587,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit;
 			});
@@ -1636,7 +1636,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(() => ({ onCleanup }) => {
 				onCleanup(() => {
 					cleanupCalled = true;
@@ -1673,7 +1673,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query<TestContext>()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(({ args, ctx }) => ({ emit: _emit }) => {
 				receivedInput = args;
 				receivedCtx = ctx;
@@ -1703,7 +1703,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 	it("handles subscriber errors gracefully", async () => {
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(() => () => {
 				throw new Error("Subscriber error");
 			});
@@ -1746,7 +1746,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveCounter = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, count: 0 }))
+			.resolve(({ args }) => ({ id: args.id, count: 0 }))
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit;
 			});
@@ -1798,7 +1798,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial", status: "offline" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial", status: "offline" }))
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit as EmitFn;
 			});
@@ -1845,7 +1845,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(() => ({ emit }) => {
 				capturedEmit = emit;
 			});
@@ -1893,7 +1893,7 @@ describe("operation-level .resolve().subscribe() (LiveQueryDef)", () => {
 
 		const liveUser = query()
 			.input(z.object({ id: z.string() }))
-			.resolve(({ input }) => ({ id: input.id, name: "Initial" }))
+			.resolve(({ args }) => ({ id: args.id, name: "Initial" }))
 			.subscribe(() => ({ emit }) => {
 				subscriberCallCount++;
 				emits.push(emit);
@@ -1969,7 +1969,7 @@ describe("scalar field subscription with emit.delta()", () => {
 				getUserWithBio: query()
 					.input(z.object({ id: z.string() }))
 					.returns(UserWithBio)
-					.resolve(({ input }) => ({ id: input.id, name: "Alice" })),
+					.resolve(({ args }) => ({ id: args.id, name: "Alice" })),
 			},
 			resolvers: [userResolver],
 		});
@@ -2032,7 +2032,7 @@ describe("scalar field subscription with emit.delta()", () => {
 				getUserWithContent: query()
 					.input(z.object({ id: z.string() }))
 					.returns(UserWithContent)
-					.resolve(({ input }) => ({ id: input.id, name: "Alice" })),
+					.resolve(({ args }) => ({ id: args.id, name: "Alice" })),
 			},
 			resolvers: [userResolver],
 		});

@@ -63,8 +63,8 @@ const userRouter = router({
 	get: query()
 		.input(z.object({ id: z.string() }))
 		.returns(User)
-		.resolve(({ input }) => {
-			const user = db.users.get(input.id);
+		.resolve(({ args }) => {
+			const user = db.users.get(args.id);
 			if (!user) throw new Error("User not found");
 			return user;
 		}),
@@ -77,9 +77,9 @@ const userRouter = router({
 		.input(z.object({ name: z.string(), email: z.string() }))
 		.returns(User)
 		.optimistic("create")
-		.resolve(({ input }) => {
+		.resolve(({ args }) => {
 			const id = `user-${Date.now()}`;
-			const user = { id, ...input, createdAt: new Date() };
+			const user = { id, ...args, createdAt: new Date() };
 			db.users.set(id, user);
 			return user;
 		}),
@@ -89,8 +89,8 @@ const postRouter = router({
 	get: query()
 		.input(z.object({ id: z.string() }))
 		.returns(Post)
-		.resolve(({ input }) => {
-			const post = db.posts.get(input.id);
+		.resolve(({ args }) => {
+			const post = db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			return post;
 		}),
@@ -102,17 +102,17 @@ const postRouter = router({
 	byAuthor: query()
 		.input(z.object({ authorId: z.string() }))
 		.returns(list(Post))
-		.resolve(({ input }) =>
-			Array.from(db.posts.values()).filter(p => p.authorId === input.authorId)
+		.resolve(({ args }) =>
+			Array.from(db.posts.values()).filter(p => p.authorId === args.authorId)
 		),
 
 	create: mutation()
 		.input(z.object({ title: z.string(), content: z.string(), authorId: z.string() }))
 		.returns(Post)
 		.optimistic("create")
-		.resolve(({ input }) => {
+		.resolve(({ args }) => {
 			const id = `post-${Date.now()}`;
-			const post = { id, ...input, published: false, createdAt: new Date() };
+			const post = { id, ...args, published: false, createdAt: new Date() };
 			db.posts.set(id, post);
 			return post;
 		}),
@@ -121,11 +121,11 @@ const postRouter = router({
 		.input(z.object({ id: z.string(), title: z.string().optional(), content: z.string().optional() }))
 		.returns(Post)
 		.optimistic("merge")
-		.resolve(({ input }) => {
-			const post = db.posts.get(input.id);
+		.resolve(({ args }) => {
+			const post = db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
-			const updated = { ...post, ...input };
-			db.posts.set(input.id, updated);
+			const updated = { ...post, ...args };
+			db.posts.set(args.id, updated);
 			return updated;
 		}),
 
@@ -133,8 +133,8 @@ const postRouter = router({
 		.input(z.object({ id: z.string() }))
 		.returns(Post)
 		.optimistic({ merge: { published: true } })
-		.resolve(({ input }) => {
-			const post = db.posts.get(input.id);
+		.resolve(({ args }) => {
+			const post = db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			post.published = true;
 			return post;
@@ -142,8 +142,8 @@ const postRouter = router({
 
 	delete: mutation()
 		.input(z.object({ id: z.string() }))
-		.resolve(({ input }) => {
-			const existed = db.posts.delete(input.id);
+		.resolve(({ args }) => {
+			const existed = db.posts.delete(args.id);
 			return { success: existed };
 		}),
 });

@@ -28,16 +28,16 @@ const client = createClient({
 async function basicQueries() {
 	console.log("\n=== Basic Queries ===\n");
 
-	// Get current user
+	// Get current user (no input required)
 	const me = await client.user.whoami();
 	console.log("Current user:", me);
 
-	// Get user by id
-	const user = await client.user.get({ id: "2" });
+	// Get user by id - use { input: {...} } pattern
+	const user = await client.user.get({ input: { id: "2" } });
 	console.log("User 2:", user);
 
-	// Search users
-	const results = await client.user.search({ query: "al", limit: 5 });
+	// Search users - use { input: {...} } pattern
+	const results = await client.user.search({ input: { query: "al", limit: 5 } });
 	console.log("Search results:", results.length);
 }
 
@@ -48,28 +48,25 @@ async function basicQueries() {
 async function mutations() {
 	console.log("\n=== Mutations ===\n");
 
-	// Update user
+	// Update user - use { input: {...} } pattern
 	const updated = await client.user.update({
-		id: "1",
-		name: "Alice Updated",
+		input: { id: "1", name: "Alice Updated" },
 	});
 	console.log("Updated user:", updated);
 
-	// Create post
+	// Create post - use { input: {...} } pattern
 	const post = await client.post.create({
-		title: "New Post",
-		content: "Created via client!",
+		input: { title: "New Post", content: "Created via client!" },
 	});
 	console.log("Created post:", post);
 
-	// Publish post
-	const published = await client.post.publish({ id: "1" });
+	// Publish post - use { input: {...} } pattern
+	const published = await client.post.publish({ input: { id: "1" } });
 	console.log("Published post:", published);
 
-	// Add comment
+	// Add comment - use { input: {...} } pattern
 	const comment = await client.comment.add({
-		postId: "1",
-		content: "Great post!",
+		input: { postId: "1", content: "Great post!" },
 	});
 	console.log("Added comment:", comment);
 }

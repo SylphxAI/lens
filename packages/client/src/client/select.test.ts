@@ -145,8 +145,8 @@ function createTestServer() {
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(User)
-					.resolve(({ input, ctx }) => {
-						const user = ctx.db.users.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("User not found");
 						return user;
 					}),
@@ -157,20 +157,20 @@ function createTestServer() {
 
 				withPosts: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input, ctx }) => {
-						const user = ctx.db.users.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("User not found");
-						const userPosts = Array.from(ctx.db.posts.values()).filter((p: any) => p.authorId === input.id);
+						const userPosts = Array.from(ctx.db.posts.values()).filter((p: any) => p.authorId === args.id);
 						return { ...user, posts: userPosts };
 					}),
 
 				withPostsAndComments: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input, ctx }) => {
-						const user = ctx.db.users.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("User not found");
 						const userPosts = Array.from(ctx.db.posts.values())
-							.filter((p: any) => p.authorId === input.id)
+							.filter((p: any) => p.authorId === args.id)
 							.map((post: any) => ({
 								...post,
 								comments: Array.from(ctx.db.comments.values()).filter((c: any) => c.postId === post.id),
@@ -183,8 +183,8 @@ function createTestServer() {
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(Post)
-					.resolve(({ input, ctx }) => {
-						const post = ctx.db.posts.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const post = ctx.db.posts.get(args.id);
 						if (!post) throw new Error("Post not found");
 						return post;
 					}),
@@ -195,8 +195,8 @@ function createTestServer() {
 
 				withAuthor: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input, ctx }) => {
-						const post = ctx.db.posts.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const post = ctx.db.posts.get(args.id);
 						if (!post) throw new Error("Post not found");
 						const author = ctx.db.users.get(post.authorId);
 						return { ...post, author };
@@ -204,10 +204,10 @@ function createTestServer() {
 
 				withComments: query()
 					.input(z.object({ id: z.string() }))
-					.resolve(({ input, ctx }) => {
-						const post = ctx.db.posts.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const post = ctx.db.posts.get(args.id);
 						if (!post) throw new Error("Post not found");
-						const postComments = Array.from(ctx.db.comments.values()).filter((c: any) => c.postId === input.id);
+						const postComments = Array.from(ctx.db.comments.values()).filter((c: any) => c.postId === args.id);
 						return { ...post, comments: postComments };
 					}),
 			}),

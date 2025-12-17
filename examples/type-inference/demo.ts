@@ -91,9 +91,9 @@ const userRouter = router({
 	get: query()
 		.input(z.object({ id: z.string() }))
 		.returns(User)
-		.resolve(({ input, ctx }) => {
-			const user = ctx.db.users.get(input.id);
-			if (!user) throw new Error(`User not found: ${input.id}`);
+		.resolve(({ args, ctx }) => {
+			const user = ctx.db.users.get(args.id);
+			if (!user) throw new Error(`User not found: ${args.id}`);
 			return user;
 		}),
 
@@ -110,15 +110,15 @@ const userRouter = router({
 			limit: z.number().default(10),
 		}))
 		.returns(list(User))
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			let results = Array.from(ctx.db.users.values())
-				.filter(u => u.name.toLowerCase().includes(input.query.toLowerCase()));
+				.filter(u => u.name.toLowerCase().includes(args.query.toLowerCase()));
 
-			if (input.role) {
-				results = results.filter(u => u.role === input.role);
+			if (args.role) {
+				results = results.filter(u => u.role === args.role);
 			}
 
-			return results.slice(0, input.limit);
+			return results.slice(0, args.limit);
 		}),
 
 	// Mutation with optimistic update
@@ -130,25 +130,25 @@ const userRouter = router({
 		}))
 		.returns(User)
 		.optimistic("merge")
-		.resolve(({ input, ctx }) => {
-			const user = ctx.db.users.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const user = ctx.db.users.get(args.id);
 			if (!user) throw new Error("User not found");
 			const updated = {
 				...user,
-				...(input.name && { name: input.name }),
+				...(args.name && { name: args.name }),
 			};
-			ctx.db.users.set(input.id, updated);
+			ctx.db.users.set(args.id, updated);
 			return updated;
 		}),
 
 	// Mutation without .returns() - infers from resolver
 	setRole: mutation()
 		.input(z.object({ id: z.string(), role: z.enum(["user", "admin", "moderator"]) }))
-		.resolve(({ input, ctx }) => {
-			const user = ctx.db.users.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const user = ctx.db.users.get(args.id);
 			if (!user) throw new Error("User not found");
-			ctx.db.users.set(input.id, { ...user, role: input.role });
-			return { success: true, userId: input.id, newRole: input.role };
+			ctx.db.users.set(args.id, { ...user, role: args.role });
+			return { success: true, userId: args.id, newRole: args.role };
 		}),
 });
 
@@ -157,8 +157,8 @@ const postRouter = router({
 	get: query()
 		.input(z.object({ id: z.string() }))
 		.returns(Post)
-		.resolve(({ input, ctx }) => {
-			const post = ctx.db.posts.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const post = ctx.db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			return post;
 		}),
@@ -166,26 +166,26 @@ const postRouter = router({
 	trending: query()
 		.input(z.object({ limit: z.number().default(10) }))
 		.returns(list(Post))
-		.resolve(({ input, ctx }) =>
+		.resolve(({ args, ctx }) =>
 			Array.from(ctx.db.posts.values())
 				.filter(p => p.published)
 				.sort((a, b) => b.viewCount - a.viewCount)
-				.slice(0, input.limit)
+				.slice(0, args.limit)
 		),
 
 	create: mutation()
 		.input(z.object({ title: z.string(), content: z.string(), tags: z.array(z.string()).default([]) }))
 		.returns(Post)
 		.optimistic("create")
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			const post = {
 				id: `post-${Date.now()}`,
-				title: input.title,
-				content: input.content,
+				title: args.title,
+				content: args.content,
 				published: false,
 				authorId: ctx.currentUser?.id ?? "anonymous",
 				viewCount: 0,
-				tags: input.tags,
+				tags: args.tags,
 			};
 			ctx.db.posts.set(post.id, post);
 			return post;
@@ -195,11 +195,11 @@ const postRouter = router({
 		.input(z.object({ id: z.string() }))
 		.returns(Post)
 		.optimistic({ merge: { published: true } })
-		.resolve(({ input, ctx }) => {
-			const post = ctx.db.posts.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const post = ctx.db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			const updated = { ...post, published: true };
-			ctx.db.posts.set(input.id, updated);
+			ctx.db.posts.set(args.id, updated);
 			return updated;
 		}),
 });
@@ -209,19 +209,19 @@ const commentRouter = router({
 	list: query()
 		.input(z.object({ postId: z.string() }))
 		.returns(list(Comment))
-		.resolve(({ input, ctx }) =>
-			Array.from(ctx.db.comments.values()).filter(c => c.postId === input.postId)
+		.resolve(({ args, ctx }) =>
+			Array.from(ctx.db.comments.values()).filter(c => c.postId === args.postId)
 		),
 
 	add: mutation()
 		.input(z.object({ postId: z.string(), text: z.string() }))
 		.returns(Comment)
 		.optimistic("create")
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			const comment = {
 				id: `comment-${Date.now()}`,
-				text: input.text,
-				postId: input.postId,
+				text: args.text,
+				postId: args.postId,
 				authorId: ctx.currentUser?.id ?? "anonymous",
 				likes: 0,
 			};
@@ -232,11 +232,11 @@ const commentRouter = router({
 	like: mutation()
 		.input(z.object({ id: z.string() }))
 		.returns(Comment)
-		.resolve(({ input, ctx }) => {
-			const comment = ctx.db.comments.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const comment = ctx.db.comments.get(args.id);
 			if (!comment) throw new Error("Comment not found");
 			const updated = { ...comment, likes: comment.likes + 1 };
-			ctx.db.comments.set(input.id, updated);
+			ctx.db.comments.set(args.id, updated);
 			return updated;
 		}),
 });

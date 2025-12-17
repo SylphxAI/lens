@@ -56,8 +56,8 @@ function wait(ms = 10): Promise<void> {
 
 const getUser = query()
 	.input(z.object({ id: z.string() }))
-	.resolve(({ input }) => ({
-		id: input.id,
+	.resolve(({ args }) => ({
+		id: args.id,
 		name: "Test User",
 		__typename: "User",
 	}));
@@ -69,16 +69,16 @@ const listUsers = query().resolve(() => [
 
 const createUser = mutation()
 	.input(z.object({ name: z.string() }))
-	.resolve(({ input }) => ({
+	.resolve(({ args }) => ({
 		id: "new-id",
-		name: input.name,
+		name: args.name,
 		__typename: "User",
 	}));
 
 const slowQuery = query()
 	.input(z.object({ delay: z.number() }))
-	.resolve(async ({ input }) => {
-		await new Promise((r) => setTimeout(r, input.delay));
+	.resolve(async ({ args }) => {
+		await new Promise((r) => setTimeout(r, args.delay));
 		return { done: true };
 	});
 

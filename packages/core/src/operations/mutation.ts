@@ -100,9 +100,9 @@ export interface MutationBuilderWithReturns<TInput, TOutput, TContext = unknown>
 	 * .optimistic('create')
 	 * .optimistic('delete')
 	 *
-	 * // Callback with typed input
-	 * .optimistic(({ input }) => [
-	 *   e.update("User", { id: input.id, name: input.name })
+	 * // Callback with typed args
+	 * .optimistic(({ args }) => [
+	 *   e.update("User", { id: args.id, name: args.name })
 	 * ])
 	 * ```
 	 */
@@ -161,7 +161,7 @@ export class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext =
 		builder._outputSpec = this._outputSpec;
 
 		if (typeof specOrCallback === "function") {
-			const inputProxy = new Proxy(
+			const argsProxy = new Proxy(
 				{},
 				{
 					get(_, prop: string) {
@@ -169,7 +169,7 @@ export class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext =
 					},
 				},
 			) as TInput;
-			const stepBuilders: StepBuilder[] = specOrCallback({ input: inputProxy });
+			const stepBuilders: StepBuilder[] = specOrCallback({ args: argsProxy });
 			const steps = stepBuilders.map((s: StepBuilder) => s.build());
 			builder._optimisticSpec = { $pipe: steps } as Pipeline;
 		} else {

@@ -79,8 +79,8 @@ describe("Server type inference", () => {
 			get: query()
 				.input(z.object({ id: z.string() }))
 				.returns(User)
-				.resolve(({ input, ctx }) => {
-					const user = ctx.db.users.get(input.id);
+				.resolve(({ args, ctx }) => {
+					const user = ctx.db.users.get(args.id);
 					if (!user) throw new Error("Not found");
 					return user;
 				}),
@@ -156,19 +156,19 @@ describe("direct transport type inference", () => {
 				get: query()
 					.input(z.object({ id: z.string() }))
 					.returns(User)
-					.resolve(({ input, ctx }) => {
-						const user = ctx.db.users.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("Not found");
 						return user;
 					}),
 				update: mutation()
 					.input(z.object({ id: z.string(), name: z.string() }))
 					.returns(User)
-					.resolve(({ input, ctx }) => {
-						const user = ctx.db.users.get(input.id);
+					.resolve(({ args, ctx }) => {
+						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("Not found");
-						const updated = { ...user, name: input.name };
-						ctx.db.users.set(input.id, updated);
+						const updated = { ...user, name: args.name };
+						ctx.db.users.set(args.id, updated);
 						return updated;
 					}),
 			}),
@@ -208,8 +208,8 @@ describe("createClient type inference", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							return user;
 						}),
@@ -219,20 +219,20 @@ describe("createClient type inference", () => {
 					search: query()
 						.input(z.object({ query: z.string(), limit: z.number().optional() }))
 						.returns([User])
-						.resolve(({ input, ctx }) => {
+						.resolve(({ args, ctx }) => {
 							const results = Array.from(ctx.db.users.values()).filter((u) =>
-								u.name.toLowerCase().includes(input.query.toLowerCase()),
+								u.name.toLowerCase().includes(args.query.toLowerCase()),
 							);
-							return input.limit ? results.slice(0, input.limit) : results;
+							return args.limit ? results.slice(0, args.limit) : results;
 						}),
 					create: mutation()
 						.input(z.object({ name: z.string(), email: z.string() }))
 						.returns(User)
-						.resolve(({ input, ctx }) => {
+						.resolve(({ args, ctx }) => {
 							const user = {
 								id: `user-${Date.now()}`,
-								name: input.name,
-								email: input.email,
+								name: args.name,
+								email: args.email,
 								role: "user" as const,
 								createdAt: new Date(),
 							};
@@ -243,15 +243,15 @@ describe("createClient type inference", () => {
 						.input(z.object({ id: z.string(), name: z.string().optional(), email: z.string().optional() }))
 						.returns(User)
 						.optimistic("merge")
-						.resolve(({ input, ctx }) => {
-							const user = ctx.db.users.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const user = ctx.db.users.get(args.id);
 							if (!user) throw new Error("Not found");
 							const updated = {
 								...user,
-								...(input.name && { name: input.name }),
-								...(input.email && { email: input.email }),
+								...(args.name && { name: args.name }),
+								...(args.email && { email: args.email }),
 							};
-							ctx.db.users.set(input.id, updated);
+							ctx.db.users.set(args.id, updated);
 							return updated;
 						}),
 				}),
@@ -259,29 +259,29 @@ describe("createClient type inference", () => {
 					get: query()
 						.input(z.object({ id: z.string() }))
 						.returns(Post)
-						.resolve(({ input, ctx }) => {
-							const post = ctx.db.posts.get(input.id);
+						.resolve(({ args, ctx }) => {
+							const post = ctx.db.posts.get(args.id);
 							if (!post) throw new Error("Not found");
 							return post;
 						}),
 					trending: query()
 						.input(z.object({ limit: z.number().default(10) }))
 						.returns([Post])
-						.resolve(({ ctx, input }) =>
+						.resolve(({ ctx, args }) =>
 							Array.from(ctx.db.posts.values())
 								.filter((p) => p.published)
 								.sort((a, b) => b.viewCount - a.viewCount)
-								.slice(0, input.limit),
+								.slice(0, args.limit),
 						),
 					create: mutation()
 						.input(z.object({ title: z.string(), content: z.string() }))
 						.returns(Post)
 						.optimistic("create")
-						.resolve(({ input, ctx }) => {
+						.resolve(({ args, ctx }) => {
 							const post = {
 								id: `post-${Date.now()}`,
-								title: input.title,
-								content: input.content,
+								title: args.title,
+								content: args.content,
 								published: false,
 								authorId: ctx.currentUser?.id ?? "unknown",
 								viewCount: 0,

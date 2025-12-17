@@ -602,7 +602,7 @@ class LensServerImpl<
 								: undefined;
 
 							const lensContext = { ...context, emit, onCleanup };
-							const result = resolver({ input: cleanInput, ctx: lensContext } as any);
+							const result = resolver({ args: cleanInput, ctx: lensContext } as any);
 
 							if (isAsyncIterable(result)) {
 								// Streaming: emit each yielded value
