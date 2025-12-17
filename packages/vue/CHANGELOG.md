@@ -1,5 +1,10 @@
 # @sylphx/lens-vue
 
+## 2.5.0 (2025-12-17)
+
+refactor(server): simplify API - app is now callable like Yoga
+
+
 ## 2.4.16 (2025-12-17)
 
 ### 📦 Dependencies

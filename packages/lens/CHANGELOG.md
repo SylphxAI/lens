@@ -1,5 +1,10 @@
 # @sylphx/lens
 
+## 3.1.0 (2025-12-17)
+
+refactor(server): simplify API - app is now callable like Yoga
+
+
 ## 3.0.1 (2025-12-17)
 
 ### 📦 Dependencies

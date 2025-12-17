@@ -1,5 +1,10 @@
 # @sylphx/lens-fresh
 
+## 2.2.0 (2025-12-17)
+
+refactor(server): simplify API - app is now callable like Yoga
+
+
 ## 2.1.16 (2025-12-17)
 
 ### 📦 Dependencies
