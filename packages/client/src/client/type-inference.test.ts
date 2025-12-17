@@ -77,7 +77,7 @@ describe("Server type inference", () => {
 
 		const userRouter = router({
 			get: query()
-				.input(z.object({ id: z.string() }))
+				.args(z.object({ id: z.string() }))
 				.returns(User)
 				.resolve(({ args, ctx }) => {
 					const user = ctx.db.users.get(args.id);
@@ -154,7 +154,7 @@ describe("direct transport type inference", () => {
 		const appRouter = router({
 			user: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(({ args, ctx }) => {
 						const user = ctx.db.users.get(args.id);
@@ -162,7 +162,7 @@ describe("direct transport type inference", () => {
 						return user;
 					}),
 				update: mutation()
-					.input(z.object({ id: z.string(), name: z.string() }))
+					.args(z.object({ id: z.string(), name: z.string() }))
 					.returns(User)
 					.resolve(({ args, ctx }) => {
 						const user = ctx.db.users.get(args.id);
@@ -206,7 +206,7 @@ describe("createClient type inference", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = ctx.db.users.get(args.id);
@@ -217,7 +217,7 @@ describe("createClient type inference", () => {
 						.returns([User])
 						.resolve(({ ctx }) => Array.from(ctx.db.users.values())),
 					search: query()
-						.input(z.object({ query: z.string(), limit: z.number().optional() }))
+						.args(z.object({ query: z.string(), limit: z.number().optional() }))
 						.returns([User])
 						.resolve(({ args, ctx }) => {
 							const results = Array.from(ctx.db.users.values()).filter((u) =>
@@ -226,7 +226,7 @@ describe("createClient type inference", () => {
 							return args.limit ? results.slice(0, args.limit) : results;
 						}),
 					create: mutation()
-						.input(z.object({ name: z.string(), email: z.string() }))
+						.args(z.object({ name: z.string(), email: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = {
@@ -240,7 +240,7 @@ describe("createClient type inference", () => {
 							return user;
 						}),
 					update: mutation()
-						.input(z.object({ id: z.string(), name: z.string().optional(), email: z.string().optional() }))
+						.args(z.object({ id: z.string(), name: z.string().optional(), email: z.string().optional() }))
 						.returns(User)
 						.optimistic("merge")
 						.resolve(({ args, ctx }) => {
@@ -257,7 +257,7 @@ describe("createClient type inference", () => {
 				}),
 				post: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(Post)
 						.resolve(({ args, ctx }) => {
 							const post = ctx.db.posts.get(args.id);
@@ -265,7 +265,7 @@ describe("createClient type inference", () => {
 							return post;
 						}),
 					trending: query()
-						.input(z.object({ limit: z.number().default(10) }))
+						.args(z.object({ limit: z.number().default(10) }))
 						.returns([Post])
 						.resolve(({ ctx, args }) =>
 							Array.from(ctx.db.posts.values())
@@ -274,7 +274,7 @@ describe("createClient type inference", () => {
 								.slice(0, args.limit),
 						),
 					create: mutation()
-						.input(z.object({ title: z.string(), content: z.string() }))
+						.args(z.object({ title: z.string(), content: z.string() }))
 						.returns(Post)
 						.optimistic("create")
 						.resolve(({ args, ctx }) => {
@@ -457,7 +457,7 @@ describe("Type-level assertions", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(() => ({
 							id: "1",
@@ -530,7 +530,7 @@ describe("Edge cases", () => {
 						users: router({
 							profile: router({
 								get: query()
-									.input(z.object({ userId: z.string() }))
+									.args(z.object({ userId: z.string() }))
 									.returns(User)
 									.resolve(() => ({
 										id: "deep",
@@ -587,7 +587,7 @@ describe("Edge cases", () => {
 		const app = createApp({
 			router: router({
 				user: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(() => ({
 						id: "1",
@@ -597,7 +597,7 @@ describe("Edge cases", () => {
 						createdAt: new Date(),
 					})),
 				post: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(Post)
 					.resolve(() => ({
 						id: "1",

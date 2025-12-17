@@ -420,7 +420,7 @@ class LensServerImpl<
 						}
 
 						// Get the publisher function
-						const publisher = subscriber({ input, ctx: context });
+						const publisher = subscriber({ args: input, ctx: context });
 
 						// Call publisher with emit/onCleanup callbacks
 						if (publisher) {

@@ -9,10 +9,10 @@
  * // With optimistic plugin - .optimistic() is available
  * const { mutation } = lens<AppContext>({ plugins: [optimisticPlugin()] });
  * mutation()
- *   .input(z.object({ id: z.string(), name: z.string() }))
+ *   .args(z.object({ id: z.string(), name: z.string() }))
  *   .returns(User)
  *   .optimistic('merge')  // ✅ Available
- *   .resolve(({ input }) => db.user.update(input));
+ *   .resolve(({ args }) => db.user.update(args));
  * ```
  */
 
@@ -31,7 +31,7 @@ import type { PluginExtension, RuntimePlugin } from "./types.js";
  * Used by ExtractPluginMethods to compose builder types.
  *
  * @typeParam TStage - Builder stage name
- * @typeParam TInput - Input type from .input()
+ * @typeParam TInput - Input type from .args()
  * @typeParam TOutput - Output type from .returns()
  * @typeParam TContext - Context type from lens<TContext>()
  */
@@ -44,23 +44,23 @@ export type OptimisticPluginMethods<
 	? {
 			/**
 			 * Define optimistic update behavior with typed callback.
-			 * The callback receives `{ input }` with the input type inferred from `.input()`.
+			 * The callback receives `{ args }` with the args type inferred from `.args()`.
 			 *
 			 * IMPORTANT: Callback overload comes FIRST to enable proper TypeScript inference
 			 * for inline arrow functions. TypeScript tries overloads in order.
 			 *
-			 * @param callback - Callback that receives typed input and returns step builders
+			 * @param callback - Callback that receives typed args and returns step builders
 			 * @returns Builder with .resolve() method
 			 *
 			 * @example
 			 * ```typescript
-			 * .optimistic(({ input }) => [
-			 *   e.update(User, { id: input.id, name: input.name }),
+			 * .optimistic(({ args }) => [
+			 *   e.update(User, { id: args.id, name: args.name }),
 			 * ])
 			 * ```
 			 */
 			optimistic(
-				callback: (ctx: { input: TInput }) => StepBuilder[],
+				callback: (ctx: { args: TInput }) => StepBuilder[],
 			): MutationBuilderWithOptimistic<TInput, TOutput, TContext>;
 
 			/**

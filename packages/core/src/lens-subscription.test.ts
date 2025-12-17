@@ -26,7 +26,7 @@ describe("lens() subscription factory", () => {
 		const { subscription } = lens<TestContext>();
 
 		const onPostCreated = subscription()
-			.input(z.object({ authorId: z.string().optional() }))
+			.args(z.object({ authorId: z.string().optional() }))
 			.returns(Post)
 			.subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
 				// ctx should be TestContext (type-checked at compile time)

@@ -31,14 +31,14 @@ const withoutPlugin = lens<{ db: any }>();
 
 const m1 = withoutPlugin
 	.mutation()
-	.input(z.object({ id: z.string() }))
+	.args(z.object({ id: z.string() }))
 	.returns(TestEntity);
 
 // @ts-expect-error - optimistic should not exist without plugin
 m1.optimistic;
 
 // But .resolve() should work
-m1.resolve(({ input, ctx: _ctx }) => ({ id: input.id }) as any);
+m1.resolve(({ args, ctx: _ctx }) => ({ id: args.id }) as any);
 
 // =============================================================================
 // Test 3: WITH plugin - .optimistic() SHOULD be available
@@ -53,7 +53,7 @@ const withPlugin = lens<MyContext>().withPlugins([mockOptimisticPlugin()] as con
 // Test DSL form
 const m2 = withPlugin
 	.mutation()
-	.input(z.object({ id: z.string() }))
+	.args(z.object({ id: z.string() }))
 	.returns(TestEntity);
 
 m2.optimistic("merge"); // Should work
@@ -76,10 +76,10 @@ directBuilder.optimistic("merge");
 
 // Test callback form WITHOUT destructuring first
 directBuilder.optimistic((ctx) => {
-	// TypeScript should know ctx.input is ExpectedInput
-	const id: string = ctx.input.id;
-	const name: string = ctx.input.name;
-	const age: number = ctx.input.age;
+	// TypeScript should know ctx.args is ExpectedInput
+	const id: string = ctx.args.id;
+	const name: string = ctx.args.name;
+	const age: number = ctx.args.age;
 	void id;
 	void name;
 	void age;
@@ -87,11 +87,11 @@ directBuilder.optimistic((ctx) => {
 });
 
 // Test callback form WITH destructuring
-directBuilder.optimistic(({ input }) => {
-	// TypeScript should know input.id is string
-	const id: string = input.id;
-	const name: string = input.name;
-	const age: number = input.age;
+directBuilder.optimistic(({ args }) => {
+	// TypeScript should know args.id is string
+	const id: string = args.id;
+	const name: string = args.name;
+	const age: number = args.age;
 	void id;
 	void name;
 	void age;
@@ -104,18 +104,18 @@ directBuilder.optimistic(({ input }) => {
 
 const m3Builder = withPlugin
 	.mutation()
-	.input(z.object({ id: z.string(), name: z.string(), age: z.number() }))
+	.args(z.object({ id: z.string(), name: z.string(), age: z.number() }))
 	.returns(TestEntity);
 
 // Test DSL form
 m3Builder.optimistic("merge");
 
 // Test callback with destructuring
-m3Builder.optimistic(({ input }) => {
+m3Builder.optimistic(({ args }) => {
 	// If this compiles, the callback inference works!
-	const id: string = input.id;
-	const name: string = input.name;
-	const age: number = input.age;
+	const id: string = args.id;
+	const name: string = args.name;
+	const age: number = args.age;
 	void id;
 	void name;
 	void age;

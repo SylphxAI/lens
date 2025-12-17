@@ -261,7 +261,7 @@ export function isOptimisticDSL(value: unknown): value is OptimisticDSL {
 
 /** Context passed to optimistic callback for type inference */
 export interface OptimisticContext<TInput> {
-	/** Typed arguments - inferred from .input() schema */
+	/** Typed arguments - inferred from .args() schema */
 	args: TInput;
 }
 

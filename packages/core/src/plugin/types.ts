@@ -25,7 +25,7 @@
  *
  * // Use in lens()
  * const { mutation } = lens<AppContext>({ plugins: [myPlugin()] });
- * mutation().input(...).returns(...).myMethod(); // Type-safe!
+ * mutation().args(...).returns(...).myMethod(); // Type-safe!
  * ```
  */
 
@@ -49,15 +49,15 @@ export interface PluginExtension {
 	readonly name: string;
 
 	/**
-	 * Methods added to MutationBuilder (before .input())
+	 * Methods added to MutationBuilder (before .args())
 	 */
 	readonly MutationBuilder?: Record<string, unknown>;
 
 	/**
-	 * Methods added to MutationBuilder after .input() is called.
+	 * Methods added to MutationBuilder after .args() is called.
 	 * These methods are available before .returns() or .resolve().
 	 */
-	readonly MutationBuilderWithInput?: Record<string, unknown>;
+	readonly MutationBuilderWithArgs?: Record<string, unknown>;
 
 	/**
 	 * Methods added to MutationBuilder after .returns() is called.
@@ -236,7 +236,7 @@ export type ExtractExtension<
  */
 export type MergeExtensions<TPlugins extends readonly PluginExtension[]> = {
 	MutationBuilder: ExtractExtension<TPlugins, "MutationBuilder">;
-	MutationBuilderWithInput: ExtractExtension<TPlugins, "MutationBuilderWithInput">;
+	MutationBuilderWithArgs: ExtractExtension<TPlugins, "MutationBuilderWithArgs">;
 	MutationBuilderWithReturns: ExtractExtension<TPlugins, "MutationBuilderWithReturns">;
 	QueryBuilder: ExtractExtension<TPlugins, "QueryBuilder">;
 };
@@ -278,14 +278,14 @@ export interface RuntimePlugin<TExt extends PluginExtension = PluginExtension> {
 	 */
 	readonly builderExtensions?: {
 		/**
-		 * Factory for MutationBuilder methods (before .input()).
+		 * Factory for MutationBuilder methods (before .args()).
 		 */
 		MutationBuilder?: (builder: unknown) => Record<string, unknown>;
 
 		/**
-		 * Factory for MutationBuilderWithInput methods.
+		 * Factory for MutationBuilderWithArgs methods.
 		 */
-		MutationBuilderWithInput?: (builder: unknown) => Record<string, unknown>;
+		MutationBuilderWithArgs?: (builder: unknown) => Record<string, unknown>;
 
 		/**
 		 * Factory for MutationBuilderWithReturns methods.

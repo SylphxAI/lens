@@ -10,8 +10,8 @@
  *
  * export const appRouter = router({
  *   user: {
- *     get: query().input(z.object({ id: z.string() })).resolve(...)
- *     create: mutation().input(...).resolve(...)
+ *     get: query().args(z.object({ id: z.string() })).resolve(...)
+ *     create: mutation().args(...).resolve(...)
  *   },
  *   post: router({
  *     list: query().resolve(...)
@@ -144,11 +144,11 @@ export function isRouterDef(value: unknown): value is RouterDef {
  * export const appRouter = router({
  *   user: {
  *     get: lens.query()
- *       .input(z.object({ id: z.string() }))
- *       .resolve(({ input, ctx }) => ctx.db.user.find(input.id)),
+ *       .args(z.object({ id: z.string() }))
+ *       .resolve(({ args, ctx }) => ctx.db.user.find(args.id)),
  *     create: lens.mutation()
- *       .input(z.object({ name: z.string() }))
- *       .resolve(({ input, ctx }) => ctx.db.user.create(input)),
+ *       .args(z.object({ name: z.string() }))
+ *       .resolve(({ args, ctx }) => ctx.db.user.create(args)),
  *   },
  * });
  * // appRouter is RouterDef<..., MyContext>

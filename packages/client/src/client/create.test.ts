@@ -173,7 +173,7 @@ describe("QueryResult.subscribe()", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = ctx.db.users.get(args.id);
@@ -218,7 +218,7 @@ describe("QueryResult.subscribe()", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = ctx.db.users.get(args.id);
@@ -261,7 +261,7 @@ describe("QueryResult.subscribe()", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = ctx.db.users.get(args.id);
@@ -380,7 +380,7 @@ describe("QueryResult.select()", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = ctx.db.users.get(args.id);
@@ -664,7 +664,7 @@ describe("createAccessor subscribe", () => {
 			router: router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(({ args, ctx }) => {
 							const user = ctx.db.users.get(args.id);
@@ -733,7 +733,7 @@ describe("createAccessor subscribe", () => {
 		const app = createApp({
 			router: router({
 				update: mutation()
-					.input(z.object({ value: z.string() }))
+					.args(z.object({ value: z.string() }))
 					.resolve(() => ({ updated: true })),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),
@@ -914,7 +914,7 @@ describe("Field merging and selection merging", () => {
 		const app = createApp({
 			router: router({
 				user: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args }) => ({
 						id: args.id,
 						name: "Alice",
@@ -1020,7 +1020,7 @@ describe("Field merging and selection merging", () => {
 		const app = createApp({
 			router: router({
 				data: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args }) => {
 						queryCallCount++;
 						return {
@@ -1194,7 +1194,7 @@ describe("Query batching", () => {
 		const app = createApp({
 			router: router({
 				item: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args }) => {
 						return { id: args.id, name: `Item ${args.id}` };
 					}),
@@ -1234,7 +1234,7 @@ describe("Query batching", () => {
 		const app = createApp({
 			router: router({
 				item: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args }) => {
 						executeCallCount++;
 						return { id: args.id, name: `Item ${args.id}` };
@@ -1500,7 +1500,7 @@ describe("Edge cases and error handling", () => {
 		const app = createApp({
 			router: router({
 				data: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args }) => ({ id: args.id, value: Math.random() })),
 			}),
 			context: () => ({ db: { users: new Map(), posts: new Map() } }),

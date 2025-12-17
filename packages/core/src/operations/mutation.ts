@@ -32,7 +32,7 @@ export interface MutationDef<TInput = unknown, TOutput = unknown, TContext = unk
 	_optimistic?: OptimisticDSL | undefined;
 	/** Method syntax for bivariance - allows flexible context types */
 	_resolve(ctx: {
-		input: TInput;
+		args: TInput;
 		ctx: TContext;
 	}): TOutput | Promise<TOutput> | AsyncGenerator<TOutput>;
 }
@@ -48,12 +48,12 @@ export interface MutationBuilder<
 	TContext = unknown,
 	TPlugins extends readonly PluginExtension[] = readonly PluginExtension[],
 > {
-	/** Define input validation schema (required for mutations) */
-	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput, TContext, TPlugins>;
+	/** Define args validation schema (required for mutations) */
+	args<T>(schema: ZodLikeSchema<T>): MutationBuilderWithArgs<T, TOutput, TContext, TPlugins>;
 }
 
-/** Mutation builder after input is defined */
-export interface MutationBuilderWithInput<
+/** Mutation builder after args is defined */
+export interface MutationBuilderWithArgs<
 	TInput,
 	_TOutput = unknown,
 	TContext = unknown,
@@ -125,7 +125,7 @@ export interface MutationBuilderWithOptimistic<TInput, TOutput, TContext = unkno
 export class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext = unknown>
 	implements
 		MutationBuilder<TInput, TOutput>,
-		MutationBuilderWithInput<TInput, TOutput, TContext>,
+		MutationBuilderWithArgs<TInput, TOutput, TContext>,
 		MutationBuilderWithReturns<TInput, TOutput, TContext>,
 		MutationBuilderWithOptimistic<TInput, TOutput, TContext>
 {
@@ -138,7 +138,7 @@ export class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext =
 		this._name = name;
 	}
 
-	input<T>(schema: ZodLikeSchema<T>): MutationBuilderWithInput<T, TOutput, TContext> {
+	args<T>(schema: ZodLikeSchema<T>): MutationBuilderWithArgs<T, TOutput, TContext> {
 		const builder = new MutationBuilderImpl<T, TOutput, TContext>(this._name);
 		builder._inputSchema = schema;
 		return builder;
@@ -181,7 +181,7 @@ export class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext =
 
 	resolve<TOut = TOutput>(fn: ResolverFn<TInput, TOut, TContext>): MutationDef<TInput, TOut> {
 		if (!this._inputSchema) {
-			throw new Error("Mutation requires input schema. Use .input(schema) first.");
+			throw new Error("Mutation requires args schema. Use .args(schema) first.");
 		}
 
 		return {
@@ -207,14 +207,14 @@ export class MutationBuilderImpl<TInput = unknown, TOutput = unknown, TContext =
  * ```typescript
  * // Basic usage
  * export const createPost = mutation()
- *   .input(z.object({ title: z.string(), content: z.string() }))
+ *   .args(z.object({ title: z.string(), content: z.string() }))
  *   .returns(Post)
- *   .resolve(({ input }) => db.post.create({ data: input }));
+ *   .resolve(({ args }) => db.post.create({ data: args }));
  *
  * // With typed context
  * export const createPost = mutation<MyContext>()
- *   .input(z.object({ title: z.string() }))
- *   .resolve(({ input, ctx }) => ctx.db.post.create({ data: input }));
+ *   .args(z.object({ title: z.string() }))
+ *   .resolve(({ args, ctx }) => ctx.db.post.create({ data: args }));
  * ```
  */
 export function mutation<TContext = unknown>(): MutationBuilder<unknown, unknown, TContext>;

@@ -98,7 +98,7 @@ describe("lens()", () => {
 		const { query } = lens<TestContext>();
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ input, ctx }) => {
 				const user = ctx.db.users.get(input.id);
@@ -114,7 +114,7 @@ describe("lens()", () => {
 		const { mutation } = lens<TestContext>();
 
 		const updateUser = mutation()
-			.input(z.object({ id: z.string(), name: z.string() }))
+			.args(z.object({ id: z.string(), name: z.string() }))
 			.returns(User)
 			.optimistic("merge")
 			.resolve(({ input, ctx }) => {
@@ -143,14 +143,14 @@ describe("lens()", () => {
 		}));
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ input, ctx }) => {
 				// ctx is TestContext
 				return ctx.db.users.get(input.id);
 			});
 
 		const createUser = mutation()
-			.input(z.object({ name: z.string(), email: z.string() }))
+			.args(z.object({ name: z.string(), email: z.string() }))
 			.resolve(({ input, ctx }) => {
 				// ctx is TestContext
 				const id = String(ctx.db.users.size + 1);
@@ -200,7 +200,7 @@ describe("lens()", () => {
 		}));
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ input }) => ({ id: input.id, name: "Test", email: "test@test.com" }));
 
 		expect(userResolver.entity._name).toBe("User");

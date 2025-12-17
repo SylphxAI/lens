@@ -274,7 +274,7 @@ describe("direct type inference", () => {
 				router: router({
 					user: router({
 						get: query()
-							.input(z.object({ id: z.string() }))
+							.args(z.object({ id: z.string() }))
 							.returns(User)
 							.resolve(() => ({ id: "1", name: "John", email: "john@test.com" })),
 					}),
@@ -305,11 +305,11 @@ describe("direct type inference", () => {
 			const appRouter = router({
 				user: router({
 					get: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(() => ({ id: "1", name: "John", email: "john@test.com" })),
 					create: mutation()
-						.input(z.object({ name: z.string(), email: z.string() }))
+						.args(z.object({ name: z.string(), email: z.string() }))
 						.returns(User)
 						.resolve(({ args }) => ({ id: "new", ...args })),
 				}),
@@ -374,11 +374,11 @@ describe("direct type inference", () => {
 							.returns([User])
 							.resolve(() => []),
 						get: query()
-							.input(z.object({ id: z.string() }))
+							.args(z.object({ id: z.string() }))
 							.returns(User)
 							.resolve(() => ({ id: "1", name: "John", email: "john@test.com" })),
 						create: mutation()
-							.input(z.object({ name: z.string(), email: z.string() }))
+							.args(z.object({ name: z.string(), email: z.string() }))
 							.returns(User)
 							.resolve(({ args }) => ({ id: "new", ...args })),
 					}),
@@ -409,11 +409,11 @@ describe("direct type inference", () => {
 			const app = createApp({
 				router: router({
 					getData: query()
-						.input(z.object({ id: z.string() }))
+						.args(z.object({ id: z.string() }))
 						.returns(User)
 						.resolve(() => ({ id: "1", name: "John", email: "john@test.com" })),
 					setData: mutation()
-						.input(z.object({ id: z.string(), value: z.string() }))
+						.args(z.object({ id: z.string(), value: z.string() }))
 						.resolve(({ args }) => ({ updated: args.id })),
 				}),
 				context: () => ({ db: new Map() }),
@@ -449,7 +449,7 @@ describe("direct type inference", () => {
 				router: router({
 					user: router({
 						get: query()
-							.input(z.object({ id: z.string() }))
+							.args(z.object({ id: z.string() }))
 							.returns(User)
 							.resolve(({ args }) => {
 								const user = db.get(args.id);
@@ -457,7 +457,7 @@ describe("direct type inference", () => {
 								return user;
 							}),
 						create: mutation()
-							.input(z.object({ name: z.string(), email: z.string() }))
+							.args(z.object({ name: z.string(), email: z.string() }))
 							.returns(User)
 							.resolve(({ args }) => {
 								const user = { id: String(db.size + 1), ...args };

@@ -87,7 +87,7 @@ export interface QueryDefChainable<TInput = void, TOutput = unknown, TContext = 
 	 * @example
 	 * ```typescript
 	 * query()
-	 *   .input(z.object({ id: z.string() }))
+	 *   .args(z.object({ id: z.string() }))
 	 *   .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
 	 *   .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
 	 *     const unsub = pubsub.on(`user:${args.id}`, emit);
@@ -106,8 +106,8 @@ export interface QueryDefChainable<TInput = void, TOutput = unknown, TContext = 
 
 /** Query builder - fluent interface */
 export interface QueryBuilder<TInput = void, TOutput = unknown, TContext = unknown> {
-	/** Define input validation schema (optional for queries) */
-	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput, TContext>;
+	/** Define args validation schema (optional for queries) */
+	args<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput, TContext>;
 	/** Define return type (optional - for entity outputs) */
 	returns<R extends ReturnSpec>(spec: R): QueryBuilder<TInput, InferReturnType<R>, TContext>;
 
@@ -120,20 +120,22 @@ export interface QueryBuilder<TInput = void, TOutput = unknown, TContext = unkno
 	 * ```typescript
 	 * // One-shot query
 	 * query()
-	 *   .input(z.object({ id: z.string() }))
-	 *   .resolve(({ input, ctx }) => db.user.find(input.id));
+	 *   .args(z.object({ id: z.string() }))
+	 *   .resolve(({ args, ctx }) => db.user.find(args.id));
 	 *
 	 * // Live query (resolve + subscribe)
 	 * query()
-	 *   .input(z.object({ id: z.string() }))
-	 *   .resolve(({ input, ctx }) => db.user.find(input.id))
-	 *   .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
-	 *     const unsub = pubsub.on(`user:${input.id}`, emit);
+	 *   .args(z.object({ id: z.string() }))
+	 *   .resolve(({ args, ctx }) => db.user.find(args.id))
+	 *   .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
+	 *     const unsub = pubsub.on(`user:${args.id}`, emit);
 	 *     onCleanup(unsub);
 	 *   });
 	 * ```
 	 */
-	resolve<T extends TOutput>(fn: QueryResolverFn<TInput, T, TContext>): QueryDefChainable<TInput, T, TContext>;
+	resolve<T extends TOutput>(
+		fn: QueryResolverFn<TInput, T, TContext>,
+	): QueryDefChainable<TInput, T, TContext>;
 }
 
 // =============================================================================
@@ -151,7 +153,7 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
 		this._name = name;
 	}
 
-	input<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput, TContext> {
+	args<T>(schema: ZodLikeSchema<T>): QueryBuilder<T, TOutput, TContext> {
 		const builder = new QueryBuilderImpl<T, TOutput, TContext>(this._name);
 		builder._inputSchema = schema;
 		builder._outputSpec = this._outputSpec;
@@ -211,14 +213,14 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
  * ```typescript
  * // Basic usage
  * export const getUser = query()
- *   .input(z.object({ id: z.string() }))
+ *   .args(z.object({ id: z.string() }))
  *   .returns(User)
- *   .resolve(({ input }) => db.user.findUnique({ where: { id: input.id } }));
+ *   .resolve(({ args }) => db.user.findUnique({ where: { id: args.id } }));
  *
  * // With typed context
  * export const getUser = query<MyContext>()
- *   .input(z.object({ id: z.string() }))
- *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id));
+ *   .args(z.object({ id: z.string() }))
+ *   .resolve(({ args, ctx }) => ctx.db.user.find(args.id));
  * ```
  */
 export function query<TContext = unknown>(): QueryBuilder<void, unknown, TContext>;

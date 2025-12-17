@@ -16,10 +16,10 @@
  *
  * // Mutation with optimistic updates
  * export const createPost = mutation()
- *   .input(z.object({ title: z.string(), content: z.string() }))
+ *   .args(z.object({ title: z.string(), content: z.string() }))
  *   .returns(Post)
  *   .optimistic('create')
- *   .resolve(({ input, ctx }) => ctx.db.post.create({ data: input }));
+ *   .resolve(({ args, ctx }) => ctx.db.post.create({ data: args }));
  * ```
  */
 
@@ -77,7 +77,7 @@ export {
 
 export type {
 	MutationBuilder,
-	MutationBuilderWithInput,
+	MutationBuilderWithArgs,
 	MutationBuilderWithOptimistic,
 	MutationBuilderWithReturns,
 	MutationBuilderWithReturns2,
@@ -133,8 +133,8 @@ export interface Operations<TContext> {
  * const { query, mutation, subscription } = operations<AppContext>();
  *
  * export const getUser = query()
- *   .input(z.object({ id: z.string() }))
- *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id));
+ *   .args(z.object({ id: z.string() }))
+ *   .resolve(({ args, ctx }) => ctx.db.user.find(args.id));
  *
  * export const onUserCreated = subscription()
  *   .returns(User)

@@ -143,7 +143,7 @@ function createTestServer() {
 		router: router({
 			user: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(({ args, ctx }) => {
 						const user = ctx.db.users.get(args.id);
@@ -156,7 +156,7 @@ function createTestServer() {
 					.resolve(({ ctx }) => Array.from(ctx.db.users.values())),
 
 				withPosts: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args, ctx }) => {
 						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("User not found");
@@ -165,7 +165,7 @@ function createTestServer() {
 					}),
 
 				withPostsAndComments: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args, ctx }) => {
 						const user = ctx.db.users.get(args.id);
 						if (!user) throw new Error("User not found");
@@ -181,7 +181,7 @@ function createTestServer() {
 
 			post: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(Post)
 					.resolve(({ args, ctx }) => {
 						const post = ctx.db.posts.get(args.id);
@@ -194,7 +194,7 @@ function createTestServer() {
 					.resolve(({ ctx }) => Array.from(ctx.db.posts.values())),
 
 				withAuthor: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args, ctx }) => {
 						const post = ctx.db.posts.get(args.id);
 						if (!post) throw new Error("Post not found");
@@ -203,7 +203,7 @@ function createTestServer() {
 					}),
 
 				withComments: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.resolve(({ args, ctx }) => {
 						const post = ctx.db.posts.get(args.id);
 						if (!post) throw new Error("Post not found");

@@ -19,7 +19,7 @@ describe("subscription()", () => {
 	it("creates a basic subscription", () => {
 		const onPostCreated = subscription()
 			.returns(Post)
-			.subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+			.subscribe(({ ctx: _ctx }) => ({ emit, onCleanup }) => {
 				// Mock subscription
 				const handle = setInterval(() => {
 					emit({ id: "1", title: "Test", authorId: "user1" });
@@ -32,15 +32,15 @@ describe("subscription()", () => {
 		expect(typeof onPostCreated._subscriber).toBe("function");
 	});
 
-	it("creates a subscription with input", () => {
+	it("creates a subscription with args", () => {
 		const onPostCreated = subscription()
-			.input(z.object({ authorId: z.string().optional() }))
+			.args(z.object({ authorId: z.string().optional() }))
 			.returns(Post)
-			.subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
-				// Use input for filtering
+			.subscribe(({ args, ctx: _ctx }) => ({ emit, onCleanup }) => {
+				// Use args for filtering
 				const handle = setInterval(() => {
-					if (!input.authorId || Math.random() > 0.5) {
-						emit({ id: "1", title: "Test", authorId: input.authorId || "user1" });
+					if (!args.authorId || Math.random() > 0.5) {
+						emit({ id: "1", title: "Test", authorId: args.authorId || "user1" });
 					}
 				}, 1000);
 				onCleanup(() => clearInterval(handle));
@@ -54,7 +54,7 @@ describe("subscription()", () => {
 	it("creates a subscription with name", () => {
 		const onPostCreated = subscription("onPostCreated")
 			.returns(Post)
-			.subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+			.subscribe(({ ctx: _ctx }) => ({ emit: _emit, onCleanup }) => {
 				onCleanup(() => {});
 			});
 
@@ -64,7 +64,7 @@ describe("subscription()", () => {
 	it("type guard works correctly", () => {
 		const onPostCreated = subscription()
 			.returns(Post)
-			.subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+			.subscribe(({ ctx: _ctx }) => ({ emit: _emit, onCleanup }) => {
 				onCleanup(() => {});
 			});
 
@@ -78,12 +78,12 @@ describe("subscription()", () => {
 		type TestContext = { events: { on: (event: string, handler: (data: unknown) => void) => () => void } };
 
 		const onPostCreated = subscription<TestContext>()
-			.input(z.object({ authorId: z.string().optional() }))
+			.args(z.object({ authorId: z.string().optional() }))
 			.returns(Post)
-			.subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+			.subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
 				// Type checking - these should compile
 				const unsub = ctx.events.on("post:created", (data) => {
-					if (!input.authorId || (data as { authorId?: string }).authorId === input.authorId) {
+					if (!args.authorId || (data as { authorId?: string }).authorId === args.authorId) {
 						emit(data);
 					}
 				});

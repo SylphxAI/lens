@@ -13,14 +13,14 @@ import { createHTTPHandler } from "./http.js";
 // =============================================================================
 
 const getUser = query()
-	.input(z.object({ id: z.string() }))
+	.args(z.object({ id: z.string() }))
 	.resolve(({ args }) => ({
 		id: args.id,
 		name: "Test User",
 	}));
 
 const createUser = mutation()
-	.input(z.object({ name: z.string() }))
+	.args(z.object({ name: z.string() }))
 	.resolve(({ args }) => ({
 		id: "new-id",
 		name: args.name,

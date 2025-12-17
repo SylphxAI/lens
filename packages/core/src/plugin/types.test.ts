@@ -41,8 +41,8 @@ interface TestPluginB extends PluginExtension {
 
 interface TestPluginC extends PluginExtension {
 	readonly name: "test-c";
-	readonly MutationBuilderWithInput: {
-		inputMethodC(): void;
+	readonly MutationBuilderWithArgs: {
+		argsMethodC(): void;
 	};
 }
 
@@ -93,22 +93,22 @@ describe("Plugin Extension Types", () => {
 
 			// Verify each category is merged correctly
 			type MutationReturns = Result["MutationBuilderWithReturns"];
-			type MutationInput = Result["MutationBuilderWithInput"];
+			type MutationArgs = Result["MutationBuilderWithArgs"];
 			type Query = Result["QueryBuilder"];
 
 			const _mutationReturns: MutationReturns = {
 				methodA: () => {},
 				methodB: () => {},
 			};
-			const _mutationInput: MutationInput = {
-				inputMethodC: () => {},
+			const _mutationArgs: MutationArgs = {
+				argsMethodC: () => {},
 			};
 			const _query: Query = {
 				queryMethodB: () => {},
 			};
 
 			expect(_mutationReturns).toBeDefined();
-			expect(_mutationInput).toBeDefined();
+			expect(_mutationArgs).toBeDefined();
 			expect(_query).toBeDefined();
 		});
 	});
@@ -158,11 +158,11 @@ describe("Plugin Extension Types", () => {
 
 			// All categories should be empty objects (Record<string, never>)
 			const _mutationReturns: Result["MutationBuilderWithReturns"] = {} as Result["MutationBuilderWithReturns"];
-			const _mutationInput: Result["MutationBuilderWithInput"] = {} as Result["MutationBuilderWithInput"];
+			const _mutationArgs: Result["MutationBuilderWithArgs"] = {} as Result["MutationBuilderWithArgs"];
 			const _query: Result["QueryBuilder"] = {} as Result["QueryBuilder"];
 
 			expect(_mutationReturns).toEqual({});
-			expect(_mutationInput).toEqual({});
+			expect(_mutationArgs).toEqual({});
 			expect(_query).toEqual({});
 		});
 	});

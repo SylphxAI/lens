@@ -58,7 +58,7 @@ describe("query() builder", () => {
 
 	it("creates a query with input", () => {
 		const getUserById = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
@@ -115,7 +115,7 @@ describe("query() builder", () => {
 		};
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(async ({ args }) => mockDb.user.findUnique({ where: { id: args.id } }));
 
@@ -137,7 +137,7 @@ describe("query() builder", () => {
 describe("mutation() builder", () => {
 	it("creates a mutation with input and returns", () => {
 		const createPost = mutation()
-			.input(z.object({ title: z.string(), content: z.string() }))
+			.args(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
 			.resolve(({ args }) => ({
 				id: "1",
@@ -154,7 +154,7 @@ describe("mutation() builder", () => {
 
 	it("creates a mutation with optimistic DSL", () => {
 		const createPost = mutation()
-			.input(z.object({ title: z.string(), content: z.string() }))
+			.args(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
 			.optimistic("create")
 			.resolve(({ args }) => ({
@@ -170,7 +170,7 @@ describe("mutation() builder", () => {
 
 	it("creates a mutation with optimistic DSL object", () => {
 		const updatePost = mutation()
-			.input(z.object({ id: z.string(), title: z.string() }))
+			.args(z.object({ id: z.string(), title: z.string() }))
 			.returns(Post)
 			.optimistic({ merge: { updatedAt: "now" } })
 			.resolve(({ args }) => ({
@@ -196,7 +196,7 @@ describe("mutation() builder", () => {
 		};
 
 		const createPost = mutation()
-			.input(z.object({ title: z.string(), content: z.string() }))
+			.args(z.object({ title: z.string(), content: z.string() }))
 			.returns(Post)
 			.resolve(async ({ args }) => mockDb.post.create({ data: args }));
 
@@ -223,7 +223,7 @@ describe("mutation() builder", () => {
 		});
 
 		const promoteUsers = mutation()
-			.input(z.object({ userIds: z.array(z.string()), role: z.string() }))
+			.args(z.object({ userIds: z.array(z.string()), role: z.string() }))
 			.returns({ users: [User], notifications: [Notification] })
 			.resolve(({ args }) => ({
 				users: args.userIds.map((id) => ({ id, name: "User", email: "user@example.com" })),
@@ -288,7 +288,7 @@ describe("Type guards", () => {
 
 	it("isMutationDef identifies mutation definitions", () => {
 		const m = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
@@ -302,7 +302,7 @@ describe("Type guards", () => {
 			.returns(User)
 			.resolve(() => ({ id: "1", name: "John", email: "john@example.com" }));
 		const m = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
@@ -359,7 +359,7 @@ describe("Input validation", () => {
 	it("input schema validates data", () => {
 		const schema = z.object({ id: z.string() });
 		const _getUser = query()
-			.input(schema)
+			.args(schema)
 			.returns(User)
 			.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" }));
 
@@ -382,20 +382,20 @@ describe("router() builder", () => {
 		const appRouter = router({
 			user: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" })),
 				list: query()
 					.returns([User])
 					.resolve(() => []),
 				create: mutation()
-					.input(z.object({ name: z.string(), email: z.string() }))
+					.args(z.object({ name: z.string(), email: z.string() }))
 					.returns(User)
 					.resolve(({ args }) => ({ id: "1", ...args })),
 			}),
 			post: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(Post)
 					.resolve(({ args }) => ({
 						id: args.id,
@@ -430,17 +430,17 @@ describe("router() builder", () => {
 		const appRouter = router({
 			user: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" })),
 				create: mutation()
-					.input(z.object({ name: z.string(), email: z.string() }))
+					.args(z.object({ name: z.string(), email: z.string() }))
 					.returns(User)
 					.resolve(({ args }) => ({ id: "1", ...args })),
 			}),
 			post: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(Post)
 					.resolve(({ args }) => ({
 						id: args.id,
@@ -500,7 +500,7 @@ describe("router() builder", () => {
 			// Nested namespace
 			user: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(({ args }) => ({ id: args.id, name: "John", email: "john@example.com" })),
 			}),
@@ -527,7 +527,7 @@ describe("router() builder", () => {
 
 		// Each procedure declares only what it needs
 		const getUserById = query<DbContext & UserContext>()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ ctx }) => {
 				// ctx has db and user
 				ctx.db.query("SELECT * FROM users");
@@ -535,7 +535,7 @@ describe("router() builder", () => {
 			});
 
 		const getCachedData = query<DbContext & CacheContext>()
-			.input(z.object({ key: z.string() }))
+			.args(z.object({ key: z.string() }))
 			.resolve(({ ctx }) => {
 				// ctx has db and cache
 				ctx.cache.get("key");
@@ -575,7 +575,7 @@ describe("operations() factory", () => {
 
 		// query() should return a typed builder
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ args, ctx }) => {
 				// ctx is AppContext - this compiles only if types are correct
 				const user = ctx.db.users.get(args.id);
@@ -584,7 +584,7 @@ describe("operations() factory", () => {
 
 		// mutation() should return a typed builder
 		const createUser = mutation()
-			.input(z.object({ name: z.string(), email: z.string() }))
+			.args(z.object({ name: z.string(), email: z.string() }))
 			.resolve(({ args, ctx }) => {
 				const user = { id: "new", ...args };
 				ctx.db.users.set(user.id, user);
@@ -601,7 +601,7 @@ describe("operations() factory", () => {
 		const namedQuery = query("getUsers").resolve(() => []);
 
 		const namedMutation = mutation("createUser")
-			.input(z.object({ name: z.string() }))
+			.args(z.object({ name: z.string() }))
 			.resolve(({ args }) => ({ id: "1", name: args.name }));
 
 		expect(namedQuery._name).toBe("getUsers");
@@ -691,7 +691,7 @@ describe("Mutation input requirement", () => {
 		expect(() => {
 			// @ts-expect-error - Testing runtime behavior
 			mutation().resolve(() => ({}));
-		}).toThrow("Mutation requires input schema");
+		}).toThrow("Mutation requires args schema");
 	});
 
 	it("throws if returns().resolve() is called without input", () => {
@@ -700,7 +700,7 @@ describe("Mutation input requirement", () => {
 			mutation()
 				.returns(User)
 				.resolve(() => ({}));
-		}).toThrow("Mutation requires input schema");
+		}).toThrow("Mutation requires args schema");
 	});
 });
 
@@ -711,7 +711,7 @@ describe("Mutation input requirement", () => {
 describe("Optimistic callback with input proxy", () => {
 	it("converts callback to Pipeline with input references", () => {
 		const createPost = mutation()
-			.input(z.object({ title: z.string(), content: z.string(), authorId: z.string() }))
+			.args(z.object({ title: z.string(), content: z.string(), authorId: z.string() }))
 			.returns(Post)
 			.optimistic(({ args }) => {
 				// Simulate building steps with input references
@@ -759,7 +759,7 @@ describe("Optimistic callback with input proxy", () => {
 
 	it("handles multiple step builders in callback", () => {
 		const complexMutation = mutation()
-			.input(z.object({ userId: z.string(), postId: z.string() }))
+			.args(z.object({ userId: z.string(), postId: z.string() }))
 			.returns(Post)
 			.optimistic(({ args }) => {
 				const userIdRef = args.userId;
@@ -797,7 +797,7 @@ describe("Optimistic callback with input proxy", () => {
 
 	it("input proxy intercepts nested property access", () => {
 		const mutation1 = mutation()
-			.input(z.object({ data: z.object({ name: z.string(), email: z.string() }) }))
+			.args(z.object({ data: z.object({ name: z.string(), email: z.string() }) }))
 			.returns(User)
 			.optimistic(({ args }) => {
 				// Access nested properties
@@ -834,7 +834,7 @@ describe("Optimistic callback with input proxy", () => {
 describe("Named operations", () => {
 	it("query() accepts a name parameter", () => {
 		const namedQuery = query("getUserById")
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({
 				id: args.id,
@@ -850,7 +850,7 @@ describe("Named operations", () => {
 
 	it("mutation() accepts a name parameter", () => {
 		const namedMutation = mutation("createUser")
-			.input(z.object({ name: z.string() }))
+			.args(z.object({ name: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({
 				id: "1",
@@ -866,7 +866,7 @@ describe("Named operations", () => {
 
 	it("query() name persists through builder chain", () => {
 		const q = query("test")
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(() => ({
 				id: "1",
@@ -881,7 +881,7 @@ describe("Named operations", () => {
 
 	it("mutation() name persists through optimistic chain", () => {
 		const m = mutation("updatePost")
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic("merge")
 			.resolve(({ args }) => ({
@@ -943,7 +943,7 @@ describe("Query minimal configuration", () => {
 describe("Mutation without returns()", () => {
 	it("mutation can resolve directly after input()", () => {
 		const deleteSomething = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ args }) => ({ deleted: true, id: args.id }));
 
 		expect(deleteSomething._type).toBe("mutation");
@@ -953,7 +953,7 @@ describe("Mutation without returns()", () => {
 
 	it("executes mutation without returns()", async () => {
 		const performAction = mutation()
-			.input(z.object({ action: z.string() }))
+			.args(z.object({ action: z.string() }))
 			.resolve(async ({ args }) => ({
 				success: true,
 				action: args.action,
@@ -1060,7 +1060,7 @@ describe("flattenRouter edge cases", () => {
 describe("Optimistic DSL patterns", () => {
 	it("supports 'merge' sugar syntax", () => {
 		const m = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic("merge")
 			.resolve(({ args }) => ({
@@ -1078,7 +1078,7 @@ describe("Optimistic DSL patterns", () => {
 
 	it("supports 'delete' sugar syntax", () => {
 		const m = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic("delete")
 			.resolve(({ args }) => ({
@@ -1096,7 +1096,7 @@ describe("Optimistic DSL patterns", () => {
 
 	it("supports object merge with additional fields", () => {
 		const m = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic({ merge: { published: true, updatedAt: Date.now() } })
 			.resolve(({ args }) => ({
@@ -1124,7 +1124,7 @@ describe("Optimistic DSL patterns", () => {
 		};
 
 		const m = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(Post)
 			.optimistic(pipeline as never)
 			.resolve(({ args }) => ({
@@ -1156,7 +1156,7 @@ describe("operations() factory context handling", () => {
 		const { query, mutation } = operations<ComplexContext>();
 
 		const complexQuery = query("complexOp")
-			.input(z.object({ key: z.string() }))
+			.args(z.object({ key: z.string() }))
 			.returns(User)
 			.resolve(({ args, ctx }) => {
 				ctx.logger.log(`Querying ${args.key}`);
@@ -1174,7 +1174,7 @@ describe("operations() factory context handling", () => {
 			});
 
 		const complexMutation = mutation("complexMut")
-			.input(z.object({ id: z.string(), data: z.string() }))
+			.args(z.object({ id: z.string(), data: z.string() }))
 			.returns(User)
 			.optimistic("merge")
 			.resolve(({ args, ctx }) => {

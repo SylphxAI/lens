@@ -66,7 +66,7 @@ describe("lens() factory", () => {
 
 			const builder = query();
 			expect(builder).toBeDefined();
-			expect(typeof builder.input).toBe("function");
+			expect(typeof builder.args).toBe("function");
 			expect(typeof builder.returns).toBe("function");
 			expect(typeof builder.resolve).toBe("function");
 		});
@@ -76,7 +76,7 @@ describe("lens() factory", () => {
 
 			const builder = mutation();
 			expect(builder).toBeDefined();
-			expect(typeof builder.input).toBe("function");
+			expect(typeof builder.args).toBe("function");
 		});
 	});
 
@@ -191,12 +191,12 @@ describe("LensConfig type", () => {
 });
 
 describe("Integration with existing builders", () => {
-	it("should work with query().input().returns().resolve() chain", () => {
+	it("should work with query().args().returns().resolve() chain", () => {
 		const { query } = lens<TestContext>();
 
 		// This should compile and work at runtime
 		const getUser = query()
-			.input({
+			.args({
 				parse: (x: unknown) => x as { id: string },
 				safeParse: () => ({ success: true, data: { id: "1" } }),
 				_output: { id: "1" },
@@ -209,11 +209,11 @@ describe("Integration with existing builders", () => {
 		expect(getUser._type).toBe("query");
 	});
 
-	it("should work with mutation().input().resolve() chain", () => {
+	it("should work with mutation().args().resolve() chain", () => {
 		const { mutation } = lens<TestContext>();
 
 		const createUser = mutation()
-			.input({
+			.args({
 				parse: (x: unknown) => x as { name: string },
 				safeParse: () => ({ success: true, data: { name: "test" } }),
 				_output: { name: "test" },

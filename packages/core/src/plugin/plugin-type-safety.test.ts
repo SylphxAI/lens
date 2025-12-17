@@ -157,14 +157,14 @@ describe("Plugin Runtime Integration", () => {
 
 			const builder = mutation();
 			expect(builder).toBeDefined();
-			expect(typeof builder.input).toBe("function");
+			expect(typeof builder.args).toBe("function");
 		});
 
 		it("should hide optimistic method at type level (compile-time safety)", () => {
 			const { mutation } = lens<TestContext>();
 
 			const builder = mutation()
-				.input({
+				.args({
 					parse: (x: unknown) => x as { id: string },
 					safeParse: () => ({ success: true, data: { id: "1" } }),
 					_output: { id: "1" },
@@ -220,7 +220,7 @@ describe("TypeScript Error Verification", () => {
 		const { mutation } = lens<TestContext>();
 
 		// This chain should work fine
-		const builder = mutation().input({
+		const builder = mutation().args({
 			parse: (x: unknown) => x as { id: string; name: string },
 			safeParse: () => ({ success: true, data: { id: "1", name: "test" } }),
 			_output: { id: "1", name: "test" },

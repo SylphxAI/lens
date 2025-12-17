@@ -23,12 +23,12 @@
  * });
  *
  * const getUser = query()
- *   .input(z.object({ id: z.string() }))
- *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id));
+ *   .args(z.object({ id: z.string() }))
+ *   .resolve(({ args, ctx }) => ctx.db.user.find(args.id));
  *
  * const createPost = mutation()
- *   .input(z.object({ title: z.string() }))
- *   .resolve(({ input, ctx }) => ctx.db.post.create(input));
+ *   .args(z.object({ title: z.string() }))
+ *   .resolve(({ args, ctx }) => ctx.db.post.create(args));
  * ```
  *
  * @example With plugins (type-safe extensions)
@@ -39,10 +39,10 @@
  * const { model, mutation } = lens<AppContext>({ plugins: [optimisticPlugin()] });
  *
  * const updateUser = mutation()
- *   .input(z.object({ id: z.string(), name: z.string() }))
+ *   .args(z.object({ id: z.string(), name: z.string() }))
  *   .returns(User)
  *   .optimistic('merge')  // ✅ Available with optimisticPlugin
- *   .resolve(({ input, ctx }) => ctx.db.user.update(input));
+ *   .resolve(({ args, ctx }) => ctx.db.user.update(args));
  * ```
  */
 
@@ -142,14 +142,14 @@ export interface LensMutationBuilder<
 	TContext,
 	TPlugins extends readonly PluginExtension[],
 > {
-	/** Define input validation schema */
-	input<T>(schema: ZodLikeSchema<T>): LensMutationBuilderWithInput<T, TOutput, TContext, TPlugins>;
+	/** Define args validation schema */
+	args<T>(schema: ZodLikeSchema<T>): LensMutationBuilderWithArgs<T, TOutput, TContext, TPlugins>;
 }
 
 /**
- * Mutation builder after .input() with plugin support.
+ * Mutation builder after .args() with plugin support.
  */
-export interface LensMutationBuilderWithInput<
+export interface LensMutationBuilderWithArgs<
 	TInput,
 	_TOutput,
 	TContext,
@@ -194,7 +194,7 @@ export interface LensMutationBuilderWithReturnsAndOptimistic<TInput, TOutput, TC
 	extends MutationBuilderWithReturns2<TInput, TOutput, TContext> {
 	/**
 	 * Define optimistic update behavior with typed callback.
-	 * The callback receives `{ args }` with the args type inferred from `.input()`.
+	 * The callback receives `{ args }` with the args type inferred from `.args()`.
 	 *
 	 * @param callback - Callback that receives typed args and returns step builders
 	 * @returns Builder with .resolve() method
@@ -355,9 +355,9 @@ export interface LensConfigWithPlugins<TPlugins extends readonly RuntimePlugin<P
  *
  * // .optimistic() is NOT available
  * const updateUser = mutation()
- *   .input(z.object({ id: z.string() }))
+ *   .args(z.object({ id: z.string() }))
  *   .returns(User)
- *   .resolve(({ input }) => ...);  // Only .resolve() available
+ *   .resolve(({ args }) => ...);  // Only .resolve() available
  * ```
  *
  * @example With plugins
@@ -368,10 +368,10 @@ export interface LensConfigWithPlugins<TPlugins extends readonly RuntimePlugin<P
  *
  * // .optimistic() is now available
  * const updateUser = mutation()
- *   .input(z.object({ id: z.string() }))
+ *   .args(z.object({ id: z.string() }))
  *   .returns(User)
  *   .optimistic('merge')  // ✅ Plugin method available
- *   .resolve(({ input }) => ...);
+ *   .resolve(({ args }) => ...);
  *
  * // Pass plugins to server
  * createApp({ router, plugins });
@@ -402,7 +402,7 @@ export interface LensBuilder<TContext> extends Lens<TContext> {
  *
  * // With plugins - use .withPlugins()
  * const { mutation, plugins } = lens<MyContext>().withPlugins([optimisticPlugin()]);
- * mutation().input(...).returns(...).optimistic('merge');
+ * mutation().args(...).returns(...).optimistic('merge');
  * ```
  */
 export function lens<TContext>(): LensBuilder<TContext>;

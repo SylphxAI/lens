@@ -68,7 +68,7 @@ describe("E2E - Basic Operations", () => {
 
 	it("query with input", async () => {
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => {
 				const user = mockUsers.find((u) => u.id === args.id);
@@ -96,7 +96,7 @@ describe("E2E - Basic Operations", () => {
 
 	it("mutation", async () => {
 		const createUser = mutation()
-			.input(z.object({ name: z.string(), email: z.string() }))
+			.args(z.object({ name: z.string(), email: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({
 				id: "user-new",
@@ -130,7 +130,7 @@ describe("E2E - Basic Operations", () => {
 
 	it("handles query errors", async () => {
 		const failingQuery = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(() => {
 				throw new Error("Query failed");
 			});
@@ -178,7 +178,7 @@ describe("E2E - Context", () => {
 		let capturedContext: unknown = null;
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ ctx }) => {
 				capturedContext = ctx;
 				return mockUsers[0];
@@ -206,7 +206,7 @@ describe("E2E - Context", () => {
 		let capturedContext: unknown = null;
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(({ ctx }) => {
 				capturedContext = ctx;
 				return mockUsers[0];
@@ -240,7 +240,7 @@ describe("E2E - Context", () => {
 describe("E2E - Selection", () => {
 	it("applies $select to filter fields", async () => {
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => {
 				const user = mockUsers.find((u) => u.id === args.id);
@@ -278,7 +278,7 @@ describe("E2E - Selection", () => {
 
 	it("includes id by default in selection", async () => {
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => mockUsers.find((u) => u.id === args.id)!);
 
@@ -340,7 +340,7 @@ describe("E2E - Entity Resolvers", () => {
 		}));
 
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(UserWithPosts)
 			.resolve(({ args }) => {
 				const user = users.find((u) => u.id === args.id);
@@ -460,12 +460,12 @@ describe("E2E - Entity Resolvers", () => {
 describe("E2E - Metadata", () => {
 	it("returns correct metadata structure", () => {
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => mockUsers.find((u) => u.id === args.id)!);
 
 		const createUser = mutation()
-			.input(z.object({ name: z.string() }))
+			.args(z.object({ name: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({ id: "new", name: args.name, email: "", status: "" }));
 
@@ -489,12 +489,12 @@ describe("E2E - Metadata", () => {
 
 	it("auto-derives optimistic hints from naming with plugin", () => {
 		const updateUser = mutation()
-			.input(z.object({ id: z.string(), name: z.string() }))
+			.args(z.object({ id: z.string(), name: z.string() }))
 			.returns(User)
 			.resolve(({ args }) => ({ ...mockUsers[0], name: args.name }));
 
 		const deleteUser = mutation()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.resolve(() => ({ success: true }));
 
 		const server = createApp({

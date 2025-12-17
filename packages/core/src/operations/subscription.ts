@@ -23,7 +23,7 @@ export interface SubscriptionDef<TInput = void, TOutput = unknown, TContext = un
 	/** Branded phantom types for inference */
 	_brand: { input: TInput; output: TOutput };
 	/** Method syntax for bivariance - allows flexible context types */
-	_subscriber?(ctx: { input: TInput; ctx: TContext }): Publisher<TOutput>;
+	_subscriber?(ctx: { args: TInput; ctx: TContext }): Publisher<TOutput>;
 }
 
 // =============================================================================
@@ -32,8 +32,8 @@ export interface SubscriptionDef<TInput = void, TOutput = unknown, TContext = un
 
 /** Subscription builder - fluent interface */
 export interface SubscriptionBuilder<TInput = void, TOutput = unknown, TContext = unknown> {
-	/** Define input validation schema (optional for subscriptions) */
-	input<T>(schema: ZodLikeSchema<T>): SubscriptionBuilder<T, TOutput, TContext>;
+	/** Define args validation schema (optional for subscriptions) */
+	args<T>(schema: ZodLikeSchema<T>): SubscriptionBuilder<T, TOutput, TContext>;
 
 	/** Define return type (optional - for entity outputs) */
 	returns<R extends ReturnSpec>(spec: R): SubscriptionBuilder<TInput, InferReturnType<R>, TContext>;
@@ -47,11 +47,11 @@ export interface SubscriptionBuilder<TInput = void, TOutput = unknown, TContext 
 	 * ```typescript
 	 * // Event-only subscription
 	 * subscription()
-	 *   .input(z.object({ authorId: z.string().optional() }))
+	 *   .args(z.object({ authorId: z.string().optional() }))
 	 *   .returns(Post)
-	 *   .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+	 *   .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
 	 *     const unsub = ctx.events.on("post:created", (post) => {
-	 *       if (!input.authorId || post.authorId === input.authorId) {
+	 *       if (!args.authorId || post.authorId === args.authorId) {
 	 *         emit(post);
 	 *       }
 	 *     });
@@ -60,7 +60,7 @@ export interface SubscriptionBuilder<TInput = void, TOutput = unknown, TContext 
 	 * ```
 	 */
 	subscribe<T>(
-		fn: (ctx: { input: TInput; ctx: TContext }) => Publisher<T>,
+		fn: (ctx: { args: TInput; ctx: TContext }) => Publisher<T>,
 	): SubscriptionDef<TInput, T, TContext>;
 }
 
@@ -79,7 +79,7 @@ export class SubscriptionBuilderImpl<TInput = void, TOutput = unknown, TContext 
 		this._name = name;
 	}
 
-	input<T>(schema: ZodLikeSchema<T>): SubscriptionBuilder<T, TOutput, TContext> {
+	args<T>(schema: ZodLikeSchema<T>): SubscriptionBuilder<T, TOutput, TContext> {
 		const builder = new SubscriptionBuilderImpl<T, TOutput, TContext>(this._name);
 		builder._inputSchema = schema;
 		builder._outputSpec = this._outputSpec;
@@ -96,7 +96,7 @@ export class SubscriptionBuilderImpl<TInput = void, TOutput = unknown, TContext 
 	}
 
 	subscribe<T>(
-		fn: (ctx: { input: TInput; ctx: TContext }) => Publisher<T>,
+		fn: (ctx: { args: TInput; ctx: TContext }) => Publisher<T>,
 	): SubscriptionDef<TInput, T, TContext> {
 		return {
 			_type: "subscription",
@@ -120,11 +120,11 @@ export class SubscriptionBuilderImpl<TInput = void, TOutput = unknown, TContext 
  * ```typescript
  * // Basic usage
  * export const onPostCreated = subscription()
- *   .input(z.object({ authorId: z.string().optional() }))
+ *   .args(z.object({ authorId: z.string().optional() }))
  *   .returns(Post)
- *   .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+ *   .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
  *     const unsub = ctx.events.on("post:created", (post) => {
- *       if (!input.authorId || post.authorId === input.authorId) {
+ *       if (!args.authorId || post.authorId === args.authorId) {
  *         emit(post);
  *       }
  *     });
@@ -133,10 +133,10 @@ export class SubscriptionBuilderImpl<TInput = void, TOutput = unknown, TContext 
  *
  * // With typed context
  * export const onUserStatusChange = subscription<MyContext>()
- *   .input(z.object({ userId: z.string() }))
+ *   .args(z.object({ userId: z.string() }))
  *   .returns(UserStatus)
- *   .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
- *     const unsub = ctx.statusService.watch(input.userId, emit);
+ *   .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
+ *     const unsub = ctx.statusService.watch(args.userId, emit);
  *     onCleanup(unsub);
  *   });
  * ```

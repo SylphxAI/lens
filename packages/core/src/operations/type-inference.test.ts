@@ -3,7 +3,7 @@
  *
  * Comprehensive tests for type inference in the Operations API.
  * These tests verify that TypeScript correctly infers types throughout
- * the builder chain: .input() → .returns() → .resolve() → QueryDef/MutationDef
+ * the builder chain: .args() → .returns() → .resolve() → QueryDef/MutationDef
  */
 
 import { describe, expect, it } from "bun:test";
@@ -66,7 +66,7 @@ describe("QueryBuilder type inference", () => {
 	describe(".returns(Entity)", () => {
 		it("infers output type from single entity", () => {
 			const getUser = query()
-				.input(z.object({ id: z.string() }))
+				.args(z.object({ id: z.string() }))
 				.returns(User)
 				.resolve(({ input }) => ({
 					id: input.id,
@@ -231,7 +231,7 @@ describe("QueryBuilder type inference", () => {
 	describe(".returns(MultiEntity)", () => {
 		it("infers output type from multi-entity object", () => {
 			const getPostWithAuthor = query()
-				.input(z.object({ id: z.string() }))
+				.args(z.object({ id: z.string() }))
 				.returns({ post: Post, author: User })
 				.resolve(({ input }) => ({
 					post: {
@@ -271,7 +271,7 @@ describe("QueryBuilder type inference", () => {
 
 		it("infers output type from multi-entity with arrays", () => {
 			const getPostWithComments = query()
-				.input(z.object({ id: z.string() }))
+				.args(z.object({ id: z.string() }))
 				.returns({ post: Post, comments: [Comment] })
 				.resolve(({ input }) => ({
 					post: {
@@ -311,10 +311,10 @@ describe("QueryBuilder type inference", () => {
 		});
 	});
 
-	describe(".input() type inference", () => {
+	describe(".args() type inference", () => {
 		it("infers input type from Zod schema", () => {
 			const getUser = query()
-				.input(z.object({ id: z.string(), includeDeleted: z.boolean().optional() }))
+				.args(z.object({ id: z.string(), includeDeleted: z.boolean().optional() }))
 				.returns(User)
 				.resolve(({ input }) => {
 					// Type check - input should have correct shape
@@ -335,9 +335,9 @@ describe("QueryBuilder type inference", () => {
 			expect(getUser._input).toBeDefined();
 		});
 
-		it("chains .input() before .returns()", () => {
+		it("chains .args() before .returns()", () => {
 			const search = query()
-				.input(z.object({ query: z.string(), limit: z.number().default(10) }))
+				.args(z.object({ query: z.string(), limit: z.number().default(10) }))
 				.returns([User])
 				.resolve(({ input }) => {
 					const _query: string = input.query;
@@ -351,10 +351,10 @@ describe("QueryBuilder type inference", () => {
 			expect(search._output).toEqual([User]);
 		});
 
-		it("chains .input() after .returns()", () => {
+		it("chains .args() after .returns()", () => {
 			const search = query()
 				.returns([User])
-				.input(z.object({ query: z.string() }))
+				.args(z.object({ query: z.string() }))
 				.resolve(({ input }) => {
 					const _query: string = input.query;
 					expect(_query).toBeDefined();
@@ -372,10 +372,10 @@ describe("QueryBuilder type inference", () => {
 // =============================================================================
 
 describe("MutationBuilder type inference", () => {
-	describe(".returns(Entity) with .input()", () => {
+	describe(".returns(Entity) with .args()", () => {
 		it("infers output type from entity after .returns()", () => {
 			const createPost = mutation()
-				.input(z.object({ title: z.string(), content: z.string() }))
+				.args(z.object({ title: z.string(), content: z.string() }))
 				.returns(Post)
 				.resolve(({ input }) => ({
 					id: "new-1",
@@ -403,7 +403,7 @@ describe("MutationBuilder type inference", () => {
 
 		it("infers output type with .optimistic() in chain", () => {
 			const updatePost = mutation()
-				.input(z.object({ id: z.string(), title: z.string() }))
+				.args(z.object({ id: z.string(), title: z.string() }))
 				.returns(Post)
 				.optimistic("merge")
 				.resolve(({ input }) => ({
@@ -428,7 +428,7 @@ describe("MutationBuilder type inference", () => {
 
 		it("infers output type with complex optimistic DSL", () => {
 			const publishPost = mutation()
-				.input(z.object({ id: z.string() }))
+				.args(z.object({ id: z.string() }))
 				.returns(Post)
 				.optimistic({ merge: { published: true } })
 				.resolve(({ input }) => ({
@@ -453,7 +453,7 @@ describe("MutationBuilder type inference", () => {
 			// For proper type inference, use .returns() with an entity or Zod schema.
 			// This test verifies runtime behavior works correctly.
 			const deletePost = mutation()
-				.input(z.object({ id: z.string() }))
+				.args(z.object({ id: z.string() }))
 				.resolve(({ input }) => ({ deleted: true, id: input.id }));
 
 			// Runtime check - the mutation definition exists
@@ -463,7 +463,7 @@ describe("MutationBuilder type inference", () => {
 
 		it("complex mutation resolver returns correct value at runtime", () => {
 			const bulkUpdate = mutation()
-				.input(z.object({ ids: z.array(z.string()), status: z.string() }))
+				.args(z.object({ ids: z.array(z.string()), status: z.string() }))
 				.resolve(({ input }) => ({
 					updated: input.ids.length,
 					failed: 0,
@@ -479,7 +479,7 @@ describe("MutationBuilder type inference", () => {
 	describe("multi-entity returns", () => {
 		it("infers output type from multi-entity object", () => {
 			const createPostWithAuthor = mutation()
-				.input(z.object({ title: z.string(), authorId: z.string() }))
+				.args(z.object({ title: z.string(), authorId: z.string() }))
 				.returns({ post: Post, author: User })
 				.resolve(({ input }) => ({
 					post: {
@@ -558,7 +558,7 @@ describe("lens() factory type inference", () => {
 		const { mutation } = lens<TestContext>();
 
 		const createUser = mutation()
-			.input(z.object({ name: z.string(), email: z.string() }))
+			.args(z.object({ name: z.string(), email: z.string() }))
 			.returns(User)
 			.resolve(({ input, ctx }) => {
 				// Type check - ctx should be TestContext
@@ -582,7 +582,7 @@ describe("lens() factory type inference", () => {
 		const appRouter = router({
 			user: router({
 				get: query()
-					.input(z.object({ id: z.string() }))
+					.args(z.object({ id: z.string() }))
 					.returns(User)
 					.resolve(({ input, ctx }) => {
 						const user = ctx.db.users.get(input.id);
@@ -665,7 +665,7 @@ describe("InferReturnType utility", () => {
 describe("_brand phantom type", () => {
 	it("QueryDef._brand.output matches .returns() type", () => {
 		const getUser = query()
-			.input(z.object({ id: z.string() }))
+			.args(z.object({ id: z.string() }))
 			.returns(User)
 			.resolve(({ input }) => ({
 				id: input.id,
@@ -691,11 +691,11 @@ describe("_brand phantom type", () => {
 		expect(_typeCheck).toBe(true);
 	});
 
-	it("QueryDef._brand.input matches .input() type", () => {
+	it("QueryDef._brand.input matches .args() type", () => {
 		const InputSchema = z.object({ id: z.string(), limit: z.number().optional() });
 
 		const search = query()
-			.input(InputSchema)
+			.args(InputSchema)
 			.returns([User])
 			.resolve(() => []);
 
@@ -709,7 +709,7 @@ describe("_brand phantom type", () => {
 
 	it("MutationDef._brand preserves types through .optimistic()", () => {
 		const updateUser = mutation()
-			.input(z.object({ id: z.string(), name: z.string() }))
+			.args(z.object({ id: z.string(), name: z.string() }))
 			.returns(User)
 			.optimistic("merge")
 			.resolve(({ input }) => ({
