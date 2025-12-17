@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 3.0.1 (2025-12-17)
+
+### ♻️ Refactoring
+
+- **core:** rename .input() to .args() for API consistency ([cdd7c51](https://github.com/SylphxAI/lens/commit/cdd7c517767ac30c4414189d1bdcf0e6fe61d3f1))
+
 ## 3.0.0 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system

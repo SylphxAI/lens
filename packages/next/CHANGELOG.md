@@ -1,5 +1,13 @@
 # @sylphx/lens-next
 
+## 2.3.15 (2025-12-17)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 3.0.1
+- Updated `@sylphx/lens-core` to 4.0.2
+- Updated `@sylphx/lens-server` to 4.0.1
+
 ## 2.3.14 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system
