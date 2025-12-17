@@ -24,7 +24,6 @@ export {
 
 export {
 	isOptimisticPlugin,
-	type MutationBuilderWithOptimisticExt,
 	OPTIMISTIC_PLUGIN_SYMBOL,
 	// Optimistic plugin extension
 	type OptimisticPluginExtension,

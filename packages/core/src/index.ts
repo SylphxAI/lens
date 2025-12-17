@@ -477,7 +477,6 @@ export {
 	isPairedPlugin,
 	isRuntimePlugin,
 	type MergeExtensions,
-	type MutationBuilderWithOptimisticExt,
 	type NoExtension,
 	type NoPlugins,
 	OPTIMISTIC_PLUGIN_SYMBOL,

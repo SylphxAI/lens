@@ -17,12 +17,7 @@
  */
 
 import type { StepBuilder } from "@sylphx/reify";
-import type {
-	MutationBuilderWithOptimistic,
-	MutationDef,
-	OptimisticDSL,
-	ResolverFn,
-} from "../operations/index.js";
+import type { MutationBuilderWithOptimistic, OptimisticDSL } from "../operations/index.js";
 import type { PluginExtension, RuntimePlugin } from "./types.js";
 
 // =============================================================================
@@ -99,20 +94,6 @@ export type OptimisticPluginMethods<
  */
 export interface OptimisticPluginExtension extends PluginExtension {
 	readonly name: "optimistic";
-}
-
-// =============================================================================
-// Legacy Types (for backward compatibility)
-// =============================================================================
-
-/**
- * Mutation builder state after .optimistic() is called.
- * Only .resolve() is available at this point.
- *
- * @deprecated Use MutationBuilderWithOptimistic from operations/index.ts
- */
-export interface MutationBuilderWithOptimisticExt<TInput, TOutput, TContext> {
-	resolve(fn: ResolverFn<TInput, TOutput, TContext>): MutationDef<TInput, TOutput>;
 }
 
 // =============================================================================
