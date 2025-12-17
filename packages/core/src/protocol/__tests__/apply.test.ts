@@ -271,3 +271,51 @@ describe("applyOp", () => {
 		expect(applyOp(state, op)).toBe(state);
 	});
 });
+
+describe("security: prototype pollution protection", () => {
+	it("throws on __proto__ path segment", () => {
+		const state = { user: {} };
+		const op: Op = { o: "set", p: "__proto__.polluted", v: true };
+		expect(() => applyOp(state, op)).toThrow("Forbidden path segment");
+	});
+
+	it("throws on constructor path segment", () => {
+		const state = { user: {} };
+		const op: Op = { o: "set", p: "constructor.prototype.polluted", v: true };
+		expect(() => applyOp(state, op)).toThrow("Forbidden path segment");
+	});
+
+	it("throws on prototype path segment", () => {
+		const state = { user: {} };
+		const op: Op = { o: "set", p: "user.prototype.toString", v: "malicious" };
+		expect(() => applyOp(state, op)).toThrow("Forbidden path segment");
+	});
+
+	it("throws on __proto__ in nested path", () => {
+		const state = { user: {} };
+		const op: Op = { o: "merge", p: "user.__proto__", v: { admin: true } };
+		expect(() => applyOp(state, op)).toThrow("Forbidden path segment");
+	});
+
+	it("allows legitimate paths with similar-looking names", () => {
+		const state = { user: {} };
+		const op: Op = { o: "set", p: "user.proto_type", v: "safe" };
+		expect(applyOp(state, op)).toEqual({ user: { proto_type: "safe" } });
+	});
+
+	it("allows legitimate paths with constructor-like names", () => {
+		const state = { user: {} };
+		const op: Op = { o: "set", p: "user.constructorName", v: "MyClass" };
+		expect(applyOp(state, op)).toEqual({ user: { constructorName: "MyClass" } });
+	});
+
+	it("protects Object.prototype from pollution via ops", () => {
+		const state = {};
+		const ops: Op[] = [{ o: "set", p: "__proto__.isAdmin", v: true }];
+
+		expect(() => applyOps(state, ops)).toThrow("Forbidden path segment");
+
+		// Verify Object.prototype was not polluted
+		expect(({} as { isAdmin?: boolean }).isAdmin).toBeUndefined();
+	});
+});

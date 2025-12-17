@@ -93,12 +93,31 @@ export function applyOp<T>(state: T, op: Op): T {
 // =============================================================================
 
 /**
+ * Forbidden path segments that could be used for prototype pollution attacks.
+ * These must never be allowed in paths from external sources.
+ */
+const FORBIDDEN_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
  * Parse dot-notation path into segments
  * Handles array indices: "users.0.name" -> ["users", "0", "name"]
+ *
+ * @throws Error if path contains forbidden segments (prototype pollution protection)
  */
 function parsePath(path: string): string[] {
 	if (!path) return [];
-	return path.split(".");
+	const segments = path.split(".");
+
+	// Security: Block prototype pollution attacks
+	for (const segment of segments) {
+		if (FORBIDDEN_PATH_SEGMENTS.has(segment)) {
+			throw new Error(
+				`Forbidden path segment: "${segment}" - potential prototype pollution attack`,
+			);
+		}
+	}
+
+	return segments;
 }
 
 /**
