@@ -395,19 +395,39 @@ type ResolverEntity = {
 	readonly fields: Record<string, unknown>;
 };
 
-export function resolver<TContext = FieldResolverContext>(): <TEntity extends ResolverEntity>(
-	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => {
-		[K in keyof TEntity["fields"]]: AnyFieldDef<TContext>;
-	},
-) => ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, TContext>;
+/**
+ * Helper type to enforce exact field keys in resolver.
+ * Extra fields not in the model will cause a type error.
+ */
+type ExactResolverFields<
+	TEntity extends ResolverEntity,
+	TFields extends Record<string, unknown>,
+	TContext,
+> = TFields & {
+	// Force extra keys to be `never`, causing type error if present
+	[K in Exclude<keyof TFields, keyof TEntity["fields"]>]: never;
+} & {
+	// Ensure all model fields are present
+	[K in keyof TEntity["fields"]]: AnyFieldDef<TContext>;
+};
 
-export function resolver<TEntity extends ResolverEntity>(
+export function resolver<TContext = FieldResolverContext>(): <
+	TEntity extends ResolverEntity,
+	TFields extends { [K in keyof TEntity["fields"]]: AnyFieldDef<TContext> },
+>(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, FieldResolverContext>) => {
-		[K in keyof TEntity["fields"]]: AnyFieldDef<FieldResolverContext>;
-	},
-): ResolverDef<TEntity, Record<string, FieldDef<any, any, any>>, FieldResolverContext>;
+	builder: (f: FieldBuilder<TEntity, TContext>) => ExactResolverFields<TEntity, TFields, TContext>,
+) => ResolverDef<TEntity, TFields, TContext>;
+
+export function resolver<
+	TEntity extends ResolverEntity,
+	TFields extends { [K in keyof TEntity["fields"]]: AnyFieldDef<FieldResolverContext> },
+>(
+	entity: TEntity,
+	builder: (
+		f: FieldBuilder<TEntity, FieldResolverContext>,
+	) => ExactResolverFields<TEntity, TFields, FieldResolverContext>,
+): ResolverDef<TEntity, TFields, FieldResolverContext>;
 
 export function resolver<TContext = FieldResolverContext>(
 	entityOrNothing?: AnyEntityLike,
@@ -437,12 +457,14 @@ export function resolver<TContext = FieldResolverContext>(
 		return result;
 	};
 
-	// Validate that resolver covers all entity fields
+	// Validate that resolver covers all model fields
+	// Note: Extra fields are caught by TypeScript at compile time (ExactResolverFields type)
 	const validateFields = (entity: AnyEntityLike, fields: Record<string, unknown>): void => {
 		const entityFields = Object.keys(entity.fields);
 		const resolverFields = Object.keys(fields);
-		const missingFields = entityFields.filter((f) => !resolverFields.includes(f));
 
+		// Check for missing fields (model has but resolver doesn't)
+		const missingFields = entityFields.filter((f) => !resolverFields.includes(f));
 		if (missingFields.length > 0) {
 			throw new Error(
 				`resolver(${entity._name}): Missing fields: ${missingFields.join(", ")}. ` +

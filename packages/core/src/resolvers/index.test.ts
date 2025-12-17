@@ -132,6 +132,9 @@ describe("resolver()", () => {
 			})),
 		).toThrow("Missing fields: email, avatarKey");
 	});
+
+	// Note: Extra fields are caught at compile time by TypeScript (ExactResolverFields type)
+	// No runtime check needed - code with extra fields won't compile
 });
 
 // =============================================================================
