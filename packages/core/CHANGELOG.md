@@ -1,5 +1,17 @@
 # @sylphx/lens-core
 
+## 4.1.0 (2025-12-17)
+
+refactor(server): simplify API - app is now callable like Yoga
+
+### ♻️ Refactoring
+
+- **server:** simplify API - app is now callable like Yoga ([11a4930](https://github.com/SylphxAI/lens/commit/11a4930bbcb49fadcbfaf4cfea8d37b5aaf1d61a))
+
+### 📚 Documentation
+
+- fix all API examples to use correct patterns ([ef85118](https://github.com/SylphxAI/lens/commit/ef851186d20ac8a02da87f7822fdbaa29cbba415))
+
 ## 4.0.2 (2025-12-17)
 
 ### ♻️ Refactoring
