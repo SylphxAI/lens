@@ -1,5 +1,10 @@
 # @sylphx/lens-react
 
+## 2.6.1 (2025-12-17)
+
+fix(server): send full LensResult envelope in SSE handler
+
+
 ## 2.6.0 (2025-12-17)
 
 refactor(server): simplify API - app is now callable like Yoga
