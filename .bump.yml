@@ -1,5 +1,5 @@
 releases:
-  - name: "fix(svelte): update JSDoc examples to use args"
+  - name: "fix(server): return full Result envelope with $ marker"
     packages:
-      - name: "@sylphx/lens-svelte"
+      - name: "@sylphx/lens-server"
         bump: patch
