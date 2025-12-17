@@ -412,6 +412,9 @@ const app = createApp({
   resolvers: [userResolver, postResolver],       // Field resolvers array
   context: () => ({ db }),
 })
+
+// Start server - app is directly callable
+Bun.serve({ fetch: app })
 ```
 
 ### Field Resolver Signature
@@ -654,7 +657,8 @@ npm install @sylphx/lens-fresh      # Fresh (Deno)
 
 ```typescript
 // server/api.ts
-import { createApp, router, query, mutation } from '@sylphx/lens-server'
+import { createApp } from '@sylphx/lens-server'
+import { router, query, mutation } from '@sylphx/lens-core'
 import { z } from 'zod'
 
 export const appRouter = router({
@@ -685,6 +689,11 @@ export const app = createApp({
     user: await getUserFromRequest(req),
   }),
 })
+
+// Start server - app is directly callable
+Bun.serve({ fetch: app })
+// Or: Deno.serve(app)
+// Or: export default app (Cloudflare Workers)
 ```
 
 ### 2. Create Your Client

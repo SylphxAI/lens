@@ -3,33 +3,19 @@
  *
  * Server runtime for Lens API framework.
  *
- * Architecture:
- * - App = Executor with optional plugin support
- *   - Stateless (default): Pure executor
- *   - Stateful (with opLog): Cursor-based state synchronization
- * - Handlers = Pure protocol handlers (HTTP, WebSocket, SSE)
- *   - No business logic - just translate protocol to app calls
- * - Plugins = App-level middleware (opLog, auth, logger)
- *   - Configured at app level, not handler level
- *
  * @example
  * ```typescript
- * // Stateless mode (default)
- * const app = createApp({ router });
- * const wsHandler = createWSHandler(app);
- *
- * // With opLog plugin (cursor-based state sync)
  * const app = createApp({
- *   router,
- *   plugins: [opLog()],
- * });
+ *   router: appRouter,
+ *   entities: { User, Post },
+ *   resolvers: [userResolver, postResolver],
+ *   context: () => ({ db }),
+ * })
  *
- * // With external storage for serverless (install @sylphx/lens-storage-upstash)
- * import { upstashStorage } from "@sylphx/lens-storage-upstash";
- * const app = createApp({
- *   router,
- *   plugins: [opLog({ storage: upstashStorage({ redis }) })],
- * });
+ * // App is directly callable - works with any runtime
+ * Bun.serve({ fetch: app })
+ * Deno.serve(app)
+ * export default app  // Cloudflare Workers
  * ```
  */
 
@@ -91,34 +77,32 @@ export {
 } from "./server/create.js";
 
 // =============================================================================
-// Protocol Handlers
+// Streaming Handlers (WebSocket, SSE)
 // =============================================================================
 
 export {
-	// Framework Handler Utilities
-	createFrameworkHandler,
-	// Unified Handler (HTTP + SSE)
-	createHandler,
-	// HTTP Handler
-	createHTTPHandler,
-	createServerClientProxy,
-	// SSE Handler
+	// SSE Handler (for live queries)
 	createSSEHandler,
-	// WebSocket Handler
+	// WebSocket Handler (for live queries + subscriptions)
 	createWSHandler,
 	DEFAULT_WS_HANDLER_CONFIG,
-	type FrameworkHandlerOptions,
-	type Handler,
-	type HandlerOptions,
-	type HTTPHandler,
-	type HTTPHandlerOptions,
-	handleWebMutation,
-	handleWebQuery,
-	handleWebSSE,
 	type SSEHandlerOptions,
 	type WSHandler,
 	type WSHandlerConfig,
 	type WSHandlerOptions,
+} from "./handlers/index.js";
+
+// =============================================================================
+// Framework Integration Utilities (internal use)
+// =============================================================================
+
+export {
+	createFrameworkHandler,
+	createServerClientProxy,
+	type FrameworkHandlerOptions,
+	handleWebMutation,
+	handleWebQuery,
+	handleWebSSE,
 } from "./handlers/index.js";
 
 // =============================================================================

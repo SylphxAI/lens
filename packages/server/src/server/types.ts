@@ -196,19 +196,45 @@ export interface WebSocketLike {
 // =============================================================================
 
 /**
- * Lens server interface - Pure Executor
+ * Lens server interface - Callable HTTP handler with executor methods
  *
- * The server is a pure operation executor. It receives operations and returns results.
- * Runtime concerns (connections, transport, protocol) are handled by adapters/handlers.
+ * The app itself is a fetch handler. Just pass it directly to your runtime.
  *
- * Core methods:
- * - getMetadata() - Server metadata for transport handshake
- * - execute() - Execute any operation (returns Observable)
+ * @example
+ * ```typescript
+ * const app = createApp({ router, context: () => ({}) })
  *
- * For handlers that need plugin integration (WS, SSE with state management),
- * use getPluginManager() to access plugin hooks directly.
+ * // Bun - app is directly usable as handler
+ * Bun.serve(app)
+ *
+ * // Or with explicit fetch
+ * Bun.serve({ fetch: app.fetch })
+ *
+ * // Deno
+ * Deno.serve(app)
+ *
+ * // Cloudflare Workers
+ * export default app
+ * ```
  */
 export interface LensServer {
+	/**
+	 * Call the app directly as a fetch handler.
+	 * This makes the app callable: `app(request)` or `Bun.serve(app)`
+	 */
+	(request: Request): Promise<Response>;
+
+	/**
+	 * HTTP fetch handler - Web standard Request/Response.
+	 * Same as calling app directly: `app.fetch(req)` === `app(req)`
+	 *
+	 * Endpoints:
+	 * - POST / → Execute operations
+	 * - GET /__lens/metadata → Server metadata
+	 * - GET /__lens/health → Health check
+	 */
+	fetch: (request: Request) => Promise<Response>;
+
 	/** Get server metadata for transport handshake */
 	getMetadata(): ServerMetadata;
 

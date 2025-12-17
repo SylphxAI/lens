@@ -1,17 +1,12 @@
 /**
  * @sylphx/lens-server - Handlers
  *
- * Protocol handlers for bridging the Lens app to various transports.
+ * Streaming handlers for real-time communication.
+ * HTTP is handled by app.fetch directly.
  */
 
 // =============================================================================
-// Unified Handler (HTTP + SSE)
-// =============================================================================
-
-export { createHandler, type Handler, type HandlerOptions } from "./unified.js";
-
-// =============================================================================
-// Framework Handler Utilities
+// Framework Handler Utilities (for framework packages)
 // =============================================================================
 
 export {
@@ -33,18 +28,6 @@ export {
 	SSEHandler,
 	type SSEHandlerConfig as SSEHandlerOptions,
 } from "../sse/handler.js";
-
-// =============================================================================
-// HTTP Handler
-// =============================================================================
-
-export {
-	createHTTPHandler,
-	type HealthCheckOptions,
-	type HealthCheckResponse,
-	type HTTPHandler,
-	type HTTPHandlerOptions,
-} from "./http.js";
 
 // =============================================================================
 // WebSocket Handler

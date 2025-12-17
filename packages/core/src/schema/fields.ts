@@ -27,7 +27,6 @@
  */
 
 import type { ModelDef } from "./model.js";
-import type { EntityDefinition } from "./types.js";
 import {
 	BigIntType,
 	BooleanType,

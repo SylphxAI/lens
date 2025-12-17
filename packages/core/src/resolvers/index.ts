@@ -417,7 +417,9 @@ export function resolver<TContext = FieldResolverContext>(): <
 	TFields extends { [K in keyof TEntity["fields"]]: AnyFieldDef<TContext> },
 >(
 	entity: TEntity,
-	builder: (f: FieldBuilder<TEntity, TContext>) => ResolverFieldRequirements<TEntity, TFields, TContext>,
+	builder: (
+		f: FieldBuilder<TEntity, TContext>,
+	) => ResolverFieldRequirements<TEntity, TFields, TContext>,
 ) => ResolverDef<TEntity, TFields, TContext>;
 
 export function resolver<

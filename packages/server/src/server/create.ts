@@ -23,13 +23,16 @@ import {
 	createResolverFromEntity,
 	type Emit,
 	type EmitCommand,
+	firstValueFrom,
 	flattenRouter,
 	hashValue,
 	type InferRouterContext,
+	isError,
 	isLiveQueryDef,
 	isModelDef,
 	isMutationDef,
 	isQueryDef,
+	isSnapshot,
 	isSubscriptionDef,
 	type LiveQueryDef,
 	type Message,
@@ -114,8 +117,7 @@ class LensServerImpl<
 	M extends MutationsMap = MutationsMap,
 	S extends SubscriptionsMap = SubscriptionsMap,
 	TContext extends ContextValue = ContextValue,
-> implements LensServer
-{
+> {
 	private queries: Q;
 	private mutations: M;
 	private subscriptions: S;
@@ -1220,6 +1222,112 @@ class LensServerImpl<
 	getPluginManager(): PluginManager {
 		return this.pluginManager;
 	}
+
+	// =========================================================================
+	// HTTP Fetch Handler
+	// =========================================================================
+
+	/**
+	 * HTTP fetch handler - Web standard Request/Response.
+	 * Works with any runtime: Bun, Deno, Cloudflare Workers, etc.
+	 */
+	fetch = async (request: Request): Promise<Response> => {
+		const url = new URL(request.url);
+		const pathname = url.pathname;
+
+		// Base headers including CORS and security
+		const baseHeaders: Record<string, string> = {
+			"Content-Type": "application/json",
+			"X-Content-Type-Options": "nosniff",
+			"X-Frame-Options": "DENY",
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type, Authorization",
+		};
+
+		// Handle CORS preflight
+		if (request.method === "OPTIONS") {
+			return new Response(null, { status: 204, headers: baseHeaders });
+		}
+
+		// Health check: GET /__lens/health
+		if (request.method === "GET" && pathname === "/__lens/health") {
+			const metadata = this.getMetadata();
+			return new Response(
+				JSON.stringify({
+					status: "healthy",
+					service: "lens-server",
+					version: metadata.version,
+					timestamp: new Date().toISOString(),
+				}),
+				{
+					headers: {
+						...baseHeaders,
+						"Cache-Control": "no-cache, no-store, must-revalidate",
+					},
+				},
+			);
+		}
+
+		// Metadata: GET /__lens/metadata
+		if (request.method === "GET" && pathname === "/__lens/metadata") {
+			return new Response(JSON.stringify(this.getMetadata()), {
+				headers: baseHeaders,
+			});
+		}
+
+		// Operations: POST /
+		if (request.method === "POST" && (pathname === "/" || pathname === "")) {
+			let body: { path?: string; input?: unknown };
+			try {
+				body = (await request.json()) as typeof body;
+			} catch {
+				return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
+					status: 400,
+					headers: baseHeaders,
+				});
+			}
+
+			if (!body.path) {
+				return new Response(JSON.stringify({ error: "Missing operation path" }), {
+					status: 400,
+					headers: baseHeaders,
+				});
+			}
+
+			try {
+				const result = await firstValueFrom(this.execute({ path: body.path, input: body.input }));
+
+				if (isError(result)) {
+					return new Response(JSON.stringify({ error: result.error }), {
+						status: 500,
+						headers: baseHeaders,
+					});
+				}
+
+				if (isSnapshot(result)) {
+					return new Response(JSON.stringify({ data: result.data }), {
+						headers: baseHeaders,
+					});
+				}
+
+				// ops message - forward as-is
+				return new Response(JSON.stringify(result), { headers: baseHeaders });
+			} catch (error) {
+				const errMsg = error instanceof Error ? error.message : String(error);
+				return new Response(JSON.stringify({ error: errMsg }), {
+					status: 500,
+					headers: baseHeaders,
+				});
+			}
+		}
+
+		// Not found
+		return new Response(JSON.stringify({ error: "Not found" }), {
+			status: 404,
+			headers: baseHeaders,
+		});
+	};
 }
 
 // =============================================================================
@@ -1227,20 +1335,31 @@ class LensServerImpl<
 // =============================================================================
 
 /**
- * Create Lens server with optional plugin support.
+ * Create Lens app - a callable HTTP handler.
+ *
+ * The returned app is directly usable as a fetch handler.
+ * Works with any runtime: Bun, Deno, Cloudflare Workers, Node.js.
  *
  * @example
  * ```typescript
- * // Stateless mode (default)
- * const app = createApp({ router });
- * createWSHandler(app); // Sends full data on each update
- *
- * // Stateful mode (with clientState)
  * const app = createApp({
- *   router,
- *   plugins: [clientState()], // Enables per-client state tracking
- * });
- * createWSHandler(app); // Sends minimal diffs
+ *   router: appRouter,
+ *   entities: { User, Post },
+ *   resolvers: [userResolver, postResolver],
+ *   context: () => ({ db }),
+ * })
+ *
+ * // Bun - app is directly callable
+ * Bun.serve(app)
+ *
+ * // Deno
+ * Deno.serve(app)
+ *
+ * // Cloudflare Workers
+ * export default app
+ *
+ * // Or use app.fetch explicitly
+ * Bun.serve({ fetch: app.fetch })
  * ```
  */
 export function createApp<
@@ -1269,7 +1388,17 @@ export function createApp<
 	config: LensServerConfig<TContext> & { queries?: Q; mutations?: M },
 ): LensServer & { _types: { queries: Q; mutations: M; context: TContext } } {
 	const server = new LensServerImpl(config) as LensServerImpl<Q, M, SubscriptionsMap, TContext>;
-	return server as unknown as LensServer & {
+
+	// Create callable function that delegates to fetch
+	const app = ((request: Request) => server.fetch(request)) as LensServer & {
 		_types: { queries: Q; mutations: M; context: TContext };
 	};
+
+	// Attach properties
+	app.fetch = server.fetch;
+	app.execute = server.execute.bind(server);
+	app.getMetadata = server.getMetadata.bind(server);
+	app.getPluginManager = server.getPluginManager.bind(server);
+
+	return app;
 }
