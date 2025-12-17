@@ -1,5 +1,12 @@
 # @sylphx/lens-nuxt
 
+## 2.3.2 (2025-12-17)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 3.1.2
+- Updated `@sylphx/lens-vue` to 2.5.2
+
 ## 2.3.1 (2025-12-17)
 
 fix(server): send full LensResult envelope in SSE handler

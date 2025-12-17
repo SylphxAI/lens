@@ -1,5 +1,11 @@
 # @sylphx/lens-svelte
 
+## 2.5.2 (2025-12-17)
+
+### 🐛 Bug Fixes
+
+- **client:** rename input to args in client API ([07c035e](https://github.com/SylphxAI/lens/commit/07c035ef375fe14373faf9956e6cfab9c4d0cd4b))
+
 ## 2.5.1 (2025-12-17)
 
 fix(server): send full LensResult envelope in SSE handler
