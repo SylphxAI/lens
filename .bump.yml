@@ -1,0 +1,13 @@
+releases:
+  - name: "fix(client): rename input to args in client API"
+    packages:
+      - name: "@sylphx/lens-client"
+        bump: patch
+      - name: "@sylphx/lens-react"
+        bump: patch
+      - name: "@sylphx/lens-vue"
+        bump: patch
+      - name: "@sylphx/lens-solid"
+        bump: patch
+      - name: "@sylphx/lens-svelte"
+        bump: patch
