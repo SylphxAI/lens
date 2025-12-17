@@ -204,6 +204,15 @@ function updateAtPath<T>(state: T, segments: string[], transform: (value: unknow
 	if (Array.isArray(state)) {
 		const result = [...state];
 		const idx = parseInt(head, 10);
+		// Validate index is a valid non-negative integer
+		if (Number.isNaN(idx) || idx < 0) {
+			// Invalid array index - treat as object property access
+			// This prevents NaN array indices and negative index attacks
+			return {
+				...Object.fromEntries(state.map((v, i) => [String(i), v])),
+				[head]: updateAtPath(undefined, tail, transform),
+			} as T;
+		}
 		result[idx] = updateAtPath(result[idx], tail, transform);
 		return result as T;
 	}

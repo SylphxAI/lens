@@ -127,6 +127,8 @@ class LensServerImpl<
 	private logger: LensLogger;
 	private ctx = createContext<TContext>();
 	private pluginManager: PluginManager;
+	/** Cache for computed type names - O(n×m) entity matching is expensive */
+	private typeNameCache = new WeakMap<object, string | undefined>();
 
 	constructor(
 		config: LensServerConfig<TContext> & { queries?: Q; mutations?: M; subscriptions?: S },
@@ -1030,16 +1032,23 @@ class LensServerImpl<
 	 *
 	 * Matching priority:
 	 * 1. Explicit __typename or _type property
-	 * 2. Best matching entity (highest field overlap score)
+	 * 2. Cached result from previous lookup
+	 * 3. Best matching entity (highest field overlap score)
 	 *
 	 * Requires at least 50% field match to avoid false positives.
+	 * Results are cached via WeakMap for O(1) repeated lookups.
 	 */
 	private getTypeName(obj: Record<string, unknown>): string | undefined {
-		// Priority 1: Explicit type marker
+		// Priority 1: Explicit type marker (fast path, no caching needed)
 		if ("__typename" in obj) return obj.__typename as string;
 		if ("_type" in obj) return obj._type as string;
 
-		// Priority 2: Find best matching entity by field overlap
+		// Priority 2: Check cache for previously computed result
+		if (this.typeNameCache.has(obj)) {
+			return this.typeNameCache.get(obj);
+		}
+
+		// Priority 3: Find best matching entity by field overlap (O(n×m))
 		let bestMatch: { name: string; score: number } | undefined;
 
 		for (const [name, def] of Object.entries(this.entities)) {
@@ -1052,7 +1061,10 @@ class LensServerImpl<
 			}
 		}
 
-		return bestMatch?.name;
+		const result = bestMatch?.name;
+		// Cache result (even undefined) to avoid repeated expensive lookups
+		this.typeNameCache.set(obj, result);
+		return result;
 	}
 
 	/**

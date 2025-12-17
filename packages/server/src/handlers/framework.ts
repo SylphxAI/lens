@@ -196,45 +196,78 @@ export function handleWebSSE(
 	signal?: AbortSignal,
 ): Response {
 	const inputParam = url.searchParams.get("input");
-	const input = inputParam ? JSON.parse(inputParam) : undefined;
+
+	// Parse input with error handling
+	let input: unknown;
+	if (inputParam) {
+		try {
+			input = JSON.parse(inputParam);
+		} catch (parseError) {
+			// Return error response for malformed JSON
+			const encoder = new TextEncoder();
+			const errorStream = new ReadableStream({
+				start(controller) {
+					const errMsg = parseError instanceof Error ? parseError.message : "Invalid JSON";
+					const data = `event: error\ndata: ${JSON.stringify({ error: `Invalid input JSON: ${errMsg}` })}\n\n`;
+					controller.enqueue(encoder.encode(data));
+					controller.close();
+				},
+			});
+			return new Response(errorStream, {
+				headers: {
+					"Content-Type": "text/event-stream",
+					"Cache-Control": "no-cache",
+					Connection: "keep-alive",
+				},
+			});
+		}
+	}
 
 	const stream = new ReadableStream({
 		start(controller) {
 			const encoder = new TextEncoder();
 
-			const result = server.execute({ path, input });
+			try {
+				const result = server.execute({ path, input });
 
-			if (result && typeof result === "object" && "subscribe" in result) {
-				const observable = result as {
-					subscribe: (handlers: {
-						next: (value: { data?: unknown }) => void;
-						error: (err: Error) => void;
-						complete: () => void;
-					}) => { unsubscribe: () => void };
-				};
+				if (result && typeof result === "object" && "subscribe" in result) {
+					const observable = result as {
+						subscribe: (handlers: {
+							next: (value: { data?: unknown }) => void;
+							error: (err: Error) => void;
+							complete: () => void;
+						}) => { unsubscribe: () => void };
+					};
 
-				const subscription = observable.subscribe({
-					next: (value) => {
-						const data = `data: ${JSON.stringify(value.data)}\n\n`;
-						controller.enqueue(encoder.encode(data));
-					},
-					error: (err) => {
-						const data = `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`;
-						controller.enqueue(encoder.encode(data));
-						controller.close();
-					},
-					complete: () => {
-						controller.close();
-					},
-				});
-
-				// Clean up on abort
-				if (signal) {
-					signal.addEventListener("abort", () => {
-						subscription.unsubscribe();
-						controller.close();
+					const subscription = observable.subscribe({
+						next: (value) => {
+							const data = `data: ${JSON.stringify(value.data)}\n\n`;
+							controller.enqueue(encoder.encode(data));
+						},
+						error: (err) => {
+							const data = `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`;
+							controller.enqueue(encoder.encode(data));
+							controller.close();
+						},
+						complete: () => {
+							controller.close();
+						},
 					});
+
+					// Clean up on abort
+					if (signal) {
+						signal.addEventListener("abort", () => {
+							subscription.unsubscribe();
+							controller.close();
+						});
+					}
 				}
+			} catch (execError) {
+				// Handle synchronous errors from server.execute() or subscribe()
+				const errMsg = execError instanceof Error ? execError.message : "Internal error";
+				const data = `event: error\ndata: ${JSON.stringify({ error: errMsg })}\n\n`;
+				controller.enqueue(encoder.encode(data));
+				controller.close();
 			}
 		},
 	});

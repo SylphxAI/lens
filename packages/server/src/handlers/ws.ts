@@ -172,8 +172,13 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 					error: { code, message },
 				}),
 			);
-		} catch {
-			// Connection may already be closed
+		} catch (sendError) {
+			// Log actual error - don't silently swallow
+			// Common case is "connection already closed" but could be serialization failure
+			logger.debug?.(
+				`Failed to send error to client ${conn.id}:`,
+				sendError instanceof Error ? sendError.message : String(sendError),
+			);
 		}
 	}
 
@@ -513,7 +518,13 @@ export function createWSHandler(server: LensServer, options: WSHandlerOptions = 
 
 		// Notify plugins of field updates
 		for (const entityKey of sub.entityKeys) {
-			const [entity, entityId] = entityKey.split(":");
+			const parts = entityKey.split(":");
+			// Validate entityKey format (must be "Entity:id")
+			if (parts.length < 2) {
+				logger.warn?.(`Invalid entityKey format: "${entityKey}" (expected "Entity:id")`);
+				continue;
+			}
+			const [entity, entityId] = parts;
 			await pluginManager.runOnUpdateFields({
 				clientId: conn.id,
 				subscriptionId: sub.id,
