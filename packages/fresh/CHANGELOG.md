@@ -1,5 +1,18 @@
 # @sylphx/lens-fresh
 
+## 2.2.0 (2025-12-17)
+
+Align resolver API with GraphQL conventions - use `args` everywhere instead of `input`
+
+### ♻️ Refactoring
+
+- **transport:** unify server Observable return type and add live query detection ([2e15de4](https://github.com/SylphxAI/lens/commit/2e15de417c84a5dc90e5d451c02253f2e3904224))
+- **core:** remove deprecated input and parent aliases ([f5a8510](https://github.com/SylphxAI/lens/commit/f5a8510aa480313ddd60e950233dfaad4fc943dc))
+
+### 🔧 Chores
+
+- retry release ([5c05700](https://github.com/SylphxAI/lens/commit/5c057005ca0bd49bc5fff61fa0a2f6aaa604ee40))
+
 ## 2.1.14 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system

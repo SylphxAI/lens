@@ -1,5 +1,22 @@
 # @sylphx/lens
 
+## 4.0.0 (2025-12-17)
+
+Align resolver API with GraphQL conventions - use `args` everywhere instead of `input`
+
+### ✨ Features
+
+- 💥 **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+
+### 🔧 Chores
+
+- retry release ([5c05700](https://github.com/SylphxAI/lens/commit/5c057005ca0bd49bc5fff61fa0a2f6aaa604ee40))
+
+### 💥 Breaking Changes
+
+- **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+  All deprecated APIs have been removed in v3.0.
+
 ## 3.0.0 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system

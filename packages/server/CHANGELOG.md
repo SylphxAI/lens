@@ -1,5 +1,42 @@
 # @sylphx/lens-server
 
+## 5.0.0 (2025-12-17)
+
+Align resolver API with GraphQL conventions - use `args` everywhere instead of `input`
+
+### ✨ Features
+
+- **core:** add compile-time type safety for resolvers ([8954db3](https://github.com/SylphxAI/lens/commit/8954db326c788042eff313bfa527f5f88ffae728))
+- 💥 **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+
+### 🐛 Bug Fixes
+
+- update resolver types and example models ([807dc65](https://github.com/SylphxAI/lens/commit/807dc6551439f630c35ad1c22e585eaae3d1c0ca))
+- round 3 comprehensive fixes for error handling and performance ([a99911b](https://github.com/SylphxAI/lens/commit/a99911b686062e5990ce46b8be8e7200a5c0d58a))
+- **server:** add cleanup on error path and AsyncIterable error handling ([d23ba76](https://github.com/SylphxAI/lens/commit/d23ba76014fc9b8f4a56abf1e44e52d1f97942a6))
+- **client,server:** fix ops-before-snapshot race and DataLoader context leak ([654adec](https://github.com/SylphxAI/lens/commit/654adec64ade8457455f67e0820d254283409062))
+- **server:** fix Query Observable memory leak and silent error swallowing ([6380730](https://github.com/SylphxAI/lens/commit/6380730435704a4bb3e51a7d4e68a75ff066eeb6))
+- **client:** fix 76 test failures after deprecated code cleanup ([71b03b3](https://github.com/SylphxAI/lens/commit/71b03b34b1c7f1caa99a772e78637ee4e5b1ad33))
+
+### ♻️ Refactoring
+
+- 💥 **api:** align resolver API with GraphQL conventions ([b002713](https://github.com/SylphxAI/lens/commit/b002713a5cd3e9dc7d3a564dc28f711b3b96d6a5))
+- **core:** remove deprecated model chain patterns ([7e25ba4](https://github.com/SylphxAI/lens/commit/7e25ba4c5e4cbd3041aa25c40645c83c7eece21f))
+- **transport:** unify server Observable return type and add live query detection ([2e15de4](https://github.com/SylphxAI/lens/commit/2e15de417c84a5dc90e5d451c02253f2e3904224))
+- **core:** remove deprecated input and parent aliases ([f5a8510](https://github.com/SylphxAI/lens/commit/f5a8510aa480313ddd60e950233dfaad4fc943dc))
+- **core,server:** remove global resolver registry, make resolvers purely functional ([c06eb63](https://github.com/SylphxAI/lens/commit/c06eb634bc5a7cf0679275b3bffc2504c1a9ef14))
+
+### 🔧 Chores
+
+- retry release ([5c05700](https://github.com/SylphxAI/lens/commit/5c057005ca0bd49bc5fff61fa0a2f6aaa604ee40))
+
+### 💥 Breaking Changes
+
+- **api:** align resolver API with GraphQL conventions ([b002713](https://github.com/SylphxAI/lens/commit/b002713a5cd3e9dc7d3a564dc28f711b3b96d6a5))
+  Resolver callbacks now receive `args` instead of `input`
+- **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+  All deprecated APIs have been removed in v3.0.
+
 ## 4.0.0 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system
