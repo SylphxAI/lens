@@ -3,11 +3,13 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { bigint, boolean, bytes, datetime, decimal, enumType, float, id, int, json, object, string } from "./fields";
 import {
 	ArrayType,
 	BelongsToType,
 	BooleanType,
 	DateTimeType,
+	DateType,
 	defineType,
 	EnumType,
 	FloatType,
@@ -18,65 +20,78 @@ import {
 	isHasManyType,
 	isRelationType,
 	isScalarType,
+	LazyManyType,
+	LazyOneType,
 	ObjectType,
 	ScalarType,
 	StringType,
-	t,
 } from "./types";
 
-describe("Type Builders (t.*)", () => {
+// Lazy relation helpers
+const one = <Target>(targetRef: () => Target) => new LazyOneType(targetRef);
+const many = <Target>(targetRef: () => Target) => new LazyManyType(targetRef);
+const date = () => new DateType();
+
+// For legacy relation tests
+const hasOne = <T extends string>(target: T) => new HasOneType(target);
+const hasMany = <T extends string>(target: T) => new HasManyType(target);
+const belongsTo = <T extends string>(target: T) => new BelongsToType(target);
+const array = <_T>(itemType: any) => new ArrayType(itemType);
+const custom = <_T, _S = _T>(def: any) => new ScalarType(def);
+
+describe("Field Type Builders", () => {
 	describe("Scalar Types", () => {
-		test("t.id() creates IdType", () => {
-			const id = t.id();
-			expect(id).toBeInstanceOf(IdType);
-			expect(id._type).toBe("id");
+		test("id() creates IdType", () => {
+			const idField = id();
+			expect(idField).toBeInstanceOf(IdType);
+			expect(idField._type).toBe("id");
 		});
 
-		test("t.string() creates StringType", () => {
-			const str = t.string();
+		test("string() creates StringType", () => {
+			const str = string();
 			expect(str).toBeInstanceOf(StringType);
 			expect(str._type).toBe("string");
 		});
 
-		test("t.int() creates IntType", () => {
-			const int = t.int();
-			expect(int).toBeInstanceOf(IntType);
-			expect(int._type).toBe("int");
+		test("int() creates IntType", () => {
+			const intField = int();
+			expect(intField).toBeInstanceOf(IntType);
+			expect(intField._type).toBe("int");
 		});
 
-		test("t.float() creates FloatType", () => {
-			const float = t.float();
-			expect(float).toBeInstanceOf(FloatType);
-			expect(float._type).toBe("float");
+		test("float() creates FloatType", () => {
+			const floatField = float();
+			expect(floatField).toBeInstanceOf(FloatType);
+			expect(floatField._type).toBe("float");
 		});
 
-		test("t.boolean() creates BooleanType", () => {
-			const bool = t.boolean();
+		test("boolean() creates BooleanType", () => {
+			const bool = boolean();
 			expect(bool).toBeInstanceOf(BooleanType);
 			expect(bool._type).toBe("boolean");
 		});
 
-		test("t.datetime() creates DateTimeType", () => {
-			const dt = t.datetime();
+		test("datetime() creates DateTimeType", () => {
+			const dt = datetime();
 			expect(dt).toBeInstanceOf(DateTimeType);
 			expect(dt._type).toBe("datetime");
 		});
 
-		test("t.enum() creates EnumType with values", () => {
-			const status = t.enum(["active", "inactive", "pending"] as const);
+		test("enumType() creates EnumType with values", () => {
+			const status = enumType(["active", "inactive", "pending"] as const);
 			expect(status).toBeInstanceOf(EnumType);
 			expect(status._type).toBe("enum");
 			expect(status.values).toEqual(["active", "inactive", "pending"]);
 		});
 
-		test("t.object() creates ObjectType", () => {
-			const obj = t.object<{ foo: string }>();
+		test("object() creates ObjectType", () => {
+			const obj = object<{ foo: string }>();
 			expect(obj).toBeInstanceOf(ObjectType);
 			expect(obj._type).toBe("object");
 		});
 
-		test("t.array() creates ArrayType", () => {
-			const arr = t.array(t.string());
+		test("array() creates ArrayType", () => {
+			const arr = array(string());
 			expect(arr).toBeInstanceOf(ArrayType);
 			expect(arr._type).toBe("array");
 			expect(arr.itemType).toBeInstanceOf(StringType);
@@ -84,22 +99,22 @@ describe("Type Builders (t.*)", () => {
 	});
 
 	describe("Relation Types", () => {
-		test("t.hasOne() creates HasOneType", () => {
-			const profile = t.hasOne("Profile");
+		test("hasOne() creates HasOneType", () => {
+			const profile = hasOne("Profile");
 			expect(profile).toBeInstanceOf(HasOneType);
 			expect(profile._type).toBe("hasOne");
 			expect(profile.target).toBe("Profile");
 		});
 
-		test("t.hasMany() creates HasManyType", () => {
-			const posts = t.hasMany("Post");
+		test("hasMany() creates HasManyType", () => {
+			const posts = hasMany("Post");
 			expect(posts).toBeInstanceOf(HasManyType);
 			expect(posts._type).toBe("hasMany");
 			expect(posts.target).toBe("Post");
 		});
 
-		test("t.belongsTo() creates BelongsToType", () => {
-			const author = t.belongsTo("User");
+		test("belongsTo() creates BelongsToType", () => {
+			const author = belongsTo("User");
 			expect(author).toBeInstanceOf(BelongsToType);
 			expect(author._type).toBe("belongsTo");
 			expect(author.target).toBe("User");
@@ -108,17 +123,17 @@ describe("Type Builders (t.*)", () => {
 
 	describe("Modifiers", () => {
 		test(".nullable() makes field nullable", () => {
-			const name = t.string().nullable();
+			const name = string().nullable();
 			expect(name.isNullable()).toBe(true);
 		});
 
 		test(".default() sets default value", () => {
-			const count = t.int().default(0);
+			const count = int().default(0);
 			expect(count.getDefault()).toBe(0);
 		});
 
 		test("modifiers can be chained", () => {
-			const bio = t.string().nullable().default("No bio");
+			const bio = string().nullable().default("No bio");
 			expect(bio.isNullable()).toBe(true);
 			expect(bio.getDefault()).toBe("No bio");
 		});
@@ -126,23 +141,23 @@ describe("Type Builders (t.*)", () => {
 
 	describe("Type Guards", () => {
 		test("isRelationType() correctly identifies relations", () => {
-			expect(isRelationType(t.hasOne("Profile"))).toBe(true);
-			expect(isRelationType(t.hasMany("Post"))).toBe(true);
-			expect(isRelationType(t.belongsTo("User"))).toBe(true);
-			expect(isRelationType(t.string())).toBe(false);
-			expect(isRelationType(t.int())).toBe(false);
+			expect(isRelationType(hasOne("Profile"))).toBe(true);
+			expect(isRelationType(hasMany("Post"))).toBe(true);
+			expect(isRelationType(belongsTo("User"))).toBe(true);
+			expect(isRelationType(string())).toBe(false);
+			expect(isRelationType(int())).toBe(false);
 		});
 
 		test("isScalarType() correctly identifies scalars", () => {
-			expect(isScalarType(t.string())).toBe(true);
-			expect(isScalarType(t.int())).toBe(true);
-			expect(isScalarType(t.hasOne("Profile"))).toBe(false);
+			expect(isScalarType(string())).toBe(true);
+			expect(isScalarType(int())).toBe(true);
+			expect(isScalarType(hasOne("Profile"))).toBe(false);
 		});
 
 		test("isHasManyType() correctly identifies hasMany", () => {
-			expect(isHasManyType(t.hasMany("Post"))).toBe(true);
-			expect(isHasManyType(t.hasOne("Profile"))).toBe(false);
-			expect(isHasManyType(t.belongsTo("User"))).toBe(false);
+			expect(isHasManyType(hasMany("Post"))).toBe(true);
+			expect(isHasManyType(hasOne("Profile"))).toBe(false);
+			expect(isHasManyType(belongsTo("User"))).toBe(false);
 		});
 	});
 });
@@ -153,209 +168,209 @@ describe("Type Builders (t.*)", () => {
 
 describe("DateTime Serialization", () => {
 	test("serialize Date to ISO string", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		const date = new Date("2024-01-15T12:00:00.000Z");
 		expect(dt.serialize(date)).toBe("2024-01-15T12:00:00.000Z");
 	});
 
 	test("deserialize ISO string to Date", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		const result = dt.deserialize("2024-01-15T12:00:00.000Z");
 		expect(result).toBeInstanceOf(Date);
 		expect(result.toISOString()).toBe("2024-01-15T12:00:00.000Z");
 	});
 
 	test("serialize throws on invalid input", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		expect(() => dt.serialize("not a date" as unknown as Date)).toThrow("Expected Date instance");
 	});
 
 	test("deserialize throws on invalid string", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		expect(() => dt.deserialize("invalid")).toThrow("Invalid date string");
 	});
 
 	test("deserialize throws on non-string input", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		expect(() => dt.deserialize(123 as unknown as string)).toThrow("Expected string");
 	});
 
 	test("validate returns true for valid Date", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		expect(dt.validate!(new Date())).toBe(true);
 	});
 
 	test("validate returns false for invalid Date", () => {
-		const dt = t.datetime();
+		const dt = datetime();
 		expect(dt.validate!(new Date("invalid"))).toBe(false);
 	});
 });
 
 describe("Date (date only) Serialization", () => {
 	test("serialize Date to YYYY-MM-DD string", () => {
-		const d = t.date();
-		const date = new Date("2024-01-15T12:00:00.000Z");
-		expect(d.serialize(date)).toBe("2024-01-15");
+		const dateField = date();
+		const testDate = new Date("2024-01-15T12:00:00.000Z");
+		expect(dateField.serialize(testDate)).toBe("2024-01-15");
 	});
 
 	test("deserialize YYYY-MM-DD string to Date", () => {
-		const d = t.date();
-		const result = d.deserialize("2024-01-15");
+		const dateField = date();
+		const result = dateField.deserialize("2024-01-15");
 		expect(result).toBeInstanceOf(Date);
 		expect(result.toISOString()).toBe("2024-01-15T00:00:00.000Z");
 	});
 
 	test("serialize throws on invalid input", () => {
-		const d = t.date();
-		expect(() => d.serialize("2024-01-15" as unknown as Date)).toThrow("Expected Date instance");
+		const dateField = date();
+		expect(() => dateField.serialize("2024-01-15" as unknown as Date)).toThrow("Expected Date instance");
 	});
 
 	test("deserialize throws on invalid string", () => {
-		const d = t.date();
-		expect(() => d.deserialize("not-a-date")).toThrow("Invalid date string");
+		const dateField = date();
+		expect(() => dateField.deserialize("not-a-date")).toThrow("Invalid date string");
 	});
 
 	test("deserialize throws on non-string input", () => {
-		const d = t.date();
-		expect(() => d.deserialize(123 as unknown as string)).toThrow("Expected string");
+		const dateField = date();
+		expect(() => dateField.deserialize(123 as unknown as string)).toThrow("Expected string");
 	});
 
 	test("validate returns true for valid Date", () => {
-		const d = t.date();
-		expect(d.validate!(new Date())).toBe(true);
+		const dateField = date();
+		expect(dateField.validate!(new Date())).toBe(true);
 	});
 });
 
 describe("Decimal Serialization", () => {
 	test("serialize number to string", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(dec.serialize(123.456789)).toBe("123.456789");
 	});
 
 	test("deserialize string to number", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(dec.deserialize("123.456789")).toBe(123.456789);
 	});
 
 	test("serialize throws on NaN", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(() => dec.serialize(Number.NaN)).toThrow("Expected number");
 	});
 
 	test("serialize throws on non-number", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(() => dec.serialize("123" as unknown as number)).toThrow("Expected number");
 	});
 
 	test("deserialize throws on invalid string", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(() => dec.deserialize("not-a-number")).toThrow("Invalid decimal string");
 	});
 
 	test("deserialize throws on non-string input", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(() => dec.deserialize(123 as unknown as string)).toThrow("Expected string");
 	});
 
 	test("validate returns true for valid finite number", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(dec.validate!(123.45)).toBe(true);
 	});
 
 	test("validate returns false for NaN", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(dec.validate!(Number.NaN)).toBe(false);
 	});
 
 	test("validate returns false for Infinity", () => {
-		const dec = t.decimal();
+		const dec = decimal();
 		expect(dec.validate!(Number.POSITIVE_INFINITY)).toBe(false);
 	});
 });
 
 describe("BigInt Serialization", () => {
 	test("serialize bigint to string", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(bi.serialize(9007199254740993n)).toBe("9007199254740993");
 	});
 
 	test("deserialize string to bigint", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(bi.deserialize("9007199254740993")).toBe(9007199254740993n);
 	});
 
 	test("serialize throws on non-bigint", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(() => bi.serialize(123 as unknown as bigint)).toThrow("Expected bigint");
 	});
 
 	test("deserialize throws on invalid string", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(() => bi.deserialize("not-a-bigint")).toThrow("Invalid bigint string");
 	});
 
 	test("deserialize throws on non-string input", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(() => bi.deserialize(123 as unknown as string)).toThrow("Expected string");
 	});
 
 	test("validate returns true for bigint", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(bi.validate!(123n)).toBe(true);
 	});
 
 	test("validate returns false for non-bigint", () => {
-		const bi = t.bigint();
+		const bi = bigint();
 		expect(bi.validate!(123)).toBe(false);
 	});
 });
 
 describe("Bytes Serialization", () => {
 	test("serialize Uint8Array to base64", () => {
-		const bytes = t.bytes();
+		const bytesField = bytes();
 		const arr = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
-		expect(bytes.serialize(arr)).toBe("SGVsbG8=");
+		expect(bytesField.serialize(arr)).toBe("SGVsbG8=");
 	});
 
 	test("deserialize base64 to Uint8Array", () => {
-		const bytes = t.bytes();
-		const result = bytes.deserialize("SGVsbG8=");
+		const bytesField = bytes();
+		const result = bytesField.deserialize("SGVsbG8=");
 		expect(result).toBeInstanceOf(Uint8Array);
 		expect(Array.from(result)).toEqual([72, 101, 108, 108, 111]);
 	});
 
 	test("serialize throws on non-Uint8Array", () => {
-		const bytes = t.bytes();
-		expect(() => bytes.serialize([1, 2, 3] as unknown as Uint8Array)).toThrow("Expected Uint8Array");
+		const bytesField = bytes();
+		expect(() => bytesField.serialize([1, 2, 3] as unknown as Uint8Array)).toThrow("Expected Uint8Array");
 	});
 
 	test("deserialize throws on non-string input", () => {
-		const bytes = t.bytes();
-		expect(() => bytes.deserialize(123 as unknown as string)).toThrow("Expected string");
+		const bytesField = bytes();
+		expect(() => bytesField.deserialize(123 as unknown as string)).toThrow("Expected string");
 	});
 
 	test("validate returns true for Uint8Array", () => {
-		const bytes = t.bytes();
-		expect(bytes.validate!(new Uint8Array([1, 2, 3]))).toBe(true);
+		const bytesField = bytes();
+		expect(bytesField.validate!(new Uint8Array([1, 2, 3]))).toBe(true);
 	});
 
 	test("validate returns false for regular array", () => {
-		const bytes = t.bytes();
-		expect(bytes.validate!([1, 2, 3])).toBe(false);
+		const bytesField = bytes();
+		expect(bytesField.validate!([1, 2, 3])).toBe(false);
 	});
 });
 
 describe("JSON Type", () => {
 	test("serialize passes through", () => {
-		const json = t.json();
+		const jsonField = json();
 		const data = { foo: "bar", nested: { num: 42 } };
-		expect(json.serialize(data)).toEqual(data);
+		expect(jsonField.serialize(data)).toEqual(data);
 	});
 
 	test("deserialize passes through", () => {
-		const json = t.json();
+		const jsonField = json();
 		const data = { foo: "bar" };
-		expect(json.deserialize(data)).toEqual(data);
+		expect(jsonField.deserialize(data)).toEqual(data);
 	});
 });
 
@@ -378,36 +393,36 @@ describe("Custom Type", () => {
 			typeof (v as Point).lng === "number",
 	});
 
-	test("t.custom() creates ScalarType", () => {
-		const point = t.custom(PointType);
+	test("custom() creates ScalarType", () => {
+		const point = custom(PointType);
 		expect(point).toBeInstanceOf(ScalarType);
 		expect(point._type).toBe("scalar");
 	});
 
 	test("serialize with custom type", () => {
-		const point = t.custom(PointType);
+		const point = custom(PointType);
 		const result = point.serialize({ lat: 37.7749, lng: -122.4194 });
 		expect(result).toEqual({ lat: 37.7749, lng: -122.4194 });
 	});
 
 	test("deserialize with custom type", () => {
-		const point = t.custom(PointType);
+		const point = custom(PointType);
 		const result = point.deserialize({ lat: 37.7749, lng: -122.4194 });
 		expect(result).toEqual({ lat: 37.7749, lng: -122.4194 });
 	});
 
 	test("validate with custom type - valid", () => {
-		const point = t.custom(PointType);
+		const point = custom(PointType);
 		expect(point.validate!({ lat: 37.7749, lng: -122.4194 })).toBe(true);
 	});
 
 	test("validate with custom type - invalid", () => {
-		const point = t.custom(PointType);
+		const point = custom(PointType);
 		expect(point.validate!({ lat: "not a number" })).toBe(false);
 	});
 
 	test("serialize throws on validation failure", () => {
-		const point = t.custom(PointType);
+		const point = custom(PointType);
 		expect(() => point.serialize({ lat: "bad" } as unknown as Point)).toThrow(
 			"Validation failed for scalar type: Point",
 		);
@@ -420,7 +435,7 @@ describe("Custom Type", () => {
 			deserialize: (s) => s.toLowerCase(),
 		});
 
-		const simple = t.custom(SimpleType);
+		const simple = custom(SimpleType);
 		expect(simple.validate!("anything")).toBe(true);
 		expect(simple.serialize("hello")).toBe("HELLO");
 		expect(simple.deserialize("HELLO")).toBe("hello");
@@ -429,12 +444,12 @@ describe("Custom Type", () => {
 
 describe("Optional Modifier", () => {
 	test(".optional() marks field as optional", () => {
-		const name = t.string().optional();
+		const name = string().optional();
 		expect(name.isOptional()).toBe(true);
 	});
 
 	test("optional can be chained with nullable", () => {
-		const field = t.string().optional().nullable();
+		const field = string().optional().nullable();
 		expect(field.isOptional()).toBe(true);
 		expect(field.isNullable()).toBe(true);
 	});
@@ -450,7 +465,7 @@ describe("Field Resolution Methods", () => {
 			const resolver = ({ parent }: { parent: { firstName: string; lastName: string } }) =>
 				`${parent.firstName} ${parent.lastName}`;
 
-			const field = t.string().resolve(resolver);
+			const field = string().resolve(resolver);
 
 			expect(field.hasResolver()).toBe(true);
 			expect(field.hasSubscription()).toBe(false);
@@ -459,19 +474,19 @@ describe("Field Resolution Methods", () => {
 		});
 
 		test("resolver function can be called", () => {
-			const field = t.string().resolve(({ parent }: { parent: { name: string } }) => parent.name.toUpperCase());
+			const field = string().resolve(({ parent }: { parent: { name: string } }) => parent.name.toUpperCase());
 
 			const result = field._resolver!({ parent: { name: "alice" }, ctx: {} });
 			expect(result).toBe("ALICE");
 		});
 
 		test("resolver preserves original field type", () => {
-			const field = t.int().resolve(() => 42);
+			const field = int().resolve(() => 42);
 			expect(field._type).toBe("int");
 		});
 
 		test("resolver works with async functions", async () => {
-			const field = t.string().resolve(async () => {
+			const field = string().resolve(async () => {
 				await new Promise((r) => setTimeout(r, 1));
 				return "async result";
 			});
@@ -485,7 +500,7 @@ describe("Field Resolution Methods", () => {
 				userId: string;
 			}
 
-			const field = t.string().resolve<unknown, TestContext>(({ ctx }) => ctx.userId);
+			const field = string().resolve<unknown, TestContext>(({ ctx }) => ctx.userId);
 
 			const result = field._resolver!({ parent: {}, ctx: { userId: "user-123" } });
 			expect(result).toBe("user-123");
@@ -498,7 +513,7 @@ describe("Field Resolution Methods", () => {
 				emit("hello");
 			};
 
-			const field = t.string().subscribe(subscriptionFn);
+			const field = string().subscribe(subscriptionFn);
 
 			expect(field.hasSubscription()).toBe(true);
 			expect(field.hasResolver()).toBe(false);
@@ -509,7 +524,7 @@ describe("Field Resolution Methods", () => {
 		test("subscription resolver can emit values", () => {
 			const emitted: string[] = [];
 
-			const field = t.string().subscribe(({ emit }) => {
+			const field = string().subscribe(({ emit }) => {
 				emit("value1");
 				emit("value2");
 			});
@@ -524,7 +539,7 @@ describe("Field Resolution Methods", () => {
 		});
 
 		test("subscription preserves original field type", () => {
-			const field = t.boolean().subscribe(({ emit }) => emit(true));
+			const field = boolean().subscribe(({ emit }) => emit(true));
 			expect(field._type).toBe("boolean");
 		});
 
@@ -538,7 +553,7 @@ describe("Field Resolution Methods", () => {
 
 			const emitted: string[] = [];
 
-			const field = t.string().subscribe<User, Ctx>(({ parent, ctx, emit }) => {
+			const field = string().subscribe<User, Ctx>(({ parent, ctx, emit }) => {
 				emit(ctx.db.getStatus(parent.id));
 			});
 
@@ -554,27 +569,26 @@ describe("Field Resolution Methods", () => {
 
 	describe("default resolution mode", () => {
 		test("fields without .resolve() or .subscribe() are exposed", () => {
-			const field = t.string();
+			const field = string();
 			expect(field.getResolutionMode()).toBe("exposed");
 			expect(field.hasResolver()).toBe(false);
 			expect(field.hasSubscription()).toBe(false);
 		});
 
 		test("nullable fields without resolver are still exposed", () => {
-			const field = t.string().nullable();
+			const field = string().nullable();
 			expect(field.getResolutionMode()).toBe("exposed");
 		});
 
 		test("optional fields without resolver are still exposed", () => {
-			const field = t.string().optional();
+			const field = string().optional();
 			expect(field.getResolutionMode()).toBe("exposed");
 		});
 	});
 
 	describe("chaining", () => {
 		test(".resolve() can be chained after .nullable()", () => {
-			const field = t
-				.string()
+			const field = string()
 				.nullable()
 				.resolve(() => "computed");
 
@@ -583,8 +597,7 @@ describe("Field Resolution Methods", () => {
 		});
 
 		test(".subscribe() can be chained after .optional()", () => {
-			const field = t
-				.string()
+			const field = string()
 				.optional()
 				.subscribe(({ emit }) => emit("streamed"));
 
@@ -595,69 +608,63 @@ describe("Field Resolution Methods", () => {
 });
 
 // =============================================================================
-// Lazy Relations (t.one() / t.many())
+// Lazy Relations (one() / many())
 // =============================================================================
 
 describe("Lazy Relations", () => {
 	// Mock entity for testing
-	const Post = { _name: "Post", fields: { id: t.id(), title: t.string() } };
-	const Profile = { _name: "Profile", fields: { id: t.id(), bio: t.string() } };
+	const Post = { _name: "Post", fields: { id: id(), title: string() } };
+	const Profile = { _name: "Profile", fields: { id: id(), bio: string() } };
 
-	describe("t.one()", () => {
+	describe("one()", () => {
 		test("creates LazyOneType", () => {
-			const field = t.one(() => Profile);
+			const field = one(() => Profile);
 			expect(field._type).toBe("lazyOne");
 			expect(field._relationKind).toBe("one");
 		});
 
 		test("getTarget() evaluates lazy reference", () => {
-			const field = t.one(() => Profile);
+			const field = one(() => Profile);
 			expect(field.getTarget()).toBe(Profile);
 		});
 
 		test("supports .resolve()", () => {
-			const field = t
-				.one(() => Profile)
-				.resolve(({ parent }: { parent: { profileId: string } }) => ({
-					id: parent.profileId,
-					bio: "Test bio",
-				}));
+			const field = one(() => Profile).resolve(({ parent }: { parent: { profileId: string } }) => ({
+				id: parent.profileId,
+				bio: "Test bio",
+			}));
 
 			expect(field.hasResolver()).toBe(true);
 			expect(field.getResolutionMode()).toBe("resolve");
 		});
 
 		test("supports .subscribe()", () => {
-			const field = t
-				.one(() => Profile)
-				.subscribe(({ emit }) => {
-					emit({ id: "1", bio: "Live bio" });
-				});
+			const field = one(() => Profile).subscribe(({ emit }) => {
+				emit({ id: "1", bio: "Live bio" });
+			});
 
 			expect(field.hasSubscription()).toBe(true);
 			expect(field.getResolutionMode()).toBe("subscribe");
 		});
 	});
 
-	describe("t.many()", () => {
+	describe("many()", () => {
 		test("creates LazyManyType", () => {
-			const field = t.many(() => Post);
+			const field = many(() => Post);
 			expect(field._type).toBe("lazyMany");
 			expect(field._relationKind).toBe("many");
 		});
 
 		test("getTarget() evaluates lazy reference", () => {
-			const field = t.many(() => Post);
+			const field = many(() => Post);
 			expect(field.getTarget()).toBe(Post);
 		});
 
 		test("supports .resolve()", () => {
-			const field = t
-				.many(() => Post)
-				.resolve(() => [
-					{ id: "1", title: "First" },
-					{ id: "2", title: "Second" },
-				]);
+			const field = many(() => Post).resolve(() => [
+				{ id: "1", title: "First" },
+				{ id: "2", title: "Second" },
+			]);
 
 			expect(field.hasResolver()).toBe(true);
 
@@ -668,11 +675,9 @@ describe("Lazy Relations", () => {
 		test("supports .subscribe()", () => {
 			const emitted: unknown[] = [];
 
-			const field = t
-				.many(() => Post)
-				.subscribe(({ emit }) => {
-					emit([{ id: "1", title: "Live post" }]);
-				});
+			const field = many(() => Post).subscribe(({ emit }) => {
+				emit([{ id: "1", title: "Live post" }]);
+			});
 
 			field._subscriptionResolver!({
 				parent: {},
@@ -690,16 +695,16 @@ describe("Lazy Relations", () => {
 			const User = {
 				_name: "User",
 				fields: {
-					id: t.id(),
-					posts: t.many(() => PostEntity),
+					id: id(),
+					posts: many(() => PostEntity),
 				},
 			};
 
 			const PostEntity = {
 				_name: "Post",
 				fields: {
-					id: t.id(),
-					author: t.one(() => User),
+					id: id(),
+					author: one(() => User),
 				},
 			};
 

@@ -7,7 +7,6 @@
 import type { Emit } from "../emit/index.js";
 import type { Pipeline, StepBuilder } from "../optimistic/reify.js";
 import { isPipeline } from "../optimistic/reify.js";
-import type { EntityDef } from "../schema/define.js";
 import type { InferScalar, ScalarFields } from "../schema/infer.js";
 import type { ModelDef } from "../schema/model.js";
 import type { EntityDefinition } from "../schema/types.js";
@@ -32,13 +31,12 @@ export interface ZodLikeSchema<T = unknown> {
 // Schema Types
 // =============================================================================
 
-/** Any model-like definition (EntityDef or ModelDef) */
-type AnyModelDef = EntityDef<string, EntityDefinition> | ModelDef<string, EntityDefinition>;
+/** Model definition type for return specifications */
+type AnyModelDef = ModelDef<string, EntityDefinition>;
 
 /**
  * Return type specification
- * - ModelDef: Model definition (recommended)
- * - EntityDef: Entity definition
+ * - ModelDef: Model definition
  * - nullable(Model): Nullable model
  * - list(Model): Array of models
  * - nullable(list(Model)): Nullable array
@@ -76,34 +74,21 @@ export type InferReturnType<R extends ReturnSpec> =
 	// Nullable wrapper
 	R extends NullableWrapper<infer Inner>
 		? Inner extends ListWrapper<infer Model>
-			? Model extends AnyModelDef
-				? Model extends EntityDef<string, infer F>
-					? InferModelFromFields<F>[] | null
-					: Model extends ModelDef<string, infer F>
-						? InferModelFromFields<F>[] | null
-						: never
+			? Model extends ModelDef<string, infer F>
+				? InferModelFromFields<F>[] | null
 				: never
-			: Inner extends AnyModelDef
-				? Inner extends EntityDef<string, infer F>
-					? InferModelFromFields<F> | null
-					: Inner extends ModelDef<string, infer F>
-						? InferModelFromFields<F> | null
-						: never
+			: Inner extends ModelDef<string, infer F>
+				? InferModelFromFields<F> | null
 				: never
 		: // List wrapper
 			R extends ListWrapper<infer Model>
-			? Model extends EntityDef<string, infer F>
+			? Model extends ModelDef<string, infer F>
 				? InferModelFromFields<F>[]
-				: Model extends ModelDef<string, infer F>
-					? InferModelFromFields<F>[]
-					: never
+				: never
 			: // ModelDef
 				R extends ModelDef<string, infer F>
 				? InferModelFromFields<F>
-				: // EntityDef
-					R extends EntityDef<string, infer F>
-					? InferModelFromFields<F>
-					: never;
+				: never;
 
 // =============================================================================
 // Context Types

@@ -601,7 +601,7 @@ describe("lens() factory type inference", () => {
 // =============================================================================
 
 describe("InferReturnType utility", () => {
-	it("infers type from EntityDef", () => {
+	it("infers type from ModelDef", () => {
 		type Result = InferReturnType<typeof User>;
 		type Expected = {
 			id: string;
@@ -617,7 +617,7 @@ describe("InferReturnType utility", () => {
 		expect(_typeCheck).toBe(true);
 	});
 
-	it("infers type from EntityDef array", () => {
+	it("infers type from ModelDef array", () => {
 		type Result = InferReturnType<[typeof User]>;
 		type Expected = {
 			id: string;
