@@ -261,7 +261,6 @@ export {
 	type ReturnSpec,
 	type RouterDef,
 	type RouterRoutes,
-	resetTempIdCounter,
 	router,
 	type SubscribedQueryDef,
 	type SubscriptionBuilder,

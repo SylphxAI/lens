@@ -161,14 +161,6 @@ export function tempId(): string {
 	return `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/**
- * @deprecated No longer needed - tempId() is now stateless.
- * This function is a no-op kept for backwards compatibility.
- */
-export function resetTempIdCounter(): void {
-	// No-op - tempId() is now stateless
-}
-
 /** Check if an ID is a temporary ID */
 export function isTempId(id: string): boolean {
 	return id.startsWith("temp_");

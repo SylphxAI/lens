@@ -19,7 +19,6 @@ import {
 	mutation,
 	operations,
 	query,
-	resetTempIdCounter,
 	router,
 	tempId,
 } from "./index.js";
@@ -268,13 +267,6 @@ describe("tempId()", () => {
 		expect(isTempId(tempId())).toBe(true);
 		expect(isTempId("real-id")).toBe(false);
 		expect(isTempId("123")).toBe(false);
-	});
-
-	it("resetTempIdCounter is deprecated no-op", () => {
-		// Should not throw - kept for backwards compatibility
-		resetTempIdCounter();
-		const id = tempId();
-		expect(isTempId(id)).toBe(true);
 	});
 });
 
