@@ -7,9 +7,8 @@
 import type { Emit } from "../emit/index.js";
 import type { Pipeline, StepBuilder } from "../optimistic/reify.js";
 import { isPipeline } from "../optimistic/reify.js";
-import type { InferScalar, ScalarFields } from "../schema/infer.js";
 import type { ModelDef } from "../schema/model.js";
-import type { EntityDefinition } from "../schema/types.js";
+import type { FieldType } from "../schema/types.js";
 import type { ListWrapper, NullableWrapper } from "../schema/wrappers.js";
 import type { Prettify } from "../utils/types.js";
 
@@ -31,64 +30,88 @@ export interface ZodLikeSchema<T = unknown> {
 // Schema Types
 // =============================================================================
 
-/** Model definition type for return specifications */
-type AnyModelDef = ModelDef<string, EntityDefinition>;
+/** Model definition type for return specifications (uses any for fields to avoid variance issues) */
+type AnyModelDef = ModelDef<string, any>;
 
 /**
  * Return type specification
  * - ModelDef: Model definition
  * - nullable(Model): Nullable model
- * - list(Model): Array of models
+ * - list(Model): Array of models (ListWrapper)
+ * - [Model]: Array of models (native JS array syntax)
  * - nullable(list(Model)): Nullable array
  */
 export type ReturnSpec =
 	| AnyModelDef
 	| NullableWrapper<AnyModelDef>
 	| ListWrapper<AnyModelDef>
+	| [AnyModelDef] // Native array syntax: [User]
 	| NullableWrapper<ListWrapper<AnyModelDef>>;
 
 // =============================================================================
 // Type Inference
 // =============================================================================
 
-/** Check if a field has the _optional flag */
-type IsOptional<F> = F extends { _optional: true } ? true : false;
-
 /**
  * Infer entity/model type from definition fields.
- * Only infers scalar fields (relations require schema context).
- * Handles optional fields properly (makes them optional properties).
+ * Uses permissive `any` constraint to avoid variance issues with ProcessedFields.
  */
-type InferModelFromFields<F extends EntityDefinition> = Prettify<
+type InferModelFromFieldsAny<F> = Prettify<
 	{
-		[K in ScalarFields<F> as IsOptional<F[K]> extends true ? never : K]: InferScalar<F[K]>;
+		[K in keyof F as F[K] extends { _optional: true } ? never : K]: F[K] extends FieldType<infer T>
+			? T
+			: unknown;
 	} & {
-		[K in ScalarFields<F> as IsOptional<F[K]> extends true ? K : never]?: InferScalar<F[K]>;
+		[K in keyof F as F[K] extends { _optional: true } ? K : never]?: F[K] extends FieldType<infer T>
+			? T
+			: unknown;
 	}
 >;
 
 /**
+ * Structural check for ModelDef-like objects.
+ * Avoids issues with nominal typing and EntityMarker extension.
+ */
+type IsModelDefLike<T> = T extends { readonly fields: infer F; _name: string } ? F : never;
+
+/**
  * Infer TypeScript type from return spec.
+ * Uses structural matching to avoid variance issues with ProcessedFields.
  */
 export type InferReturnType<R extends ReturnSpec> =
 	// Nullable wrapper
 	R extends NullableWrapper<infer Inner>
 		? Inner extends ListWrapper<infer Model>
-			? Model extends ModelDef<string, infer F>
-				? InferModelFromFields<F>[] | null
+			? IsModelDefLike<Model> extends infer F
+				? F extends never
+					? never
+					: InferModelFromFieldsAny<F>[] | null
 				: never
-			: Inner extends ModelDef<string, infer F>
-				? InferModelFromFields<F> | null
+			: IsModelDefLike<Inner> extends infer F
+				? F extends never
+					? never
+					: InferModelFromFieldsAny<F> | null
 				: never
 		: // List wrapper
 			R extends ListWrapper<infer Model>
-			? Model extends ModelDef<string, infer F>
-				? InferModelFromFields<F>[]
+			? IsModelDefLike<Model> extends infer F
+				? F extends never
+					? never
+					: InferModelFromFieldsAny<F>[]
 				: never
-			: // ModelDef
-				R extends ModelDef<string, infer F>
-				? InferModelFromFields<F>
-				: never;
+			: // Native array syntax: [Model]
+				R extends [infer Model]
+				? IsModelDefLike<Model> extends infer F
+					? F extends never
+						? never
+						: InferModelFromFieldsAny<F>[]
+					: never
+				: // ModelDef-like
+					IsModelDefLike<R> extends infer F
+					? F extends never
+						? never
+						: InferModelFromFieldsAny<F>
+					: never;
 
 // =============================================================================
 // Context Types

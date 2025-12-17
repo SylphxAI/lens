@@ -31,7 +31,7 @@ export interface SubscriptionContext<T, Parent, TContext> {
 	parent: Parent;
 	ctx: TContext;
 	emit: (value: T) => void;
-	onCleanup?: (fn: () => void) => void;
+	onCleanup?: ((fn: () => void) => void) | undefined;
 }
 
 /** Resolver function type */
@@ -54,14 +54,14 @@ export abstract class FieldType<T = unknown, SerializedT = T> {
 
 	readonly _nullable: boolean = false;
 	readonly _optional: boolean = false;
-	readonly _default?: T;
+	readonly _default?: T | undefined;
 
 	/** Resolution mode for this field */
 	readonly _resolutionMode: FieldResolutionMode = "exposed";
 	/** Resolver function (if _resolutionMode is 'resolve') */
-	readonly _resolver?: ResolverFn<T, unknown, unknown>;
+	readonly _resolver?: ResolverFn<T, unknown, unknown> | undefined;
 	/** Subscription resolver function (if _resolutionMode is 'subscribe') */
-	readonly _subscriptionResolver?: SubscriptionResolverFn<T, unknown, unknown>;
+	readonly _subscriptionResolver?: SubscriptionResolverFn<T, unknown, unknown> | undefined;
 
 	/** Make this field nullable (value can be null) */
 	nullable(): NullableType<this> {

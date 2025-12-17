@@ -77,19 +77,26 @@ interface AppContext {
 // In-memory "database"
 // =============================================================================
 
+// DB types match model definitions
+type DbUser = { id: string; name: string; email: string; role: "user" | "admin" | "vip"; avatar: string | null; createdAt: Date };
+type DbPost = { id: string; title: string; content: string; published: boolean; authorId: string; updatedAt: Date | null; createdAt: Date };
+type DbComment = { id: string; content: string; postId: string; authorId: string; createdAt: Date };
+type DbSession = { id: string; title: string; userId: string; createdAt: Date };
+type DbMessage = { id: string; sessionId: string; role: "user" | "assistant"; content: string; createdAt: Date };
+
 const db = {
-	users: new Map([
-		["1", { id: "1", name: "Alice", email: "alice@test.com", role: "admin" as const, createdAt: new Date() }],
-		["2", { id: "2", name: "Bob", email: "bob@test.com", role: "user" as const, createdAt: new Date() }],
-		["3", { id: "3", name: "Charlie", email: "charlie@test.com", role: "vip" as const, createdAt: new Date() }],
+	users: new Map<string, DbUser>([
+		["1", { id: "1", name: "Alice", email: "alice@test.com", role: "admin", avatar: null, createdAt: new Date() }],
+		["2", { id: "2", name: "Bob", email: "bob@test.com", role: "user", avatar: null, createdAt: new Date() }],
+		["3", { id: "3", name: "Charlie", email: "charlie@test.com", role: "vip", avatar: null, createdAt: new Date() }],
 	]),
-	posts: new Map([
-		["1", { id: "1", title: "Hello World", content: "First post!", published: true, authorId: "1", createdAt: new Date() }],
-		["2", { id: "2", title: "Lens Guide", content: "How to use Lens...", published: true, authorId: "1", createdAt: new Date() }],
+	posts: new Map<string, DbPost>([
+		["1", { id: "1", title: "Hello World", content: "First post!", published: true, authorId: "1", updatedAt: null, createdAt: new Date() }],
+		["2", { id: "2", title: "Lens Guide", content: "How to use Lens...", published: true, authorId: "1", updatedAt: null, createdAt: new Date() }],
 	]),
-	comments: new Map<string, { id: string; content: string; postId: string; authorId: string; createdAt: Date }>(),
-	sessions: new Map<string, { id: string; title: string; userId: string; createdAt: Date }>(),
-	messages: new Map<string, { id: string; sessionId: string; role: "user" | "assistant"; content: string; createdAt: Date }>(),
+	comments: new Map<string, DbComment>(),
+	sessions: new Map<string, DbSession>(),
+	messages: new Map<string, DbMessage>(),
 };
 
 // =============================================================================
@@ -209,8 +216,8 @@ const userRouter = router({
 	get: query()
 		.input(z.object({ id: z.string() }))
 		.returns(User)
-		.resolve(({ input, ctx }) => {
-			const user = ctx.db.users.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const user = ctx.db.users.get(args.id);
 			if (!user) throw new Error("User not found");
 			return user;
 		}),
@@ -218,11 +225,11 @@ const userRouter = router({
 	search: query()
 		.input(z.object({ query: z.string(), limit: z.number().optional() }))
 		.returns([User])
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			const results = Array.from(ctx.db.users.values()).filter((u) =>
-				u.name.toLowerCase().includes(input.query.toLowerCase()),
+				u.name.toLowerCase().includes(args.query.toLowerCase()),
 			);
-			return input.limit ? results.slice(0, input.limit) : results;
+			return args.limit ? results.slice(0, args.limit) : results;
 		}),
 
 	update: mutation()
@@ -269,8 +276,8 @@ const postRouter = router({
 	get: query()
 		.input(z.object({ id: z.string() }))
 		.returns(Post)
-		.resolve(({ input, ctx }) => {
-			const post = ctx.db.posts.get(input.id);
+		.resolve(({ args, ctx }) => {
+			const post = ctx.db.posts.get(args.id);
 			if (!post) throw new Error("Post not found");
 			return post;
 		}),
@@ -278,11 +285,11 @@ const postRouter = router({
 	trending: query()
 		.input(z.object({ limit: z.number().default(10) }))
 		.returns([Post])
-		.resolve(({ input, ctx }) => {
+		.resolve(({ args, ctx }) => {
 			const posts = Array.from(ctx.db.posts.values())
 				.filter((p) => p.published)
 				.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-			return posts.slice(0, input.limit);
+			return posts.slice(0, args.limit);
 		}),
 
 	create: mutation()
@@ -296,6 +303,7 @@ const postRouter = router({
 				...input,
 				published: false,
 				authorId: ctx.currentUser?.id ?? "unknown",
+				updatedAt: null,
 				createdAt: new Date(),
 			};
 			ctx.db.posts.set(id, post);
