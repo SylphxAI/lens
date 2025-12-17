@@ -1,5 +1,9 @@
 # @sylphx/lens-svelte
 
+## 2.5.4 (2025-12-17)
+
+No notable changes.
+
 ## 2.5.3 (2025-12-17)
 
 ### 🐛 Bug Fixes

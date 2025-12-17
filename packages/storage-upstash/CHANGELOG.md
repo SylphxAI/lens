@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2 (2025-12-17)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-server` to 4.1.2
+
 ## 1.2.1 (2025-12-17)
 
 fix(server): send full LensResult envelope in SSE handler

@@ -1,5 +1,9 @@
 # @sylphx/lens-vue
 
+## 2.5.3 (2025-12-17)
+
+No notable changes.
+
 ## 2.5.2 (2025-12-17)
 
 ### 🐛 Bug Fixes
