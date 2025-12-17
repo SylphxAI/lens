@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.12 (2025-12-17)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-core` to 4.0.2
+
 ## 1.1.11 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system

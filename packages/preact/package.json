@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-preact",
-	"version": "2.1.14",
+	"version": "2.1.15",
 	"description": "Preact bindings for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",

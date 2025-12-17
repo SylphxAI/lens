@@ -1,5 +1,12 @@
 # @sylphx/lens-svelte
 
+## 2.4.16 (2025-12-17)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 3.0.1
+- Updated `@sylphx/lens-core` to 4.0.2
+
 ## 2.4.14 (2025-12-17)
 
 refactor: remove deprecated APIs and clean up resolver system
