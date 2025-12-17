@@ -1,5 +1,38 @@
 # @sylphx/lens-client
 
+## 3.0.0 (2025-12-17)
+
+refactor: remove deprecated APIs and clean up resolver system
+
+- Remove deprecated entity() API and t.* type builders
+- Remove model().resolve() and model().subscribe() chain patterns
+- Simplify resolver system: Model = pure schema, Resolver = separate implementation
+- Update createResolverFromEntity() to create exposed-only resolvers
+- Deprecate hasInlineResolvers() (always returns false)
+- Auto-generate exposed-only resolvers for models without explicit resolvers
+
+### ✨ Features
+
+- 💥 **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+
+### 🐛 Bug Fixes
+
+- **client,server:** fix ops-before-snapshot race and DataLoader context leak ([654adec](https://github.com/SylphxAI/lens/commit/654adec64ade8457455f67e0820d254283409062))
+- **client:** fix 76 test failures after deprecated code cleanup ([71b03b3](https://github.com/SylphxAI/lens/commit/71b03b34b1c7f1caa99a772e78637ee4e5b1ad33))
+
+### ♻️ Refactoring
+
+- 💥 **api:** align resolver API with GraphQL conventions ([b002713](https://github.com/SylphxAI/lens/commit/b002713a5cd3e9dc7d3a564dc28f711b3b96d6a5))
+- **transport:** unify server Observable return type and add live query detection ([2e15de4](https://github.com/SylphxAI/lens/commit/2e15de417c84a5dc90e5d451c02253f2e3904224))
+- **core:** remove deprecated input and parent aliases ([f5a8510](https://github.com/SylphxAI/lens/commit/f5a8510aa480313ddd60e950233dfaad4fc943dc))
+
+### 💥 Breaking Changes
+
+- **api:** align resolver API with GraphQL conventions ([b002713](https://github.com/SylphxAI/lens/commit/b002713a5cd3e9dc7d3a564dc28f711b3b96d6a5))
+  Resolver callbacks now receive `args` instead of `input`
+- **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+  All deprecated APIs have been removed in v3.0.
+
 ## 2.7.6 (2025-12-16)
 
 ### 📦 Dependencies

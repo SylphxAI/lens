@@ -1,5 +1,25 @@
 # @sylphx/lens
 
+## 3.0.0 (2025-12-17)
+
+refactor: remove deprecated APIs and clean up resolver system
+
+- Remove deprecated entity() API and t.* type builders
+- Remove model().resolve() and model().subscribe() chain patterns
+- Simplify resolver system: Model = pure schema, Resolver = separate implementation
+- Update createResolverFromEntity() to create exposed-only resolvers
+- Deprecate hasInlineResolvers() (always returns false)
+- Auto-generate exposed-only resolvers for models without explicit resolvers
+
+### ✨ Features
+
+- 💥 **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+
+### 💥 Breaking Changes
+
+- **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+  All deprecated APIs have been removed in v3.0.
+
 ## 2.2.10 (2025-12-16)
 
 ### 📦 Dependencies
