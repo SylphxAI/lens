@@ -89,7 +89,7 @@ const userRouter = router({
 
 	// Query with input
 	get: query()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(User)
 		.resolve(({ args, ctx }) => {
 			const user = ctx.db.users.get(args.id);
@@ -104,7 +104,7 @@ const userRouter = router({
 
 	// Query with optional parameters
 	search: query()
-		.input(z.object({
+		.args(z.object({
 			query: z.string(),
 			role: z.enum(["user", "admin", "moderator"]).optional(),
 			limit: z.number().default(10),
@@ -123,7 +123,7 @@ const userRouter = router({
 
 	// Mutation with optimistic update
 	update: mutation()
-		.input(z.object({
+		.args(z.object({
 			id: z.string(),
 			name: z.string().optional(),
 			bio: z.string().optional(),
@@ -143,7 +143,7 @@ const userRouter = router({
 
 	// Mutation without .returns() - infers from resolver
 	setRole: mutation()
-		.input(z.object({ id: z.string(), role: z.enum(["user", "admin", "moderator"]) }))
+		.args(z.object({ id: z.string(), role: z.enum(["user", "admin", "moderator"]) }))
 		.resolve(({ args, ctx }) => {
 			const user = ctx.db.users.get(args.id);
 			if (!user) throw new Error("User not found");
@@ -155,7 +155,7 @@ const userRouter = router({
 // Post operations
 const postRouter = router({
 	get: query()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Post)
 		.resolve(({ args, ctx }) => {
 			const post = ctx.db.posts.get(args.id);
@@ -164,7 +164,7 @@ const postRouter = router({
 		}),
 
 	trending: query()
-		.input(z.object({ limit: z.number().default(10) }))
+		.args(z.object({ limit: z.number().default(10) }))
 		.returns(list(Post))
 		.resolve(({ args, ctx }) =>
 			Array.from(ctx.db.posts.values())
@@ -174,7 +174,7 @@ const postRouter = router({
 		),
 
 	create: mutation()
-		.input(z.object({ title: z.string(), content: z.string(), tags: z.array(z.string()).default([]) }))
+		.args(z.object({ title: z.string(), content: z.string(), tags: z.array(z.string()).default([]) }))
 		.returns(Post)
 		.optimistic("create")
 		.resolve(({ args, ctx }) => {
@@ -192,7 +192,7 @@ const postRouter = router({
 		}),
 
 	publish: mutation()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Post)
 		.optimistic({ merge: { published: true } })
 		.resolve(({ args, ctx }) => {
@@ -207,14 +207,14 @@ const postRouter = router({
 // Comment operations
 const commentRouter = router({
 	list: query()
-		.input(z.object({ postId: z.string() }))
+		.args(z.object({ postId: z.string() }))
 		.returns(list(Comment))
 		.resolve(({ args, ctx }) =>
 			Array.from(ctx.db.comments.values()).filter(c => c.postId === args.postId)
 		),
 
 	add: mutation()
-		.input(z.object({ postId: z.string(), text: z.string() }))
+		.args(z.object({ postId: z.string(), text: z.string() }))
 		.returns(Comment)
 		.optimistic("create")
 		.resolve(({ args, ctx }) => {
@@ -230,7 +230,7 @@ const commentRouter = router({
 		}),
 
 	like: mutation()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Comment)
 		.resolve(({ args, ctx }) => {
 			const comment = ctx.db.comments.get(args.id);

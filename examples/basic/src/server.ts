@@ -61,7 +61,7 @@ const { query, mutation, plugins } = lens<AppContext>({
 
 const userRouter = router({
 	get: query()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(User)
 		.resolve(({ args }) => {
 			const user = db.users.get(args.id);
@@ -74,7 +74,7 @@ const userRouter = router({
 		.resolve(() => Array.from(db.users.values())),
 
 	create: mutation()
-		.input(z.object({ name: z.string(), email: z.string() }))
+		.args(z.object({ name: z.string(), email: z.string() }))
 		.returns(User)
 		.optimistic("create")
 		.resolve(({ args }) => {
@@ -87,7 +87,7 @@ const userRouter = router({
 
 const postRouter = router({
 	get: query()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Post)
 		.resolve(({ args }) => {
 			const post = db.posts.get(args.id);
@@ -100,14 +100,14 @@ const postRouter = router({
 		.resolve(() => Array.from(db.posts.values())),
 
 	byAuthor: query()
-		.input(z.object({ authorId: z.string() }))
+		.args(z.object({ authorId: z.string() }))
 		.returns(list(Post))
 		.resolve(({ args }) =>
 			Array.from(db.posts.values()).filter(p => p.authorId === args.authorId)
 		),
 
 	create: mutation()
-		.input(z.object({ title: z.string(), content: z.string(), authorId: z.string() }))
+		.args(z.object({ title: z.string(), content: z.string(), authorId: z.string() }))
 		.returns(Post)
 		.optimistic("create")
 		.resolve(({ args }) => {
@@ -118,7 +118,7 @@ const postRouter = router({
 		}),
 
 	update: mutation()
-		.input(z.object({ id: z.string(), title: z.string().optional(), content: z.string().optional() }))
+		.args(z.object({ id: z.string(), title: z.string().optional(), content: z.string().optional() }))
 		.returns(Post)
 		.optimistic("merge")
 		.resolve(({ args }) => {
@@ -130,7 +130,7 @@ const postRouter = router({
 		}),
 
 	publish: mutation()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Post)
 		.optimistic({ merge: { published: true } })
 		.resolve(({ args }) => {
@@ -141,7 +141,7 @@ const postRouter = router({
 		}),
 
 	delete: mutation()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.resolve(({ args }) => {
 			const existed = db.posts.delete(args.id);
 			return { success: existed };

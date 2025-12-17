@@ -24,12 +24,12 @@ Lens lets you define type-safe API operations on the server that clients can cal
 const appRouter = router({
   user: {
     get: query()
-      .input(z.object({ id: z.string() }))
-      .resolve(({ input, ctx }) => ctx.db.user.find(input.id)),
+      .args(z.object({ id: z.string() }))
+      .resolve(({ args, ctx }) => ctx.db.user.find(args.id)),
 
     update: mutation()
-      .input(z.object({ id: z.string(), name: z.string() }))
-      .resolve(({ input, ctx }) => ctx.db.user.update(input)),
+      .args(z.object({ id: z.string(), name: z.string() }))
+      .resolve(({ args, ctx }) => ctx.db.user.update(input)),
   },
 })
 
@@ -77,8 +77,8 @@ trpc.subscribeUser({ id }).subscribe(callback)    // Real-time
 ```typescript
 // Define ONCE - works for all access patterns
 const getUser = query()
-  .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
+  .args(z.object({ id: z.string() }))
+  .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
 
 // Client chooses access pattern at call site
 const user = await client.user.get({ id })              // One-time fetch
@@ -135,8 +135,8 @@ Most common pattern - returns a value once. Context has **no** `emit` or `onClea
 
 ```typescript
 const getUser = query()
-  .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
+  .args(z.object({ id: z.string() }))
+  .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
   //         ^ ctx has NO emit, NO onCleanup
 ```
 
@@ -146,11 +146,11 @@ For real-time updates with initial value. Uses **Publisher pattern** - emit/onCl
 
 ```typescript
 const watchUser = query()
-  .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))  // Initial value
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+  .args(z.object({ id: z.string() }))
+  .resolve(({ args, ctx }) => ctx.db.user.find(args.id))  // Initial value
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
     // Publisher callback - emit/onCleanup passed here, NOT in ctx
-    const unsubscribe = db.user.onChange(input.id, (user) => {
+    const unsubscribe = db.user.onChange(args.id, (user) => {
       emit(user)  // Push update to subscribed clients
     })
     onCleanup(unsubscribe)
@@ -177,7 +177,7 @@ const streamMessages = query()
 ```typescript
 // ❌ DEPRECATED - ctx.emit pattern
 const watchUser = query()
-  .subscribe(({ input, ctx }) => {
+  .subscribe(({ args, ctx }) => {
     ctx.emit(user)  // OLD pattern - emit on ctx
     ctx.onCleanup(unsubscribe)
   })
@@ -202,7 +202,7 @@ The `ctx.emit` method provides type-safe methods for pushing state updates to su
 For single entity or multi-entity object outputs (`.returns(User)` or `.returns({ user: User, posts: [Post] })`):
 
 ```typescript
-.subscribe(({ input, ctx }) => {
+.subscribe(({ args, ctx }) => {
   // Full data update (merge mode)
   ctx.emit({ title: "Hello", content: "World" })
 
@@ -234,7 +234,7 @@ For single entity or multi-entity object outputs (`.returns(User)` or `.returns(
 For array outputs (`.returns([User])`):
 
 ```typescript
-.subscribe(({ input, ctx }) => {
+.subscribe(({ args, ctx }) => {
   // Replace entire array
   ctx.emit([user1, user2])
   ctx.emit.replace([user1, user2])
@@ -262,9 +262,9 @@ For array outputs (`.returns([User])`):
 
 ```typescript
 const chat = query()
-  .input(z.object({ prompt: z.string() }))
-  .subscribe(({ input, ctx }) => {
-    const stream = ctx.ai.stream(input.prompt)
+  .args(z.object({ prompt: z.string() }))
+  .subscribe(({ args, ctx }) => {
+    const stream = ctx.ai.stream(args.prompt)
 
     // Emit initial empty state
     ctx.emit({ content: "" })
@@ -660,16 +660,16 @@ export const appRouter = router({
       .resolve(({ ctx }) => ctx.db.user.findMany()),
 
     get: query()
-      .input(z.object({ id: z.string() }))
-      .resolve(({ input, ctx }) => ctx.db.user.findUnique({ where: { id: input.id } })),
+      .args(z.object({ id: z.string() }))
+      .resolve(({ args, ctx }) => ctx.db.user.findUnique({ where: { id: args.id } })),
 
     create: mutation()
-      .input(z.object({ name: z.string(), email: z.string() }))
-      .resolve(({ input, ctx }) => ctx.db.user.create({ data: input })),
+      .args(z.object({ name: z.string(), email: z.string() }))
+      .resolve(({ args, ctx }) => ctx.db.user.create({ data: args })),
 
     update: mutation()
-      .input(z.object({ id: z.string(), name: z.string().optional() }))
-      .resolve(({ input, ctx }) => ctx.db.user.update({ where: { id: input.id }, data: input })),
+      .args(z.object({ id: z.string(), name: z.string().optional() }))
+      .resolve(({ args, ctx }) => ctx.db.user.update({ where: { id: args.id }, data: args })),
   },
 })
 
@@ -910,11 +910,11 @@ Mutations can define optimistic behavior for instant UI feedback.
 ```typescript
 // Server: Define optimistic strategy
 const updateUser = mutation()
-  .input(z.object({ id: z.string(), name: z.string() }))
+  .args(z.object({ id: z.string(), name: z.string() }))
   .optimistic('merge')  // Instantly merge input into local state
-  .resolve(({ input, ctx }) => ctx.db.user.update({
-    where: { id: input.id },
-    data: input
+  .resolve(({ args, ctx }) => ctx.db.user.update({
+    where: { id: args.id },
+    data: args
   }))
 
 // Client: UI updates instantly, rolls back on error
@@ -935,7 +935,7 @@ For mutations that affect multiple entities, use [Reify](https://github.com/Sylp
 // Import Reify DSL directly from @sylphx/reify
 import { entity, pipe, temp, ref, now, branch, inc, push } from '@sylphx/reify';
 
-const sendMessagePipeline = pipe(({ input }) => [
+const sendMessagePipeline = pipe(({ args }) => [
   // Step 1: Conditional upsert - create or update session
   branch(input.sessionId)
     .then(entity.update('Session', {
@@ -954,7 +954,7 @@ const sendMessagePipeline = pipe(({ input }) => [
     id: temp(),
     sessionId: ref('session').id,  // Reference sibling operation result
     role: 'user',
-    content: input.content,
+    content: args.content,
     createdAt: now(),
   }).as('message'),
 
@@ -969,7 +969,7 @@ const sendMessagePipeline = pipe(({ input }) => [
 
 // Use in Lens mutation
 const createChatSession = mutation()
-  .input(z.object({
+  .args(z.object({
     sessionId: z.string().optional(),
     title: z.string(),
     content: z.string(),
@@ -1158,17 +1158,17 @@ import { z } from 'zod'
 
 // Only uses ctx.db
 export const getUser = query<{ db: PrismaClient }>()
-  .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => {
-    return ctx.db.user.findUnique({ where: { id: input.id } })
+  .args(z.object({ id: z.string() }))
+  .resolve(({ args, ctx }) => {
+    return ctx.db.user.findUnique({ where: { id: args.id } })
   })
 
 // Uses ctx.db AND ctx.user
 export const createUser = mutation<{ db: PrismaClient; user: User | null }>()
-  .input(z.object({ name: z.string(), email: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .args(z.object({ name: z.string(), email: z.string() }))
+  .resolve(({ args, ctx }) => {
     if (!ctx.user) throw new Error('Unauthorized')
-    return ctx.db.user.create({ data: input })
+    return ctx.db.user.create({ data: args })
   })
 ```
 
@@ -1176,8 +1176,8 @@ export const createUser = mutation<{ db: PrismaClient; user: User | null }>()
 // routes/cache.ts - Different requirements
 // Only uses ctx.cache
 export const getCached = query<{ cache: RedisClient }>()
-  .input(z.object({ key: z.string() }))
-  .resolve(({ input, ctx }) => ctx.cache.get(input.key))
+  .args(z.object({ key: z.string() }))
+  .resolve(({ args, ctx }) => ctx.cache.get(input.key))
 ```
 
 ```typescript
@@ -1242,7 +1242,7 @@ export const typedMutation = () => mutation<Context>()
 import { typedQuery, typedMutation } from '../lib/procedures'
 
 export const getUser = typedQuery()
-  .input(z.object({ id: z.string() }))
+  .args(z.object({ id: z.string() }))
   .resolve(({ ctx }) => ctx.db.user.find(...))
 ```
 
@@ -1325,11 +1325,11 @@ client.dashboard.get().subscribe((dashboard) => {
 ```typescript
 // Server: Stream tokens as they arrive (yield pattern)
 const chat = query()
-  .input(z.object({ messages: z.array(MessageSchema) }))
-  .resolve(async function* ({ input, ctx }) {
+  .args(z.object({ messages: z.array(MessageSchema) }))
+  .resolve(async function* ({ args, ctx }) {
     const stream = ctx.openai.chat.completions.create({
       model: "gpt-4",
-      messages: input.messages,
+      messages: args.messages,
       stream: true,
     })
 
@@ -1354,10 +1354,10 @@ client.chat({ messages }).subscribe((response) => {
 ```typescript
 // Server: Multiple users editing same document
 const getDocument = query()
-  .input(z.object({ docId: z.string() }))
-  .resolve(({ input, ctx }) => ctx.docs.get(input.docId).get())
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
-    const docRef = ctx.docs.get(input.docId)
+  .args(z.object({ docId: z.string() }))
+  .resolve(({ args, ctx }) => ctx.docs.get(args.docId).get())
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
+    const docRef = ctx.docs.get(args.docId)
 
     // Listen for changes from ANY user
     const unsub = docRef.onSnapshot((doc) => {
@@ -1368,11 +1368,11 @@ const getDocument = query()
   })
 
 const updateDocument = mutation()
-  .input(z.object({ docId: z.string(), content: z.string() }))
-  .resolve(({ input, ctx }) => {
+  .args(z.object({ docId: z.string(), content: z.string() }))
+  .resolve(({ args, ctx }) => {
     // Update triggers onSnapshot above
     // ALL subscribed clients receive the change
-    return ctx.docs.update(input.docId, { content: input.content })
+    return ctx.docs.update(args.docId, { content: args.content })
   })
 
 // Client A & B: Both subscribe to same document
@@ -1391,11 +1391,11 @@ await client.document.update({ docId: "123", content: newContent })
 ```typescript
 // Server: Return page, but also push new items
 const getPosts = query()
-  .input(z.object({ cursor: z.string().optional(), limit: z.number() }))
-  .resolve(({ input, ctx }) =>
-    ctx.posts.findMany({ cursor: input.cursor, take: input.limit })
+  .args(z.object({ cursor: z.string().optional(), limit: z.number() }))
+  .resolve(({ args, ctx }) =>
+    ctx.posts.findMany({ cursor: args.cursor, take: args.limit })
   )
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
     // Listen for new posts
     const unsub = ctx.posts.onNew((newPost) => {
       emit.unshift(newPost)  // Add to front of array
@@ -1417,13 +1417,13 @@ client.posts.get({ limit: 20 }).subscribe((posts) => {
 ```typescript
 // Server: Track active users
 const getPresence = query()
-  .input(z.object({ roomId: z.string() }))
-  .resolve(({ input, ctx }) => {
-    const room = ctx.presence.join(input.roomId, ctx.user)
+  .args(z.object({ roomId: z.string() }))
+  .resolve(({ args, ctx }) => {
+    const room = ctx.presence.join(args.roomId, ctx.user)
     return room.getUsers()
   })
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
-    const room = ctx.presence.get(input.roomId)
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
+    const room = ctx.presence.get(args.roomId)
 
     // Listen for user join/leave
     room.onUpdate((users) => {
@@ -1485,11 +1485,11 @@ Use `.resolve().subscribe()` with the Publisher pattern:
 
 ```typescript
 const watchPrices = query()
-  .input(z.object({ symbol: z.string() }))
-  .resolve(({ input }) => ({ price: 0, symbol: input.symbol }))  // Initial value
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+  .args(z.object({ symbol: z.string() }))
+  .resolve(({ args }) => ({ price: 0, symbol: args.symbol }))  // Initial value
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
     // Connect to external WebSocket
-    const ws = new WebSocket(`wss://prices.api/${input.symbol}`)
+    const ws = new WebSocket(`wss://prices.api/${args.symbol}`)
 
     ws.onmessage = (event) => {
       emit(JSON.parse(event.data))  // Push to Lens clients
@@ -1507,16 +1507,16 @@ Two ways:
 ```typescript
 // Query subscribes to database changes
 const getUser = query()
-  .input(z.object({ id: z.string() }))
-  .resolve(({ input, ctx }) => ctx.db.user.find(input.id))
-  .subscribe(({ input, ctx }) => ({ emit, onCleanup }) => {
+  .args(z.object({ id: z.string() }))
+  .resolve(({ args, ctx }) => ctx.db.user.find(args.id))
+  .subscribe(({ args, ctx }) => ({ emit, onCleanup }) => {
     // Listen for changes
-    const unsub = ctx.db.user.onChange(input.id, emit)
+    const unsub = ctx.db.user.onChange(args.id, emit)
     onCleanup(unsub)
   })
 
 // Mutation updates database
-const updateUser = mutation().resolve(({ input, ctx }) => {
+const updateUser = mutation().resolve(({ args, ctx }) => {
   return ctx.db.user.update(input)  // Triggers onChange above
 })
 ```
@@ -1526,12 +1526,12 @@ const updateUser = mutation().resolve(({ input, ctx }) => {
 // Both query and mutation use same GraphStateManager
 const manager = new GraphStateManager()
 
-const getUser = query().resolve(({ input }) => {
-  return manager.getState("User", input.id)
+const getUser = query().resolve(({ args }) => {
+  return manager.getState("User", args.id)
 })
 
-const updateUser = mutation().resolve(({ input }) => {
-  manager.emit("User", input.id, input.data)  // Pushes to all subscribers
+const updateUser = mutation().resolve(({ args }) => {
+  manager.emit("User", args.id, input.data)  // Pushes to all subscribers
   return input.data
 })
 ```

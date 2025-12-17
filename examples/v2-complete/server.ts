@@ -214,7 +214,7 @@ const userRouter = router({
 		}),
 
 	get: query()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(User)
 		.resolve(({ args, ctx }) => {
 			const user = ctx.db.users.get(args.id);
@@ -223,7 +223,7 @@ const userRouter = router({
 		}),
 
 	search: query()
-		.input(z.object({ query: z.string(), limit: z.number().optional() }))
+		.args(z.object({ query: z.string(), limit: z.number().optional() }))
 		.returns(list(User))
 		.resolve(({ args, ctx }) => {
 			const results = Array.from(ctx.db.users.values()).filter((u) =>
@@ -233,7 +233,7 @@ const userRouter = router({
 		}),
 
 	update: mutation()
-		.input(z.object({
+		.args(z.object({
 			id: z.string(),
 			name: z.string().optional(),
 			email: z.string().optional(),
@@ -255,7 +255,7 @@ const userRouter = router({
 		}),
 
 	bulkPromote: mutation()
-		.input(z.object({
+		.args(z.object({
 			userIds: z.array(z.string()),
 			newRole: z.enum(["user", "admin", "vip"]),
 		}))
@@ -274,7 +274,7 @@ const userRouter = router({
 
 const postRouter = router({
 	get: query()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Post)
 		.resolve(({ args, ctx }) => {
 			const post = ctx.db.posts.get(args.id);
@@ -283,7 +283,7 @@ const postRouter = router({
 		}),
 
 	trending: query()
-		.input(z.object({ limit: z.number().default(10) }))
+		.args(z.object({ limit: z.number().default(10) }))
 		.returns(list(Post))
 		.resolve(({ args, ctx }) => {
 			const posts = Array.from(ctx.db.posts.values())
@@ -293,7 +293,7 @@ const postRouter = router({
 		}),
 
 	create: mutation()
-		.input(z.object({ title: z.string(), content: z.string() }))
+		.args(z.object({ title: z.string(), content: z.string() }))
 		.returns(Post)
 		.optimistic("create")
 		.resolve(({ args, ctx }) => {
@@ -311,7 +311,7 @@ const postRouter = router({
 		}),
 
 	update: mutation()
-		.input(z.object({
+		.args(z.object({
 			id: z.string(),
 			title: z.string().optional(),
 			content: z.string().optional(),
@@ -332,7 +332,7 @@ const postRouter = router({
 		}),
 
 	publish: mutation()
-		.input(z.object({ id: z.string() }))
+		.args(z.object({ id: z.string() }))
 		.returns(Post)
 		.optimistic({ merge: { published: true } })
 		.resolve(({ args, ctx }) => {
@@ -346,7 +346,7 @@ const postRouter = router({
 
 const commentRouter = router({
 	add: mutation()
-		.input(z.object({ postId: z.string(), content: z.string() }))
+		.args(z.object({ postId: z.string(), content: z.string() }))
 		.returns(Comment)
 		.optimistic("create")
 		.resolve(({ args, ctx }) => {
@@ -375,10 +375,10 @@ const chatRouter = router({
 	 * - Server executes same pipeline against Prisma for persistence
 	 *
 	 * Callback pattern with automatic type inference!
-	 * The `args` parameter is fully typed from .input() schema.
+	 * The `args` parameter is fully typed from .args() schema.
 	 */
 	send: mutation()
-		.input(z.object({
+		.args(z.object({
 			sessionId: z.string().optional(),  // Optional: create new if not provided
 			title: z.string().optional(),
 			content: z.string(),
