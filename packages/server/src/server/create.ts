@@ -1306,7 +1306,7 @@ class LensServerImpl<
 				}
 
 				if (isSnapshot(result)) {
-					return new Response(JSON.stringify({ data: result.data }), {
+					return new Response(JSON.stringify(result), {
 						headers: baseHeaders,
 					});
 				}

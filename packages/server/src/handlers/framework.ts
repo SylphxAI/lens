@@ -125,7 +125,7 @@ export async function handleWebQuery(
 		}
 
 		if (isSnapshot(result)) {
-			return Response.json({ data: result.data });
+			return Response.json(result);
 		}
 
 		// ops message - forward as-is
@@ -165,7 +165,7 @@ export async function handleWebMutation(
 		}
 
 		if (isSnapshot(result)) {
-			return Response.json({ data: result.data });
+			return Response.json(result);
 		}
 
 		// ops message - forward as-is
