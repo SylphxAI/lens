@@ -224,7 +224,7 @@ const userRouter = router({
 
 	search: query()
 		.input(z.object({ query: z.string(), limit: z.number().optional() }))
-		.returns([User])
+		.returns(list(User))
 		.resolve(({ args, ctx }) => {
 			const results = Array.from(ctx.db.users.values()).filter((u) =>
 				u.name.toLowerCase().includes(args.query.toLowerCase()),
@@ -284,7 +284,7 @@ const postRouter = router({
 
 	trending: query()
 		.input(z.object({ limit: z.number().default(10) }))
-		.returns([Post])
+		.returns(list(Post))
 		.resolve(({ args, ctx }) => {
 			const posts = Array.from(ctx.db.posts.values())
 				.filter((p) => p.published)

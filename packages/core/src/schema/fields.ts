@@ -145,7 +145,7 @@ export function scalar<T, SerializedT = T>(
 // =============================================================================
 
 /** Model-like type that can be referenced */
-type ModelLike = ModelDef<string, EntityDefinition>;
+type ModelLike = ModelDef<string, any>;
 
 /** Lazy model reference (for circular dependencies) */
 type LazyModelRef<T extends ModelLike = ModelLike> = () => T;

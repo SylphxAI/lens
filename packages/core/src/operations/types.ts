@@ -35,18 +35,18 @@ type AnyModelDef = ModelDef<string, any>;
 
 /**
  * Return type specification
- * - ModelDef: Model definition
+ * - Model: Model definition
  * - nullable(Model): Nullable model
- * - list(Model): Array of models (ListWrapper)
- * - [Model]: Array of models (native JS array syntax)
+ * - list(Model): Array of models
  * - nullable(list(Model)): Nullable array
+ *
+ * Uses `any` for inner types to avoid variance issues with specific ModelDef types.
  */
 export type ReturnSpec =
 	| AnyModelDef
-	| NullableWrapper<AnyModelDef>
-	| ListWrapper<AnyModelDef>
-	| [AnyModelDef] // Native array syntax: [User]
-	| NullableWrapper<ListWrapper<AnyModelDef>>;
+	| NullableWrapper<any>
+	| ListWrapper<any>
+	| NullableWrapper<ListWrapper<any>>;
 
 // =============================================================================
 // Type Inference
@@ -99,19 +99,12 @@ export type InferReturnType<R extends ReturnSpec> =
 					? never
 					: InferModelFromFieldsAny<F>[]
 				: never
-			: // Native array syntax: [Model]
-				R extends [infer Model]
-				? IsModelDefLike<Model> extends infer F
-					? F extends never
-						? never
-						: InferModelFromFieldsAny<F>[]
-					: never
-				: // ModelDef-like
-					IsModelDefLike<R> extends infer F
-					? F extends never
-						? never
-						: InferModelFromFieldsAny<F>
-					: never;
+			: // ModelDef-like
+				IsModelDefLike<R> extends infer F
+				? F extends never
+					? never
+					: InferModelFromFieldsAny<F>
+				: never;
 
 // =============================================================================
 // Context Types

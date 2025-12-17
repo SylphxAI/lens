@@ -133,7 +133,7 @@ export interface QueryBuilder<TInput = void, TOutput = unknown, TContext = unkno
 	 *   });
 	 * ```
 	 */
-	resolve<T>(fn: QueryResolverFn<TInput, T, TContext>): QueryDefChainable<TInput, T, TContext>;
+	resolve<T extends TOutput>(fn: QueryResolverFn<TInput, T, TContext>): QueryDefChainable<TInput, T, TContext>;
 }
 
 // =============================================================================

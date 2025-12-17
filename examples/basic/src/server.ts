@@ -1,7 +1,7 @@
 /**
  * Example Lens Server
  */
-import { model, id, string, boolean, datetime, lens, router } from "@sylphx/lens-core";
+import { model, id, string, boolean, datetime, lens, router, list } from "@sylphx/lens-core";
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { z } from "zod";
 
@@ -70,7 +70,7 @@ const userRouter = router({
 		}),
 
 	list: query()
-		.returns([User])
+		.returns(list(User))
 		.resolve(() => Array.from(db.users.values())),
 
 	create: mutation()
@@ -96,12 +96,12 @@ const postRouter = router({
 		}),
 
 	list: query()
-		.returns([Post])
+		.returns(list(Post))
 		.resolve(() => Array.from(db.posts.values())),
 
 	byAuthor: query()
 		.input(z.object({ authorId: z.string() }))
-		.returns([Post])
+		.returns(list(Post))
 		.resolve(({ input }) =>
 			Array.from(db.posts.values()).filter(p => p.authorId === input.authorId)
 		),

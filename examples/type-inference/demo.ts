@@ -9,7 +9,7 @@
 
 import { createApp, optimisticPlugin } from "@sylphx/lens-server";
 import { createClient, direct } from "@sylphx/lens-client";
-import { model, id, string, boolean, datetime, enumType, nullable, int, json, lens, router } from "@sylphx/lens-core";
+import { model, id, string, boolean, datetime, enumType, nullable, int, json, lens, router, list } from "@sylphx/lens-core";
 import { z } from "zod";
 
 // =============================================================================
@@ -99,7 +99,7 @@ const userRouter = router({
 
 	// Query returning array
 	list: query()
-		.returns([User])
+		.returns(list(User))
 		.resolve(({ ctx }) => Array.from(ctx.db.users.values())),
 
 	// Query with optional parameters
@@ -109,7 +109,7 @@ const userRouter = router({
 			role: z.enum(["user", "admin", "moderator"]).optional(),
 			limit: z.number().default(10),
 		}))
-		.returns([User])
+		.returns(list(User))
 		.resolve(({ input, ctx }) => {
 			let results = Array.from(ctx.db.users.values())
 				.filter(u => u.name.toLowerCase().includes(input.query.toLowerCase()));
@@ -165,7 +165,7 @@ const postRouter = router({
 
 	trending: query()
 		.input(z.object({ limit: z.number().default(10) }))
-		.returns([Post])
+		.returns(list(Post))
 		.resolve(({ input, ctx }) =>
 			Array.from(ctx.db.posts.values())
 				.filter(p => p.published)
@@ -208,7 +208,7 @@ const postRouter = router({
 const commentRouter = router({
 	list: query()
 		.input(z.object({ postId: z.string() }))
-		.returns([Comment])
+		.returns(list(Comment))
 		.resolve(({ input, ctx }) =>
 			Array.from(ctx.db.comments.values()).filter(c => c.postId === input.postId)
 		),
@@ -324,7 +324,7 @@ async function demonstrateTypeInference() {
 	console.log();
 
 	// Example 2: Query returning array
-	console.log("2️⃣ Query with .returns([User])");
+	console.log("2️⃣ Query with .returns(list(User))");
 	console.log("-".repeat(40));
 	const users = await client.user.list();
 
