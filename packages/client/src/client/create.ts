@@ -807,7 +807,8 @@ class ClientImpl {
 							this.distributeData(endpoint, message.data);
 						} else if (isOps(message)) {
 							// Must have baseline data before applying ops
-							if (endpoint.data === undefined) {
+							// endpoint.data is initialized to null, so check for null OR undefined
+							if (endpoint.data === null || endpoint.data === undefined) {
 								// Ops received before snapshot - protocol error or race condition
 								// Log warning and skip (server should send snapshot first)
 								console.warn(

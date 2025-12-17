@@ -126,7 +126,6 @@ class LensServerImpl<
 	private version: string;
 	private logger: LensLogger;
 	private ctx = createContext<TContext>();
-	private loaders = new Map<string, DataLoader<unknown, unknown>>();
 	private pluginManager: PluginManager;
 
 	constructor(
@@ -680,9 +679,9 @@ class LensServerImpl<
 							observer.next?.({ $: "error", error: errMsg, code: "INTERNAL_ERROR" } as Message);
 							observer.complete?.();
 						}
-					} finally {
-						this.clearLoaders();
 					}
+					// Note: No need to clear loaders - they are now request-scoped
+					// (created fresh in processQueryResult for each request)
 				})();
 
 				return {
@@ -789,6 +788,9 @@ class LensServerImpl<
 		// Extract nested inputs from selection for field resolver args
 		const nestedInputs = select ? extractNestedInputs(select) : undefined;
 
+		// Create request-scoped loaders to avoid context leak across concurrent requests
+		const requestLoaders = new Map<string, DataLoader<unknown, unknown>>();
+
 		const processed = await this.resolveEntityFields(
 			data,
 			nestedInputs,
@@ -797,6 +799,7 @@ class LensServerImpl<
 			onCleanup,
 			createFieldEmit,
 			new Set(), // Cycle detection for circular entity references (type:id)
+			requestLoaders, // Request-scoped DataLoaders
 		);
 		if (select) {
 			return applySelection(processed, select) as T;
@@ -815,6 +818,7 @@ class LensServerImpl<
 	 * @param onCleanup - Cleanup registration for live query subscriptions
 	 * @param createFieldEmit - Factory for creating field-specific emit handlers
 	 * @param visited - Set of "type:id" keys to track visited entities and prevent circular reference infinite loops
+	 * @param loaders - Request-scoped DataLoader map to avoid context leak across concurrent requests
 	 */
 	private async resolveEntityFields<T>(
 		data: T,
@@ -824,6 +828,7 @@ class LensServerImpl<
 		onCleanup?: (fn: () => void) => void,
 		createFieldEmit?: (fieldPath: string, resolvedValue?: unknown) => Emit<unknown> | undefined,
 		visited: Set<string> = new Set(),
+		loaders: Map<string, DataLoader<unknown, unknown>> = new Map(),
 	): Promise<T> {
 		if (!data || !this.resolverMap) return data;
 
@@ -838,6 +843,7 @@ class LensServerImpl<
 						onCleanup,
 						createFieldEmit,
 						visited,
+						loaders,
 					),
 				),
 			) as Promise<T>;
@@ -899,6 +905,7 @@ class LensServerImpl<
 							resolverDef,
 							field,
 							context ?? ({} as TContext),
+							loaders,
 						);
 						result[field] = await loader.load(obj);
 					}
@@ -949,6 +956,7 @@ class LensServerImpl<
 							resolverDef,
 							field,
 							context ?? ({} as TContext),
+							loaders,
 						);
 						result[field] = await loader.load(obj);
 					}
@@ -971,6 +979,7 @@ class LensServerImpl<
 				onCleanup,
 				createFieldEmit,
 				visited,
+				loaders,
 			);
 		}
 
@@ -1028,11 +1037,12 @@ class LensServerImpl<
 		resolverDef: ResolverDef<any, any, any>,
 		fieldName: string,
 		context: TContext,
+		loaders: Map<string, DataLoader<unknown, unknown>>,
 	): DataLoader<unknown, unknown> {
-		let loader = this.loaders.get(loaderKey);
+		let loader = loaders.get(loaderKey);
 		if (!loader) {
-			// Capture context at loader creation time
-			// This ensures the batch function has access to request context
+			// Create loader with current request's context
+			// Using request-scoped loaders map ensures context isolation between concurrent requests
 			loader = new DataLoader(async (parents: unknown[]) => {
 				const results: unknown[] = [];
 				for (const parent of parents) {
@@ -1050,13 +1060,9 @@ class LensServerImpl<
 				}
 				return results;
 			});
-			this.loaders.set(loaderKey, loader);
+			loaders.set(loaderKey, loader);
 		}
 		return loader;
-	}
-
-	private clearLoaders(): void {
-		this.loaders.clear();
 	}
 
 	// =========================================================================
