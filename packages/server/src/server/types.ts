@@ -74,6 +74,11 @@ export interface OperationMeta {
 	 * Used by client for field-level subscription detection.
 	 */
 	returnType?: string;
+	/**
+	 * Indicates this is a live query (Publisher pattern with _subscriber).
+	 * Client should use streaming transport even though type is "query".
+	 */
+	live?: boolean;
 }
 
 /** Nested operations structure for handshake */

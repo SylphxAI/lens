@@ -63,12 +63,10 @@ export type {
 	QueryDef,
 	QueryDefChainable,
 	QueryMode,
-	SubscribedQueryDef,
 } from "./query.js";
 export {
 	isLiveQueryDef,
 	isQueryDef,
-	isSubscribedQueryDef,
 	QueryBuilderImpl,
 	query,
 } from "./query.js";

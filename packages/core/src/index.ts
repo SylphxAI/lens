@@ -237,7 +237,6 @@ export {
 	isOptimisticDSL,
 	isQueryDef,
 	isRouterDef,
-	isSubscribedQueryDef,
 	isSubscriptionDef,
 	isTempId,
 	type LiveQueryDef,
@@ -262,7 +261,6 @@ export {
 	type RouterDef,
 	type RouterRoutes,
 	router,
-	type SubscribedQueryDef,
 	type SubscriptionBuilder,
 	type SubscriptionDef,
 	type SubscriptionResultType,
@@ -465,7 +463,7 @@ export {
 // =============================================================================
 
 export {
-	// Legacy extraction types (backward compatibility)
+	// Plugin type extraction utilities
 	type ExtractExtension,
 	type ExtractPluginExtensions,
 	// Direct type lookup extraction (for generic-aware plugins)

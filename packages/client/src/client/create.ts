@@ -21,6 +21,9 @@ import {
 import type { Plugin } from "../transport/plugin.js";
 import {
 	hasAnySubscription,
+	isMutationCapable,
+	isQueryCapable,
+	isSubscriptionCapable,
 	type Metadata,
 	type Observable,
 	type Operation,
@@ -179,11 +182,11 @@ class ClientImpl {
 
 		// Execute through transport using capability methods
 		let resultOrObservable: Promise<Result> | Observable<Result>;
-		if (processedOp.type === "mutation" && "mutation" in this.transport) {
+		if (processedOp.type === "mutation" && isMutationCapable(this.transport)) {
 			resultOrObservable = this.transport.mutation(processedOp);
-		} else if (processedOp.type === "subscription" && "subscription" in this.transport) {
+		} else if (processedOp.type === "subscription" && isSubscriptionCapable(this.transport)) {
 			resultOrObservable = this.transport.subscription(processedOp);
-		} else if ("query" in this.transport) {
+		} else if (isQueryCapable(this.transport)) {
 			resultOrObservable = this.transport.query(processedOp);
 		} else {
 			throw new Error(`Transport does not support ${processedOp.type} operations`);
@@ -294,6 +297,9 @@ class ClientImpl {
 
 		// Already a subscription - yes
 		if (meta.type === "subscription") return true;
+
+		// Live query (Publisher pattern) - needs streaming transport
+		if ((meta as { live?: boolean }).live) return true;
 
 		// For queries, check if any selected field is a subscription
 		if (meta.type === "query" && meta.returnType && this.metadata?.entities) {
@@ -788,12 +794,11 @@ class ClientImpl {
 			};
 
 			// Use subscription capability if available, fallback to query
-			const resultOrObservable =
-				"subscription" in this.transport
-					? this.transport.subscription(op)
-					: "query" in this.transport
-						? this.transport.query(op)
-						: Promise.reject(new Error("Transport does not support subscriptions"));
+			const resultOrObservable = isSubscriptionCapable(this.transport)
+				? this.transport.subscription(op)
+				: isQueryCapable(this.transport)
+					? this.transport.query(op)
+					: Promise.reject(new Error("Transport does not support subscriptions"));
 
 			if (this.isObservable(resultOrObservable)) {
 				const subscription = resultOrObservable.subscribe({
@@ -897,7 +902,9 @@ class ClientImpl {
 		path: string,
 	): (descriptor?: { input?: unknown; select?: SelectionObject }) => unknown {
 		return (descriptor?: { input?: unknown; select?: SelectionObject }) => {
-			// Handle both old API (direct input) and new API ({ input, select })
+			// Handle both forms:
+			// - Standard: client.user.get({ id }) - input object directly
+			// - With selection: client.user.get({ input: { id }, select: { name: true } })
 			let input: unknown;
 			let select: SelectionObject | undefined;
 
@@ -906,11 +913,11 @@ class ClientImpl {
 				typeof descriptor === "object" &&
 				("input" in descriptor || "select" in descriptor)
 			) {
-				// New API: { input, select }
+				// Extended form with explicit input/select
 				input = descriptor.input;
 				select = descriptor.select;
 			} else {
-				// Old API: direct input (backwards compatibility)
+				// Standard form: direct input
 				input = descriptor;
 				select = undefined;
 			}
@@ -1022,7 +1029,7 @@ export function createClient(config: LensClientConfig | TypedClientConfig<unknow
 			},
 			apply(_target, _thisArg, args: unknown[]) {
 				const accessor = impl.createAccessor(prefix);
-				return accessor(args[0]);
+				return accessor(args[0] as { input?: unknown; select?: SelectionObject } | undefined);
 			},
 		};
 		return new Proxy(() => {}, handler);

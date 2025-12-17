@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "bun:test";
 import { app, db, type AppRouter } from "./server";
-import { createClient, inProcess } from "@sylphx/lens-client";
+import { createClient, direct } from "@sylphx/lens-client";
 import type { InferRouterClient } from "@sylphx/lens-core";
 import { firstValueFrom, isError, isSnapshot } from "@sylphx/lens-core";
 
@@ -17,7 +17,7 @@ type Client = InferRouterClient<AppRouter>;
 // Create client with in-process transport (direct execution)
 function createTestClient(): Client {
 	return createClient({
-		transport: inProcess({ app }),
+		transport: direct({ app }),
 	}) as unknown as Client;
 }
 

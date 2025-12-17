@@ -5,18 +5,14 @@
  *
  * Query Types:
  * - .resolve() → Query (returns value, no ctx.emit/onCleanup) - can chain .subscribe()
- * - .subscribe() → Legacy Subscription (ctx.emit) - DEPRECATED
  * - .resolve().subscribe() → Live Subscription (Publisher pattern) - RECOMMENDED
  */
 
 import type { Publisher } from "../resolvers/resolver-types.js";
 import type {
-	EmitResolverFn,
-	GeneratorResolverFn,
 	InferReturnType,
 	QueryResolverContext,
 	QueryResolverFn,
-	ResolverFn,
 	ReturnSpec,
 	ZodLikeSchema,
 } from "./types.js";
@@ -49,18 +45,6 @@ export interface QueryDef<TInput = void, TOutput = unknown, TContext = unknown>
 	): TOutput | Promise<TOutput> | AsyncGenerator<TOutput> | void | Promise<void>;
 }
 
-/**
- * @deprecated Use .resolve().subscribe() with Publisher pattern instead.
- * Legacy subscription definition - uses ctx.emit
- */
-export interface SubscribedQueryDef<TInput = void, TOutput = unknown, TContext = unknown>
-	extends QueryDefBase<TInput, TOutput, TContext> {
-	_mode: "subscribe";
-	_resolve?(
-		ctx: import("./types.js").EmitResolverContext<TInput, TOutput, TContext>,
-	): void | Promise<void>;
-}
-
 /** Live subscription definition - uses Publisher pattern */
 export interface LiveQueryDef<TInput = void, TOutput = unknown, TContext = unknown>
 	extends QueryDefBase<TInput, TOutput, TContext> {
@@ -76,7 +60,6 @@ export interface LiveQueryDef<TInput = void, TOutput = unknown, TContext = unkno
 /** Any query definition */
 export type AnyQueryDef<TInput = void, TOutput = unknown, TContext = unknown> =
 	| QueryDef<TInput, TOutput, TContext>
-	| SubscribedQueryDef<TInput, TOutput, TContext>
 	| LiveQueryDef<TInput, TOutput, TContext>;
 
 // =============================================================================
@@ -151,54 +134,6 @@ export interface QueryBuilder<TInput = void, TOutput = unknown, TContext = unkno
 	 * ```
 	 */
 	resolve<T>(fn: QueryResolverFn<TInput, T, TContext>): QueryDefChainable<TInput, T, TContext>;
-
-	/**
-	 * @deprecated Use .resolve().subscribe() with Publisher pattern instead.
-	 * Define subscription resolver (emit-based).
-	 * Returns void, uses ctx.emit() to push updates.
-	 * ctx has emit and onCleanup.
-	 *
-	 * @example
-	 * ```typescript
-	 * // DEPRECATED - use .resolve().subscribe() instead
-	 * query()
-	 *   .returns(User)
-	 *   .subscribe(({ input, ctx }) => {
-	 *     const unsub = pubsub.on(`user:${input.id}`, (user) => ctx.emit(user));
-	 *     ctx.onCleanup(unsub);
-	 *   });
-	 * ```
-	 */
-	subscribe(
-		fn: EmitResolverFn<TInput, TOutput, TContext>,
-	): SubscribedQueryDef<TInput, TOutput, TContext>;
-
-	/**
-	 * @deprecated Use .resolve().subscribe() with Publisher pattern instead.
-	 * Define subscription resolver (generator-based).
-	 * Yields values to push updates.
-	 * ctx has onCleanup but NO emit (yield IS the emit).
-	 *
-	 * @example
-	 * ```typescript
-	 * // DEPRECATED - use .resolve().subscribe() instead
-	 * query()
-	 *   .subscribe(async function* ({ input, ctx }) {
-	 *     for await (const event of pubsub.subscribe(`user:${input.id}`)) {
-	 *       yield event;
-	 *     }
-	 *   });
-	 * ```
-	 */
-	subscribe<T>(
-		fn: GeneratorResolverFn<TInput, T, TContext>,
-	): SubscribedQueryDef<TInput, T, TContext>;
-
-	/**
-	 * @deprecated Use .resolve() for queries or .resolve().subscribe() for subscriptions.
-	 * Legacy resolver that allows all patterns but doesn't enforce type safety.
-	 */
-	resolveUnsafe(fn: ResolverFn<TInput, TOutput, TContext>): QueryDef<TInput, TOutput, TContext>;
 }
 
 // =============================================================================
@@ -263,34 +198,6 @@ export class QueryBuilderImpl<TInput = void, TOutput = unknown, TContext = unkno
 		};
 		return queryDef;
 	}
-
-	/** @deprecated Use .resolve().subscribe() with Publisher pattern instead */
-	subscribe(
-		fn: EmitResolverFn<TInput, TOutput, TContext> | GeneratorResolverFn<TInput, TOutput, TContext>,
-	): SubscribedQueryDef<TInput, TOutput, TContext> {
-		return {
-			_type: "query",
-			_mode: "subscribe",
-			_name: this._name,
-			_input: this._inputSchema,
-			_output: this._outputSpec,
-			_brand: {} as { input: TInput; output: TOutput },
-			_resolve: fn as any, // Deprecated method - type mismatch is expected
-		};
-	}
-
-	/** @deprecated Use .resolve() or .resolve().subscribe() */
-	resolveUnsafe(fn: ResolverFn<TInput, TOutput, TContext>): QueryDef<TInput, TOutput, TContext> {
-		return {
-			_type: "query",
-			_mode: "query",
-			_name: this._name,
-			_input: this._inputSchema,
-			_output: this._outputSpec,
-			_brand: {} as { input: TInput; output: TOutput },
-			_resolve: fn as any, // Deprecated method - type mismatch is expected
-		};
-	}
 }
 
 // =============================================================================
@@ -332,9 +239,4 @@ export function isQueryDef(value: unknown): value is AnyQueryDef {
 /** Check if value is a live query definition (Publisher pattern) */
 export function isLiveQueryDef(value: unknown): value is LiveQueryDef {
 	return isQueryDef(value) && (value as LiveQueryDef)._mode === "live";
-}
-
-/** Check if value is a subscribed query definition (legacy ctx.emit) */
-export function isSubscribedQueryDef(value: unknown): value is SubscribedQueryDef {
-	return isQueryDef(value) && (value as SubscribedQueryDef)._mode === "subscribe";
 }

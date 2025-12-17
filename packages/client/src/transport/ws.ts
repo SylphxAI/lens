@@ -21,11 +21,11 @@ import {
 import { SubscriptionRegistry } from "../reconnect/subscription-registry.js";
 import type {
 	ConnectionState,
+	FullTransport,
 	Metadata,
 	Observable,
 	Operation,
 	Result,
-	Transport,
 } from "./types.js";
 
 // =============================================================================
@@ -92,7 +92,7 @@ interface WsMessage {
 /**
  * Extended transport with reconnection support.
  */
-export interface WsTransportInstance extends Transport {
+export interface WsTransportInstance extends FullTransport {
 	/** Get subscription registry for testing/debugging */
 	getRegistry(): SubscriptionRegistry;
 	/** Get current connection state */
@@ -545,82 +545,92 @@ export const ws: WsTransport = function ws(options: WsTransportOptions): WsTrans
 		},
 
 		/**
-		 * Execute operation.
+		 * Execute query operation.
 		 */
-		execute(op: Operation): Promise<Result> | Observable<Result> {
-			if (op.type === "subscription") {
-				return {
-					subscribe(observer) {
-						// Extract entity info from path and input
-						// Path format: "entity.subscribe" or "entity.watch"
-						const pathParts = op.path.split(".");
-						const entity = pathParts[0] ?? "unknown";
-						const entityId = ((op.input as Record<string, unknown>)?.id as string) ?? "unknown";
-						const fields = (op.input as Record<string, unknown>)?.fields as string[] | undefined;
+		query(op: Operation): Promise<Result> {
+			return sendAndWait(op);
+		},
 
-						// Store in observer map for message handling
-						subscriptionObservers.set(op.id, {
-							observer,
-							entity,
-							entityId,
-							fields: fields ?? "*",
-							input: op.input,
+		/**
+		 * Execute mutation operation.
+		 */
+		mutation(op: Operation): Promise<Result> {
+			return sendAndWait(op);
+		},
+
+		/**
+		 * Execute subscription operation.
+		 */
+		subscription(op: Operation): Observable<Result> {
+			return {
+				subscribe(observer) {
+					// Extract entity info from path and input
+					// Path format: "entity.subscribe" or "entity.watch"
+					const pathParts = op.path.split(".");
+					const entity = pathParts[0] ?? "unknown";
+					const entityId = ((op.input as Record<string, unknown>)?.id as string) ?? "unknown";
+					const fields = (op.input as Record<string, unknown>)?.fields as string[] | undefined;
+
+					// Store in observer map for message handling
+					subscriptionObservers.set(op.id, {
+						observer,
+						entity,
+						entityId,
+						fields: fields ?? "*",
+						input: op.input,
+					});
+
+					// Register in subscription registry for reconnection
+					registry.add({
+						id: op.id,
+						entity,
+						entityId,
+						fields: fields ?? "*",
+						version: 0,
+						lastData: null,
+						observer: {
+							// Transform SubscriptionResult to Message format
+							next: (result) => observer.next?.({ $: "snapshot", data: result.data }),
+							error: (error) => observer.error?.(error),
+							complete: () => observer.complete?.(),
+						},
+						input: op.input,
+					});
+
+					// Send subscribe message
+					ensureConnection()
+						.then((ws) => {
+							ws.send(
+								JSON.stringify({
+									type: "subscription",
+									id: op.id,
+									path: op.path,
+									input: op.input,
+								}),
+							);
+						})
+						.catch((err) => {
+							observer.error?.(err instanceof Error ? err : new Error(String(err)));
 						});
 
-						// Register in subscription registry for reconnection
-						registry.add({
-							id: op.id,
-							entity,
-							entityId,
-							fields: fields ?? "*",
-							version: 0,
-							lastData: null,
-							observer: {
-								// Transform SubscriptionResult to Message format
-								next: (result) => observer.next?.({ $: "snapshot", data: result.data }),
-								error: (error) => observer.error?.(error),
-								complete: () => observer.complete?.(),
-							},
-							input: op.input,
-						});
+					return {
+						unsubscribe() {
+							// Remove from registry and observers
+							registry.remove(op.id);
+							subscriptionObservers.delete(op.id);
 
-						// Send subscribe message
-						ensureConnection()
-							.then((ws) => {
-								ws.send(
+							if (socket && socket.readyState === WebSocket.OPEN) {
+								socket.send(
 									JSON.stringify({
-										type: "subscription",
+										type: "unsubscribe",
 										id: op.id,
-										path: op.path,
-										input: op.input,
 									}),
 								);
-							})
-							.catch((err) => {
-								observer.error?.(err instanceof Error ? err : new Error(String(err)));
-							});
-
-						return {
-							unsubscribe() {
-								// Remove from registry and observers
-								registry.remove(op.id);
-								subscriptionObservers.delete(op.id);
-
-								if (socket && socket.readyState === WebSocket.OPEN) {
-									socket.send(
-										JSON.stringify({
-											type: "unsubscribe",
-											id: op.id,
-										}),
-									);
-								}
-							},
-						};
-					},
-				};
-			}
-
-			return sendAndWait(op);
+							}
+						},
+					};
+				},
+			};
 		},
 
 		/**

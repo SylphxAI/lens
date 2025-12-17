@@ -7,12 +7,12 @@
 
 import { isError, isOps, isSnapshot } from "@sylphx/lens-core";
 import type {
+	FullTransport,
 	LensServerInterface,
 	Metadata,
 	Observable,
 	Operation,
 	Result,
-	Transport,
 } from "./types.js";
 
 // =============================================================================
@@ -46,7 +46,7 @@ export interface HttpTransportOptions {
  * HTTP transport function with server method
  */
 export interface HttpTransport {
-	(options: HttpTransportOptions): Transport;
+	(options: HttpTransportOptions): FullTransport;
 	server(options: HttpServerTransportOptions): ServerTransport;
 }
 
@@ -65,7 +65,7 @@ export interface HttpTransport {
  * })
  * ```
  */
-export const http: HttpTransport = function http(options: HttpTransportOptions): Transport {
+export const http: HttpTransport = function http(options: HttpTransportOptions): FullTransport {
 	const { url, headers: defaultHeaders = {}, fetch: fetchImpl = fetch, polling = {} } = options;
 
 	const { interval: pollInterval = 1000, maxRetries = 3 } = polling;
@@ -95,19 +95,9 @@ export const http: HttpTransport = function http(options: HttpTransportOptions):
 		},
 
 		/**
-		 * Execute operation.
-		 * POST for query/mutation, polling for subscription.
+		 * Execute query operation.
 		 */
-		execute(op: Operation): Promise<Result> | Observable<Result> {
-			if (op.type === "subscription") {
-				return createPollingObservable(baseUrl, op, {
-					interval: pollInterval,
-					maxRetries,
-					headers: defaultHeaders,
-					fetch: fetchImpl,
-				});
-			}
-
+		query(op: Operation): Promise<Result> {
 			return executeRequest(baseUrl, op, {
 				headers: {
 					...defaultHeaders,
@@ -115,6 +105,32 @@ export const http: HttpTransport = function http(options: HttpTransportOptions):
 				},
 				fetch: fetchImpl,
 				timeout: op.meta?.timeout as number | undefined,
+			});
+		},
+
+		/**
+		 * Execute mutation operation.
+		 */
+		mutation(op: Operation): Promise<Result> {
+			return executeRequest(baseUrl, op, {
+				headers: {
+					...defaultHeaders,
+					...((op.meta?.headers as Record<string, string>) ?? {}),
+				},
+				fetch: fetchImpl,
+				timeout: op.meta?.timeout as number | undefined,
+			});
+		},
+
+		/**
+		 * Execute subscription operation (polling).
+		 */
+		subscription(op: Operation): Observable<Result> {
+			return createPollingObservable(baseUrl, op, {
+				interval: pollInterval,
+				maxRetries,
+				headers: defaultHeaders,
+				fetch: fetchImpl,
 			});
 		},
 	};
@@ -289,6 +305,22 @@ export interface ServerTransport {
 }
 
 /**
+ * Extract first value from Observable as Promise.
+ */
+function firstValueFromServer<T>(observable: import("./types.js").Observable<T>): Promise<T> {
+	return new Promise((resolve, reject) => {
+		let subscription: { unsubscribe?: () => void } | undefined;
+		subscription = observable.subscribe({
+			next: (value) => {
+				subscription?.unsubscribe?.();
+				resolve(value);
+			},
+			error: reject,
+		});
+	});
+}
+
+/**
  * Create HTTP server transport.
  *
  * @example
@@ -320,7 +352,8 @@ http.server = function httpServer(options: HttpServerTransportOptions): ServerTr
 					if (url.pathname === basePath && req.method === "POST") {
 						try {
 							const body = (await req.json()) as Operation;
-							const result = await server.execute(body);
+							// Server.execute() returns Observable, extract first value
+							const result = await firstValueFromServer(server.execute(body));
 							return Response.json(result);
 						} catch (error) {
 							return Response.json(

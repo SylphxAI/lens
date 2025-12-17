@@ -1,25 +1,45 @@
 /**
- * @sylphx/lens-integration-tests - In-Process Transport Tests
+ * @sylphx/lens-integration-tests - Direct Transport Tests
  *
  * Tests that require both @sylphx/lens-client and @sylphx/lens-server.
  */
 
 import { describe, expect, it, mock } from "bun:test";
 import {
+	direct,
 	type ExtractServerTypes,
-	inProcess,
 	type LensServerInterface,
 	type Observable,
 	type Result,
 	type TypedTransport,
 } from "@sylphx/lens-client";
-import { firstValueFrom, id, isObservable, lens, model, router, string } from "@sylphx/lens-core";
+import { id, lens, model, router, string } from "@sylphx/lens-core";
 import { createApp } from "@sylphx/lens-server";
 import { z } from "zod";
 
 // =============================================================================
 // Mock App
 // =============================================================================
+
+/**
+ * Create a mock Observable that emits a single value and completes.
+ */
+function createMockObservable<T>(getValue: () => T | Promise<T>): Observable<Result<T>> {
+	return {
+		subscribe: (observer) => {
+			(async () => {
+				try {
+					const value = await getValue();
+					observer.next?.({ $: "snapshot", data: value } as Result<T>);
+					observer.complete?.();
+				} catch (error) {
+					observer.error?.(error instanceof Error ? error : new Error(String(error)));
+				}
+			})();
+			return { unsubscribe: () => {} };
+		},
+	};
+}
 
 function createMockApp(overrides: Partial<LensServerInterface> = {}): LensServerInterface {
 	return {
@@ -30,7 +50,7 @@ function createMockApp(overrides: Partial<LensServerInterface> = {}): LensServer
 				post: { create: { type: "mutation" } },
 			},
 		}),
-		execute: async (op) => ({ data: { id: "1", path: op.path } }),
+		execute: (op) => createMockObservable(() => ({ id: "1", path: op.path })),
 		...overrides,
 	};
 }
@@ -39,11 +59,11 @@ function createMockApp(overrides: Partial<LensServerInterface> = {}): LensServer
 // Tests
 // =============================================================================
 
-describe("inProcess transport", () => {
+describe("direct transport", () => {
 	describe("connect()", () => {
 		it("returns metadata from server", async () => {
 			const app = createMockApp();
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			const metadata = await transport.connect();
 
@@ -57,7 +77,7 @@ describe("inProcess transport", () => {
 				operations: {},
 			}));
 			const app = createMockApp({ getMetadata });
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			await transport.connect();
 
@@ -65,12 +85,12 @@ describe("inProcess transport", () => {
 		});
 	});
 
-	describe("execute()", () => {
+	describe("query()", () => {
 		it("executes query operation", async () => {
 			const app = createMockApp();
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
-			const result = (await transport.execute({
+			const result = (await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
@@ -80,12 +100,74 @@ describe("inProcess transport", () => {
 			expect(result.data).toEqual({ id: "1", path: "user.get" });
 		});
 
-		it("executes mutation operation", async () => {
-			const execute = mock(async () => ({ data: { id: "new-1" } }));
+		it("passes operation input correctly", async () => {
+			const execute = mock((op) => createMockObservable(() => op.input));
 			const app = createMockApp({ execute });
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
-			const result = (await transport.execute({
+			const input = { userId: "123", options: { includeDeleted: true } };
+			const result = (await transport.query({
+				id: "4",
+				path: "user.get",
+				type: "query",
+				input,
+			})) as Result;
+
+			expect(result.data).toEqual(input);
+		});
+
+		it("handles server errors", async () => {
+			const app = createMockApp({
+				execute: () => ({
+					subscribe: (observer) => {
+						observer.next?.({ $: "error", error: "Database error" } as Result);
+						observer.complete?.();
+						return { unsubscribe: () => {} };
+					},
+				}),
+			});
+			const transport = direct({ app });
+
+			const result = (await transport.query({
+				id: "5",
+				path: "user.get",
+				type: "query",
+			})) as Result;
+
+			expect(result.$).toBe("error");
+			if (result.$ === "error") {
+				expect(result.error).toBe("Database error");
+			}
+		});
+
+		it("handles server throwing", async () => {
+			const app = createMockApp({
+				execute: () => ({
+					subscribe: (observer) => {
+						observer.error?.(new Error("Unexpected error"));
+						return { unsubscribe: () => {} };
+					},
+				}),
+			});
+			const transport = direct({ app });
+
+			await expect(
+				transport.query({
+					id: "6",
+					path: "user.get",
+					type: "query",
+				}),
+			).rejects.toThrow("Unexpected error");
+		});
+	});
+
+	describe("mutation()", () => {
+		it("executes mutation operation", async () => {
+			const execute = mock(() => createMockObservable(() => ({ id: "new-1" })));
+			const app = createMockApp({ execute });
+			const transport = direct({ app });
+
+			const result = (await transport.mutation({
 				id: "2",
 				path: "post.create",
 				type: "mutation",
@@ -100,12 +182,14 @@ describe("inProcess transport", () => {
 				input: { title: "Hello" },
 			});
 		});
+	});
 
-		it("handles subscription operation", async () => {
+	describe("subscription()", () => {
+		it("handles subscription operation", () => {
 			const mockObservable: Observable<Result> = {
 				subscribe: (observer) => {
-					observer.next?.({ data: { count: 1 } });
-					observer.next?.({ data: { count: 2 } });
+					observer.next?.({ $: "snapshot", data: { count: 1 } });
+					observer.next?.({ $: "snapshot", data: { count: 2 } });
 					return { unsubscribe: () => {} };
 				},
 			};
@@ -113,9 +197,9 @@ describe("inProcess transport", () => {
 			const app = createMockApp({
 				execute: () => mockObservable,
 			});
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "3",
 				path: "counter.watch",
 				type: "subscription",
@@ -132,73 +216,28 @@ describe("inProcess transport", () => {
 
 			expect(values).toEqual([{ count: 1 }, { count: 2 }]);
 		});
-
-		it("passes operation input correctly", async () => {
-			const execute = mock(async (op) => ({ data: op.input }));
-			const app = createMockApp({ execute });
-			const transport = inProcess({ app });
-
-			const input = { userId: "123", options: { includeDeleted: true } };
-			const result = (await transport.execute({
-				id: "4",
-				path: "user.get",
-				type: "query",
-				input,
-			})) as Result;
-
-			expect(result.data).toEqual(input);
-		});
-
-		it("handles server errors", async () => {
-			const app = createMockApp({
-				execute: async () => ({ $: "error", error: "Database error" }),
-			});
-			const transport = inProcess({ app });
-
-			const result = (await transport.execute({
-				id: "5",
-				path: "user.get",
-				type: "query",
-			})) as Result;
-
-			expect(result.$).toBe("error");
-			if (result.$ === "error") {
-				expect(result.error).toBe("Database error");
-			}
-		});
-
-		it("handles server throwing", async () => {
-			const app = createMockApp({
-				execute: async () => {
-					throw new Error("Unexpected error");
-				},
-			});
-			const transport = inProcess({ app });
-
-			await expect(
-				transport.execute({
-					id: "6",
-					path: "user.get",
-					type: "query",
-				}),
-			).rejects.toThrow("Unexpected error");
-		});
 	});
 
 	describe("integration", () => {
 		it("works with multiple operations", async () => {
 			const app = createMockApp({
-				execute: async (op) => {
-					if (op.path === "user.get") return { $: "snapshot", data: { name: "John" } };
-					if (op.path === "post.create") return { $: "snapshot", data: { id: "post-1" } };
-					return { $: "error", error: "Unknown path" };
+				execute: (op) => {
+					if (op.path === "user.get") return createMockObservable(() => ({ name: "John" }));
+					if (op.path === "post.create") return createMockObservable(() => ({ id: "post-1" }));
+					return {
+						subscribe: (observer) => {
+							observer.next?.({ $: "error", error: "Unknown path" } as Result);
+							observer.complete?.();
+							return { unsubscribe: () => {} };
+						},
+					};
 				},
 			});
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			const [user, post] = await Promise.all([
-				transport.execute({ id: "1", path: "user.get", type: "query" }),
-				transport.execute({ id: "2", path: "post.create", type: "mutation", input: {} }),
+				transport.query({ id: "1", path: "user.get", type: "query" }),
+				transport.mutation({ id: "2", path: "post.create", type: "mutation", input: {} }),
 			]);
 
 			expect((user as Result).$ === "snapshot" ? (user as Result).data : null).toEqual({ name: "John" });
@@ -215,7 +254,7 @@ describe("inProcess transport", () => {
 type Equals<T, U> = [T] extends [U] ? ([U] extends [T] ? true : false) : false;
 type Assert<T extends true> = T;
 
-describe("inProcess type inference", () => {
+describe("direct type inference", () => {
 	// Test entities
 	const User = model("User", {
 		id: id(),
@@ -243,7 +282,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			// TypedTransport should have _api property type
 			type TransportType = typeof transport;
@@ -253,9 +292,11 @@ describe("inProcess type inference", () => {
 			const _check: _assertTypedTransport = true;
 			expect(_check).toBe(true);
 
-			// Runtime: transport should have connect and execute
+			// Runtime: transport should have connect and capability methods
 			expect(typeof transport.connect).toBe("function");
-			expect(typeof transport.execute).toBe("function");
+			expect(typeof transport.query).toBe("function");
+			expect(typeof transport.mutation).toBe("function");
+			expect(typeof transport.subscription).toBe("function");
 		});
 
 		it("_api type matches server._types", () => {
@@ -279,7 +320,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			// Extract types
 			type ServerTypes = typeof app._types;
@@ -348,7 +389,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			// The transport's _api should have the full router structure
 			type Api = (typeof transport)["_api"];
@@ -378,7 +419,7 @@ describe("inProcess type inference", () => {
 				context: () => ({ db: new Map() }),
 			});
 
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			type Api = (typeof transport)["_api"];
 			type RouterType = Api["router"];
@@ -428,40 +469,32 @@ describe("inProcess type inference", () => {
 				context: () => ({ db }),
 			});
 
-			const transport = inProcess({ app });
+			const transport = direct({ app });
 
 			// Test connect
 			const metadata = await transport.connect();
 			expect(metadata.version).toBeDefined();
 
-			// Test execute query
-			const queryResultOrObs = transport.execute({
+			// Test query
+			const queryResult = await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
 				input: { id: "1" },
 			});
-			// Handle Observable (execute now returns Observable for streaming support)
-			const queryResult = isObservable(queryResultOrObs)
-				? await firstValueFrom(queryResultOrObs)
-				: await queryResultOrObs;
 			expect((queryResult as Result).data).toEqual({
 				id: "1",
 				name: "Alice",
 				email: "alice@test.com",
 			});
 
-			// Test execute mutation
-			const mutationResultOrObs = transport.execute({
+			// Test mutation
+			const mutationResult = await transport.mutation({
 				id: "2",
 				path: "user.create",
 				type: "mutation",
 				input: { name: "Bob", email: "bob@test.com" },
 			});
-			// Handle Observable
-			const mutationResult = isObservable(mutationResultOrObs)
-				? await firstValueFrom(mutationResultOrObs)
-				: await mutationResultOrObs;
 			expect((mutationResult as Result).data).toEqual({
 				id: "2",
 				name: "Bob",

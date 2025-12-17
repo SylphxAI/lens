@@ -89,6 +89,11 @@ export interface OperationMeta {
 	 * Used for field-level subscription detection.
 	 */
 	returnType?: string;
+	/**
+	 * Indicates this is a live query (Publisher pattern with _subscriber).
+	 * Client should use streaming transport even though type is "query".
+	 */
+	live?: boolean;
 }
 
 /**
@@ -215,12 +220,16 @@ export type FullTransport = QueryCapable & MutationCapable & SubscriptionCapable
 /**
  * Minimal Lens server interface needed by transports.
  * Used for in-process transport and type inference.
+ *
+ * Server always returns Observable<Result>:
+ * - One-shot (query/mutation): emits once, then completes
+ * - Streaming (subscription): emits multiple times until unsubscribed
  */
 export interface LensServerInterface {
 	/** Get operation metadata */
 	getMetadata(): Metadata;
-	/** Execute an operation (may return Observable for subscriptions) */
-	execute(op: Operation): Promise<Result> | Observable<Result>;
+	/** Execute an operation - always returns Observable */
+	execute(op: Operation): Observable<Result>;
 }
 
 // =============================================================================

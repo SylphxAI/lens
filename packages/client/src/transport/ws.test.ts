@@ -253,7 +253,7 @@ describe("ws transport", () => {
 		});
 	});
 
-	describe("execute() - queries/mutations", () => {
+	describe("query()/mutation() - queries/mutations", () => {
 		async function setupConnection(transport: ReturnType<typeof ws>) {
 			const connectPromise = transport.connect();
 			await new Promise((r) => setTimeout(r, 10));
@@ -275,14 +275,14 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const resultPromise = transport.execute({
+			const resultPromise = transport.query({
 				id: "op-1",
 				path: "user.get",
 				type: "query",
 				input: { id: "123" },
 			});
 
-			// Wait for execute() to set up the pending operation
+			// Wait for query() to set up the pending operation
 			await Promise.resolve();
 			await Promise.resolve();
 
@@ -311,14 +311,14 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const resultPromise = transport.execute({
+			const resultPromise = transport.mutation({
 				id: "op-2",
 				path: "user.create",
 				type: "mutation",
 				input: { name: "Jane" },
 			});
 
-			// Wait for execute() to set up the pending operation
+			// Wait for mutation() to set up the pending operation
 			await Promise.resolve();
 			await Promise.resolve();
 
@@ -346,14 +346,14 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const resultPromise = transport.execute({
+			const resultPromise = transport.query({
 				id: "op-3",
 				path: "user.get",
 				type: "query",
 				input: { id: "not-found" },
 			});
 
-			// Wait for execute() to set up the pending operation
+			// Wait for query() to set up the pending operation
 			await Promise.resolve();
 			await Promise.resolve();
 
@@ -375,13 +375,13 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const resultPromise = transport.execute({
+			const resultPromise = transport.query({
 				id: "op-4",
 				path: "user.get",
 				type: "query",
 			});
 
-			// Wait for execute() to set up the pending operation
+			// Wait for query() to set up the pending operation
 			await Promise.resolve();
 			await Promise.resolve();
 
@@ -403,7 +403,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 50 });
 			await setupConnection(transport);
 
-			const resultPromise = transport.execute({
+			const resultPromise = transport.query({
 				id: "op-5",
 				path: "user.get",
 				type: "query",
@@ -419,7 +419,7 @@ describe("ws transport", () => {
 		});
 	});
 
-	describe("execute() - subscriptions", () => {
+	describe("subscription() - subscriptions", () => {
 		async function setupConnection(transport: ReturnType<typeof ws>) {
 			const connectPromise = transport.connect();
 			await new Promise((r) => setTimeout(r, 10));
@@ -441,7 +441,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			await setupConnection(transport);
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "sub-1",
 				path: "counter.watch",
 				type: "subscription",
@@ -454,7 +454,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-2",
 				path: "counter.watch",
 				type: "subscription",
@@ -480,7 +480,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-3",
 				path: "counter.watch",
 				type: "subscription",
@@ -519,7 +519,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-4",
 				path: "counter.watch",
 				type: "subscription",
@@ -546,7 +546,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-5",
 				path: "counter.watch",
 				type: "subscription",
@@ -590,7 +590,7 @@ describe("ws transport", () => {
 			const instance = await setupConnection(transport);
 
 			// Start an operation but don't resolve it
-			const resultPromise = transport.execute({
+			const resultPromise = transport.query({
 				id: "op-disconnect",
 				path: "user.get",
 				type: "query",
@@ -609,7 +609,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-disconnect",
 				path: "counter.watch",
 				type: "subscription",
@@ -704,9 +704,9 @@ describe("ws transport", () => {
 			await connectPromise;
 
 			// Execute multiple operations
-			const op1 = transport.execute({ id: "op-a", path: "a", type: "query" });
-			const op2 = transport.execute({ id: "op-b", path: "b", type: "query" });
-			const op3 = transport.execute({ id: "op-c", path: "c", type: "query" });
+			const op1 = transport.query({ id: "op-a", path: "a", type: "query" });
+			const op2 = transport.query({ id: "op-b", path: "b", type: "query" });
+			const op3 = transport.query({ id: "op-c", path: "c", type: "query" });
 
 			// Wait for execute() to set up pending operations
 			await Promise.resolve();
@@ -745,7 +745,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-registry",
 				path: "user.watch",
 				type: "subscription",
@@ -765,7 +765,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			const instance = await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-version",
 				path: "user.watch",
 				type: "subscription",
@@ -792,7 +792,7 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500 });
 			await setupConnection(transport);
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-remove",
 				path: "user.watch",
 				type: "subscription",
@@ -820,7 +820,7 @@ describe("ws transport", () => {
 			const instance = await setupConnection(transport);
 
 			// Subscribe
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-reconnect",
 				path: "user.watch",
 				type: "subscription",
@@ -887,7 +887,7 @@ describe("ws transport", () => {
 			const instanceCountAfterSetup = mockInstances.length;
 
 			const values: unknown[] = [];
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-patch",
 				path: "user.watch",
 				type: "subscription",
@@ -979,7 +979,7 @@ describe("ws transport", () => {
 			const instance = await setupConnection(transport);
 
 			const values: unknown[] = [];
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "sub-snapshot",
 				path: "user.watch",
 				type: "subscription",
@@ -1099,8 +1099,8 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500, reconnect: { enabled: false } });
 
 			// Start multiple operations simultaneously before connection is established
-			const op1Promise = transport.execute({ id: "op-1", path: "a", type: "query" });
-			const op2Promise = transport.execute({ id: "op-2", path: "b", type: "query" });
+			const op1Promise = transport.query({ id: "op-1", path: "a", type: "query" });
+			const op2Promise = transport.query({ id: "op-2", path: "b", type: "query" });
 
 			// Give operations time to trigger ensureConnection
 			await new Promise((r) => setTimeout(r, 10));
@@ -1128,13 +1128,13 @@ describe("ws transport", () => {
 			const transport = ws({ url: "ws://localhost:3000", timeout: 500, reconnect: { enabled: false } });
 
 			// Start first operation (triggers connection)
-			const op1Promise = transport.execute({ id: "op-1", path: "a", type: "query" });
+			const op1Promise = transport.query({ id: "op-1", path: "a", type: "query" });
 
 			// Give it time to start connecting
 			await new Promise((r) => setTimeout(r, 10));
 
 			// Start second operation while first is still connecting
-			const op2Promise = transport.execute({ id: "op-2", path: "b", type: "query" });
+			const op2Promise = transport.query({ id: "op-2", path: "b", type: "query" });
 
 			// Give time for second operation to wait
 			await new Promise((r) => setTimeout(r, 50));
@@ -1162,19 +1162,15 @@ describe("ws transport", () => {
 			const errors: Error[] = [];
 
 			// Start first operation (triggers connection)
-			const op1 = transport.execute({ id: "op-1", path: "a", type: "query" });
-			if ("then" in op1) {
-				(op1 as Promise<unknown>).catch((e: Error) => errors.push(e));
-			}
+			const op1 = transport.query({ id: "op-1", path: "a", type: "query" });
+			op1.catch((e: Error) => errors.push(e));
 
 			// Give it time to start connecting
 			await new Promise((r) => setTimeout(r, 10));
 
 			// Start second operation while first is still connecting
-			const op2 = transport.execute({ id: "op-2", path: "b", type: "query" });
-			if ("then" in op2) {
-				(op2 as Promise<unknown>).catch((e: Error) => errors.push(e));
-			}
+			const op2 = transport.query({ id: "op-2", path: "b", type: "query" });
+			op2.catch((e: Error) => errors.push(e));
 
 			// Give time for second operation to start waiting and enter the polling loop
 			await new Promise((r) => setTimeout(r, 50));

@@ -5,7 +5,7 @@
  * Cycle detection in resolveEntityFields prevents infinite recursion.
  */
 import { describe, it, expect, beforeEach } from "bun:test";
-import { createClient, inProcess } from "@sylphx/lens-client";
+import { createClient, direct } from "@sylphx/lens-client";
 import { firstValueFrom, type InferRouterClient } from "@sylphx/lens-core";
 import { app, db, type AppRouter } from "./server";
 
@@ -19,7 +19,7 @@ type Client = InferRouterClient<AppRouter>;
 
 function createTestClient(): Client {
 	return createClient({
-		transport: inProcess({ app }),
+		transport: direct({ app }),
 	}) as unknown as Client;
 }
 

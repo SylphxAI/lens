@@ -94,20 +94,27 @@ export type TypedTransport<TApi = unknown> = FullTransport & {
  * expect(result).toHaveLength(5);
  * ```
  */
+/**
+ * Extract first value from Observable as Promise.
+ * Used for query/mutation operations.
+ */
+function firstValueFrom<T>(observable: Observable<T>): Promise<T> {
+	return new Promise((resolve, reject) => {
+		let subscription: { unsubscribe?: () => void } | undefined;
+		subscription = observable.subscribe({
+			next: (value) => {
+				subscription?.unsubscribe?.();
+				resolve(value);
+			},
+			error: reject,
+		});
+	});
+}
+
 export function direct<TApp extends LensServerInterface>(
 	options: DirectTransportOptions<TApp>,
 ): TypedTransport<ExtractServerTypes<TApp>> {
 	const { app } = options;
-
-	// Helper to check if result is Observable
-	const isObservable = (value: unknown): value is Observable<Result> => {
-		return (
-			value !== null &&
-			typeof value === "object" &&
-			"subscribe" in value &&
-			typeof (value as Observable<Result>).subscribe === "function"
-		);
-	};
 
 	// Cast to TypedTransport - _api is a phantom type, never accessed at runtime
 	return {
@@ -121,70 +128,26 @@ export function direct<TApp extends LensServerInterface>(
 
 		/**
 		 * Execute query operation directly on app.
+		 * Server returns Observable, extract first value as Promise.
 		 */
-		async query(op: Operation): Promise<Result> {
-			const result = app.execute(op);
-			if (isObservable(result)) {
-				// Get first value from Observable
-				return new Promise((resolve, reject) => {
-					let subscription: { unsubscribe?: () => void } | undefined;
-					subscription = result.subscribe({
-						next: (value) => {
-							subscription?.unsubscribe?.();
-							resolve(value);
-						},
-						error: reject,
-					});
-				});
-			}
-			return result;
+		query(op: Operation): Promise<Result> {
+			return firstValueFrom(app.execute(op));
 		},
 
 		/**
 		 * Execute mutation operation directly on app.
+		 * Server returns Observable, extract first value as Promise.
 		 */
-		async mutation(op: Operation): Promise<Result> {
-			const result = app.execute(op);
-			if (isObservable(result)) {
-				// Get first value from Observable
-				return new Promise((resolve, reject) => {
-					let subscription: { unsubscribe?: () => void } | undefined;
-					subscription = result.subscribe({
-						next: (value) => {
-							subscription?.unsubscribe?.();
-							resolve(value);
-						},
-						error: reject,
-					});
-				});
-			}
-			return result;
+		mutation(op: Operation): Promise<Result> {
+			return firstValueFrom(app.execute(op));
 		},
 
 		/**
 		 * Execute subscription operation directly on app.
-		 * Returns Observable for streaming support.
+		 * Returns Observable for streaming support (passthrough).
 		 */
 		subscription(op: Operation): Observable<Result> {
-			const result = app.execute(op);
-			if (isObservable(result)) {
-				return result;
-			}
-			// Wrap Promise result in Observable
-			return {
-				subscribe: (observer) => {
-					(async () => {
-						try {
-							const value = await result;
-							observer.next?.(value);
-							observer.complete?.();
-						} catch (error) {
-							observer.error?.(error instanceof Error ? error : new Error(String(error)));
-						}
-					})();
-					return { unsubscribe: () => {} };
-				},
-			};
+			return app.execute(op);
 		},
 	} as TypedTransport<ExtractServerTypes<TApp>>;
 }

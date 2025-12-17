@@ -82,6 +82,18 @@ export interface SerializedData<T> {
 	timestamp: number;
 }
 
+/**
+ * Check if value is serialized data from lens.serialize().
+ */
+export function isSerializedData<T>(value: unknown): value is SerializedData<T> {
+	return (
+		value !== null &&
+		typeof value === "object" &&
+		"__lens_data__" in value &&
+		(value as SerializedData<T>).__lens_data__ === true
+	);
+}
+
 export interface LensFreshInstance<TClient> {
 	/** Fresh handler for API routes */
 	handler: {
@@ -170,15 +182,6 @@ export function createLensFresh<TServer extends LensServer>(
 		data,
 		timestamp: Date.now(),
 	});
-
-	const isSerializedData = <T>(value: unknown): value is SerializedData<T> => {
-		return (
-			value !== null &&
-			typeof value === "object" &&
-			"__lens_data__" in value &&
-			(value as SerializedData<T>).__lens_data__ === true
-		);
-	};
 
 	// Hooks
 	const useIslandQuery = createUseIslandQuery(browserClient, isSerializedData);

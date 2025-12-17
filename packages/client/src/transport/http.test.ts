@@ -101,7 +101,7 @@ describe("http transport", () => {
 		});
 	});
 
-	describe("execute() - queries/mutations", () => {
+	describe("query() - queries", () => {
 		it("sends POST request with operation data", async () => {
 			let capturedBody: unknown;
 			const mockFetch = mock(async (_url: string, init?: RequestInit) => {
@@ -114,7 +114,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			await transport.execute({
+			await transport.query({
 				id: "op-1",
 				path: "user.get",
 				type: "query",
@@ -137,7 +137,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			const result = (await transport.execute({
+			const result = (await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
@@ -154,7 +154,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			const result = (await transport.execute({
+			const result = (await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
@@ -174,7 +174,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			const result = (await transport.execute({
+			const result = (await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
@@ -196,7 +196,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			await transport.execute({
+			await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
@@ -231,7 +231,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			const result = (await transport.execute({
+			const result = (await transport.query({
 				id: "1",
 				path: "user.get",
 				type: "query",
@@ -262,7 +262,7 @@ describe("http transport", () => {
 			}) as typeof clearTimeout;
 
 			try {
-				const result = (await transport.execute({
+				const result = (await transport.query({
 					id: "1",
 					path: "user.get",
 					type: "query",
@@ -277,7 +277,7 @@ describe("http transport", () => {
 		});
 	});
 
-	describe("execute() - subscriptions (polling)", () => {
+	describe("subscription() - subscriptions (polling)", () => {
 		it("returns observable for subscription", () => {
 			const mockFetch = createMockFetch(new Map([["*", Response.json({ data: {} })]]));
 
@@ -286,7 +286,7 @@ describe("http transport", () => {
 				fetch: mockFetch,
 			});
 
-			const result = transport.execute({
+			const result = transport.subscription({
 				id: "1",
 				path: "counter.watch",
 				type: "subscription",
@@ -309,7 +309,7 @@ describe("http transport", () => {
 				polling: { interval: 50 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "counter.watch",
 				type: "subscription",
@@ -346,7 +346,7 @@ describe("http transport", () => {
 				polling: { interval: 30 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "data.watch",
 				type: "subscription",
@@ -382,7 +382,7 @@ describe("http transport", () => {
 				polling: { interval: 20 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "counter.watch",
 				type: "subscription",
@@ -417,7 +417,7 @@ describe("http transport", () => {
 				polling: { interval: 20, maxRetries: 3 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "data.watch",
 				type: "subscription",
@@ -452,7 +452,7 @@ describe("http transport", () => {
 				polling: { interval: 20, maxRetries: 2 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "data.watch",
 				type: "subscription",
@@ -481,7 +481,7 @@ describe("http transport", () => {
 				polling: { interval: 20, maxRetries: 3 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "data.watch",
 				type: "subscription",
@@ -510,7 +510,7 @@ describe("http transport", () => {
 				polling: { interval: 20 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "data.watch",
 				type: "subscription",
@@ -550,7 +550,7 @@ describe("http transport", () => {
 				polling: { interval: 20 },
 			});
 
-			const observable = transport.execute({
+			const observable = transport.subscription({
 				id: "1",
 				path: "data.watch",
 				type: "subscription",
@@ -576,6 +576,37 @@ describe("http transport", () => {
 // =============================================================================
 
 describe("http.server transport", () => {
+	/**
+	 * Create a mock Observable that emits a single value and completes.
+	 */
+	const createMockObservable = <T>(getValue: () => T): Observable<Result> => ({
+		subscribe: (observer) => {
+			try {
+				const value = getValue();
+				observer.next?.({ $: "snapshot", data: value } as Result);
+				observer.complete?.();
+			} catch (error) {
+				observer.error?.(error instanceof Error ? error : new Error(String(error)));
+			}
+			return { unsubscribe: () => {} };
+		},
+	});
+
+	const createErrorObservable = (error: string): Observable<Result> => ({
+		subscribe: (observer) => {
+			observer.next?.({ $: "error", error } as Result);
+			observer.complete?.();
+			return { unsubscribe: () => {} };
+		},
+	});
+
+	const createThrowingObservable = (error: Error): Observable<Result> => ({
+		subscribe: (observer) => {
+			observer.error?.(error);
+			return { unsubscribe: () => {} };
+		},
+	});
+
 	const createMockServer = (): LensServerInterface => ({
 		getMetadata: () => ({
 			version: "1.0.0",
@@ -584,17 +615,17 @@ describe("http.server transport", () => {
 				"user.update": { type: "mutation" },
 			},
 		}),
-		execute: async (op: Operation) => {
+		execute: (op: Operation) => {
 			if (op.path === "user.get") {
-				return { $: "snapshot", data: { id: "123", name: "John" } };
+				return createMockObservable(() => ({ id: "123", name: "John" }));
 			}
 			if (op.path === "user.update") {
-				return { $: "snapshot", data: { id: "123", name: "Updated" } };
+				return createMockObservable(() => ({ id: "123", name: "Updated" }));
 			}
 			if (op.path === "error.test") {
-				throw new Error("Test server error");
+				return createThrowingObservable(new Error("Test server error"));
 			}
-			return { $: "error", error: "Unknown operation" };
+			return createErrorObservable("Unknown operation");
 		},
 	});
 

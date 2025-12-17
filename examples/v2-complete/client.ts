@@ -3,13 +3,13 @@
  *
  * Demonstrates: Type-safe client usage with router
  *
- * Type inference works automatically from inProcess transport:
+ * Type inference works automatically from direct transport:
  * - Server carries router type via _types phantom type
- * - inProcess() extracts and forwards this type
+ * - direct() extracts and forwards this type
  * - createClient() infers the client type automatically
  */
 
-import { createClient, inProcess } from "@sylphx/lens-client";
+import { createClient, direct } from "@sylphx/lens-client";
 import { app } from "./server.js";
 
 // =============================================================================
@@ -18,7 +18,7 @@ import { app } from "./server.js";
 
 // Full type inference from server - no manual type annotation needed!
 const client = createClient({
-	transport: inProcess({ app }),
+	transport: direct({ app }),
 });
 
 // =============================================================================

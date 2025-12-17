@@ -1076,15 +1076,25 @@ class LensServerImpl<
 		};
 
 		for (const [name, def] of Object.entries(this.queries)) {
-			// Auto-detect subscription: if resolver is AsyncGeneratorFunction → subscription
-			const isSubscription =
+			// Auto-detect live query types:
+			// 1. AsyncGenerator-based: resolver returns async generator
+			// 2. Publisher-based: LiveQueryDef with _subscriber (ADR-002 pattern)
+			const isAsyncGenerator =
 				def._resolve?.constructor?.name === "AsyncGeneratorFunction" ||
 				def._resolve?.constructor?.name === "GeneratorFunction";
-			const opType = isSubscription ? "subscription" : "query";
+			const isLive = isLiveQueryDef(def);
+
+			// Live queries need streaming transport (treated as subscription for transport routing)
+			// But operation type stays "query" for semantic correctness
+			const opType = isAsyncGenerator ? "subscription" : "query";
 			const returnType = getReturnTypeName(def._output);
 			const meta: OperationMeta = { type: opType };
 			if (returnType) {
 				meta.returnType = returnType;
+			}
+			// Mark as live for client to use streaming transport
+			if (isLive) {
+				(meta as OperationMeta & { live?: boolean }).live = true;
 			}
 			this.pluginManager.runEnhanceOperationMeta({
 				path: name,

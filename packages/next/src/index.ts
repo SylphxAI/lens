@@ -87,6 +87,24 @@ export interface LensNextConfig {
 	clientConfig?: Partial<LensClientConfig>;
 }
 
+/**
+ * Dehydrated state for hydration between server and client.
+ */
+export interface DehydratedState {
+	queries: Record<string, unknown>;
+	timestamp: number;
+}
+
+/**
+ * Create dehydrated state from server-fetched data.
+ */
+export function dehydrate(data: Record<string, unknown>): DehydratedState {
+	return {
+		queries: data,
+		timestamp: Date.now(),
+	};
+}
+
 export interface LensNextInstance<TClient> {
 	/** API route handler for Next.js App Router */
 	handler: (request: Request) => Promise<Response>;

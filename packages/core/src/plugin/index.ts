@@ -34,7 +34,7 @@ export {
 
 export {
 	type EmptyExtension,
-	// Legacy extraction types (backward compatibility)
+	// Plugin type extraction utilities
 	type ExtractExtension,
 	type ExtractPluginExtensions,
 	type ExtractPluginMethods,
