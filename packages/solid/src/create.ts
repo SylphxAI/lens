@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // SolidJS primitives (in components)
- * const { data, loading } = client.user.get.createQuery({ input: { id } });
+ * const { data, loading } = client.user.get.createQuery({ args: { id } });
  * const { mutate, loading } = client.user.create.createMutation();
  * ```
  */
@@ -56,8 +56,8 @@ export interface QueryDebugOptions<T> {
 
 /** Query primitive options */
 export interface QueryPrimitiveOptions<TInput, TOutput = unknown> {
-	/** Query input parameters */
-	input?: TInput;
+	/** Query args parameters */
+	args?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
@@ -94,7 +94,7 @@ export interface MutationPrimitiveOptions<TOutput> {
 /** Mutation primitive result */
 export interface MutationPrimitiveResult<TInput, TOutput> {
 	/** Execute the mutation */
-	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
+	mutate: (options: { args: TInput; select?: SelectionObject }) => Promise<TOutput>;
 	/** Reactive loading state */
 	loading: Accessor<boolean>;
 	/** Reactive error state */
@@ -108,7 +108,7 @@ export interface MutationPrimitiveResult<TInput, TOutput> {
 /** Query endpoint with SolidJS primitives */
 export interface QueryEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
-	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
+	(options?: { args?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
 	/** SolidJS primitive for reactive queries */
 	createQuery: (
@@ -121,7 +121,7 @@ export interface QueryEndpoint<TInput, TOutput> {
 /** Mutation endpoint with SolidJS primitives */
 export interface MutationEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns Promise */
-	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
+	(options: { args: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
 	/** SolidJS primitive for mutations */
 	createMutation: (
@@ -178,7 +178,7 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 			}
 
 			const endpoint = getEndpoint();
-			const query = endpoint({ input: options?.input, select: options?.select });
+			const query = endpoint({ args: options?.args, select: options?.select });
 
 			setLoading(true);
 			setError(null);
@@ -210,13 +210,13 @@ function createQueryPrimitiveFactory<TInput, TOutput>(
 		// Execute initial query
 		executeQuery();
 
-		// Watch for input/select changes using JSON.stringify for stable comparison
+		// Watch for args/select changes using JSON.stringify for stable comparison
 		// This prevents re-fetching when object reference changes but content is the same
 		// Using on() with defer: true to skip initial run (already executed above)
 		createEffect(
 			on(
 				() => ({
-					inputKey: JSON.stringify(options?.input),
+					argsKey: JSON.stringify(options?.args),
 					selectKey: JSON.stringify(options?.select),
 					skip: options?.skip,
 				}),
@@ -257,7 +257,7 @@ function createMutationPrimitiveFactory<TInput, TOutput>(
 		const [error, setError] = createSignal<Error | null>(null);
 
 		const mutate = async (options: {
-			input: TInput;
+			args: TInput;
 			select?: SelectionObject;
 		}): Promise<TOutput> => {
 			setLoading(true);
@@ -265,7 +265,7 @@ function createMutationPrimitiveFactory<TInput, TOutput>(
 
 			try {
 				const endpoint = getEndpoint();
-				const result = await endpoint({ input: options.input, select: options.select });
+				const result = await endpoint({ args: options.args, select: options.select });
 
 				setData(() => result.data);
 				setLoading(false);
@@ -321,12 +321,12 @@ const primitiveCache = new Map<string, unknown>();
  * });
  *
  * // Vanilla JS (anywhere)
- * const user = await client.user.get({ input: { id } });
+ * const user = await client.user.get({ args: { id } });
  *
  * // Component usage
  * function UserProfile(props: { id: string }) {
  *   const { data, loading, error } = client.user.get.createQuery({
- *     input: { id: props.id },
+ *     args: { id: props.id },
  *   });
  *
  *   const { mutate, loading: saving } = client.user.update.createMutation({
@@ -337,7 +337,7 @@ const primitiveCache = new Map<string, unknown>();
  *     <Show when={!loading()} fallback={<Spinner />}>
  *       <h1>{data()?.name}</h1>
  *       <button
- *         onClick={() => mutate({ input: { id: props.id, name: 'New' } })}
+ *         onClick={() => mutate({ args: { id: props.id, name: 'New' } })}
  *         disabled={saving()}
  *       >
  *         Update

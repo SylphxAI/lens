@@ -934,14 +934,14 @@ describe("Field merging and selection merging", () => {
 		const inputObj = { id: "1" };
 
 		// First subscriber wants name only
-		const accessor1 = client.user({ input: inputObj, select: { name: true } });
+		const accessor1 = client.user({ args: inputObj, select: { name: true } });
 		const data1: unknown[] = [];
 		const unsub1 = accessor1.subscribe((d) => data1.push(d));
 
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
 		// Second subscriber wants email and phone
-		const accessor2 = client.user({ input: inputObj, select: { email: true, phone: true } });
+		const accessor2 = client.user({ args: inputObj, select: { email: true, phone: true } });
 		const data2: unknown[] = [];
 		const unsub2 = accessor2.subscribe((d) => data2.push(d));
 
@@ -1039,7 +1039,7 @@ describe("Field merging and selection merging", () => {
 		});
 
 		// First subscriber
-		const accessor1 = client.data({ input: { id: "test" }, select: { fieldA: true } });
+		const accessor1 = client.data({ args: { id: "test" }, select: { fieldA: true } });
 		const data1: unknown[] = [];
 		const unsub1 = accessor1.subscribe((d) => data1.push(d));
 
@@ -1047,7 +1047,7 @@ describe("Field merging and selection merging", () => {
 		const callsAfterFirst = queryCallCount;
 
 		// Second subscriber with NEW fields (should trigger re-subscription)
-		const accessor2 = client.data({ input: { id: "test" }, select: { fieldB: true, fieldC: true } });
+		const accessor2 = client.data({ args: { id: "test" }, select: { fieldB: true, fieldC: true } });
 		const data2: unknown[] = [];
 		const unsub2 = accessor2.subscribe((d) => data2.push(d));
 
@@ -1211,8 +1211,8 @@ describe("Query batching", () => {
 
 		// Execute multiple queries for SAME endpoint in same microtask
 		// All reference the SAME input object, so they share the same endpoint
-		const promise1 = client.item({ input: inputObj, select: { name: true } });
-		const promise2 = client.item({ input: inputObj, select: { id: true } });
+		const promise1 = client.item({ args: inputObj, select: { name: true } });
+		const promise2 = client.item({ args: inputObj, select: { id: true } });
 
 		// Wait for all
 		const [result1, result2] = await Promise.all([promise1, promise2]);
@@ -1253,9 +1253,9 @@ describe("Query batching", () => {
 		const input2 = { id: "2" };
 		const input3 = { id: "3" };
 
-		const promise1 = client.item({ input: input1 });
-		const promise2 = client.item({ input: input2 });
-		const promise3 = client.item({ input: input3 });
+		const promise1 = client.item({ args: input1 });
+		const promise2 = client.item({ args: input2 });
+		const promise3 = client.item({ args: input3 });
 
 		const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3]);
 
@@ -1317,10 +1317,10 @@ describe("Query batching", () => {
 			transport: direct({ app }),
 		});
 
-		// Multiple queries to failing endpoint - use same input to ensure batching
+		// Multiple queries to failing endpoint - use same args to ensure batching
 		const inputObj = {};
-		const accessor1 = client.failing({ input: inputObj, select: { a: true } });
-		const accessor2 = client.failing({ input: inputObj, select: { b: true } });
+		const accessor1 = client.failing({ args: inputObj, select: { a: true } });
+		const accessor2 = client.failing({ args: inputObj, select: { b: true } });
 
 		// Both should reject - need to actually await them
 		let error1: Error | null = null;

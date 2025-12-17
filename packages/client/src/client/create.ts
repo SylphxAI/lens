@@ -897,28 +897,28 @@ class ClientImpl {
 	// =========================================================================
 
 	/**
-	 * Create accessor with unified { input, select } pattern.
+	 * Create accessor with unified { args, select } pattern.
 	 */
 	createAccessor(
 		path: string,
-	): (descriptor?: { input?: unknown; select?: SelectionObject }) => unknown {
-		return (descriptor?: { input?: unknown; select?: SelectionObject }) => {
+	): (descriptor?: { args?: unknown; select?: SelectionObject }) => unknown {
+		return (descriptor?: { args?: unknown; select?: SelectionObject }) => {
 			// Handle both forms:
-			// - Standard: client.user.get({ id }) - input object directly
-			// - With selection: client.user.get({ input: { id }, select: { name: true } })
+			// - Standard: client.user.get({ id }) - args object directly
+			// - With selection: client.user.get({ args: { id }, select: { name: true } })
 			let input: unknown;
 			let select: SelectionObject | undefined;
 
 			if (
 				descriptor &&
 				typeof descriptor === "object" &&
-				("input" in descriptor || "select" in descriptor)
+				("args" in descriptor || "select" in descriptor)
 			) {
-				// Extended form with explicit input/select
-				input = descriptor.input;
+				// Extended form with explicit args/select
+				input = descriptor.args;
 				select = descriptor.select;
 			} else {
-				// Standard form: direct input
+				// Standard form: direct args
 				input = descriptor;
 				select = undefined;
 			}
@@ -1030,7 +1030,7 @@ export function createClient(config: LensClientConfig | TypedClientConfig<unknow
 			},
 			apply(_target, _thisArg, args: unknown[]) {
 				const accessor = impl.createAccessor(prefix);
-				return accessor(args[0] as { input?: unknown; select?: SelectionObject } | undefined);
+				return accessor(args[0] as { args?: unknown; select?: SelectionObject } | undefined);
 			},
 		};
 		return new Proxy(() => {}, handler);

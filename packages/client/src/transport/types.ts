@@ -267,7 +267,7 @@ interface SelectionObject {
 		| boolean
 		| SelectionObject
 		| { select: SelectionObject }
-		| { input?: unknown; select?: SelectionObject };
+		| { args?: unknown; select?: SelectionObject };
 }
 
 /**

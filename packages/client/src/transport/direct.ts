@@ -75,10 +75,10 @@ export type TypedTransport<TApi = unknown> = FullTransport & {
  * });
  *
  * // Live queries work!
- * const { data } = client.user.get({ input: { id: '123' } });
+ * const { data } = client.user.get({ args: { id: '123' } });
  *
  * // One-shot for SSR
- * const user = await client.user.get.fetch({ input: { id: '123' } });
+ * const user = await client.user.get.fetch({ args: { id: '123' } });
  * ```
  *
  * @example

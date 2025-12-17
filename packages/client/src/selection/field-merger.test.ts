@@ -77,26 +77,26 @@ describe("mergeSelections", () => {
 		});
 	});
 
-	it("handles selections with input parameters", () => {
+	it("handles selections with args parameters", () => {
 		const selectionA: SelectionObject = {
 			posts: {
-				input: { limit: 10 },
+				args: { limit: 10 },
 				select: { title: true },
 			},
 		};
 		const selectionB: SelectionObject = {
 			posts: {
-				input: { limit: 20 },
+				args: { limit: 20 },
 				select: { body: true },
 			},
 		};
 
 		const merged = mergeSelections([selectionA, selectionB]);
 
-		// Last input wins (implementation choice)
+		// Last args wins (implementation choice)
 		expect(merged).toEqual({
 			posts: {
-				input: { limit: 20 },
+				args: { limit: 20 },
 				select: {
 					title: true,
 					body: true,
@@ -287,7 +287,7 @@ describe("filterToSelection", () => {
 		expect(filterToSelection(true, selection)).toBe(true);
 	});
 
-	it("handles selections with input parameters", () => {
+	it("handles selections with args parameters", () => {
 		const data = {
 			posts: [
 				{ id: "1", title: "Hello", body: "World" },
@@ -296,7 +296,7 @@ describe("filterToSelection", () => {
 		};
 		const selection: SelectionObject = {
 			posts: {
-				input: { limit: 10 },
+				args: { limit: 10 },
 				select: { title: true },
 			},
 		};

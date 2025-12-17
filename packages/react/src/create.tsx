@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // React hooks (in components)
- * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { data, loading } = client.user.get.useQuery({ args: { id } });
  * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
@@ -56,8 +56,8 @@ export interface QueryDebugOptions<T> {
 
 /** Query hook options */
 export interface QueryHookOptions<TInput, TOutput = unknown> {
-	/** Query input parameters */
-	input?: TInput;
+	/** Query args parameters */
+	args?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
@@ -94,7 +94,7 @@ export interface MutationHookOptions<TOutput> {
 /** Mutation hook result */
 export interface MutationHookResult<TInput, TOutput> {
 	/** Execute the mutation */
-	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
+	mutate: (options: { args: TInput; select?: SelectionObject }) => Promise<TOutput>;
 	/** Mutation is in progress */
 	loading: boolean;
 	/** Mutation error */
@@ -108,7 +108,7 @@ export interface MutationHookResult<TInput, TOutput> {
 /** Query endpoint with React hooks */
 export interface QueryEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
-	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
+	(options?: { args?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
 	/** React hook for reactive queries */
 	useQuery: (
@@ -121,7 +121,7 @@ export interface QueryEndpoint<TInput, TOutput> {
 /** Mutation endpoint with React hooks */
 export interface MutationEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns Promise */
-	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
+	(options: { args: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
 	/** React hook for mutations */
 	useMutation: (options?: MutationHookOptions<TOutput>) => MutationHookResult<TInput, TOutput>;
@@ -188,8 +188,8 @@ function createUseQueryHook<TInput, TOutput>(
 ) {
 	return function useQuery(options?: QueryHookOptions<TInput, TOutput>): QueryHookResult<TOutput> {
 		// Use JSON.stringify for stable dependency comparison
-		// This prevents re-fetching when input object reference changes but content is the same
-		const inputKey = JSON.stringify(options?.input);
+		// This prevents re-fetching when args object reference changes but content is the same
+		const argsKey = JSON.stringify(options?.args);
 		const selectKey = JSON.stringify(options?.select);
 
 		// Store debug callbacks in ref to avoid dependency issues
@@ -197,12 +197,12 @@ function createUseQueryHook<TInput, TOutput>(
 		debugRef.current = options?.debug;
 
 		// Get query result from base client
-		// biome-ignore lint/correctness/useExhaustiveDependencies: Using JSON.stringify keys (inputKey, selectKey) for stable comparison instead of object references
+		// biome-ignore lint/correctness/useExhaustiveDependencies: Using JSON.stringify keys (argsKey, selectKey) for stable comparison instead of object references
 		const query = useMemo(() => {
 			if (options?.skip) return null;
 			const endpoint = getEndpoint();
-			return endpoint({ input: options?.input, select: options?.select });
-		}, [inputKey, selectKey, options?.skip]);
+			return endpoint({ args: options?.args, select: options?.select });
+		}, [argsKey, selectKey, options?.skip]);
 
 		// State management
 		const initialState: QueryState<TOutput> = {
@@ -319,13 +319,13 @@ function createUseMutationHook<TInput, TOutput>(
 		}, []);
 
 		const mutate = useCallback(
-			async (options: { input: TInput; select?: SelectionObject }): Promise<TOutput> => {
+			async (options: { args: TInput; select?: SelectionObject }): Promise<TOutput> => {
 				setLoading(true);
 				setError(null);
 
 				try {
 					const endpoint = getEndpoint();
-					const result = await endpoint({ input: options.input, select: options.select });
+					const result = await endpoint({ args: options.args, select: options.select });
 
 					if (mountedRef.current) {
 						setData(result.data);
@@ -388,17 +388,17 @@ const hookCache = new Map<string, unknown>();
  * });
  *
  * // Vanilla JS (anywhere)
- * const user = await client.user.get({ input: { id } });
+ * const user = await client.user.get({ args: { id } });
  *
  * // React component
  * function UserProfile({ id }: { id: string }) {
- *   const { data, loading } = client.user.get.useQuery({ input: { id } });
+ *   const { data, loading } = client.user.get.useQuery({ args: { id } });
  *   const { mutate } = client.user.update.useMutation();
  *
  *   return (
  *     <div>
  *       <h1>{data?.name}</h1>
- *       <button onClick={() => mutate({ input: { id, name: 'New' } })}>
+ *       <button onClick={() => mutate({ args: { id, name: 'New' } })}>
  *         Update
  *       </button>
  *     </div>

@@ -465,7 +465,7 @@ export class SelectionRegistry {
 
 				if ("select" in value && typeof value.select === "object") {
 					nestedSelection = value.select as SelectionObject;
-				} else if (!("input" in value)) {
+				} else if (!("args" in value)) {
 					// Direct SelectionObject
 					nestedSelection = value as SelectionObject;
 				}
@@ -528,13 +528,13 @@ export class SelectionRegistry {
  * // Result: { user: { name: true, email: true, posts: { title: true } } }
  * ```
  *
- * @example With input parameters
+ * @example With args parameters
  * ```typescript
- * const selectionA = { posts: { input: { limit: 10 }, select: { title: true } } };
- * const selectionB = { posts: { input: { limit: 20 }, select: { body: true } } };
+ * const selectionA = { posts: { args: { limit: 10 }, select: { title: true } } };
+ * const selectionB = { posts: { args: { limit: 20 }, select: { body: true } } };
  * const merged = mergeSelections([selectionA, selectionB]);
- * // Result: { posts: { input: { limit: 20 }, select: { title: true, body: true } } }
- * // Note: Input params from last selection win (implementation choice)
+ * // Result: { posts: { args: { limit: 20 }, select: { title: true, body: true } } }
+ * // Note: Args params from last selection win (implementation choice)
  * ```
  */
 export function mergeSelections(selections: SelectionObject[]): SelectionObject {
@@ -572,15 +572,15 @@ export function mergeSelections(selections: SelectionObject[]): SelectionObject 
 				// Extract nested selection
 				if ("select" in value && typeof value.select === "object") {
 					nestedSelections.push(value.select as SelectionObject);
-					// Track input if present
-					if ("input" in value) {
-						lastInput = value.input as Record<string, unknown>;
+					// Track args if present
+					if ("args" in value) {
+						lastInput = value.args as Record<string, unknown>;
 					}
-				} else if ("input" in value) {
-					// { input } without explicit select means select everything
-					lastInput = value.input as Record<string, unknown>;
+				} else if ("args" in value) {
+					// { args } without explicit select means select everything
+					lastInput = value.args as Record<string, unknown>;
 					// Treat as selecting the whole field
-					merged[key] = { input: lastInput };
+					merged[key] = { args: lastInput };
 				} else {
 					// Direct SelectionObject
 					nestedSelections.push(value as SelectionObject);
@@ -591,7 +591,7 @@ export function mergeSelections(selections: SelectionObject[]): SelectionObject 
 		if (nestedSelections.length > 0) {
 			const mergedNested = mergeSelections(nestedSelections);
 			if (lastInput !== undefined) {
-				merged[key] = { input: lastInput, select: mergedNested };
+				merged[key] = { args: lastInput, select: mergedNested };
 			} else {
 				merged[key] = mergedNested;
 			}
@@ -693,7 +693,7 @@ export function filterToSelection(data: unknown, selection: SelectionObject): un
 
 			if ("select" in value && typeof value.select === "object") {
 				nestedSelection = value.select as SelectionObject;
-			} else if (!("input" in value)) {
+			} else if (!("args" in value)) {
 				// Direct SelectionObject
 				nestedSelection = value as SelectionObject;
 			}

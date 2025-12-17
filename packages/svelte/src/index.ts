@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // Svelte stores (in components)
- * const userStore = client.user.get.createQuery({ input: { id } });
+ * const userStore = client.user.get.createQuery({ args: { id } });
  * $: ({ data, loading } = $userStore);
  *
  * const { mutate } = client.user.create.createMutation();

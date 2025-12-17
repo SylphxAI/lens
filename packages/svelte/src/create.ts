@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // Svelte stores (in components)
- * const { data, loading } = client.user.get.createQuery({ input: { id } });
+ * const { data, loading } = client.user.get.createQuery({ args: { id } });
  * const { mutate, loading } = client.user.create.createMutation();
  * ```
  */
@@ -66,8 +66,8 @@ export interface QueryDebugOptions<T> {
 
 /** Query store options */
 export interface QueryStoreOptions<TInput, TOutput = unknown> {
-	/** Query input parameters */
-	input?: TInput;
+	/** Query args parameters */
+	args?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
@@ -109,7 +109,7 @@ export interface MutationStoreValue<TOutput> {
 export interface MutationStoreResult<TInput, TOutput>
 	extends Readable<MutationStoreValue<TOutput>> {
 	/** Execute the mutation */
-	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
+	mutate: (options: { args: TInput; select?: SelectionObject }) => Promise<TOutput>;
 	/** Reset mutation state */
 	reset: () => void;
 }
@@ -117,7 +117,7 @@ export interface MutationStoreResult<TInput, TOutput>
 /** Query endpoint with Svelte stores */
 export interface QueryEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
-	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
+	(options?: { args?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
 	/** Svelte store for reactive queries */
 	createQuery: (
@@ -130,7 +130,7 @@ export interface QueryEndpoint<TInput, TOutput> {
 /** Mutation endpoint with Svelte stores */
 export interface MutationEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns Promise */
-	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
+	(options: { args: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
 	/** Svelte store for mutations */
 	createMutation: (options?: MutationStoreOptions<TOutput>) => MutationStoreResult<TInput, TOutput>;
@@ -161,8 +161,8 @@ export type TypedClient<TRouter extends RouterDef> =
 function createQueryStoreFactory<TInput, TOutput>(
 	getEndpoint: () => (options: unknown) => QueryResult<TOutput>,
 ) {
-	// Cache stores by input key to prevent unnecessary re-creation
-	// when input object reference changes but content is the same
+	// Cache stores by args key to prevent unnecessary re-creation
+	// when args object reference changes but content is the same
 	const storeCache = new Map<string, QueryStoreResult<TOutput>>();
 
 	return function createQuery(
@@ -170,7 +170,7 @@ function createQueryStoreFactory<TInput, TOutput>(
 	): QueryStoreResult<TOutput> {
 		// Use JSON.stringify for stable key comparison
 		const cacheKey = JSON.stringify({
-			input: options?.input,
+			args: options?.args,
 			select: options?.select,
 			skip: options?.skip,
 		});
@@ -204,7 +204,7 @@ function createQueryStoreFactory<TInput, TOutput>(
 			}
 
 			const endpoint = getEndpoint();
-			const query = endpoint({ input: options?.input, select: options?.select });
+			const query = endpoint({ args: options?.args, select: options?.select });
 
 			store.set({ data: null, loading: true, error: null });
 			options?.debug?.onSubscribe?.();
@@ -293,14 +293,14 @@ function createMutationStoreFactory<TInput, TOutput>(
 		});
 
 		const mutate = async (options: {
-			input: TInput;
+			args: TInput;
 			select?: SelectionObject;
 		}): Promise<TOutput> => {
 			store.set({ data: null, loading: true, error: null });
 
 			try {
 				const endpoint = getEndpoint();
-				const result = await endpoint({ input: options.input, select: options.select });
+				const result = await endpoint({ args: options.args, select: options.select });
 
 				store.set({ data: result.data, loading: false, error: null });
 
@@ -356,7 +356,7 @@ const storeCache = new Map<string, unknown>();
  * });
  *
  * // Vanilla JS (anywhere)
- * const user = await client.user.get({ input: { id } });
+ * const user = await client.user.get({ args: { id } });
  * ```
  *
  * ```svelte
@@ -366,7 +366,7 @@ const storeCache = new Map<string, unknown>();
  *   export let id: string;
  *
  *   // Query store - auto-subscribes with $
- *   $: userStore = client.user.get.createQuery({ input: { id } });
+ *   $: userStore = client.user.get.createQuery({ args: { id } });
  *
  *   // Mutation store
  *   const updateUser = client.user.update.createMutation({
@@ -374,7 +374,7 @@ const storeCache = new Map<string, unknown>();
  *   });
  *
  *   async function handleUpdate() {
- *     await updateUser.mutate({ input: { id, name: 'New' } });
+ *     await updateUser.mutate({ args: { id, name: 'New' } });
  *   }
  * </script>
  *

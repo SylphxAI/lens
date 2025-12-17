@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // Vue composables (in components)
- * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { data, loading } = client.user.get.useQuery({ args: { id } });
  * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
@@ -56,8 +56,8 @@ export interface QueryDebugOptions<T> {
 
 /** Query composable options */
 export interface QueryHookOptions<TInput, TOutput = unknown> {
-	/** Query input parameters */
-	input?: TInput;
+	/** Query args parameters */
+	args?: TInput;
 	/** Field selection */
 	select?: SelectionObject;
 	/** Skip query execution */
@@ -94,7 +94,7 @@ export interface MutationHookOptions<TOutput> {
 /** Mutation composable result */
 export interface MutationHookResult<TInput, TOutput> {
 	/** Execute the mutation */
-	mutate: (options: { input: TInput; select?: SelectionObject }) => Promise<TOutput>;
+	mutate: (options: { args: TInput; select?: SelectionObject }) => Promise<TOutput>;
 	/** Reactive loading state */
 	loading: Ref<boolean>;
 	/** Reactive error state */
@@ -108,7 +108,7 @@ export interface MutationHookResult<TInput, TOutput> {
 /** Query endpoint with Vue composables */
 export interface QueryEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns QueryResult (Promise + Observable) */
-	(options?: { input?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
+	(options?: { args?: TInput; select?: SelectionObject }): QueryResult<TOutput>;
 
 	/** Vue composable for reactive queries */
 	useQuery: (
@@ -121,7 +121,7 @@ export interface QueryEndpoint<TInput, TOutput> {
 /** Mutation endpoint with Vue composables */
 export interface MutationEndpoint<TInput, TOutput> {
 	/** Vanilla JS call - returns Promise */
-	(options: { input: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
+	(options: { args: TInput; select?: SelectionObject }): Promise<{ data: TOutput }>;
 
 	/** Vue composable for mutations */
 	useMutation: (options?: MutationHookOptions<TOutput>) => MutationHookResult<TInput, TOutput>;
@@ -176,7 +176,7 @@ function createUseQueryComposable<TInput, TOutput>(
 			}
 
 			const endpoint = getEndpoint();
-			const query = endpoint({ input: options?.input, select: options?.select });
+			const query = endpoint({ args: options?.args, select: options?.select });
 
 			loading.value = true;
 			error.value = null;
@@ -208,11 +208,11 @@ function createUseQueryComposable<TInput, TOutput>(
 		// Initial execution
 		executeQuery();
 
-		// Watch for input/select changes using JSON.stringify for stable comparison
+		// Watch for args/select changes using JSON.stringify for stable comparison
 		// This prevents re-fetching when object reference changes but content is the same
 		const stopWatch = watch(
 			() => ({
-				inputKey: JSON.stringify(options?.input),
+				argsKey: JSON.stringify(options?.args),
 				selectKey: JSON.stringify(options?.select),
 				skip: typeof options?.skip === "object" ? options.skip.value : options?.skip,
 			}),
@@ -252,7 +252,7 @@ function createUseMutationComposable<TInput, TOutput>(
 		const error = shallowRef<Error | null>(null);
 
 		const mutate = async (options: {
-			input: TInput;
+			args: TInput;
 			select?: SelectionObject;
 		}): Promise<TOutput> => {
 			loading.value = true;
@@ -260,7 +260,7 @@ function createUseMutationComposable<TInput, TOutput>(
 
 			try {
 				const endpoint = getEndpoint();
-				const result = await endpoint({ input: options.input, select: options.select });
+				const result = await endpoint({ args: options.args, select: options.select });
 
 				data.value = result.data;
 				loading.value = false;
@@ -316,7 +316,7 @@ const composableCache = new Map<string, unknown>();
  * });
  *
  * // Vanilla JS (anywhere)
- * const user = await client.user.get({ input: { id } });
+ * const user = await client.user.get({ args: { id } });
  * ```
  *
  * ```vue
@@ -327,7 +327,7 @@ const composableCache = new Map<string, unknown>();
  *
  * // Query composable - auto-subscribes
  * const { data, loading, error } = client.user.get.useQuery({
- *   input: { id: props.id },
+ *   args: { id: props.id },
  * });
  *
  * // Mutation composable - returns mutate function
@@ -336,7 +336,7 @@ const composableCache = new Map<string, unknown>();
  * });
  *
  * const handleUpdate = async () => {
- *   await mutate({ input: { id: props.id, name: 'New' } });
+ *   await mutate({ args: { id: props.id, name: 'New' } });
  * };
  * </script>
  *

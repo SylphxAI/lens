@@ -24,12 +24,12 @@ export type MutationsMap = Record<string, MutationDef<unknown, unknown>>;
 // =============================================================================
 
 /**
- * Nested selection object with optional input.
+ * Nested selection object with optional args.
  * Used for relations that need their own params.
  */
 export interface NestedSelection {
-	/** Input/params for this nested query */
-	input?: Record<string, unknown>;
+	/** Args/params for this nested query */
+	args?: Record<string, unknown>;
 	/** Field selection for this nested query */
 	select?: SelectionObject;
 }
@@ -39,22 +39,22 @@ export interface NestedSelection {
  * Supports:
  * - `true` - Select this field
  * - `{ select: {...} }` - Nested selection only
- * - `{ input: {...}, select?: {...} }` - Nested with input params
+ * - `{ args: {...}, select?: {...} }` - Nested with args params
  */
 export interface SelectionObject {
 	[key: string]: boolean | SelectionObject | { select: SelectionObject } | NestedSelection;
 }
 
 /**
- * Query descriptor with unified { input, select } pattern.
+ * Query descriptor with unified { args, select } pattern.
  * Used at top-level and nested levels for consistency.
  */
 export interface QueryDescriptor<
-	TInput = unknown,
+	TArgs = unknown,
 	TSelect extends SelectionObject = SelectionObject,
 > {
-	/** Input params for the query */
-	input?: TInput;
+	/** Args/params for the query */
+	args?: TArgs;
 	/** Field selection */
 	select?: TSelect;
 }
@@ -69,7 +69,7 @@ export type SelectedType<T, S extends SelectionObject> = {
 				: T[K] extends object
 					? SelectedType<T[K], Nested>
 					: T[K]
-			: S[K] extends { input?: unknown; select?: infer Nested extends SelectionObject }
+			: S[K] extends { args?: unknown; select?: infer Nested extends SelectionObject }
 				? T[K] extends Array<infer Item>
 					? Array<SelectedType<Item, Nested>>
 					: T[K] extends object
@@ -179,8 +179,8 @@ export interface RouterApiShape<TRouter extends RouterDef = RouterDef> {
 export type ExtractRouter<T> = T extends { router: infer R extends RouterDef } ? R : never;
 
 /**
- * Query function type with unified { input, select } pattern.
- * Handles both queries with and without required input.
+ * Query function type with unified { args, select } pattern.
+ * Handles both queries with and without required args.
  */
 export type QueryFn<TInput, TOutput> = TInput extends void
 	? <TSelect extends SelectionObject = SelectionObject>(
@@ -191,7 +191,7 @@ export type QueryFn<TInput, TOutput> = TInput extends void
 		) => QueryResult<TSelect extends SelectionObject ? SelectedType<TOutput, TSelect> : TOutput>;
 
 /**
- * Mutation function type with unified { input, select } pattern.
+ * Mutation function type with unified { args, select } pattern.
  */
 export type MutationFn<TInput, TOutput> = <TSelect extends SelectionObject = SelectionObject>(
 	descriptor: QueryDescriptor<TInput, TSelect>,

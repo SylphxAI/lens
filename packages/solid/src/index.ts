@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // SolidJS primitives (in components)
- * const { data, loading } = client.user.get.createQuery({ input: { id } });
+ * const { data, loading } = client.user.get.createQuery({ args: { id } });
  * const { mutate } = client.user.create.createMutation();
  * ```
  */

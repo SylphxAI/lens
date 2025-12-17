@@ -16,11 +16,11 @@
  * });
  *
  * // Vanilla JS (anywhere - SSR, utilities, event handlers)
- * const user = await client.user.get({ input: { id } });
- * client.user.get({ input: { id } }).subscribe(data => console.log(data));
+ * const user = await client.user.get({ args: { id } });
+ * client.user.get({ args: { id } }).subscribe(data => console.log(data));
  *
  * // React hooks (in components)
- * const { data, loading } = client.user.get.useQuery({ input: { id } });
+ * const { data, loading } = client.user.get.useQuery({ args: { id } });
  * const { mutate, loading } = client.user.create.useMutation();
  * ```
  */
