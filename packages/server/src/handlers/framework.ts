@@ -233,7 +233,7 @@ export function handleWebSSE(
 				if (result && typeof result === "object" && "subscribe" in result) {
 					const observable = result as {
 						subscribe: (handlers: {
-							next: (value: { data?: unknown }) => void;
+							next: (value: unknown) => void;
 							error: (err: Error) => void;
 							complete: () => void;
 						}) => { unsubscribe: () => void };
@@ -241,7 +241,9 @@ export function handleWebSSE(
 
 					const subscription = observable.subscribe({
 						next: (value) => {
-							const data = `data: ${JSON.stringify(value.data)}\n\n`;
+							// Send full LensResult envelope (e.g. { "$": "snapshot", "data": ... })
+							// Client expects the complete message, not just the inner data
+							const data = `data: ${JSON.stringify(value)}\n\n`;
 							controller.enqueue(encoder.encode(data));
 						},
 						error: (err) => {
