@@ -100,9 +100,11 @@ import type { MutationBuilder } from "./mutation.js";
 import { MutationBuilderImpl } from "./mutation.js";
 import type { QueryBuilder } from "./query.js";
 import { QueryBuilderImpl } from "./query.js";
+import type { SubscriptionBuilder } from "./subscription.js";
+import { SubscriptionBuilderImpl } from "./subscription.js";
 
 /**
- * Operations factory result - typed query and mutation builders
+ * Operations factory result - typed query, mutation, and subscription builders
  */
 export interface Operations<TContext> {
 	/** Create a query with pre-typed context */
@@ -115,19 +117,31 @@ export interface Operations<TContext> {
 		(): MutationBuilder<unknown, unknown, TContext>;
 		(name: string): MutationBuilder<unknown, unknown, TContext>;
 	};
+	/** Create a subscription with pre-typed context */
+	subscription: {
+		(): SubscriptionBuilder<void, unknown, TContext>;
+		(name: string): SubscriptionBuilder<void, unknown, TContext>;
+	};
 }
 
 /**
- * Create typed query and mutation builders with shared context.
+ * Create typed query, mutation, and subscription builders with shared context.
  *
  * @example
  * ```typescript
  * type AppContext = { db: DB; user: User };
- * const { query, mutation } = operations<AppContext>();
+ * const { query, mutation, subscription } = operations<AppContext>();
  *
  * export const getUser = query()
  *   .input(z.object({ id: z.string() }))
  *   .resolve(({ input, ctx }) => ctx.db.user.find(input.id));
+ *
+ * export const onUserCreated = subscription()
+ *   .returns(User)
+ *   .subscribe(({ ctx }) => ({ emit, onCleanup }) => {
+ *     const unsub = ctx.events.on("user:created", emit);
+ *     onCleanup(unsub);
+ *   });
  * ```
  */
 export function operations<TContext>(): Operations<TContext> {
@@ -138,6 +152,10 @@ export function operations<TContext>(): Operations<TContext> {
 			new MutationBuilderImpl<unknown, unknown, TContext>(
 				name,
 			)) as Operations<TContext>["mutation"],
+		subscription: ((name?: string) =>
+			new SubscriptionBuilderImpl<void, unknown, TContext>(
+				name,
+			)) as Operations<TContext>["subscription"],
 	};
 }
 

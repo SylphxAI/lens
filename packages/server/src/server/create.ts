@@ -659,10 +659,18 @@ class LensServerImpl<
 									}
 								}
 
-								// Mutations complete immediately - they're truly one-shot
-								// Queries stay open for potential emit calls from field resolvers
-								if (!isQuery && !cancelled) {
-									observer.complete?.();
+								// Determine if query should remain open for live updates
+								const hasLiveSubscriptions = cleanups.length > 0;
+								const isLiveQuery = isQuery && isLiveQueryDef(def) && def._subscriber;
+
+								// Complete Observable:
+								// - Mutations: complete immediately (one-shot)
+								// - Queries without live fields/subscriptions: complete after initial data
+								// - Queries with live fields or LiveQueryDef with subscriber: stay open
+								if (!cancelled) {
+									if (!isQuery || (!hasLiveSubscriptions && !isLiveQuery)) {
+										observer.complete?.();
+									}
 								}
 							}
 						});
@@ -911,11 +919,20 @@ class LensServerImpl<
 									},
 								});
 							}
-						} catch {
-							// Subscription errors are handled via emit, ignore here
+						} catch (subscribeError) {
+							// Log subscription setup errors for debugging
+							this.logger.error?.(
+								`Field subscription error at ${currentPath}:`,
+								subscribeError instanceof Error ? subscribeError.message : String(subscribeError),
+							);
 						}
 					}
-				} catch {
+				} catch (resolveError) {
+					// Log live field resolution errors
+					this.logger.error?.(
+						`Live field resolution error at ${currentPath}:`,
+						resolveError instanceof Error ? resolveError.message : String(resolveError),
+					);
 					result[field] = null;
 				}
 			} else {
@@ -935,7 +952,12 @@ class LensServerImpl<
 						);
 						result[field] = await loader.load(obj);
 					}
-				} catch {
+				} catch (resolveError) {
+					// Log field resolution errors
+					this.logger.error?.(
+						`Field resolution error at ${currentPath}:`,
+						resolveError instanceof Error ? resolveError.message : String(resolveError),
+					);
 					result[field] = null;
 				}
 			}
