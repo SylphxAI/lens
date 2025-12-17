@@ -447,6 +447,14 @@ class LensServerImpl<
 						// Note: Subscriptions stay open until unsubscribed
 						// They do NOT call observer.complete() automatically
 					} catch (error) {
+						// Call cleanup functions on error path - important for resource cleanup
+						for (const fn of cleanups) {
+							try {
+								fn();
+							} catch {
+								// Ignore cleanup errors
+							}
+						}
 						if (!cancelled) {
 							const errMsg = error instanceof Error ? error.message : String(error);
 							observer.next?.({ $: "error", error: errMsg, code: "INTERNAL_ERROR" } as Message);
@@ -600,20 +608,43 @@ class LensServerImpl<
 
 							if (isAsyncIterable(result)) {
 								// Streaming: emit each yielded value
-								for await (const value of result) {
-									if (cancelled) break;
-									const processed = await this.processQueryResult(
-										path,
-										value,
-										select,
-										context,
-										onCleanup,
-										createFieldEmit,
-									);
-									emitIfChanged(processed);
-								}
-								if (!cancelled) {
-									observer.complete?.();
+								try {
+									for await (const value of result) {
+										if (cancelled) break;
+										const processed = await this.processQueryResult(
+											path,
+											value,
+											select,
+											context,
+											onCleanup,
+											createFieldEmit,
+										);
+										emitIfChanged(processed);
+									}
+									if (!cancelled) {
+										observer.complete?.();
+									}
+								} catch (iterError) {
+									// Handle errors from async iterator
+									// Call cleanup functions before reporting error
+									for (const fn of cleanups) {
+										try {
+											fn();
+										} catch {
+											// Ignore cleanup errors
+										}
+									}
+									if (!cancelled) {
+										const errMsg =
+											iterError instanceof Error ? iterError.message : String(iterError);
+										observer.next?.({
+											$: "error",
+											error: errMsg,
+											code: "STREAM_ERROR",
+										} as Message);
+										observer.complete?.();
+									}
+									return; // Don't continue to outer try block
 								}
 							} else {
 								// One-shot: emit single value
@@ -674,6 +705,14 @@ class LensServerImpl<
 							}
 						});
 					} catch (error) {
+						// Call cleanup functions on error path - important for resource cleanup
+						for (const fn of cleanups) {
+							try {
+								fn();
+							} catch {
+								// Ignore cleanup errors
+							}
+						}
 						if (!cancelled) {
 							const errMsg = error instanceof Error ? error.message : String(error);
 							observer.next?.({ $: "error", error: errMsg, code: "INTERNAL_ERROR" } as Message);
