@@ -1,48 +1,34 @@
 /**
  * @sylphx/lens-core - Field Resolvers
  *
- * Type-safe field resolution for entities.
+ * Type-safe field resolution for models.
  * Define how each field is resolved with full type inference.
+ *
+ * Model = pure schema (types only)
+ * Resolver = separate implementation
  *
  * @example
  * ```typescript
- * import { entity, resolver, t } from '@sylphx/lens-core';
+ * import { model, id, string, resolver } from '@sylphx/lens-core';
  *
- * const User = entity('User', {
- *   id: t.id(),
- *   name: t.string(),
- *   avatarKey: t.string(),  // internal field
+ * // Schema only
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   avatarKey: string(),
  * });
  *
- * const Post = entity('Post', {
- *   id: t.id(),
- *   title: t.string(),
- *   authorId: t.string(),
- * });
- *
- * // Define field resolution
- * const [resolveUser, resolvePost] = [
- *   resolver(User, (f) => ({
- *     id: f.expose('id'),
- *     name: f.expose('name'),
- *     // avatarKey not exposed = private field
- *     avatar: f.string().resolve(({ parent, ctx }) =>
- *       ctx.cdn.getAvatar(parent.avatarKey)
- *     ),
- *     posts: f.many(Post).resolve(({ parent, ctx }) =>
- *       ctx.loaders.post.loadByAuthorId(parent.id)
- *     ),
- *   })),
- *
- *   resolver(Post, (f) => ({
- *     id: f.expose('id'),
- *     title: f.expose('title'),
- *     // authorId not exposed = internal FK
- *     author: f.one(User).resolve(({ parent, ctx }) =>
- *       ctx.loaders.user.load(parent.authorId)
- *     ),
- *   })),
- * ];
+ * // Implementation - separate resolver
+ * const userResolver = resolver(User, (t) => ({
+ *   id: t.expose('id'),
+ *   name: t.expose('name'),
+ *   avatarKey: t.expose('avatarKey'),
+ *   // Computed fields use plain functions
+ *   avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
+ *   // Relations with args use builder
+ *   posts: t.args(z.object({ limit: z.number() }))
+ *     .resolve(({ source, args, ctx }) => ctx.db.posts.filter(...)),
+ * }));
  * ```
  */
 
@@ -376,38 +362,27 @@ class ResolverDefImpl<
 // =============================================================================
 
 /**
- * Define field resolvers for an entity.
+ * Define field resolvers for a model.
  *
- * @deprecated Use unified entity definition with inline resolvers instead.
- * Define resolvers directly in the entity using `.resolve()` and `.subscribe()`:
+ * Model = pure schema (types only)
+ * Resolver = separate implementation
  *
+ * Every field must have a resolver (use t.expose() for passthrough fields).
+ *
+ * @example
  * ```typescript
- * // NEW: Unified entity definition (recommended)
- * const User = entity("User", (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   fullName: t.string().resolve(({ parent }) =>
- *     `${parent.firstName} ${parent.lastName}`
- *   ),
- *   posts: t.many(() => Post).resolve(({ parent, ctx }) =>
- *     ctx.db.posts.filter(p => p.authorId === parent.id)
- *   ),
+ * const userResolver = resolver(User, (t) => ({
+ *   id: t.expose('id'),
+ *   name: t.expose('name'),
+ *   avatarKey: t.expose('avatarKey'),
+ *   // Computed field with plain function
+ *   avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
  * }));
  *
- * // Convert to resolver for server
- * const userResolver = createResolverFromEntity(User);
- * ```
- *
- * Legacy patterns (still supported but deprecated):
- * 1. Direct call (default context): `resolver(User, (f) => ({ ... }))`
- * 2. With custom context: `resolver<{ db: DB }>()(User, (f) => ({ ... }))`
- *
- * @example Legacy usage
- * ```typescript
- * // OLD: Separate resolver definition (deprecated)
- * const userResolver = resolver(User, (f) => ({
- *   id: f.expose('id'),
- *   name: f.expose('name'),
+ * // With typed context
+ * const userResolver = resolver<AppContext>()(User, (t) => ({
+ *   id: t.expose('id'),
+ *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id),
  * }));
  * ```
  */
@@ -551,37 +526,33 @@ export function isResolverDef(value: unknown): value is ResolverDef {
 }
 
 // =============================================================================
-// Entity to Resolver Conversion (Phase 4 - ADR-001)
+// Model to Resolver Conversion
 // =============================================================================
 
 /**
- * Create a ResolverDef from an entity's inline field definitions.
+ * Create a ResolverDef from a model with all fields exposed.
  *
- * Extracts `.resolve()` and `.subscribe()` handlers from entity fields
- * and creates a ResolverDef that can be used by the execution engine.
- *
- * Field resolution rules:
- * - Fields without `.resolve()` or `.subscribe()` → exposed (passthrough from parent)
- * - Fields with `.resolve(fn)` → computed field
- * - Fields with `.subscribe(fn)` → subscription field
+ * Use this when you want a simple passthrough resolver for all fields.
+ * For custom field resolution, use the `resolver()` function instead.
  *
  * @example
  * ```typescript
- * const User = entity("User", (t) => ({
- *   id: t.id(),
- *   name: t.string(),
- *   fullName: t.string().resolve(({ parent }) =>
- *     `${parent.firstName} ${parent.lastName}`
- *   ),
- * }));
- *
- * // Create resolver from entity
- * const userResolver = createResolverFromEntity(User);
- *
- * // Use in server config
- * const server = createLensServer({
- *   resolvers: [userResolver],
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   email: string(),
  * });
+ *
+ * // Create simple exposed-only resolver
+ * const simpleResolver = createResolverFromEntity(User);
+ *
+ * // Or use resolver() for custom field handling
+ * const customResolver = resolver(User, (t) => ({
+ *   id: t.expose('id'),
+ *   name: t.expose('name'),
+ *   email: t.expose('email'),
+ *   avatar: ({ source, ctx }) => ctx.cdn.getAvatar(source.avatarKey),
+ * }));
  * ```
  */
 export function createResolverFromEntity<
@@ -590,150 +561,12 @@ export function createResolverFromEntity<
 >(entity: TEntity): ResolverDef<TEntity, Record<string, FieldDef<any, any, TContext>>, TContext> {
 	const fields: Record<string, FieldDef<any, any, TContext>> = {};
 
-	// Get model-level resolvers/subscribers if present (new API)
-	const model = entity as {
-		_fieldResolvers?: Record<
-			string,
-			(params: { source: unknown; parent: unknown; args: unknown; ctx: unknown }) => unknown
-		>;
-		_fieldSubscribers?: Record<
-			string,
-			(params: {
-				source: unknown;
-				parent: unknown;
-				args: unknown;
-				ctx: unknown;
-			}) => Publisher<unknown>
-		>;
-	};
-	const modelResolvers = model._fieldResolvers ?? {};
-	const modelSubscribers = model._fieldSubscribers ?? {};
-
-	for (const [fieldName, fieldType] of Object.entries(entity.fields)) {
-		// Cast through unknown to avoid exactOptionalPropertyTypes issues
-		const ft = fieldType as unknown as {
-			_resolutionMode?: "exposed" | "resolve";
-			_resolver?: (params: { parent: unknown; args: unknown; ctx: unknown }) => unknown;
-		};
-
-		// Check for model-level resolver/subscriber for this field (new API)
-		const modelResolver = modelResolvers[fieldName];
-		const modelSubscriber = modelSubscribers[fieldName];
-
-		if (modelResolver && modelSubscriber) {
-			// LIVE MODE: Both resolver and subscriber from model chain
-			fields[fieldName] = {
-				_kind: "resolved" as const,
-				_mode: "live" as const,
-				_returnType: undefined,
-				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
-					return modelResolver({ source: parent, parent, args: {}, ctx });
-				},
-				_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
-					return modelSubscriber({ source: parent, parent, args: {}, ctx });
-				},
-			};
-		} else if (modelResolver) {
-			// RESOLVE MODE: Only resolver from model chain
-			fields[fieldName] = {
-				_kind: "resolved" as const,
-				_mode: "resolve" as const,
-				_returnType: undefined,
-				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
-					return modelResolver({ source: parent, parent, args: {}, ctx });
-				},
-			};
-		} else if (modelSubscriber) {
-			// LIVE MODE (subscriber-only): Field exposed from parent, with live updates via Publisher
-			// Uses passthrough resolver for initial data, subscriber for updates
-			fields[fieldName] = {
-				_kind: "resolved" as const,
-				_mode: "live" as const,
-				_returnType: undefined,
-				_argsSchema: null,
-				_resolver: ({ parent }: { parent: unknown }) => {
-					// Passthrough: extract field from parent data
-					return (parent as Record<string, unknown>)[fieldName];
-				},
-				_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
-					return modelSubscriber({ source: parent, parent, args: {}, ctx });
-				},
-			};
-		} else if (ft._resolutionMode === "resolve" && ft._resolver) {
-			// Computed field - wrap the inline resolver (legacy API)
-			fields[fieldName] = {
-				_kind: "resolved" as const,
-				_mode: "resolve" as const,
-				_returnType: undefined,
-				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
-					// Inline resolvers use { parent, ctx } format (no args)
-					return ft._resolver!({ parent, args: {}, ctx });
-				},
-			};
-		} else {
-			// Exposed field - passthrough from parent data
-			fields[fieldName] = {
-				_kind: "exposed" as const,
-				_fieldName: fieldName,
-				_type: undefined,
-			};
-		}
-	}
-
-	// Add computed fields from _fieldResolvers that don't exist in entity.fields
-	// These are resolver-only fields (e.g., displayPrice defined only in .resolve())
-	for (const [fieldName, modelResolver] of Object.entries(modelResolvers)) {
-		if (fields[fieldName]) continue; // Already handled above
-
-		const modelSubscriber = modelSubscribers[fieldName];
-
-		if (modelSubscriber) {
-			// LIVE MODE: Both resolver and subscriber
-			fields[fieldName] = {
-				_kind: "resolved" as const,
-				_mode: "live" as const,
-				_returnType: undefined,
-				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
-					return modelResolver({ source: parent, parent, args: {}, ctx });
-				},
-				_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
-					return modelSubscriber({ source: parent, parent, args: {}, ctx });
-				},
-			};
-		} else {
-			// RESOLVE MODE: Only resolver
-			fields[fieldName] = {
-				_kind: "resolved" as const,
-				_mode: "resolve" as const,
-				_returnType: undefined,
-				_argsSchema: null,
-				_resolver: ({ parent, ctx }: { parent: unknown; ctx: FieldQueryContext<TContext> }) => {
-					return modelResolver({ source: parent, parent, args: {}, ctx });
-				},
-			};
-		}
-	}
-
-	// Add subscriber-only fields from _fieldSubscribers that don't exist in entity.fields
-	for (const [fieldName, modelSubscriber] of Object.entries(modelSubscribers)) {
-		if (fields[fieldName]) continue; // Already handled above
-
-		// LIVE MODE (subscriber-only): Field exposed from parent, with live updates
+	// All fields are exposed (passthrough from parent data)
+	for (const fieldName of Object.keys(entity.fields)) {
 		fields[fieldName] = {
-			_kind: "resolved" as const,
-			_mode: "live" as const,
-			_returnType: undefined,
-			_argsSchema: null,
-			_resolver: ({ parent }: { parent: unknown }) => {
-				return (parent as Record<string, unknown>)[fieldName];
-			},
-			_subscriber: ({ parent, ctx }: { parent: unknown; ctx: TContext }) => {
-				return modelSubscriber({ source: parent, parent, args: {}, ctx });
-			},
+			_kind: "exposed" as const,
+			_fieldName: fieldName,
+			_type: undefined,
 		};
 	}
 
@@ -747,48 +580,14 @@ export function createResolverFromEntity<
 /**
  * Check if an entity has any inline resolvers defined.
  *
- * Checks for:
- * - Field-level resolvers: `t.string().resolve(...)`
- * - Model-level resolvers: `.resolve({...})` or `.subscribe({...})` chained on model
+ * @deprecated Models no longer support inline resolvers.
+ * Use standalone `resolver(Model, ...)` instead.
  *
- * @example
- * ```typescript
- * // Field-level
- * const User = entity("User", (t) => ({
- *   id: t.id(),
- *   fullName: t.string().resolve(({ parent }) => ...),
- * }));
- *
- * // Model-level
- * const Session = model("Session", (t) => ({ ... }))
- *   .resolve({ title: ({ source }) => ... })
- *   .subscribe({ title: ({ source }) => ... });
- *
- * hasInlineResolvers(User); // true
- * hasInlineResolvers(Session); // true
- * ```
+ * This function always returns false for new ModelDef instances.
+ * Kept for backward compatibility during migration.
  */
-export function hasInlineResolvers(entity: AnyEntityLike): boolean {
-	// Check for model-level resolvers/subscribers (new API)
-	const model = entity as {
-		_fieldResolvers?: Record<string, unknown>;
-		_fieldSubscribers?: Record<string, unknown>;
-	};
-	if (model._fieldResolvers && Object.keys(model._fieldResolvers).length > 0) {
-		return true;
-	}
-	if (model._fieldSubscribers && Object.keys(model._fieldSubscribers).length > 0) {
-		return true;
-	}
-
-	// Check for field-level resolvers (legacy API)
-	for (const fieldType of Object.values(entity.fields)) {
-		const ft = fieldType as {
-			_resolutionMode?: "exposed" | "resolve";
-		};
-		if (ft._resolutionMode === "resolve") {
-			return true;
-		}
-	}
+export function hasInlineResolvers(_entity: AnyEntityLike): boolean {
+	// Models no longer have inline resolvers (v3.0+)
+	// Use standalone resolver(Model, ...) instead
 	return false;
 }

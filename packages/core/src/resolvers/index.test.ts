@@ -899,7 +899,9 @@ describe("createResolverFromEntity()", () => {
 });
 
 describe("hasInlineResolvers()", () => {
-	it("returns false for model without inline resolvers", () => {
+	it("always returns false (inline resolvers deprecated)", () => {
+		// Models no longer support inline resolvers (v3.0+)
+		// Use standalone resolver(Model, ...) instead
 		const PlainUser = model("PlainUser", {
 			id: id(),
 			name: string(),
@@ -908,7 +910,4 @@ describe("hasInlineResolvers()", () => {
 
 		expect(hasInlineResolvers(PlainUser)).toBe(false);
 	});
-
-	// Note: model().resolve() chain was removed in v3.0
-	// Use standalone resolver(Model, ...) instead
 });

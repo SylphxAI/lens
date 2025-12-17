@@ -2,12 +2,28 @@
  * @sylphx/lens-core - Model Resolver Types
  *
  * Types for model-level field resolution.
- * Use standalone resolver(Model, ...) function instead of model chains.
+ *
+ * Model = pure schema (types only)
+ * Resolver = separate implementation via resolver(Model, ...)
  *
  * @example
  * ```typescript
+ * const User = model('User', {
+ *   id: id(),
+ *   name: string(),
+ *   posts: list(() => Post),
+ * });
+ *
+ * // Source type excludes relations
  * type UserSource = InferModelSource<typeof User>
  * // { id: string; name: string }  - posts excluded (relation)
+ *
+ * // Use standalone resolver() for implementation
+ * const userResolver = resolver(User, (t) => ({
+ *   id: t.expose('id'),
+ *   name: t.expose('name'),
+ *   posts: ({ source, ctx }) => ctx.db.posts.filter(p => p.authorId === source.id),
+ * }));
  * ```
  */
 
@@ -96,19 +112,19 @@ type InferFieldArgs<F> = F extends { _argsSchema: infer S }
 // =============================================================================
 
 /**
- * Field resolver function for model chain.
+ * Field resolver function type.
  * Receives source (parent), args, and context.
  * Return type is checked against the field's expected type.
  *
  * @example
  * ```typescript
- * const User = model('User', {
- *   id: id(),
- *   posts: list(() => Post),
- * }).resolve({
- *   posts: ({ source, args, ctx }) =>
- *     ctx.db.posts.filter(p => p.authorId === source.id)
- * });
+ * const userResolver = resolver(User, (t) => ({
+ *   id: t.expose('id'),
+ *   posts: t.args(z.object({ limit: z.number() }))
+ *     .resolve(({ source, args, ctx }) =>
+ *       ctx.db.posts.filter(p => p.authorId === source.id).slice(0, args.limit)
+ *     ),
+ * }));
  * ```
  */
 export type ModelFieldResolver<TSource, TArgs, TContext, TResult> = (params: {
@@ -121,20 +137,19 @@ export type ModelFieldResolver<TSource, TArgs, TContext, TResult> = (params: {
 }) => TResult | Promise<TResult>;
 
 /**
- * Field subscriber function for model chain (returns Publisher).
+ * Field subscriber function type (returns Publisher).
  * Used for real-time field updates.
  *
  * @example
  * ```typescript
- * const User = model('User', {
- *   id: id(),
- *   name: string(),
- * }).subscribe({
- *   name: ({ source, ctx }) => ({ emit, onCleanup }) => {
- *     const unsub = ctx.events.on(`user:${source.id}:name`, emit)
- *     onCleanup(unsub)
- *   }
- * });
+ * const userResolver = resolver(User, (t) => ({
+ *   id: t.expose('id'),
+ *   name: t.resolve(({ source, ctx }) => ctx.db.getUser(source.id).name)
+ *     .subscribe(({ source, ctx }) => ({ emit, onCleanup }) => {
+ *       const unsub = ctx.events.on(`user:${source.id}:name`, emit);
+ *       onCleanup(unsub);
+ *     }),
+ * }));
  * ```
  */
 export type ModelFieldSubscriber<TSource, TArgs, TContext, TResult> = (params: {

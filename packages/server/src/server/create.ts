@@ -25,7 +25,6 @@ import {
 	type EmitCommand,
 	flattenRouter,
 	hashValue,
-	hasInlineResolvers,
 	type InferRouterContext,
 	isLiveQueryDef,
 	isModelDef,
@@ -184,9 +183,8 @@ class LensServerImpl<
 		}
 		this.entities = entities;
 
-		// Build resolver map: explicit resolvers + auto-converted from entities with inline resolvers
-		// Unified Entity Definition (ADR-001): entities can have inline .resolve()/.subscribe() methods
-		// These are automatically converted to resolvers, no need to call createResolverFromEntity() manually
+		// Build resolver map: explicit resolvers + auto-generated exposed-only resolvers
+		// Models without explicit resolvers get auto-generated exposed-only resolvers
 		this.resolverMap = this.buildResolverMap(config.resolvers, entities);
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
@@ -245,12 +243,12 @@ class LensServerImpl<
 	}
 
 	/**
-	 * Build resolver map from explicit resolvers and entities with inline resolvers.
+	 * Build resolver map from explicit resolvers.
 	 *
-	 * Unified Entity Definition (ADR-001): Entities can have inline .resolve()/.subscribe() methods.
-	 * These are automatically converted to resolvers - no manual createResolverFromEntity() needed.
+	 * Models without explicit resolvers get auto-generated exposed-only resolvers.
+	 * Use standalone resolver(Model, ...) for custom field resolution.
 	 *
-	 * Priority: explicit resolvers > auto-converted from entities
+	 * Priority: explicit resolvers > auto-generated exposed-only resolvers
 	 */
 	private buildResolverMap(
 		explicitResolvers: import("@sylphx/lens-core").Resolvers | undefined,
@@ -268,16 +266,14 @@ class LensServerImpl<
 			}
 		}
 
-		// 2. Auto-convert models with inline resolvers (if not already in map)
+		// 2. Auto-create exposed-only resolvers for models without explicit resolvers
 		for (const [name, entity] of Object.entries(entities)) {
 			if (!isModelDef(entity)) continue;
 			if (resolverMap.has(name)) continue; // Explicit resolver takes priority
 
-			// Check if entity/model has inline resolvers
-			if (hasInlineResolvers(entity)) {
-				const resolver = createResolverFromEntity(entity);
-				resolverMap.set(name, resolver);
-			}
+			// Create exposed-only resolver for this model
+			const resolver = createResolverFromEntity(entity);
+			resolverMap.set(name, resolver);
 		}
 
 		return resolverMap.size > 0 ? resolverMap : undefined;
