@@ -1,5 +1,11 @@
 # @sylphx/lens-svelte
 
+## 2.5.3 (2025-12-17)
+
+### 🐛 Bug Fixes
+
+- **svelte:** update JSDoc examples to use args instead of input ([e5a265e](https://github.com/SylphxAI/lens/commit/e5a265eb651703570913a0bffaf861a2150d7693))
+
 ## 2.5.2 (2025-12-17)
 
 ### 🐛 Bug Fixes
