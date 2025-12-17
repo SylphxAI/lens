@@ -1,5 +1,55 @@
 # @sylphx/lens-core
 
+## 4.0.0 (2025-12-17)
+
+refactor: remove deprecated APIs and clean up resolver system
+
+- Remove deprecated entity() API and t.* type builders
+- Remove model().resolve() and model().subscribe() chain patterns
+- Simplify resolver system: Model = pure schema, Resolver = separate implementation
+- Update createResolverFromEntity() to create exposed-only resolvers
+- Deprecate hasInlineResolvers() (always returns false)
+- Auto-generate exposed-only resolvers for models without explicit resolvers
+
+### ✨ Features
+
+- **core:** add type-safe resolver field validation ([4a240a5](https://github.com/SylphxAI/lens/commit/4a240a55f0ef24c08f3a7b5a63a7ee9a14b6daed))
+- **core:** add compile-time type safety for resolvers ([8954db3](https://github.com/SylphxAI/lens/commit/8954db326c788042eff313bfa527f5f88ffae728))
+- 💥 **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+
+### 🐛 Bug Fixes
+
+- **types:** add resolver return type validation and use list() API ([2d9661a](https://github.com/SylphxAI/lens/commit/2d9661a4fd0568533c360f00053be28b5afdab82))
+- **types:** resolve exactOptionalPropertyTypes compatibility issues ([baa269f](https://github.com/SylphxAI/lens/commit/baa269f6ee8d43d0e416de72c52ae4aef81fbc96))
+- update resolver types and example models ([807dc65](https://github.com/SylphxAI/lens/commit/807dc6551439f630c35ad1c22e585eaae3d1c0ca))
+- round 3 comprehensive fixes for error handling and performance ([a99911b](https://github.com/SylphxAI/lens/commit/a99911b686062e5990ce46b8be8e7200a5c0d58a))
+- **core:** prevent prototype pollution in path parsing ([cb0d441](https://github.com/SylphxAI/lens/commit/cb0d441ae651906f989b8dd5c901e8e77f0e428f))
+- **server:** fix Query Observable memory leak and silent error swallowing ([6380730](https://github.com/SylphxAI/lens/commit/6380730435704a4bb3e51a7d4e68a75ff066eeb6))
+- **core:** update resolver tests to use new model() API ([e3518c7](https://github.com/SylphxAI/lens/commit/e3518c7849fd423a0dfb92e9825697608eb3b88e))
+
+### ♻️ Refactoring
+
+- 💥 **api:** align resolver API with GraphQL conventions ([b002713](https://github.com/SylphxAI/lens/commit/b002713a5cd3e9dc7d3a564dc28f711b3b96d6a5))
+- **core:** remove deprecated model chain patterns ([7e25ba4](https://github.com/SylphxAI/lens/commit/7e25ba4c5e4cbd3041aa25c40645c83c7eece21f))
+- **core:** remove deprecated entity() API and t.* type builders ([34ff68f](https://github.com/SylphxAI/lens/commit/34ff68fb2eb2b134db91bfae503a39ddca4535b0))
+- **transport:** unify server Observable return type and add live query detection ([2e15de4](https://github.com/SylphxAI/lens/commit/2e15de417c84a5dc90e5d451c02253f2e3904224))
+- **core:** remove backward compatibility aliases from wrappers ([887bf67](https://github.com/SylphxAI/lens/commit/887bf67120af071217807fbd712c823b87e3e236))
+- **core:** remove deprecated input and parent aliases ([f5a8510](https://github.com/SylphxAI/lens/commit/f5a8510aa480313ddd60e950233dfaad4fc943dc))
+- **core,server:** remove global resolver registry, make resolvers purely functional ([c06eb63](https://github.com/SylphxAI/lens/commit/c06eb634bc5a7cf0679275b3bffc2504c1a9ef14))
+- 💥 **core:** WIP remove builder function API for v3.0 ([b6e56de](https://github.com/SylphxAI/lens/commit/b6e56de1f825623d3052d7eb81b3bd29071e9bb2))
+
+### 🔧 Chores
+
+- remove deprecated resetTempIdCounter function ([9bf5ba9](https://github.com/SylphxAI/lens/commit/9bf5ba913f4f9c2c1911f58208492558285f0467))
+
+### 💥 Breaking Changes
+
+- **api:** align resolver API with GraphQL conventions ([b002713](https://github.com/SylphxAI/lens/commit/b002713a5cd3e9dc7d3a564dc28f711b3b96d6a5))
+  Resolver callbacks now receive `args` instead of `input`
+- **core:** remove deprecated APIs for v3.0 clean break ([8f31558](https://github.com/SylphxAI/lens/commit/8f31558b934a18e50cc0fde6185125e05e2dc33f))
+  All deprecated APIs have been removed in v3.0.
+- **core:** WIP remove builder function API for v3.0 ([b6e56de](https://github.com/SylphxAI/lens/commit/b6e56de1f825623d3052d7eb81b3bd29071e9bb2))
+
 ## 3.0.1 (2025-12-16)
 
 v3.0 - Remove deprecated APIs and unify types

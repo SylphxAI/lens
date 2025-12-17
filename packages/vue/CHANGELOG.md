@@ -1,5 +1,20 @@
 # @sylphx/lens-vue
 
+## 2.4.14 (2025-12-17)
+
+refactor: remove deprecated APIs and clean up resolver system
+
+- Remove deprecated entity() API and t.* type builders
+- Remove model().resolve() and model().subscribe() chain patterns
+- Simplify resolver system: Model = pure schema, Resolver = separate implementation
+- Update createResolverFromEntity() to create exposed-only resolvers
+- Deprecate hasInlineResolvers() (always returns false)
+- Auto-generate exposed-only resolvers for models without explicit resolvers
+
+### ♻️ Refactoring
+
+- **core:** remove deprecated input and parent aliases ([f5a8510](https://github.com/SylphxAI/lens/commit/f5a8510aa480313ddd60e950233dfaad4fc943dc))
+
 ## 2.4.11 (2025-12-16)
 
 ### 📦 Dependencies
