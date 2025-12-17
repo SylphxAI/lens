@@ -1,5 +1,11 @@
 # @sylphx/lens-server
 
+## 4.1.2 (2025-12-17)
+
+### 🐛 Bug Fixes
+
+- **server:** return full Result envelope with $ marker ([15b8c7a](https://github.com/SylphxAI/lens/commit/15b8c7a4c834bcdd80f429ffc6d189962fe739f6))
+
 ## 4.1.1 (2025-12-17)
 
 fix(server): send full LensResult envelope in SSE handler

@@ -1,5 +1,9 @@
 # @sylphx/lens-solid
 
+## 2.4.3 (2025-12-17)
+
+No notable changes.
+
 ## 2.4.2 (2025-12-17)
 
 ### 🐛 Bug Fixes

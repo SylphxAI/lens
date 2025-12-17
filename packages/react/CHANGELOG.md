@@ -1,5 +1,9 @@
 # @sylphx/lens-react
 
+## 2.6.3 (2025-12-17)
+
+No notable changes.
+
 ## 2.6.2 (2025-12-17)
 
 ### 🐛 Bug Fixes
