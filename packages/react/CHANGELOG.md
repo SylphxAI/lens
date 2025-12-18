@@ -1,5 +1,11 @@
 # @sylphx/lens-react
 
+## 2.6.6 (2025-12-18)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-client` to 3.1.6
+
 ## 2.6.5 (2025-12-18)
 
 No notable changes.
