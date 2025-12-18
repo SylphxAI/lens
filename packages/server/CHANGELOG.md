@@ -1,5 +1,13 @@
 # @sylphx/lens-server
 
+## 4.1.4 (2025-12-18)
+
+fix(server): add SSE request handling to fetch handler
+
+### 🐛 Bug Fixes
+
+- **server:** add SSE request handling to fetch handler ([ebdd137](https://github.com/SylphxAI/lens/commit/ebdd13709be08721556a3cc588b8d596bdd794c3))
+
 ## 4.1.3 (2025-12-18)
 
 ### ♻️ Refactoring
