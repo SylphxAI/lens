@@ -117,12 +117,13 @@ export class SseConnectionManager {
 				let retryCount = 0;
 
 				const connect = () => {
-					// Build SSE URL with operation info
-					const sseUrl = new URL(`${this.config.baseUrl}/${op.path}`);
+					// Build SSE URL - dedicated endpoint with path in query param
+					// GET /__lens/sse?path={path}&input={...}
+					const sseUrl = new URL(`${this.config.baseUrl}/__lens/sse`);
+					sseUrl.searchParams.set("path", op.path);
 					if (op.input !== undefined) {
 						sseUrl.searchParams.set("input", JSON.stringify(op.input));
 					}
-					sseUrl.searchParams.set("_sse", "1"); // Mark as SSE request
 
 					// Add headers as query params (EventSource doesn't support custom headers)
 					if (this.config.headers) {

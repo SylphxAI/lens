@@ -1276,14 +1276,30 @@ class LensServerImpl<
 			});
 		}
 
-		// SSE: GET /{path}?_sse=1&input={...}
-		// Client uses EventSource which sends GET requests with path in URL
-		const isSseRequest =
-			url.searchParams.get("_sse") === "1" || request.headers.get("accept") === "text/event-stream";
+		// SSE: GET /__lens/sse?path={path}&input={...}
+		// Dedicated endpoint with path in query param - consistent with POST body format
+		// This avoids base path parsing issues when server is mounted at /api etc.
+		if (request.method === "GET" && pathname.endsWith("/__lens/sse")) {
+			const path = url.searchParams.get("path");
 
-		if (request.method === "GET" && isSseRequest) {
-			// Extract path from URL (strip leading slash)
-			const path = pathname.replace(/^\//, "");
+			// Validate path parameter
+			if (!path) {
+				const encoder = new TextEncoder();
+				const errorStream = new ReadableStream({
+					start(controller) {
+						const data = `event: error\ndata: ${JSON.stringify({ error: "Missing path parameter" })}\n\n`;
+						controller.enqueue(encoder.encode(data));
+						controller.close();
+					},
+				});
+				return new Response(errorStream, {
+					headers: {
+						"Content-Type": "text/event-stream",
+						"Cache-Control": "no-cache",
+						Connection: "keep-alive",
+					},
+				});
+			}
 
 			// Parse input from query params
 			const inputParam = url.searchParams.get("input");

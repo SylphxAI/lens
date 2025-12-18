@@ -314,9 +314,10 @@ describe("HTTP + SSE Transport", () => {
 
 			const es = MockEventSource.getLastInstance();
 			expect(es).toBeDefined();
-			expect(es!.url).toContain("user.watch");
+			// New format: GET /__lens/sse?path={path}&input={...}
+			expect(es!.url).toContain("/__lens/sse");
+			expect(es!.url).toContain("path=user.watch");
 			expect(es!.url).toContain("input=");
-			expect(es!.url).toContain("_sse=1");
 		});
 
 		it("receives messages from EventSource", async () => {
