@@ -52,11 +52,7 @@
  */
 
 import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import {
-	createFrameworkHandler,
-	createServerClientProxy,
-	type LensServer,
-} from "@sylphx/lens-server";
+import { createServerClientProxy, type LensServer } from "@sylphx/lens-server";
 
 // =============================================================================
 // Types
@@ -169,11 +165,10 @@ export function createLensFresh<TServer extends LensServer>(
 		...config.clientConfig,
 	}) as unknown as InferClient<TServer>;
 
-	// Handler (using shared utilities from @sylphx/lens-server)
-	const baseHandler = createFrameworkHandler(server, { basePath });
+	// Handler - server is directly callable as a fetch handler
 	const handler = {
-		GET: baseHandler,
-		POST: baseHandler,
+		GET: (req: Request) => server(req),
+		POST: (req: Request) => server(req),
 	};
 
 	// Serialization utilities
@@ -198,8 +193,8 @@ export function createLensFresh<TServer extends LensServer>(
 	};
 }
 
-// NOTE: Server client proxy and handler utilities are now imported from @sylphx/lens-server
-// See: createServerClientProxy, createFrameworkHandler
+// NOTE: Server client proxy is imported from @sylphx/lens-server
+// Server is directly callable as a fetch handler
 
 // =============================================================================
 // Preact Hooks

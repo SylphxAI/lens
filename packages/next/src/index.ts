@@ -62,11 +62,7 @@
  */
 
 import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import {
-	createFrameworkHandler,
-	createServerClientProxy,
-	type LensServer,
-} from "@sylphx/lens-server";
+import { createServerClientProxy, type LensServer } from "@sylphx/lens-server";
 import type { ReactNode } from "react";
 
 // =============================================================================
@@ -187,8 +183,8 @@ export function createLensNext<TServer extends LensServer>(
 		...config.clientConfig,
 	}) as unknown as InferClient<TServer>;
 
-	// API Handler (using shared utilities from @sylphx/lens-server)
-	const handler = createFrameworkHandler(server, { basePath });
+	// API Handler - server is directly callable as a fetch handler
+	const handler = (request: Request) => server(request);
 
 	// Hooks implementation (will use React context internally)
 	const useQuery = createUseQuery(browserClient);
@@ -209,8 +205,8 @@ export function createLensNext<TServer extends LensServer>(
 	};
 }
 
-// NOTE: Server client proxy and handler utilities are now imported from @sylphx/lens-server
-// See: createServerClientProxy, createFrameworkHandler
+// NOTE: Server client proxy is imported from @sylphx/lens-server
+// Server is directly callable as a fetch handler
 
 // =============================================================================
 // React Hooks (Inline Implementation)

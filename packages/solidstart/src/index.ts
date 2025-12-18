@@ -37,11 +37,7 @@
  */
 
 import { createClient, http, type LensClientConfig } from "@sylphx/lens-client";
-import {
-	createFrameworkHandler,
-	createServerClientProxy,
-	type LensServer,
-} from "@sylphx/lens-server";
+import { createServerClientProxy, type LensServer } from "@sylphx/lens-server";
 import { type Accessor, createResource, createSignal } from "solid-js";
 
 // =============================================================================
@@ -139,11 +135,10 @@ export function createLensSolidStart<TServer extends LensServer>(
 		return browserClient;
 	};
 
-	// API Handler (using shared utilities from @sylphx/lens-server)
+	// API Handler - server is directly callable as a fetch handler
 	// SolidStart wraps requests in { request: Request } so we extract it
-	const baseHandler = createFrameworkHandler(server, { basePath });
 	const handler = async (event: { request: Request }): Promise<Response> => {
-		return baseHandler(event.request);
+		return server(event.request);
 	};
 
 	// Primitives
@@ -161,8 +156,8 @@ export function createLensSolidStart<TServer extends LensServer>(
 	};
 }
 
-// NOTE: Server client proxy and handler utilities are now imported from @sylphx/lens-server
-// See: createServerClientProxy, createFrameworkHandler
+// NOTE: Server client proxy is imported from @sylphx/lens-server
+// Server is directly callable as a fetch handler
 
 // =============================================================================
 // Solid Primitives

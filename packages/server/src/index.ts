@@ -93,17 +93,10 @@ export {
 } from "./handlers/index.js";
 
 // =============================================================================
-// Framework Integration Utilities (internal use)
+// Server Client Proxy (for framework packages)
 // =============================================================================
 
-export {
-	createFrameworkHandler,
-	createServerClientProxy,
-	type FrameworkHandlerOptions,
-	handleWebMutation,
-	handleWebQuery,
-	handleWebSSE,
-} from "./handlers/index.js";
+export { createServerClientProxy } from "./handlers/index.js";
 
 // =============================================================================
 // Plugin System

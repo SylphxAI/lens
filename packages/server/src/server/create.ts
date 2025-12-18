@@ -1276,8 +1276,8 @@ class LensServerImpl<
 			});
 		}
 
-		// Operations: POST /
-		if (request.method === "POST" && (pathname === "/" || pathname === "")) {
+		// Operations: POST to any path (client sends path in body)
+		if (request.method === "POST") {
 			let body: { path?: string; input?: unknown };
 			try {
 				body = (await request.json()) as typeof body;

@@ -6,17 +6,10 @@
  */
 
 // =============================================================================
-// Framework Handler Utilities (for framework packages)
+// Server Client Proxy (for framework packages)
 // =============================================================================
 
-export {
-	createFrameworkHandler,
-	createServerClientProxy,
-	type FrameworkHandlerOptions,
-	handleWebMutation,
-	handleWebQuery,
-	handleWebSSE,
-} from "./framework.js";
+export { createServerClientProxy } from "./framework.js";
 
 // =============================================================================
 // SSE Handler
