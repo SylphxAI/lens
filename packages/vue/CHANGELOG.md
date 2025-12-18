@@ -1,5 +1,9 @@
 # @sylphx/lens-vue
 
+## 2.5.7 (2025-12-18)
+
+No notable changes.
+
 ## 2.5.6 (2025-12-18)
 
 ### 📦 Dependencies

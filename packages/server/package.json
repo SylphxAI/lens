@@ -1,6 +1,6 @@
 {
 	"name": "@sylphx/lens-server",
-	"version": "4.1.5",
+	"version": "4.1.6",
 	"description": "Server runtime for Lens API framework",
 	"type": "module",
 	"main": "./dist/index.js",
