@@ -1,5 +1,13 @@
 # @sylphx/lens-server
 
+## 4.1.6 (2025-12-18)
+
+fix(server): support base path mounting for all __lens endpoints
+
+### 🐛 Bug Fixes
+
+- **server:** support base path mounting for all __lens endpoints ([a52644e](https://github.com/SylphxAI/lens/commit/a52644ee9795e5b5998748f675ba71177140fbcd))
+
 ## 4.1.5 (2025-12-18)
 
 fix(server,client): use dedicated SSE endpoint for subscriptions

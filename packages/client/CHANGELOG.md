@@ -1,5 +1,11 @@
 # @sylphx/lens-client
 
+## 3.1.7 (2025-12-18)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-server` to 4.1.6
+
 ## 3.1.6 (2025-12-18)
 
 fix(server,client): use dedicated SSE endpoint for subscriptions
