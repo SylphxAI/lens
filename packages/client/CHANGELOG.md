@@ -1,5 +1,13 @@
 # @sylphx/lens-client
 
+## 3.1.6 (2025-12-18)
+
+fix(server,client): use dedicated SSE endpoint for subscriptions
+
+### 🐛 Bug Fixes
+
+- **server,client:** use dedicated SSE endpoint for subscriptions ([0c85c68](https://github.com/SylphxAI/lens/commit/0c85c6859a5ce73546dd14969fdb4f5428f80252))
+
 ## 3.1.5 (2025-12-18)
 
 ### 📦 Dependencies
