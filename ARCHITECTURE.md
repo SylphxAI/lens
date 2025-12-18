@@ -5,6 +5,29 @@
 
 ---
 
+## Tech Stack
+
+| Layer | Technology | Rationale |
+|-------|------------|-----------|
+| **Language** | TypeScript 5.9+ | Target audience, type inference |
+| **Runtime** | Bun (primary), Node, Deno | Bun for speed, universal compat |
+| **Build** | Bunup (esbuild) + Turbo | Fast builds, monorepo caching |
+| **Schema Validation** | Zod | Industry standard, excellent TS inference |
+| **Package Manager** | Bun | Speed, workspace support |
+| **Linting** | Biome | Fast, unified lint+format |
+| **Testing** | Bun test | Native, fast |
+| **CI/CD** | GitHub Actions | Standard, marketplace integrations |
+
+### Key Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `zod` | Input validation |
+| `@sylphx/reify` | Declarative entity operations (optimistic) |
+| `@sylphx/standard-entity` | Standard entity definitions |
+
+---
+
 ## Core Philosophy
 
 ```
@@ -595,32 +618,62 @@ createClient({
 ```
 packages/
 ├── core/                    @sylphx/lens-core
-│   ├── schema/              entity(), relation(), t.*
+│   ├── schema/              model(), field types (id, string, etc.)
 │   ├── operations/          query(), mutation(), router()
-│   ├── plugin/              PairedPlugin, resolvers
-│   └── types/               Shared types
+│   ├── resolvers/           resolver(), field builders
+│   ├── emit/                Emit API (createEmit, toOps)
+│   ├── plugin/              PairedPlugin, PluginExtension
+│   ├── reconnect/           Subscription tracking, hashing
+│   ├── updates/             Update strategies (value/delta/patch)
+│   ├── protocol/            Wire protocol types (Op, Message)
+│   ├── observable/          Observable primitives
+│   ├── optimistic/          Reify pipeline integration
+│   └── context/             Context types (impl in server)
 │
 ├── client/                  @sylphx/lens-client
-│   ├── client/              createClient
-│   ├── transport/           http, ws, sse, pusher, route, routeByType
-│   ├── plugins/             logger, auth, retry, cache
-│   └── store/               ReactiveStore, optimistic
+│   ├── client/              createClient, proxy creation
+│   ├── transport/           http, ws, sse, direct, routeByType
+│   ├── plugins/             logger, auth, retry, cache, timeout
+│   └── reconnect/           Client-side reconnection
 │
 ├── server/                  @sylphx/lens-server
 │   ├── server/              createApp (pure executor)
-│   ├── adapters/
-│   │   ├── http.ts          createHTTPHandler
+│   ├── handlers/
+│   │   ├── http.ts          HTTP request handling
 │   │   ├── ws.ts            createWSHandler
-│   │   └── sse.ts           createSSEHandler
-│   ├── state/               GraphStateManager
-│   ├── plugins/             diffOptimizer, logger
-│   └── publishers/
-│       └── pusher.ts        createPusherPublisher
+│   │   └── unified.ts       Unified handler logic
+│   ├── sse/                 createSSEHandler, SSEHandler class
+│   ├── state/               State management
+│   ├── plugin/              optimisticPlugin, opLog
+│   ├── storage/             OpLogStorage (memory, redis adapters)
+│   ├── reconnect/           OperationLog, patch coalescing
+│   ├── context/             Context system implementation
+│   └── logging/             Structured logger
 │
-├── react/                   @sylphx/lens-react
-├── solid/                   @sylphx/lens-solid
-├── vue/                     @sylphx/lens-vue
-└── svelte/                  @sylphx/lens-svelte
+├── storage-redis/           @sylphx/lens-storage-redis
+├── storage-upstash/         @sylphx/lens-storage-upstash
+├── storage-vercel-kv/       @sylphx/lens-storage-vercel-kv
+│
+├── signals/                 @sylphx/lens-signals
+│   ├── signal.ts            Reactive signal primitives
+│   └── reactive-store.ts    Store implementation
+│
+├── react/                   @sylphx/lens-react (hooks)
+├── solid/                   @sylphx/lens-solid (primitives)
+├── vue/                     @sylphx/lens-vue (composables)
+├── svelte/                  @sylphx/lens-svelte (stores)
+├── preact/                  @sylphx/lens-preact (hooks + signals)
+│
+├── next/                    @sylphx/lens-next (Next.js)
+├── nuxt/                    @sylphx/lens-nuxt (Nuxt 3)
+├── solidstart/              @sylphx/lens-solidstart
+├── fresh/                   @sylphx/lens-fresh (Deno)
+│
+├── pusher/                  @sylphx/lens-pusher (3rd party transport)
+│
+├── lens/                    @sylphx/lens (all-in-one bundle)
+│
+└── integration-tests/       E2E tests
 ```
 
 ---
@@ -716,3 +769,81 @@ await client.user.get({ id: '123' })          // → user-api
 **Reactive by default:** Every query can stream, optimistic is built-in.
 
 **Simple > Complex:** Fewer concepts, clearer mental model.
+
+---
+
+## 10. Plugin Type Extension Architecture
+
+Plugins can extend builder methods with full TypeScript type safety. This enables features like `.optimistic()` to only appear when the corresponding plugin is configured.
+
+### Plugin Extension Protocol
+
+```typescript
+// Plugin declares the methods it adds
+interface PluginExtension {
+  name: string
+  MutationBuilderWithReturns?: {}  // Methods added after .returns()
+  QueryBuilder?: {}                 // Methods added to query builder
+}
+
+// Example: Optimistic plugin extension
+interface OptimisticPluginExtension extends PluginExtension {
+  name: 'optimistic'
+  MutationBuilderWithReturns: {
+    optimistic(spec: OptimisticDSL): MutationBuilderWithOptimistic<...>
+  }
+}
+```
+
+### Type-Safe Plugin Usage
+
+```typescript
+// Without plugin - .optimistic() doesn't exist
+const { mutation } = lens<AppContext>({ plugins: [] })
+mutation().input(...).returns(...).optimistic('merge') // ❌ Type Error
+
+// With plugin - .optimistic() is available
+const { mutation } = lens<AppContext>({ plugins: [optimisticPlugin()] })
+mutation().input(...).returns(...).optimistic('merge') // ✅ Works
+```
+
+### Paired Plugins
+
+For features requiring matched client/server implementations:
+
+```typescript
+interface PairedPlugin {
+  __paired: true
+  server: ServerPlugin
+  client: ClientPlugin
+}
+
+// Same import works on both sides
+import { compression } from '@sylphx/lens-plugin-compression'
+createWSHandler(server, { plugins: [compression] })  // Gets server part
+createClient({ plugins: [compression] })             // Gets client part
+```
+
+See `PLUGIN_TYPE_EXTENSION_DESIGN.md` for full implementation details.
+
+---
+
+## 11. Known Limitations
+
+### Current Constraints
+
+1. **No GraphQL Compatibility** - Inspired by GraphQL, not compatible with it
+2. **TypeScript Required** - No JavaScript-only support planned
+3. **No Built-in Auth** - Bring your own authentication
+4. **Single-Threaded State** - GraphStateManager not horizontally scalable without external storage
+
+### Planned Improvements
+
+1. **Horizontal Scaling** - Redis/external storage for multi-instance deployments
+2. **Offline Support** - Client-side persistence and sync
+3. **CRDT Integration** - Conflict-free replicated data types for collaborative editing
+4. **Visual Dev Tools** - Browser extension for debugging subscriptions
+
+---
+
+*Last updated: 2024-12-18*

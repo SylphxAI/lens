@@ -17,6 +17,7 @@ bun test
 ## Structure
 
 - `src/server.ts` - Server with router definition
+- `src/index.ts` - Interactive demo (runs queries/mutations)
 - `src/index.test.ts` - Integration tests
 
 ---

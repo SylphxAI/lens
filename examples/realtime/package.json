@@ -1,0 +1,15 @@
+{
+  "name": "lens-realtime-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run main.ts"
+  },
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/lens-server": "workspace:*",
+    "@sylphx/lens-client": "workspace:*",
+    "zod": "^4.1.13"
+  }
+}
