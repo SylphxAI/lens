@@ -1250,8 +1250,8 @@ class LensServerImpl<
 			return new Response(null, { status: 204, headers: baseHeaders });
 		}
 
-		// Health check: GET /__lens/health
-		if (request.method === "GET" && pathname === "/__lens/health") {
+		// Health check: GET /__lens/health (supports base path mounting)
+		if (request.method === "GET" && pathname.endsWith("/__lens/health")) {
 			const metadata = this.getMetadata();
 			return new Response(
 				JSON.stringify({
@@ -1269,8 +1269,8 @@ class LensServerImpl<
 			);
 		}
 
-		// Metadata: GET /__lens/metadata
-		if (request.method === "GET" && pathname === "/__lens/metadata") {
+		// Metadata: GET /__lens/metadata (supports base path mounting)
+		if (request.method === "GET" && pathname.endsWith("/__lens/metadata")) {
 			return new Response(JSON.stringify(this.getMetadata()), {
 				headers: baseHeaders,
 			});
