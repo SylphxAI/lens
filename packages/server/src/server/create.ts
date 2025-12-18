@@ -1276,6 +1276,101 @@ class LensServerImpl<
 			});
 		}
 
+		// SSE: GET /{path}?_sse=1&input={...}
+		// Client uses EventSource which sends GET requests with path in URL
+		const isSseRequest =
+			url.searchParams.get("_sse") === "1" || request.headers.get("accept") === "text/event-stream";
+
+		if (request.method === "GET" && isSseRequest) {
+			// Extract path from URL (strip leading slash)
+			const path = pathname.replace(/^\//, "");
+
+			// Parse input from query params
+			const inputParam = url.searchParams.get("input");
+			let input: unknown;
+			if (inputParam) {
+				try {
+					input = JSON.parse(inputParam);
+				} catch {
+					// Return SSE error for malformed JSON
+					const encoder = new TextEncoder();
+					const errorStream = new ReadableStream({
+						start(controller) {
+							const data = `event: error\ndata: ${JSON.stringify({ error: "Invalid input JSON" })}\n\n`;
+							controller.enqueue(encoder.encode(data));
+							controller.close();
+						},
+					});
+					return new Response(errorStream, {
+						headers: {
+							"Content-Type": "text/event-stream",
+							"Cache-Control": "no-cache",
+							Connection: "keep-alive",
+						},
+					});
+				}
+			}
+
+			// Create SSE stream
+			const self = this;
+			const stream = new ReadableStream({
+				start(controller) {
+					const encoder = new TextEncoder();
+
+					try {
+						const result = self.execute({ path, input });
+
+						if (result && typeof result === "object" && "subscribe" in result) {
+							const observable = result as {
+								subscribe: (handlers: {
+									next: (value: unknown) => void;
+									error: (err: Error) => void;
+									complete: () => void;
+								}) => { unsubscribe: () => void };
+							};
+
+							const subscription = observable.subscribe({
+								next: (value) => {
+									// Send full LensResult envelope
+									const data = `data: ${JSON.stringify(value)}\n\n`;
+									controller.enqueue(encoder.encode(data));
+								},
+								error: (err) => {
+									const data = `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`;
+									controller.enqueue(encoder.encode(data));
+									controller.close();
+								},
+								complete: () => {
+									controller.close();
+								},
+							});
+
+							// Clean up on abort
+							if (request.signal) {
+								request.signal.addEventListener("abort", () => {
+									subscription.unsubscribe();
+									controller.close();
+								});
+							}
+						}
+					} catch (execError) {
+						const errMsg = execError instanceof Error ? execError.message : "Internal error";
+						const data = `event: error\ndata: ${JSON.stringify({ error: errMsg })}\n\n`;
+						controller.enqueue(encoder.encode(data));
+						controller.close();
+					}
+				},
+			});
+
+			return new Response(stream, {
+				headers: {
+					"Content-Type": "text/event-stream",
+					"Cache-Control": "no-cache",
+					Connection: "keep-alive",
+				},
+			});
+		}
+
 		// Operations: POST to any path (client sends path in body)
 		if (request.method === "POST") {
 			let body: { path?: string; input?: unknown };
