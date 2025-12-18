@@ -1,5 +1,11 @@
 releases:
-  - name: "fix(server): return full Result envelope with $ marker"
+  - name: "refactor(server): remove deprecated createFrameworkHandler API"
     packages:
       - name: "@sylphx/lens-server"
-        bump: patch
+        bump: minor
+      - name: "@sylphx/lens-next"
+        bump: minor
+      - name: "@sylphx/lens-fresh"
+        bump: minor
+      - name: "@sylphx/lens-solidstart"
+        bump: minor
