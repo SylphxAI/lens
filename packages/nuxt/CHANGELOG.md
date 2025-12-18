@@ -1,5 +1,11 @@
 # @sylphx/lens-nuxt
 
+## 2.3.4 (2025-12-18)
+
+### 📦 Dependencies
+
+- Updated `@sylphx/lens-server` to 4.1.3
+
 ## 2.3.3 (2025-12-17)
 
 ### 📦 Dependencies

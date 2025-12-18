@@ -1,5 +1,11 @@
 # @sylphx/lens-next
 
+## 2.4.4 (2025-12-18)
+
+### ♻️ Refactoring
+
+- **server:** remove deprecated createFrameworkHandler API ([5904fbc](https://github.com/SylphxAI/lens/commit/5904fbc8fbd9c7f10f864889c99f93f21694e58b))
+
 ## 2.4.3 (2025-12-17)
 
 ### 📦 Dependencies
