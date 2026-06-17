@@ -1,4 +1,4 @@
 {
-  "buildDir": "website",
-  "framework": "static"
+	"buildDir": "website",
+	"framework": "static"
 }
