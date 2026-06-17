@@ -203,6 +203,45 @@ export const patchStrategy: UpdateStrategy<object> = {
 	},
 };
 
+/**
+ * Compute a *shallow* JSON Patch between two state records — top-level keys
+ * only, comparing values by `JSON.stringify`. Unlike the recursive
+ * {@link computeJsonPatch} (deep, JSON-pointer-escaped, used by the patch
+ * transfer strategy), this produces one `add`/`replace`/`remove` op per
+ * changed top-level key with unescaped `/key` paths.
+ *
+ * This is the canonical home for the snapshot-diff helper that the storage
+ * adapters (`@sylphx/lens-storage-*`) previously each redefined identically;
+ * it pairs with the public {@link applyPatch}.
+ */
+export function computeShallowPatch(
+	oldState: Record<string, unknown>,
+	newState: Record<string, unknown>,
+): PatchOperation[] {
+	const patch: PatchOperation[] = [];
+	const oldKeys = new Set(Object.keys(oldState));
+	const newKeys = new Set(Object.keys(newState));
+
+	for (const key of newKeys) {
+		const oldValue = oldState[key];
+		const newValue = newState[key];
+
+		if (!oldKeys.has(key)) {
+			patch.push({ op: "add", path: `/${key}`, value: newValue });
+		} else if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+			patch.push({ op: "replace", path: `/${key}`, value: newValue });
+		}
+	}
+
+	for (const key of oldKeys) {
+		if (!newKeys.has(key)) {
+			patch.push({ op: "remove", path: `/${key}` });
+		}
+	}
+
+	return patch;
+}
+
 /** Compute JSON Patch operations */
 function computeJsonPatch(prev: object, next: object, basePath = ""): PatchOperation[] {
 	const operations: PatchOperation[] = [];

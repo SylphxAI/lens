@@ -28,7 +28,7 @@
  * ```
  */
 
-import type { PatchOperation } from "@sylphx/lens-core";
+import { computeShallowPatch, type PatchOperation } from "@sylphx/lens-core";
 import {
 	DEFAULT_STORAGE_CONFIG,
 	type EmitResult,
@@ -87,37 +87,6 @@ interface StoredData {
 	version: number;
 	updatedAt: number;
 	patches: StoredPatchEntry[];
-}
-
-/**
- * Compute JSON Patch operations between two states.
- */
-function computePatch(
-	oldState: Record<string, unknown>,
-	newState: Record<string, unknown>,
-): PatchOperation[] {
-	const patch: PatchOperation[] = [];
-	const oldKeys = new Set(Object.keys(oldState));
-	const newKeys = new Set(Object.keys(newState));
-
-	for (const key of newKeys) {
-		const oldValue = oldState[key];
-		const newValue = newState[key];
-
-		if (!oldKeys.has(key)) {
-			patch.push({ op: "add", path: `/${key}`, value: newValue });
-		} else if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
-			patch.push({ op: "replace", path: `/${key}`, value: newValue });
-		}
-	}
-
-	for (const key of oldKeys) {
-		if (!newKeys.has(key)) {
-			patch.push({ op: "remove", path: `/${key}` });
-		}
-	}
-
-	return patch;
 }
 
 /**
@@ -227,7 +196,7 @@ export function redisStorage(options: RedisStorageOptions): OpLogStorage {
 			};
 		}
 
-		const patch = computePatch(existing.data, data);
+		const patch = computeShallowPatch(existing.data, data);
 		const newVersion = expectedVersion + 1;
 
 		let patches = [...existing.patches];
