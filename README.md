@@ -1636,7 +1636,6 @@ MIT © Sylphx AI
 
 - [@sylphx/biome-config](https://github.com/SylphxAI/configs) - Shared Biome configuration
 - [@sylphx/tsconfig](https://github.com/SylphxAI/configs) - Shared TypeScript configuration
-- [@sylphx/doctor](https://github.com/SylphxAI/doctor) - Project health checker
 - [@sylphx/bump](https://github.com/SylphxAI/bump) - Version management
 - [@sylphx/reify](https://github.com/SylphxAI/reify) - Declarative entity operations
 - [@sylphx/standard-entity](https://github.com/SylphxAI/standard-entity) - Standard entity definitions
