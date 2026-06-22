@@ -4,7 +4,8 @@
 
 This file is the repo-local operating policy for agents working in
 `SylphxAI/lens`. Org-wide engineering doctrine is owned by `SylphxAI/doctrine`;
-this file only specializes that SSOT for the Lens API-framework boundary.
+`PROJECT.md` and `.doctrine/project.json` own this repository's local identity,
+lifecycle, boundary, package-release posture, and delivery facts.
 
 Lens is a TypeScript-first, real-time API framework where type-safe operations,
 models, resolvers, transports, client bindings, storage adapters, and examples
@@ -16,18 +17,20 @@ forcing product-specific or hosted-service assumptions into the core packages.
 Before proposing or implementing changes, read the smallest relevant set of
 these source-of-truth documents:
 
-1. `README.md` — public API shape, mental model, resolver patterns, and package
+1. `PROJECT.md` and `.doctrine/project.json` — project goal, lifecycle,
+   boundaries, public surfaces, delivery proof, and adoption gaps.
+2. `README.md` — public API shape, mental model, resolver patterns, and package
    overview.
-2. `PRODUCT.md` — product vision, target users, differentiators, success metrics,
+3. `PRODUCT.md` — product vision, target users, differentiators, success metrics,
    and feature status.
-3. `ARCHITECTURE.md` — SSOT architecture, pure executor model, adapter pattern,
+4. `ARCHITECTURE.md` — SSOT architecture, pure executor model, adapter pattern,
    storage, transport, and package boundaries.
-4. Relevant ADRs under `docs/adr/`, especially:
+5. Relevant ADRs under `docs/adr/`, especially:
    - `docs/adr/001-unified-entity-definition.md`
    - `docs/adr/002-two-phase-field-resolution.md`
    - `docs/adr/003-resolver-subscription-design.md`
-5. `docs/implementation-plan.md` before model/entity/resolver API work.
-6. The touched package README under `packages/*/README.md` and any affected
+6. `docs/implementation-plan.md` before model/entity/resolver API work.
+7. The touched package README under `packages/*/README.md` and any affected
    examples before changing public API, client bindings, storage adapters, or
    docs.
 
