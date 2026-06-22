@@ -1,154 +1,146 @@
 {
-  "schemaVersion": 1,
-  "project": {
-    "repo": "SylphxAI/lens",
-    "name": "Lens",
-    "lifecycle": "production",
-    "layer": "foundation",
-    "summary": "Lens is a TypeScript-first real-time API framework with automatic live queries, minimal diff updates, transport adapters, storage adapters, and framework bindings.",
-    "goals": [
-      "Own the Lens server executor, client transports, framework bindings, storage adapters, examples, docs, and npm package release path.",
-      "Keep every-query-is-live semantics, minimal diff updates, type-safe field selection, and multi-server routing coherent across packages.",
-      "Keep TypeScript as the schema source of truth without required SDL or code generation."
-    ],
-    "nonGoals": [
-      "Own product applications' domain models, databases, auth policies, or deployment paths.",
-      "Introduce GraphQL SDL/codegen as a required public source of truth without a new ADR.",
-      "Put customer-specific or hosted-service assumptions into core framework packages."
-    ]
-  },
-  "boundaries": {
-    "owns": [
-      {
-        "name": "real-time-api-framework",
-        "description": "Core query, mutation, live-query, resolver, diffing, transport, storage, and framework-binding packages."
-      },
-      {
-        "name": "lens-package-release",
-        "description": "Build, test, lint, and npm release workflow for the Lens package family."
-      }
-    ],
-    "doesNotOwn": [
-      "Downstream product apps' domain models, databases, auth policies, deployment paths, or customer-specific behavior.",
-      "External hosted realtime providers except through documented adapter packages.",
-      "Enterprise doctrine or organization-wide rulesets."
-    ],
-    "publicSurfaces": [
-      {
-        "type": "package-export",
-        "name": "Lens npm package family",
-        "location": "packages/*/package.json"
-      },
-      {
-        "type": "documentation",
-        "name": "Product and architecture docs",
-        "location": "README.md, PRODUCT.md, ARCHITECTURE.md"
-      },
-      {
-        "type": "documentation",
-        "name": "Lens ADRs",
-        "location": "docs/adr/"
-      },
-      {
-        "type": "workflow",
-        "name": "CI and release workflows",
-        "location": ".github/workflows/"
-      },
-      {
-        "type": "status-context",
-        "name": "Required branch contexts",
-        "location": "Build & Test, Lint"
-      }
-    ],
-    "allowedDependencies": [
-      {
-        "repo": "SylphxAI/doctrine",
-        "surface": "enterprise engineering doctrine",
-        "direction": "downward"
-      },
-      {
-        "repo": "SylphxAI/.github",
-        "surface": "reusable release workflow",
-        "direction": "downward"
-      },
-      {
-        "repo": "SylphxAI/reify",
-        "surface": "public package dependency for optimistic/declarative entity operations",
-        "direction": "peer-public"
-      },
-      {
-        "repo": "SylphxAI/standard-entity",
-        "surface": "public package dependency for standard entity definitions",
-        "direction": "peer-public"
-      }
-    ],
-    "forbiddenCouplings": [
-      "Do not add product-specific backend assumptions to Lens core, server, transport, storage, or framework packages.",
-      "Do not require SDL/codegen as a parallel source of truth for public Lens APIs.",
-      "Do not publish package changes without CI, release workflow evidence, and npm registry readback."
-    ]
-  },
-  "documentation": {
-    "adr": {
-      "path": "docs/adr/",
-      "status": "present"
-    },
-    "specs": {
-      "path": "PRODUCT.md, ARCHITECTURE.md",
-      "status": "present"
-    },
-    "catalog": {
-      "path": "PROJECT.md",
-      "status": "present"
-    },
-    "runbooks": {
-      "path": "AGENTS.md",
-      "status": "present"
-    },
-    "generatedReferences": {
-      "path": "packages/*/dist/",
-      "status": "generated"
-    }
-  },
-  "delivery": {
-    "ciModel": "legacy-ci",
-    "requiredContexts": [
-      "Build & Test",
-      "Lint"
-    ],
-    "deployPath": "Main push runs the central reusable release workflow to publish changed Lens npm packages.",
-    "productionProof": "Build & Test, Lint, release workflow completion, generated changelog/version evidence, and npm package readback for changed packages.",
-    "recoveryClass": "forward-fix-only",
-    "packageRelease": {
-      "publishesPackages": true,
-      "ecosystems": [
-        "npm"
-      ],
-      "releaseIntent": "Package changes are released from main by the central reusable release workflow; formal Changesets adoption is not yet declared in this repo.",
-      "versionPr": "Version/changelog ownership is delegated to the reusable release workflow at adoption time.",
-      "publisher": "SylphxAI/.github reusable release workflow with inherited repository secrets.",
-      "requiredContexts": [
-        "Build & Test",
-        "Lint"
-      ],
-      "publishProof": "npm package readback for each changed @sylphx/lens* package."
-    }
-  },
-  "adoption": {
-    "status": "baseline",
-    "gaps": [
-      {
-        "id": "central-admission",
-        "description": "CI uses repo-local legacy Build & Test and Lint contexts rather than ADR-29 stable fan-in contexts.",
-        "owner": "SylphxAI/lens",
-        "target": "before full doctrine adoption"
-      },
-      {
-        "id": "changesets-release-intent",
-        "description": "Package release workflow does not expose repo-local Changesets release intent at adoption time.",
-        "owner": "SylphxAI/lens",
-        "target": "before claiming full package-release adoption"
-      }
-    ]
-  }
+	"schemaVersion": 1,
+	"project": {
+		"repo": "SylphxAI/lens",
+		"name": "Lens",
+		"lifecycle": "production",
+		"layer": "foundation",
+		"summary": "Lens is a TypeScript-first real-time API framework with automatic live queries, minimal diff updates, transport adapters, storage adapters, and framework bindings.",
+		"goals": [
+			"Own the Lens server executor, client transports, framework bindings, storage adapters, examples, docs, and npm package release path.",
+			"Keep every-query-is-live semantics, minimal diff updates, type-safe field selection, and multi-server routing coherent across packages.",
+			"Keep TypeScript as the schema source of truth without required SDL or code generation."
+		],
+		"nonGoals": [
+			"Own product applications' domain models, databases, auth policies, or deployment paths.",
+			"Introduce GraphQL SDL/codegen as a required public source of truth without a new ADR.",
+			"Put customer-specific or hosted-service assumptions into core framework packages."
+		]
+	},
+	"boundaries": {
+		"owns": [
+			{
+				"name": "real-time-api-framework",
+				"description": "Core query, mutation, live-query, resolver, diffing, transport, storage, and framework-binding packages."
+			},
+			{
+				"name": "lens-package-release",
+				"description": "Build, test, lint, and npm release workflow for the Lens package family."
+			}
+		],
+		"doesNotOwn": [
+			"Downstream product apps' domain models, databases, auth policies, deployment paths, or customer-specific behavior.",
+			"External hosted realtime providers except through documented adapter packages.",
+			"Enterprise doctrine or organization-wide rulesets."
+		],
+		"publicSurfaces": [
+			{
+				"type": "package-export",
+				"name": "Lens npm package family",
+				"location": "packages/*/package.json"
+			},
+			{
+				"type": "documentation",
+				"name": "Product and architecture docs",
+				"location": "README.md, PRODUCT.md, ARCHITECTURE.md"
+			},
+			{
+				"type": "documentation",
+				"name": "Lens ADRs",
+				"location": "docs/adr/"
+			},
+			{
+				"type": "workflow",
+				"name": "CI and release workflows",
+				"location": ".github/workflows/"
+			},
+			{
+				"type": "status-context",
+				"name": "Required branch contexts",
+				"location": "Build & Test, Lint"
+			}
+		],
+		"allowedDependencies": [
+			{
+				"repo": "SylphxAI/doctrine",
+				"surface": "enterprise engineering doctrine",
+				"direction": "downward"
+			},
+			{
+				"repo": "SylphxAI/.github",
+				"surface": "reusable release workflow",
+				"direction": "downward"
+			},
+			{
+				"repo": "SylphxAI/reify",
+				"surface": "public package dependency for optimistic/declarative entity operations",
+				"direction": "peer-public"
+			},
+			{
+				"repo": "SylphxAI/standard-entity",
+				"surface": "public package dependency for standard entity definitions",
+				"direction": "peer-public"
+			}
+		],
+		"forbiddenCouplings": [
+			"Do not add product-specific backend assumptions to Lens core, server, transport, storage, or framework packages.",
+			"Do not require SDL/codegen as a parallel source of truth for public Lens APIs.",
+			"Do not publish package changes without CI, release workflow evidence, and npm registry readback."
+		]
+	},
+	"documentation": {
+		"adr": {
+			"path": "docs/adr/",
+			"status": "present"
+		},
+		"specs": {
+			"path": "PRODUCT.md, ARCHITECTURE.md",
+			"status": "present"
+		},
+		"catalog": {
+			"path": "PROJECT.md",
+			"status": "present"
+		},
+		"runbooks": {
+			"path": "AGENTS.md",
+			"status": "present"
+		},
+		"generatedReferences": {
+			"path": "packages/*/dist/",
+			"status": "generated"
+		}
+	},
+	"delivery": {
+		"ciModel": "legacy-ci",
+		"requiredContexts": ["Build & Test", "Lint"],
+		"deployPath": "Main push runs the central reusable release workflow to publish changed Lens npm packages.",
+		"productionProof": "Build & Test, Lint, release workflow completion, generated changelog/version evidence, and npm package readback for changed packages.",
+		"recoveryClass": "forward-fix-only",
+		"packageRelease": {
+			"publishesPackages": true,
+			"ecosystems": ["npm"],
+			"releaseIntent": "Package changes are released from main by the central reusable release workflow; formal Changesets adoption is not yet declared in this repo.",
+			"versionPr": "Version/changelog ownership is delegated to the reusable release workflow at adoption time.",
+			"publisher": "SylphxAI/.github reusable release workflow with inherited repository secrets.",
+			"requiredContexts": ["Build & Test", "Lint"],
+			"publishProof": "npm package readback for each changed @sylphx/lens* package."
+		}
+	},
+	"adoption": {
+		"status": "baseline",
+		"gaps": [
+			{
+				"id": "central-admission",
+				"description": "CI uses repo-local legacy Build & Test and Lint contexts rather than ADR-29 stable fan-in contexts.",
+				"owner": "SylphxAI/lens",
+				"target": "before full doctrine adoption"
+			},
+			{
+				"id": "changesets-release-intent",
+				"description": "Package release workflow does not expose repo-local Changesets release intent at adoption time.",
+				"owner": "SylphxAI/lens",
+				"target": "before claiming full package-release adoption"
+			}
+		]
+	}
 }
