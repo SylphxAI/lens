@@ -199,6 +199,7 @@ export {
 	applyArrayDiff,
 	applyUpdate,
 	computeArrayDiff,
+	computeShallowPatch,
 	createArrayUpdate,
 	createUpdate,
 	type DeltaOperation,
