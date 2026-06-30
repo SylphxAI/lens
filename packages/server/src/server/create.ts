@@ -20,7 +20,6 @@ import {
 	collectModelsFromOperations,
 	collectModelsFromRouter,
 	createEmit,
-	createResolverFromEntity,
 	type Emit,
 	type EmitCommand,
 	firstValueFrom,
@@ -39,7 +38,6 @@ import {
 	type ModelDef,
 	mergeModelCollections,
 	type Observable,
-	type ResolverDef,
 	type RouterDef,
 	type SubscriptionDef,
 	toOps,
@@ -47,7 +45,14 @@ import {
 } from "@sylphx/lens-core";
 import { createContext, runWithContext } from "../context/index.js";
 import { createPluginManager, type PluginManager } from "../plugin/types.js";
-import { DataLoader } from "./dataloader.js";
+import { prefixCommandPath } from "./create/command-path.js";
+import { getOrCreateLoaderForField } from "./create/field-loader.js";
+import { isAsyncIterable } from "./create/guards.js";
+import type { ResolverMap } from "./create/internal-types.js";
+import { getReturnTypeName, setNested } from "./create/operations-map.js";
+import { buildResolverMap } from "./create/resolver-map.js";
+import { getEntityMatchScore } from "./create/type-matching.js";
+import type { DataLoader } from "./dataloader.js";
 import { applySelection, extractNestedInputs } from "./selection.js";
 import type {
 	EntitiesMap,
@@ -96,21 +101,10 @@ export type {
 } from "./types.js";
 
 // =============================================================================
-// Helper Functions
-// =============================================================================
-
-function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
-	return value != null && typeof value === "object" && Symbol.asyncIterator in value;
-}
-
-// =============================================================================
 // Server Implementation
 // =============================================================================
 
 const noopLogger: LensLogger = {};
-
-/** Resolver map type for internal use */
-type ResolverMap = Map<string, ResolverDef<any, any, any>>;
 
 class LensServerImpl<
 	Q extends QueriesMap = QueriesMap,
@@ -187,7 +181,7 @@ class LensServerImpl<
 
 		// Build resolver map: explicit resolvers + auto-generated exposed-only resolvers
 		// Models without explicit resolvers get auto-generated exposed-only resolvers
-		this.resolverMap = this.buildResolverMap(config.resolvers, entities);
+		this.resolverMap = buildResolverMap(config.resolvers, entities);
 		this.contextFactory = config.context ?? (() => ({}) as TContext);
 		this.version = config.version ?? "1.0.0";
 		this.logger = config.logger ?? noopLogger;
@@ -242,43 +236,6 @@ class LensServerImpl<
 				throw new Error(`Invalid subscription definition: ${name}`);
 			}
 		}
-	}
-
-	/**
-	 * Build resolver map from explicit resolvers.
-	 *
-	 * Models without explicit resolvers get auto-generated exposed-only resolvers.
-	 * Use standalone resolver(Model, ...) for custom field resolution.
-	 *
-	 * Priority: explicit resolvers > auto-generated exposed-only resolvers
-	 */
-	private buildResolverMap(
-		explicitResolvers: import("@sylphx/lens-core").Resolvers | undefined,
-		entities: EntitiesMap,
-	): ResolverMap | undefined {
-		const resolverMap: ResolverMap = new Map();
-
-		// 1. Add explicit resolvers first (takes priority)
-		if (explicitResolvers) {
-			for (const resolver of explicitResolvers) {
-				const entityName = resolver.entity._name;
-				if (entityName) {
-					resolverMap.set(entityName, resolver);
-				}
-			}
-		}
-
-		// 2. Auto-create exposed-only resolvers for models without explicit resolvers
-		for (const [name, entity] of Object.entries(entities)) {
-			if (!isModelDef(entity)) continue;
-			if (resolverMap.has(name)) continue; // Explicit resolver takes priority
-
-			// Create exposed-only resolver for this model
-			const resolver = createResolverFromEntity(entity);
-			resolverMap.set(name, resolver);
-		}
-
-		return resolverMap.size > 0 ? resolverMap : undefined;
 	}
 
 	// =========================================================================
@@ -766,52 +723,12 @@ class LensServerImpl<
 			// STATELESS: Forward command with field path prefix to client
 			const emitHandler = (command: EmitCommand) => {
 				// Transform command to include field path
-				const prefixedCommand = this.prefixCommandPath(command, fieldPath);
+				const prefixedCommand = prefixCommandPath(command, fieldPath);
 				sendUpdate(prefixedCommand);
 			};
 
 			return createEmit<unknown>(emitHandler, outputType);
 		};
-	}
-
-	/**
-	 * Prefix a command's field path for nested field emits.
-	 */
-	private prefixCommandPath(command: EmitCommand, prefix: string): EmitCommand {
-		switch (command.type) {
-			case "full":
-				// Full replacement at field path
-				return {
-					type: "field",
-					field: prefix,
-					update: { strategy: "value", data: command.data },
-				};
-			case "field":
-				// Nested field path
-				return {
-					type: "field",
-					field: command.field ? `${prefix}.${command.field}` : prefix,
-					update: command.update,
-				};
-			case "batch":
-				// Prefix all fields in batch
-				return {
-					type: "batch",
-					updates: command.updates.map((u) => ({
-						field: `${prefix}.${u.field}`,
-						update: u.update,
-					})),
-				};
-			case "array":
-				// Array operations at field path - preserve as array command with field
-				return {
-					type: "array",
-					operation: command.operation,
-					field: prefix,
-				};
-			default:
-				return command;
-		}
 	}
 
 	private async processQueryResult<T>(
@@ -939,7 +856,7 @@ class LensServerImpl<
 					} else {
 						// Use DataLoader for batching
 						const loaderKey = `${typeName}.${field}`;
-						const loader = this.getOrCreateLoaderForField(
+						const loader = getOrCreateLoaderForField(
 							loaderKey,
 							resolverDef,
 							field,
@@ -990,7 +907,7 @@ class LensServerImpl<
 					} else {
 						// Use DataLoader for batching
 						const loaderKey = `${typeName}.${field}`;
-						const loader = this.getOrCreateLoaderForField(
+						const loader = getOrCreateLoaderForField(
 							loaderKey,
 							resolverDef,
 							field,
@@ -1052,7 +969,7 @@ class LensServerImpl<
 		for (const [name, def] of Object.entries(this.entities)) {
 			if (!isModelDef(def)) continue;
 
-			const score = this.getEntityMatchScore(obj, def);
+			const score = getEntityMatchScore(obj, def);
 			// Require at least 50% field match to avoid false positives
 			if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
 				bestMatch = { name, score };
@@ -1065,92 +982,12 @@ class LensServerImpl<
 		return result;
 	}
 
-	/**
-	 * Calculate how well an object matches an entity definition.
-	 *
-	 * @returns Score between 0 and 1 (1 = perfect match, all entity fields present)
-	 */
-	private getEntityMatchScore(
-		obj: Record<string, unknown>,
-		entityDef: ModelDef<string, any>,
-	): number {
-		const fieldNames = Object.keys(entityDef.fields);
-		if (fieldNames.length === 0) return 0;
-
-		const matchingFields = fieldNames.filter((field) => field in obj);
-		return matchingFields.length / fieldNames.length;
-	}
-
-	private getOrCreateLoaderForField(
-		loaderKey: string,
-		resolverDef: ResolverDef<any, any, any>,
-		fieldName: string,
-		context: TContext,
-		loaders: Map<string, DataLoader<unknown, unknown>>,
-	): DataLoader<unknown, unknown> {
-		let loader = loaders.get(loaderKey);
-		if (!loader) {
-			// Create loader with current request's context
-			// Using request-scoped loaders map ensures context isolation between concurrent requests
-			loader = new DataLoader(async (parents: unknown[]) => {
-				const results: unknown[] = [];
-				for (const parent of parents) {
-					try {
-						const result = await resolverDef.resolveField(
-							fieldName,
-							parent as Record<string, unknown>,
-							{},
-							context,
-						);
-						results.push(result);
-					} catch {
-						results.push(null);
-					}
-				}
-				return results;
-			});
-			loaders.set(loaderKey, loader);
-		}
-		return loader;
-	}
-
 	// =========================================================================
 	// Operations Map
 	// =========================================================================
 
 	private buildOperationsMap(): OperationsMap {
 		const result: OperationsMap = {};
-
-		const setNested = (path: string, meta: OperationMeta) => {
-			const parts = path.split(".");
-			let current: OperationsMap = result;
-
-			for (let i = 0; i < parts.length - 1; i++) {
-				const part = parts[i];
-				if (!current[part] || "type" in current[part]) {
-					current[part] = {};
-				}
-				current = current[part] as OperationsMap;
-			}
-			current[parts[parts.length - 1]] = meta;
-		};
-
-		// Helper to extract return type name from output definition
-		const getReturnTypeName = (output: unknown): string | undefined => {
-			if (!output) return undefined;
-			// Handle array output: [EntityDef] → extract from first element
-			if (Array.isArray(output) && output.length > 0) {
-				const element = output[0];
-				if (element && typeof element === "object" && "_name" in element) {
-					return element._name as string;
-				}
-			}
-			// Handle direct entity output
-			if (typeof output === "object" && "_name" in output) {
-				return (output as { _name?: string })._name;
-			}
-			return undefined;
-		};
 
 		for (const [name, def] of Object.entries(this.queries)) {
 			// Auto-detect live query types:
@@ -1179,7 +1016,7 @@ class LensServerImpl<
 				meta: meta as unknown as Record<string, unknown>,
 				definition: def,
 			});
-			setNested(name, meta);
+			setNested(result, name, meta);
 		}
 
 		for (const [name, def] of Object.entries(this.mutations)) {
@@ -1194,7 +1031,7 @@ class LensServerImpl<
 				meta: meta as unknown as Record<string, unknown>,
 				definition: def,
 			});
-			setNested(name, meta);
+			setNested(result, name, meta);
 		}
 
 		for (const [name, def] of Object.entries(this.subscriptions)) {
@@ -1209,7 +1046,7 @@ class LensServerImpl<
 				meta: meta as unknown as Record<string, unknown>,
 				definition: def,
 			});
-			setNested(name, meta);
+			setNested(result, name, meta);
 		}
 
 		return result;
