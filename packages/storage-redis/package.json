@@ -1,44 +1,47 @@
 {
-	"name": "@sylphx/lens-storage-redis",
-	"version": "1.2.6",
-	"description": "Redis storage adapter for Lens opLog plugin (ioredis)",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "echo 'no tests yet'",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"storage",
-		"redis",
-		"ioredis",
-		"oplog"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/lens-server": "workspace:*"
-	},
-	"peerDependencies": {
-		"ioredis": ">=5.0.0"
-	},
-	"devDependencies": {
-		"ioredis": "^5.6.1",
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens-storage-redis",
+  "version": "1.2.6",
+  "description": "Redis storage adapter for Lens opLog plugin (ioredis)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet'",
+    "prepack": "[ -d dist ] || bun run build",
+    "lint:fix": "biome check --write ."
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "storage",
+    "redis",
+    "ioredis",
+    "oplog"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/lens-server": "workspace:*"
+  },
+  "peerDependencies": {
+    "ioredis": ">=5.0.0"
+  },
+  "devDependencies": {
+    "ioredis": "^5.6.1",
+    "typescript": "^7.0.2",
+    "@biomejs/biome": "^2.3.12",
+    "@sylphx/biome-config": "^0.4.1"
+  }
 }

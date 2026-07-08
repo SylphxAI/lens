@@ -1,20 +1,23 @@
 {
-	"extends": "@sylphx/tsconfig",
-	"compilerOptions": {
-		"allowImportingTsExtensions": true,
-		"forceConsistentCasingInFileNames": true,
-		"sourceMap": true,
-		"composite": false,
-		"noUncheckedIndexedAccess": false,
-		"noPropertyAccessFromIndexSignature": false,
-		"jsx": "react-jsx"
-	},
-	"exclude": [
-		"examples",
-		"**/*.test.ts",
-		"**/*.test.tsx",
-		"packages/preact",
-		"packages/solid",
-		"packages/solidstart"
-	]
+  "extends": "@sylphx/tsconfig",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "composite": false,
+    "noUncheckedIndexedAccess": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "jsx": "react-jsx",
+    "types": [
+      "bun"
+    ]
+  },
+  "exclude": [
+    "examples",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "packages/preact",
+    "packages/solid",
+    "packages/solidstart"
+  ]
 }

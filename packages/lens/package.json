@@ -1,52 +1,55 @@
 {
-	"name": "@sylphx/lens",
-	"version": "3.1.7",
-	"description": "Type-safe, real-time API framework - GraphQL concepts in TypeScript with zero codegen",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		},
-		"./client": {
-			"import": "./dist/client.js",
-			"types": "./dist/client.d.ts"
-		},
-		"./server": {
-			"import": "./dist/server.js",
-			"types": "./dist/server.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bunup",
-		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"api",
-		"graphql",
-		"trpc",
-		"typescript",
-		"type-safe",
-		"real-time",
-		"reactive"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/lens-client": "workspace:*",
-		"@sylphx/lens-server": "workspace:*"
-	},
-	"devDependencies": {
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens",
+  "version": "3.1.7",
+  "description": "Type-safe, real-time API framework - GraphQL concepts in TypeScript with zero codegen",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bunup",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "[ -d dist ] || bun run build",
+    "lint:fix": "biome check --write ."
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "api",
+    "graphql",
+    "trpc",
+    "typescript",
+    "type-safe",
+    "real-time",
+    "reactive"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/lens-client": "workspace:*",
+    "@sylphx/lens-server": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "@biomejs/biome": "^2.3.12",
+    "@sylphx/biome-config": "^0.4.1"
+  }
 }

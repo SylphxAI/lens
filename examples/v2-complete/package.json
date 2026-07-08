@@ -1,21 +1,21 @@
 {
-	"name": "lens-v2-example",
-	"version": "1.0.3",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "bun run server.ts",
-		"client": "bun run client.ts",
-		"test": "bun test"
-	},
-	"dependencies": {
-		"@sylphx/lens-core": "workspace:*",
-		"@sylphx/lens-server": "workspace:*",
-		"@sylphx/lens-client": "workspace:*",
-		"@sylphx/reify": "^0.1.2",
-		"zod": "^4.1.13"
-	},
-	"devDependencies": {
-		"typescript": "^5.9.3"
-	}
+  "name": "lens-v2-example",
+  "version": "1.0.3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run server.ts",
+    "client": "bun run client.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@sylphx/lens-core": "workspace:*",
+    "@sylphx/lens-server": "workspace:*",
+    "@sylphx/lens-client": "workspace:*",
+    "@sylphx/reify": "^0.1.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
 }

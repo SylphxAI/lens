@@ -1,45 +1,48 @@
 {
-	"name": "@sylphx/lens-solid",
-	"version": "2.4.7",
-	"description": "SolidJS bindings for Lens API framework",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.js",
-			"types": "./dist/index.d.ts"
-		}
-	},
-	"scripts": {
-		"build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js && bunx tsc --emitDeclarationOnly --declaration --outDir ./dist",
-		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"prepack": "[ -d dist ] || bun run build"
-	},
-	"files": [
-		"dist",
-		"src"
-	],
-	"keywords": [
-		"lens",
-		"solid",
-		"solidjs",
-		"reactive",
-		"signals"
-	],
-	"author": "SylphxAI",
-	"license": "MIT",
-	"dependencies": {
-		"@sylphx/lens-client": "workspace:*",
-		"@sylphx/lens-core": "workspace:*"
-	},
-	"peerDependencies": {
-		"solid-js": ">=1.8.0"
-	},
-	"devDependencies": {
-		"@solidjs/testing-library": "^0.8.10",
-		"solid-js": "^1.9.5",
-		"typescript": "^5.9.3"
-	}
+  "name": "@sylphx/lens-solid",
+  "version": "2.4.7",
+  "description": "SolidJS bindings for Lens API framework",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target browser --external solid-js && bunx tsc --emitDeclarationOnly --declaration --outDir ./dist",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "prepack": "[ -d dist ] || bun run build",
+    "lint:fix": "biome check --write ."
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "keywords": [
+    "lens",
+    "solid",
+    "solidjs",
+    "reactive",
+    "signals"
+  ],
+  "author": "SylphxAI",
+  "license": "MIT",
+  "dependencies": {
+    "@sylphx/lens-client": "workspace:*",
+    "@sylphx/lens-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": ">=1.8.0"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
+    "solid-js": "^1.9.5",
+    "typescript": "^7.0.2",
+    "@biomejs/biome": "^2.3.12",
+    "@sylphx/biome-config": "^0.4.1"
+  }
 }
