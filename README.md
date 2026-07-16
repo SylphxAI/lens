@@ -2,6 +2,11 @@
 
 # 🔮 Lens
 
+<p align="center">
+  <img src="docs/banner.png" alt="lens banner" width="100%" />
+</p>
+
+
 > Type-safe, real-time API framework for TypeScript
 
 [![npm](https://img.shields.io/npm/v/@sylphx/lens-server)](https://www.npmjs.com/package/@sylphx/lens-server)
