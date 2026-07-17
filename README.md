@@ -3,9 +3,8 @@
 # 🔮 Lens
 
 <p align="center">
-  <img src="docs/banner.png" alt="lens banner" width="100%" />
+  <img src="https://mark.sylphx.com/api/v1/banner?type=wave&theme=tokyonight&text=lens&desc=Type-safe%2C+real-time+API+framework+for+TypeScript&height=200&animation=rise&credit=0" alt="lens — Sylphx Mark banner" width="100%" />
 </p>
-
 
 > Type-safe, real-time API framework for TypeScript
 
