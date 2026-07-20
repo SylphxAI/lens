@@ -241,7 +241,7 @@ export function vercelKVStorage(options: VercelKVStorageOptions): OpLogStorage {
 			// Version conflict
 			if (retryCount < cfg.maxRetries) {
 				const delay = Math.min(10 * 2 ** retryCount, 100);
-				await new Promise((resolve) => setTimeout(resolve, delay));
+				await new Promise((resolve) => globalThis.setTimeout(resolve, delay));
 				return emitWithRetry(entity, entityId, data, retryCount + 1);
 			}
 			return {
