@@ -1,50 +1,50 @@
 {
-  "name": "@sylphx/lens-nuxt",
-  "version": "2.3.7",
-  "description": "Nuxt 3 integration for Lens API framework",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "bunup",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "prepack": "[ -d dist ] || bun run build",
-    "lint:fix": "biome check --write ."
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "keywords": [
-    "lens",
-    "nuxt",
-    "vue",
-    "ssr"
-  ],
-  "author": "SylphxAI",
-  "license": "MIT",
-  "dependencies": {
-    "@sylphx/lens-client": "workspace:*",
-    "@sylphx/lens-core": "workspace:*",
-    "@sylphx/lens-server": "workspace:*",
-    "@sylphx/lens-vue": "workspace:*"
-  },
-  "peerDependencies": {
-    "nuxt": ">=3.0.0",
-    "vue": ">=3.0.0"
-  },
-  "devDependencies": {
-    "nuxt": "^3.17.4",
-    "typescript": "^7.0.2",
-    "vue": "^3.5.16",
-    "@biomejs/biome": "^2.3.12",
-    "@sylphx/biome-config": "^0.4.1"
-  }
+	"name": "@sylphx/lens-nuxt",
+	"version": "2.3.7",
+	"description": "Nuxt 3 integration for Lens API framework",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "bunup",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepack": "[ -d dist ] || bun run build",
+		"lint:fix": "biome check --write ."
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"keywords": [
+		"lens",
+		"nuxt",
+		"vue",
+		"ssr"
+	],
+	"author": "SylphxAI",
+	"license": "MIT",
+	"dependencies": {
+		"@sylphx/lens-client": "workspace:*",
+		"@sylphx/lens-core": "workspace:*",
+		"@sylphx/lens-server": "workspace:*",
+		"@sylphx/lens-vue": "workspace:*"
+	},
+	"peerDependencies": {
+		"nuxt": ">=3.0.0",
+		"vue": ">=3.0.0"
+	},
+	"devDependencies": {
+		"nuxt": "^3.17.4",
+		"typescript": "^7.0.2",
+		"vue": "^3.5.16",
+		"@biomejs/biome": "^2.3.12",
+		"@sylphx/biome-config": "^0.4.1"
+	}
 }
