@@ -256,7 +256,7 @@ export function upstashStorage(options: UpstashStorageOptions): OpLogStorage {
 			if (retryCount < cfg.maxRetries) {
 				// Retry with exponential backoff
 				const delay = Math.min(10 * 2 ** retryCount, 100);
-				await new Promise((resolve) => setTimeout(resolve, delay));
+				await new Promise((resolve) => globalThis.setTimeout(resolve, delay));
 				return emitWithRetry(entity, entityId, data, retryCount + 1);
 			}
 			// Max retries exceeded - return the current state
