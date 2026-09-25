@@ -1,3 +1,7 @@
+> **Archived — no longer maintained (2026-09-24).** This repository is read-only.
+> The published `@sylphx/*` packages stay installable but receive no updates
+> or security fixes, and are marked deprecated on npm. There is no replacement.
+
 <div align="center">
 
 # 🔮 Lens
